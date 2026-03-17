@@ -1,0 +1,68 @@
+cases:
+  # Positive triggers
+  - id: list_available_skills
+    prompt: "What skills are available in armory?"
+    fixtures: []
+    rubric:
+      - "Fetches the armory catalog from GitHub"
+      - "Displays a table of available skills with versions"
+    trigger_expected: true
+
+  - id: install_specific_skill
+    prompt: "Pull the code-refiner skill"
+    fixtures: []
+    rubric:
+      - "Identifies code-refiner in the catalog"
+      - "Fetches the skill via sparse checkout or API"
+      - "Copies to ~/.claude/skills/code-refiner/"
+    trigger_expected: true
+
+  - id: search_skills
+    prompt: "Search armory for anything related to testing"
+    fixtures: []
+    rubric:
+      - "Searches catalog names and descriptions for testing-related keywords"
+      - "Returns test-harness, qa-systematic, benchmark-runner as matches"
+    trigger_expected: true
+
+  - id: sync_installed
+    prompt: "Update all my installed skills to the latest versions"
+    fixtures: []
+    rubric:
+      - "Scans installed skills and compares against remote catalog"
+      - "Shows update plan before executing"
+    trigger_expected: true
+
+  - id: remove_skill
+    prompt: "Remove the code-refiner skill from my machine"
+    fixtures: []
+    rubric:
+      - "Checks if code-refiner is installed in ~/.claude/skills/"
+      - "Asks for confirmation before deleting"
+      - "Removes the skill directory"
+    trigger_expected: true
+
+  # Negative triggers
+  - id: neg_create_new_skill
+    prompt: "Create a new skill for database migrations"
+    fixtures: []
+    rubric:
+      - "Does NOT activate skill-library"
+      - "Routes to skill-creator or skill-evaluator instead"
+    trigger_expected: false
+
+  - id: neg_review_architecture
+    prompt: "Review the architecture of my microservices"
+    fixtures: []
+    rubric:
+      - "Does NOT activate skill-library"
+      - "Routes to architecture-reviewer instead"
+    trigger_expected: false
+
+  - id: neg_general_code_question
+    prompt: "How do I write a pytest fixture?"
+    fixtures: []
+    rubric:
+      - "Does NOT activate skill-library"
+      - "Answers directly from Claude's knowledge"
+    trigger_expected: false
