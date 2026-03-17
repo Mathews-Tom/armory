@@ -8,6 +8,7 @@ skills:
     choose", "capture this decision", "record the decision", "ADR for", "document the architecture", "decision record", "design
     decision", "technical decision". Use this skill when an architectural or technical decision needs to be documented.'
   path: skills/adr-writer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/adr-writer/SKILL.md
 - name: agent-builder
   version: 1.1.0
   description: Build AI agents and automate Claude Code programmatically using the Claude Agent SDK and headless CLI mode.
@@ -16,6 +17,7 @@ skills:
     Covers the Python SDK, the claude -p headless interface, custom tool creation with SDK MCP servers, hooks for deterministic
     control, session management, and CLI flag reference. Authentication uses existing ~/.claude/ config — no API keys required.
   path: skills/agent-builder
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/agent-builder/SKILL.md
 - name: api-docs-generator
   version: 1.1.0
   description: 'Audits and enhances API documentation for FastAPI and REST endpoints. Identifies missing descriptions, incomplete
@@ -24,6 +26,7 @@ skills:
     audit", "FastAPI docs", "document endpoints", "API reference", "swagger docs", "REST API docs", "endpoint documentation",
     "response documentation". Use this skill when API endpoints need documentation or documentation audit.'
   path: skills/api-docs-generator
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/api-docs-generator/SKILL.md
 - name: architecture-diagram
   version: 1.1.0
   description: 'Generate detailed layered architecture diagrams as self-contained HTML artifacts with inline SVG icons, CSS
@@ -33,6 +36,7 @@ skills:
     hierarchy, and interconnections. For architecture reviews, audits, critiques, or design assessments, use architecture-reviewer
     instead.'
   path: skills/architecture-diagram
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/architecture-diagram/SKILL.md
 - name: architecture-reviewer
   version: 1.1.0
   description: 'Architecture reviews across 7 dimensions: structural integrity, scalability, enterprise readiness (SOC2/HIPAA/GDPR/PCI-DSS),
@@ -44,6 +48,7 @@ skills:
     design document or codebase and asks for feedback or improvements. For architecture diagrams, visuals, or topology drawings,
     use architecture-diagram instead.'
   path: skills/architecture-reviewer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/architecture-reviewer/SKILL.md
 - name: benchmark-runner
   version: 1.1.0
   description: 'Designs structured benchmarks for comparing algorithms, models, or implementations. Selects appropriate metrics
@@ -53,6 +58,7 @@ skills:
     "evaluate algorithms", "performance comparison", "throughput test", "speed test". Use this skill when comparing two or
     more implementations, algorithms, or models.'
   path: skills/benchmark-runner
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/benchmark-runner/SKILL.md
 - name: changelog-composer
   version: 1.1.0
   description: 'Generates structured changelogs and release notes from git history and PR descriptions. Classifies changes
@@ -61,6 +67,7 @@ skills:
     "what changed since", "changes since last release", "prepare release", "release notes for", "changelog for", "summarize
     changes", "diff since tag". Use this skill when preparing a release and needing to summarize changes for users.'
   path: skills/changelog-composer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/changelog-composer/SKILL.md
 - name: code-refiner
   version: 1.1.0
   description: 'Deep code simplification, refactoring, and quality refinement. Analyzes structural complexity, anti-patterns,
@@ -71,6 +78,7 @@ skills:
     function is too long", "clean this up before I PR it", "tidy up my code", cyclomatic complexity, cognitive complexity,
     code smells.'
   path: skills/code-refiner
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/code-refiner/SKILL.md
 - name: concept-to-image
   version: 1.2.0
   description: 'Turn any concept, idea, or description into a polished static HTML visual, then export it as a PNG or SVG
@@ -82,6 +90,7 @@ skills:
     this HTML", "design a graphic for export". For interactive HTML visuals opened in a browser, use static-web-artifacts-builder
     instead.'
   path: skills/concept-to-image
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/concept-to-image/SKILL.md
 - name: concept-to-video
   version: 1.1.0
   description: 'Turn any concept into an animated explainer video using Manim (Python). Use whenever the user wants animated
@@ -93,6 +102,7 @@ skills:
     this process", "add voiceover to video", "animate with audio", or any concept + video/animation request. For branded motion
     graphics or React-based video, use remotion-video instead.'
   path: skills/concept-to-video
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/concept-to-video/SKILL.md
 - name: debug-investigator
   version: 1.1.0
   description: 'Hypothesis-driven debugging methodology: ranked hypotheses with confirming/refuting tests, git bisect strategy,
@@ -103,6 +113,7 @@ skills:
     bugs that need systematic investigation, not simple errors the model diagnoses directly. NOT for abstract reasoning or
     problem decomposition without a specific error — the model handles general reasoning natively.'
   path: skills/debug-investigator
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/debug-investigator/SKILL.md
 - name: dependency-audit
   version: 1.1.0
   description: 'Audits project dependencies for license compliance, maintenance health, security vulnerabilities, and bloat.
@@ -112,11 +123,13 @@ skills:
     dependencies", "dependency review", "license compliance", "package audit", "supply chain", "dependency risk". Use this
     skill when reviewing project dependencies for risk.'
   path: skills/dependency-audit
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/dependency-audit/SKILL.md
 - name: doc-condenser
   version: 1.1.0
   description: 'DEPRECATED: The base model handles document condensation and summarization natively at high quality. This
     skill no longer provides meaningful uplift. Retained for reference only.'
   path: skills/doc-condenser
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/doc-condenser/SKILL.md
 - name: engineering-retro
   version: 1.0.0
   description: Git-based engineering retrospective analyzing commit history, PR patterns, and development velocity over a
@@ -125,6 +138,7 @@ skills:
     this week", "engineering retro", "sprint retro", "dev summary", "/engineering-retro". Supports time windows (7d default,
     24h, 14d, 30d) and monorepo path scoping.
   path: skills/engineering-retro
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/engineering-retro/SKILL.md
 - name: estimate-calibrator
   version: 1.1.0
   description: 'Produces calibrated three-point estimates (best/likely/worst case) with explicit unknowns, confidence intervals,
@@ -134,6 +148,7 @@ skills:
     points", "t-shirt sizing", "estimate the work", "PERT". NOT for task decomposition, implementation plans, or dependency
     mapping — use task-decomposer instead. Use this skill when a task or project needs an effort estimate with explicit uncertainty.'
   path: skills/estimate-calibrator
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/estimate-calibrator/SKILL.md
 - name: filesystem
   version: 1.1.0
   description: 'File and directory operations using Claude Code built-in tools — replaces the Filesystem MCP server. Maps
@@ -144,6 +159,7 @@ skills:
     "file info", "find all Python files", "search codebase for". Use this skill when performing file operations, navigating
     codebases, or managing directories.'
   path: skills/filesystem
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/filesystem/SKILL.md
 - name: github
   version: 1.1.0
   description: 'GitHub CLI operations via `gh` for issues, pull requests, CI/Actions, releases, repos, search, gists, and
@@ -155,6 +171,7 @@ skills:
     "merge a PR", "manage releases", "query the GitHub API", "search repositories", "triage workflows", "automate GitHub operations".
     Also triggers when the user pastes a GitHub URL.'
   path: skills/github
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/github/SKILL.md
 - name: gpu-optimizer
   version: 1.1.0
   description: Expert GPU optimization for modern consumer GPUs (8-24GB VRAM). Use this skill when you need to optimize GPU
@@ -162,6 +179,7 @@ skills:
     GPU memory, optimize VRAM usage, or benchmark PyTorch. Covers mixed precision, gradient checkpointing, XGBoost GPU acceleration,
     CuPy/cuDF migration, vectorization, torch.compile, and diagnostics. NVIDIA GPUs only. PyTorch, XGBoost, and RAPIDS frameworks.
   path: skills/gpu-optimizer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/gpu-optimizer/SKILL.md
 - name: html-presentation
   version: 1.1.0
   description: Convert any document, outline, or content into a polished, self-contained HTML slide presentation. Use this
@@ -173,6 +191,7 @@ skills:
     minimal, corporate, hacker terminal). Consider asking the user for clarification on theme, navigation direction, and content
     structure if not already specified.
   path: skills/html-presentation
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/html-presentation/SKILL.md
 - name: humanize
   version: 1.0.0
   description: Detect and remove AI-generated writing patterns from text while preserving semantic meaning and factual accuracy.
@@ -182,6 +201,7 @@ skills:
     or provides AI-generated text and asks for a natural rewrite. Also trigger when reviewing drafts for AI tells, checking
     if text sounds AI-generated, or requesting a "human pass" on content.
   path: skills/humanize
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/humanize/SKILL.md
 - name: immune
   version: 1.0.0
   description: 'Hybrid adaptive memory system with two complementary memories: Cheatsheet (positive patterns injected before
@@ -191,6 +211,7 @@ skills:
     injection", "antibody scan", "adaptive memory scan", "immune check", "quality scan", "pattern detection". NOT for general
     code review or PR review — use pr-review instead. NOT for security audits of repositories — use repo-sentinel instead.'
   path: skills/immune
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/immune/SKILL.md
 - name: linkedin-post-style
   version: 1.2.1
   description: Write LinkedIn posts matching a specific technical author's voice — direct, analytical, dry-humored, and precise.
@@ -201,6 +222,7 @@ skills:
     into a post. Includes visual companion guidance for pairing posts with document carousels (via md-to-pdf with Mermaid
     diagrams), custom images (via concept-to-image), or animations (via concept-to-video).
   path: skills/linkedin-post-style
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/linkedin-post-style/SKILL.md
 - name: manuscript-provenance
   version: 1.1.0
   description: 'Computational provenance audit verifying that every number, table, figure, ordering, and terminology in a
@@ -210,6 +232,7 @@ skills:
     the user says "check provenance", "verify reproducibility", "audit my pipeline", "are my numbers from code", "check manuscript
     against scripts", "provenance audit", or any request to verify that manuscript content traces back to computational outputs.'
   path: skills/manuscript-provenance
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/manuscript-provenance/SKILL.md
 - name: manuscript-review
   version: 1.2.1
   description: Systematic pre-publication manuscript audit producing a structured refactoring report with section-level diagnostics,
@@ -220,6 +243,7 @@ skills:
     argument coherence, or formatting compliance. Covers partial requests like "check my references" or "does the abstract
     work" — the full diagnostic surfaces issues across all facets even when only one was asked about.
   path: skills/manuscript-review
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/manuscript-review/SKILL.md
 - name: mcp-to-skill
   version: 1.1.0
   description: 'Convert MCP (Model Context Protocol) servers into on-demand skills to dramatically reduce active context window
@@ -230,6 +254,7 @@ skills:
     context usage, asks about reducing token overhead from tool definitions, or says my context is too big or running out
     of context when MCPs are active.'
   path: skills/mcp-to-skill
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/mcp-to-skill/SKILL.md
 - name: md-to-pdf
   version: 1.1.0
   description: 'Convert Markdown files to professionally styled PDF documents with full support for Mermaid diagrams, LaTeX/KaTeX
@@ -240,6 +265,7 @@ skills:
     with equations", "generate a pdf report", "how do I export markdown as PDF", "convert my notes to PDF", "can you make
     a PDF from this markdown".'
   path: skills/md-to-pdf
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/md-to-pdf/SKILL.md
 - name: migration-risk-analyzer
   version: 1.1.0
   description: 'Analyzes database migration scripts for risk: lock contention, downtime estimation, rollback strategy, and
@@ -249,6 +275,7 @@ skills:
     strategy", "how to roll back", "migration review", "alter table risk". Use this skill when reviewing database migrations
     before deployment.'
   path: skills/migration-risk-analyzer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/migration-risk-analyzer/SKILL.md
 - name: notebooklm
   version: 1.1.0
   description: 'Complete API for Google NotebookLM — full programmatic access including features not in the web UI. Create
@@ -261,6 +288,7 @@ skills:
     research with notebooklm, offload analysis, bulk source import, download from notebooklm, notebooklm deliverables, or
     uses /notebooklm.'
   path: skills/notebooklm
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/notebooklm/SKILL.md
 - name: plan-review
   version: 1.0.0
   description: Pre-implementation plan audit that stress-tests scope, assumptions, risks, and failure modes before code is
@@ -269,6 +297,7 @@ skills:
     "plan review", "scope check", "stress-test this", "/plan-review". Supports product lens, engineering lens, or combined
     review.
   path: skills/plan-review
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/plan-review/SKILL.md
 - name: pr-review
   version: 1.1.0
   description: 'Pull request and code review with diff-based routing across five dimensions: code quality and guideline compliance,
@@ -279,6 +308,7 @@ skills:
     with this code", "pre-merge review", "look over my changes", "code review". Use this skill when reviewing code before
     commit or merge, checking PR quality, or when the user asks for feedback on recent modifications.'
   path: skills/pr-review
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/pr-review/SKILL.md
 - name: pre-landing-review
   version: 1.0.0
   description: Gate-oriented safety audit for code changes before landing, using a structured checklist with two-pass severity
@@ -286,6 +316,7 @@ skills:
     skill when the user asks for a pre-landing check, safety audit, pre-merge review, gate check, landing review, or says
     "is this safe to land", "pre-landing review", "safety check before merge", "run the checklist", "gate check", "/pre-landing-review".
   path: skills/pre-landing-review
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/pre-landing-review/SKILL.md
 - name: prompt-lab
   version: 1.1.0
   description: 'Systematic LLM prompt engineering: analyzes existing prompts for failure modes, generates structured variants
@@ -296,6 +327,7 @@ skills:
     or evaluating LLM prompts specifically. NOT for evaluating Claude Code skills or SKILL.md files — use skill-evaluator
     instead.'
   path: skills/prompt-lab
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/prompt-lab/SKILL.md
 - name: qa-systematic
   version: 1.0.0
   description: Systematic web application QA testing with structured issue taxonomy, health scoring, and regression tracking.
@@ -303,6 +335,7 @@ skills:
     browser testing, or says "QA this", "test the app", "smoke test", "run QA", "systematic test", "check the site", "regression
     test", "full QA", "/qa-systematic". Supports full, quick, and regression modes.
   path: skills/qa-systematic
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/qa-systematic/SKILL.md
 - name: rag-auditor
   version: 1.1.0
   description: 'Evaluates RAG (Retrieval-Augmented Generation) pipeline quality across retrieval and generation stages. Measures
@@ -312,11 +345,13 @@ skills:
     quality", "RAG evaluation", "chunk quality", "RAG pipeline review", "grounding check". Use this skill when diagnosing
     or evaluating a RAG pipeline''s quality. For general architecture or system audits, use architecture-reviewer instead.'
   path: skills/rag-auditor
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/rag-auditor/SKILL.md
 - name: regex-builder
   version: 1.1.0
   description: 'DEPRECATED: The base model generates, explains, and tests regex patterns natively with high accuracy. This
     skill no longer provides meaningful uplift. Retained for reference only.'
   path: skills/regex-builder
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/regex-builder/SKILL.md
 - name: remotion-video
   version: 1.1.0
   description: 'Create production-grade motion graphics and videos using Remotion (React). Use whenever the user wants branded
@@ -328,6 +363,7 @@ skills:
     "video with voiceover". For mathematical animations, algorithm visualizations, or headless container rendering, use concept-to-video
     (Manim) instead.'
   path: skills/remotion-video
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/remotion-video/SKILL.md
 - name: repo-sentinel
   version: 1.1.0
   description: 'Full security audit and enforcement for public repositories across 12 attack surfaces: git history, source
@@ -340,11 +376,13 @@ skills:
     to push, pre-oss, open source readiness, release audit, or open source audit. This is the gatekeeper between internal
     and public.'
   path: skills/repo-sentinel
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/repo-sentinel/SKILL.md
 - name: sequential-thinking
   version: 1.1.0
   description: 'DEPRECATED: Use the model''s native extended thinking instead. Structured, reflective problem-solving through
     sequential chain-of-thought reasoning that replaced the Sequential Thinking MCP server.'
   path: skills/sequential-thinking
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/sequential-thinking/SKILL.md
 - name: ship-workflow
   version: 1.0.0
   description: Automated release pipeline that merges main, runs tests, performs pre-landing review, bumps version, updates
@@ -352,6 +390,7 @@ skills:
     "release this", "prepare for release", "open a PR", "push and PR", "land this", "get this ready to ship", "create release",
     "/ship-workflow". Handles the full lifecycle from pre-flight checks through PR creation.
   path: skills/ship-workflow
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/ship-workflow/SKILL.md
 - name: skill-evaluator
   version: 1.2.0
   description: 'Evaluate Claude Code SKILL.md quality across 6 weighted dimensions: frontmatter quality, trigger coverage,
@@ -364,6 +403,17 @@ skills:
     or diagnosing why a skill fails to activate on relevant queries. NOT for evaluating or improving LLM prompts — use prompt-lab
     instead.'
   path: skills/skill-evaluator
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/skill-evaluator/SKILL.md
+- name: skill-library
+  version: 1.0.0
+  description: 'Agent-native catalog and installer for armory skills. Browse, search, install, update, sync, and remove skills
+    from the armory collection without leaving your agent session. Triggers on: "list available skills", "install skill",
+    "pull skill", "what skills are available", "update my skills", "search skills for", "skill catalog", "armory list", "armory
+    install", "armory search", "remove skill", "uninstall skill", "/library list", "/library use", "/library remove", "show
+    me armory skills", "get the architecture-reviewer skill", "do I have the latest skills". Use this skill when the user
+    wants to discover, install, update, or remove armory skills from within an agent session.'
+  path: skills/skill-library
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/skill-library/SKILL.md
 - name: sql-optimizer
   version: 1.1.0
   description: 'Analyzes SQL queries for performance issues: missing indexes, N+1 patterns, suboptimal joins, full table scans.
@@ -372,6 +422,7 @@ skills:
     "explain plan", "query plan", "N+1 query", "fix this SQL", "SQL performance", "optimize SQL", "why is this query slow",
     "index strategy". Use this skill when given a SQL query that needs performance analysis or optimization.'
   path: skills/sql-optimizer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/sql-optimizer/SKILL.md
 - name: static-web-artifacts-builder
   version: 1.1.0
   description: 'Build elaborate, self-contained static HTML artifacts opened in a browser — interactive diagrams, architecture
@@ -381,6 +432,7 @@ skills:
     dashboard", "HTML artifact", "HTML infographic", "interactive infographic". For image file output (PNG/SVG), use concept-to-image
     instead.'
   path: skills/static-web-artifacts-builder
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/static-web-artifacts-builder/SKILL.md
 - name: task-decomposer
   version: 1.1.0
   description: 'Produces structured phased task boards from feature requests: dependency-mapped work items with parallelization
@@ -390,6 +442,7 @@ skills:
     — use this skill when you need a formal task board, not ad-hoc decomposition the model handles natively. NOT for effort
     estimates, PERT calculations, or confidence intervals — use estimate-calibrator instead.'
   path: skills/task-decomposer
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/task-decomposer/SKILL.md
 - name: tavily
   version: 1.1.0
   description: 'AI-optimized web search via Tavily API. Use this skill when no specific URL is provided and the user needs
@@ -398,6 +451,7 @@ skills:
     data on", "what does the web say about", "research online". NOT for fetching a known URL — use web-fetch for that. Tavily
     returns clean, AI-ready snippets optimized for search-first intent.'
   path: skills/tavily
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/tavily/SKILL.md
 - name: test-harness
   version: 1.1.0
   description: 'Generates comprehensive pytest test suites: happy path, edge cases, error conditions, fixture scaffolding,
@@ -407,6 +461,7 @@ skills:
     test", "test coverage for", "write a test file". Use this skill when given a Python function, class, or module and asked
     to produce tests.'
   path: skills/test-harness
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/test-harness/SKILL.md
 - name: to-markdown
   version: 1.0.0
   description: 'Convert any file or URL to clean Markdown. Handles PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX), HTML,
@@ -417,6 +472,7 @@ skills:
     to markdown", "extract text from PDF", "turn this into markdown", "scrape this URL", "file to md", "document ingestion",
     "read this PDF", "get contents of", "parse this document", "ingest for RAG".'
   path: skills/to-markdown
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/to-markdown/SKILL.md
 - name: web-fetch
   version: 1.1.0
   description: 'Web content fetching and URL retrieval via curl and WebFetch — replaces the Fetch MCP server (fetch_html,
@@ -427,6 +483,7 @@ skills:
     "scrape this page", "read this URL", "pull data from API", "make an HTTP request", "extract page content", "get article
     text". NOT for web searches without a URL — use tavily for that.'
   path: skills/web-fetch
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/web-fetch/SKILL.md
 - name: youtube-analysis
   version: 1.1.0
   description: 'Extract YouTube video transcripts and produce structured concept analysis with multi-level summaries, key
@@ -437,6 +494,7 @@ skills:
     talk notes, tech talk breakdown, video key points, TL;DR of video, video takeaways, or pastes any URL containing youtube.com
     or youtu.be.'
   path: skills/youtube-analysis
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/youtube-analysis/SKILL.md
 - name: youtube-search
   version: 1.1.0
   description: 'Search YouTube by keyword and return structured video metadata (title, URL, channel, views, duration, upload
@@ -446,3 +504,4 @@ skills:
     youtube content, youtube for research, curate youtube sources, yt search, search for videos, find me videos, youtube trending,
     popular videos about, latest videos on, youtube discovery, or uses /yt-search.'
   path: skills/youtube-search
+  source: https://github.com/Mathews-Tom/praxis-skills/blob/main/skills/youtube-search/SKILL.md
