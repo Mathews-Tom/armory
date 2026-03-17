@@ -1,5 +1,5 @@
 [project]
-name = "praxis-skills"
+name = "armory"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,4 +13,4 @@ dev = [
 ]
 
 [project.scripts]
-praxis-install = "scripts.install_skills:main"
+armory-install = "scripts.install_skills:main"

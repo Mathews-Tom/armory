@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TUI installer for praxis-skills — copies skills to ~/.claude/skills/."""
+"""TUI installer for armory — copies skills to ~/.claude/skills/."""
 from __future__ import annotations
 
 import re
@@ -341,7 +341,7 @@ def main() -> int:
     """Main entry point for the TUI installer."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Install praxis-skills to ~/.claude/skills/")
+    parser = argparse.ArgumentParser(description="Install armory skills to ~/.claude/skills/")
     parser.add_argument(
         "--reinstall",
         action="store_true",
@@ -349,7 +349,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    console.print(Panel("praxis-skills installer", border_style="blue"))
+    console.print(Panel("armory installer", border_style="blue"))
 
     # Discover
     skills = discover_skills()
