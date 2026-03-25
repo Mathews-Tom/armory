@@ -1,0 +1,50 @@
+cases:
+  - id: deep_research_topic
+    prompt: "Research the current state of WebAssembly for server-side applications."
+    fixtures: []
+    rubric:
+      - "activates research-analyst agent"
+      - "frames research question with sub-questions"
+      - "spawns parallel research agents across multiple source types"
+      - "produces synthesis report with citations and confidence ratings"
+    trigger_expected: true
+
+  - id: multi_source_investigation
+    prompt: "I need a comprehensive analysis of vector database options for our RAG pipeline. Compare Pinecone, Weaviate, Qdrant, and Milvus."
+    fixtures: []
+    rubric:
+      - "activates research-analyst agent"
+      - "includes competitive comparison matrix"
+      - "researches across web, docs, and practitioner reports"
+      - "provides recommendations based on evidence"
+    trigger_expected: true
+
+  - id: landscape_survey
+    prompt: "Survey the landscape of AI code review tools — what's out there and how do they compare?"
+    fixtures: []
+    rubric:
+      - "activates research-analyst agent"
+      - "investigates multiple source types"
+      - "produces structured comparison with strengths and gaps"
+    trigger_expected: true
+
+  - id: quick_web_search
+    prompt: "What's the latest version of Node.js?"
+    fixtures: []
+    rubric:
+      - "does not activate research-analyst (tavily skill territory for quick lookups)"
+    trigger_expected: false
+
+  - id: specific_video_analysis
+    prompt: "Summarize this YouTube video for me: https://youtube.com/watch?v=abc123"
+    fixtures: []
+    rubric:
+      - "does not activate research-analyst (youtube-analysis skill territory)"
+    trigger_expected: false
+
+  - id: business_idea_validation
+    prompt: "Is this startup idea viable? We want to build an AI tutoring platform."
+    fixtures: []
+    rubric:
+      - "does not activate research-analyst (idea-scout agent territory)"
+    trigger_expected: false

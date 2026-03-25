@@ -1,0 +1,55 @@
+cases:
+  - id: validate_saas_idea
+    prompt: "I have an idea for a SaaS tool that helps freelancers automate their invoicing and tax prep. Is this viable?"
+    fixtures: []
+    rubric:
+      - "activates idea-scout agent"
+      - "extracts problem, solution, target customer from description"
+      - "constructs Lean Canvas"
+      - "spawns market, competitive, and feasibility research in parallel"
+      - "produces SWOT matrix"
+      - "delivers scored verdict with GO/CAUTION/NO-GO"
+      - "recommends low-cost validation experiments"
+    trigger_expected: true
+
+  - id: evaluate_marketplace_concept
+    prompt: "Should I build a marketplace connecting local farmers with restaurants? Validate the business model."
+    fixtures: []
+    rubric:
+      - "activates idea-scout agent"
+      - "asks clarifying questions for missing elements"
+      - "sizes the market with TAM/SAM/SOM"
+      - "identifies direct and indirect competitors"
+      - "assesses unit economics and feasibility"
+      - "produces validation scorecard"
+    trigger_expected: true
+
+  - id: idea_with_existing_research
+    prompt: "Validate this fintech idea. I already have some competitor research and market data attached."
+    fixtures: []
+    rubric:
+      - "activates idea-scout agent"
+      - "incorporates existing research rather than starting from scratch"
+      - "fills gaps in existing research with parallel agents"
+    trigger_expected: true
+
+  - id: general_market_research
+    prompt: "What are the trends in the AI developer tools market?"
+    fixtures: []
+    rubric:
+      - "does not activate idea-scout (no specific idea to validate, research-analyst territory)"
+    trigger_expected: false
+
+  - id: build_request
+    prompt: "Build me a React dashboard for tracking inventory."
+    fixtures: []
+    rubric:
+      - "does not activate idea-scout (implementation request, full-stack-builder territory)"
+    trigger_expected: false
+
+  - id: architecture_request
+    prompt: "Design the system architecture for our validated payment processing platform."
+    fixtures: []
+    rubric:
+      - "does not activate idea-scout (project-architect territory, idea already validated)"
+    trigger_expected: false
