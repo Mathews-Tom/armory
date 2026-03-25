@@ -930,25 +930,17 @@ packages:
     path: presets/ai-builder
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/ai-builder/PRESET.md
   - name: biz-validation
-    version: 1.0.0
-    description: 'Complete business idea validation toolkit bundling four complementary skills: market analysis (TAM/SAM/SOM,
-      trend assessment), competitive landscape analysis (Porter''s Five Forces, feature matrices, positioning), feasibility
-      assessment (unit economics, technical risk, financial viability), and full idea validation (Lean Canvas, JTBD, SWOT/PESTLE,
-      integrated scoring). Install the complete suite for end-to-end business validation, or install individual skills for
-      focused analysis. Triggers on: "validate business idea", "biz validation", "install business analysis tools", "market
-      and competitive analysis", "evaluate business concept", "startup due diligence", "vet a business opportunity", "assess
-      market feasibility", "is this idea viable", "business idea scorecard", "idea validation toolkit". Use this preset when
-      setting up a complete business analysis capability across market research, competition, and feasibility assessment.'
+    version: 1.1.0
+    description: 'DEPRECATED: Superseded by the idea-scout agent, which orchestrates the same skills (market-analyzer, competitive-analyzer,
+      feasibility-assessor, idea-validator) with parallel research delegation, weighted scoring, and GO/CAUTION/NO-GO verdicts.
+      Use idea-scout agent instead.'
     path: presets/biz-validation
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/biz-validation/PRESET.md
   - name: content-ops
-    version: 1.0.0
-    description: Complete writing toolkit and content pipeline for Claude Code. Bundles text humanization, social media formatting,
-      manuscript review and provenance verification, release notes generation, document summarization, PDF export, and markdown
-      conversion into a single publishing workflow. Covers the full content lifecycle from draft through refinement, review,
-      and export. Handles technical writing, document management, and document conversion tasks. Use this preset when setting
-      up a content creation environment, manuscript tools workspace, social content workflow, or any project requiring a cohesive
-      publishing workflow with release notes and format conversion capabilities.
+    version: 1.1.0
+    description: 'DEPRECATED: Superseded by the content-strategist agent, which orchestrates content skills (humanize, linkedin-post-style,
+      html-presentation, md-to-pdf, tavily, youtube-analysis) with per-channel adaptation, audience-aware tone, and automated
+      quality passes. Use content-strategist agent instead.'
     path: presets/content-ops
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/content-ops/PRESET.md
   - name: core
@@ -961,25 +953,17 @@ packages:
     path: presets/core
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/core/PRESET.md
   - name: eng-ops
-    version: 1.0.0
-    description: Full-cycle engineering operations preset covering the build-test-ship pipeline and surrounding practices.
-      Bundles shipping workflow orchestration, systematic QA and test planning, test scaffolding and harness generation, performance
-      benchmarking, migration safety analysis, effort estimation calibration, engineering retrospectives, and root cause debugging
-      investigation. Use this preset when managing an engineering workflow, running a shipping pipeline, coordinating release
-      management, conducting test planning or QA toolkit setup, executing performance testing or benchmark suites, evaluating
-      migration safety and risk, calibrating effort estimation for sprints, facilitating a retrospective, or assembling a
-      debugging toolkit for incident response.
+    version: 1.1.0
+    description: 'DEPRECATED: Superseded by the release-captain and full-stack-builder agents. release-captain orchestrates
+      ship-workflow, changelog-composer, pre-landing-review, dependency-audit with quality gates. full-stack-builder handles
+      implementation with test-harness, code-refiner, and api-docs-generator. Use these agents instead.'
     path: presets/eng-ops
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/eng-ops/PRESET.md
   - name: media-craft
-    version: 1.0.0
-    description: Visual content creation toolkit for Claude Code. Bundles image generation (PNG/SVG from HTML/CSS), video
-      production (MP4/GIF via Manim and React/Remotion), slide deck authoring, interactive HTML visual builders, and system
-      architecture diagrams into a single install. Create visual assets, make an image, generate video, design presentation
-      decks, produce graphics, build slides, and compose animations from natural language descriptions. Serves as a media
-      toolkit for creative assets, visual content pipelines, and animation toolkit workflows. Use this preset when producing
-      graphics, illustrations, explainer videos, branded content, interactive data visualizations, or architectural topology
-      diagrams from concept descriptions.
+    version: 1.1.0
+    description: 'DEPRECATED: Superseded by the media-producer agent, which orchestrates the same skills (concept-to-image,
+      concept-to-video, remotion-video, html-presentation, static-web-artifacts-builder, architecture-diagram) with intelligent
+      format routing based on content type. Use media-producer agent instead.'
     path: presets/media-craft
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/media-craft/PRESET.md
   - name: python-strict
@@ -992,11 +976,10 @@ packages:
     path: presets/python-strict
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/python-strict/PRESET.md
   - name: research
-    version: 1.0.0
-    description: Complete academic research workflow for Claude Code. Bundles literature discovery (arXiv search), systematic
-      literature review, single-paper critical analysis, manuscript pre-publication audit, and computational provenance verification
-      into a single install. Covers the full research lifecycle from surveying a field through writing and validating a manuscript.
-      Use this preset when setting up a research project, academic writing environment, or scholarly review workflow.
+    version: 1.1.0
+    description: 'DEPRECATED: Superseded by the research-analyst agent, which orchestrates literature-review, tavily, youtube-analysis,
+      competitive-analyzer, and web-fetch with parallel multi-source investigation, cross-referencing, and confidence-rated
+      synthesis. Use research-analyst agent instead.'
     path: presets/research
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/research/PRESET.md
   - name: sec-strict
@@ -1004,7 +987,7 @@ packages:
     description: Security-focused preset for projects requiring audit-grade protection. Extends the core review-commit lifecycle
       with security-specific review agents, secret scanning, dependency vulnerability auditing, repository configuration sentinel,
       cost tracking, and security coding standards. Use this preset for applications handling sensitive data, regulated environments,
-      or any codebase where security posture is a primary concern. Bundles 11 packages across skills, agents, rules, hooks,
+      or any codebase where security posture is a primary concern. Bundles 12 packages across skills, agents, rules, hooks,
       and commands.
     path: presets/sec-strict
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/sec-strict/PRESET.md

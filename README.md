@@ -1,6 +1,6 @@
 # armory
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![packages: 81](https://img.shields.io/badge/packages-81-informational)](manifest.yaml) [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![packages: 92](https://img.shields.io/badge/packages-92-informational)](manifest.yaml) [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 
 Curated, production-grade skills, agents, hooks, rules, commands, utilities, and presets for AI coding agents. No magic, no demos — battle-tested workflows built for developers who use AI seriously.
 
@@ -16,25 +16,33 @@ Intended for developers who treat AI coding agents as a serious part of their wo
 
 ---
 
-## Presets
-
-Presets are curated bundles that install multiple packages in one command. Start with `core`, layer on domain-specific presets as needed.
-
-| Preset                                    | Packages                                         | Description                                                                                                                                                                                                                |
-| ----------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [core](presets/core/)                     | 3 skills, 1 hook, 1 rule                         | Baseline review-commit lifecycle — PR review, code refinement, pre-landing gate, git protection, commit standards. Start here.                                                                                             |
-| [sec-strict](presets/sec-strict/)         | 5 skills, 2 agents, 2 rules, 2 hooks, 1 command  | Audit-grade security stack — secret scanning, dependency auditing, security review agents, repo sentinel, cost tracking. Superset of `core`.                                                                               |
-| [python-strict](presets/python-strict/)   | 4 skills, 2 agents, 3 rules, 2 hooks, 2 commands | Full Python enforcement — PR review, test harness, code review agents, secret scanning, commit/test/security standards, git protection, TDD, refactor.                                                                     |
-| [research](presets/research/)             | 4 skills, 1 utility                              | Academic research workflow — literature review, research critique, manuscript review, provenance auditing, arXiv search.                                                                                                   |
-| [biz-validation](presets/biz-validation/) | 4 skills                                         | Business idea validation — market analysis (TAM/SAM/SOM), competitive landscape (Porter's Five Forces), feasibility assessment (unit economics, technical risk), orchestrated validation (Lean Canvas, JTBD, SWOT/PESTLE). |
-| [eng-ops](presets/eng-ops/)               | 8 skills                                         | Engineering operations lifecycle — ship workflow, systematic QA, test scaffolding, benchmarking, migration risk, effort estimation, retrospectives, debugging.                                                             |
-| [media-craft](presets/media-craft/)       | 6 skills                                         | Visual and video production — concept-to-image (PNG/SVG), concept-to-video (Manim), Remotion video (React), HTML presentations, interactive HTML artifacts, architecture diagrams.                                         |
-| [content-ops](presets/content-ops/)       | 8 skills                                         | Writing and publishing pipeline — humanize AI text, social content, manuscript review, authorship verification, changelogs, PDF export, summarization, format conversion.                                                  |
-| [ai-builder](presets/ai-builder/)         | 6 skills                                         | AI/ML development toolkit — agent building, prompt engineering, GPU optimization, RAG auditing, MCP-to-skill conversion, notebook generation.                                                                              |
-
----
-
 ## Package Catalog
+
+### Agents — Orchestrators
+
+Orchestrator agents compose skills and other agents into multi-phase workflows. Each can run solo or be spawned by another agent via the Agent tool.
+
+| Agent                                              | Model  | Description                                                                                                     |
+| -------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| [team-lead](agents/team-lead/)                     | opus   | Meta-orchestrator — decomposes multi-domain requests, delegates to specialized agents, synthesizes results       |
+| [codebase-auditor](agents/codebase-auditor/)       | sonnet | Unified quality assessment — spawns code-reviewer, security-reviewer, secret-scanner in parallel, merges report |
+| [project-architect](agents/project-architect/)     | opus   | Phased requirements discovery producing architecture documents with diagrams and tech stack justification        |
+| [project-planner](agents/project-planner/)         | sonnet | Task decomposition with dependency mapping, three-point estimates, milestone timelines, and risk logs            |
+| [research-analyst](agents/research-analyst/)       | opus   | Multi-source investigation with parallel agents across web, academic, video, and competitive sources             |
+| [idea-scout](agents/idea-scout/)                   | opus   | Business idea validation — Lean Canvas, parallel market/competitive/feasibility research, weighted scorecard     |
+| [full-stack-builder](agents/full-stack-builder/)   | opus   | End-to-end implementation from spec — scaffolding, sprints, quality passes, documentation, pre-delivery review   |
+| [release-captain](agents/release-captain/)         | sonnet | Ship lifecycle with quality gates — pre-flight, secret scan, changelog, version bump, PR creation               |
+| [proposal-writer](agents/proposal-writer/)         | opus   | Technical proposals with ROI calculations, three-tier pricing, and Problem-Agitate-Solve framing                |
+| [content-strategist](agents/content-strategist/)   | sonnet | Multi-channel content creation with per-channel adaptation and automated quality passes                          |
+| [media-producer](agents/media-producer/)           | sonnet | Visual and video format router — selects the right skill based on concept type and output needs                  |
+
+### Agents — Analyzers
+
+| Agent                                          | Model  | Description                                           |
+| ---------------------------------------------- | ------ | ----------------------------------------------------- |
+| [code-reviewer](agents/code-reviewer/)         | sonnet | Multi-phase code review with severity-ranked findings |
+| [security-reviewer](agents/security-reviewer/) | sonnet | OWASP Top 10 vulnerability scanning                   |
+| [secret-scanner](agents/secret-scanner/)       | haiku  | Pre-commit detection of hardcoded credentials         |
 
 ### Skills — Development & Tooling
 
@@ -145,16 +153,6 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [regex-builder](skills/regex-builder/)             | Base model generates regex at equivalent quality |
 | [sequential-thinking](skills/sequential-thinking/) | Base model handles chain-of-thought natively     |
 
----
-
-## Agents
-
-| Agent                                          | Description                                           |
-| ---------------------------------------------- | ----------------------------------------------------- |
-| [code-reviewer](agents/code-reviewer/)         | Multi-phase code review with severity-ranked findings |
-| [security-reviewer](agents/security-reviewer/) | OWASP Top 10 vulnerability scanning                   |
-| [secret-scanner](agents/secret-scanner/)       | Pre-commit detection of hardcoded credentials         |
-
 ## Rules
 
 | Rule                                            | Description                                    |
@@ -187,20 +185,46 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [dependency-tree](utilities/dependency-tree/)           | Visualize project dependency graph                       |
 | [test-coverage-report](utilities/test-coverage-report/) | Coverage summary for changed files                       |
 
+## Presets
+
+Presets install curated bundles of passive packages (rules, hooks, commands) in one command. For active workflow orchestration, use agents instead.
+
+| Preset                                    | Packages                                          | Description                                                                                              |
+| ----------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [core](presets/core/)                     | 3 skills, 1 hook, 1 rule                          | Baseline review-commit lifecycle. Start here.                                                            |
+| [sec-strict](presets/sec-strict/)         | 5 skills, 3 agents, 2 rules, 2 hooks, 1 command   | Audit-grade security stack with codebase-auditor. Superset of `core`.                                    |
+| [python-strict](presets/python-strict/)   | 4 skills, 2 agents, 3 rules, 2 hooks, 2 commands  | Full Python enforcement — TDD, type checking, test coverage, security standards.                         |
+| [ai-builder](presets/ai-builder/)         | 6 skills                                          | AI/ML development toolkit — agent building, prompt engineering, GPU optimization, RAG auditing.           |
+
+### Deprecated Presets
+
+Superseded by orchestrator agents that provide autonomous workflow orchestration instead of manual skill invocation.
+
+| Preset | Replacement |
+| ------ | ----------- |
+| ~~biz-validation~~ | `idea-scout` agent |
+| ~~media-craft~~ | `media-producer` agent |
+| ~~content-ops~~ | `content-strategist` agent |
+| ~~research~~ | `research-analyst` agent |
+| ~~eng-ops~~ | `release-captain` + `full-stack-builder` agents |
+
+---
+
 ## Installation
 
 **Option 1 — Skills CLI (recommended)**
 
-Install any skill directly using [`npx skills`](https://github.com/vercel-labs/skills):
+Install any package directly using [`npx skills`](https://github.com/vercel-labs/skills):
 
 ```bash
-# Install all skills
+# Install all packages
 npx skills add Mathews-Tom/armory
 
-# Install a specific skill
+# Install a specific skill or agent
 npx skills add Mathews-Tom/armory -s architecture-reviewer
+npx skills add Mathews-Tom/armory -s codebase-auditor
 
-# List available skills without installing
+# List available packages without installing
 npx skills add Mathews-Tom/armory -l
 ```
 
@@ -230,10 +254,15 @@ Clone the repo and symlink individual package folders:
 
 ```bash
 git clone https://github.com/Mathews-Tom/armory.git
+
+# Skills
 ln -s "$(pwd)/armory/skills/architecture-reviewer" ~/.claude/skills/architecture-reviewer
+
+# Agents
+ln -s "$(pwd)/armory/agents/codebase-auditor" ~/.claude/agents/codebase-auditor
 ```
 
-Or download `.skill` archives from the [Releases](../../releases) page.
+Or download `.skill` / `.agent` archives from the [Releases](../../releases) page.
 
 ---
 
