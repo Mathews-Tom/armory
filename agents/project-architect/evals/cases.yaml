@@ -1,0 +1,49 @@
+cases:
+  - id: design_new_system
+    prompt: "I want to build a SaaS platform for inventory management. Help me architect it."
+    fixtures: []
+    rubric:
+      - "activates project-architect agent"
+      - "begins with business discovery questions before proposing technology"
+      - "asks about users, scale, integrations, and constraints"
+      - "produces architecture document with technology justification"
+    trigger_expected: true
+
+  - id: tech_stack_selection
+    prompt: "What tech stack should I use for a real-time collaboration tool?"
+    fixtures: []
+    rubric:
+      - "activates project-architect agent"
+      - "gathers requirements before recommending stack"
+      - "evaluates multiple options with tradeoff analysis"
+    trigger_expected: true
+
+  - id: architecture_discovery_session
+    prompt: "Let's do an architecture discovery session for our new mobile app backend."
+    fixtures: []
+    rubric:
+      - "activates project-architect agent"
+      - "conducts phased discovery starting with business context"
+      - "produces architecture document with diagrams"
+    trigger_expected: true
+
+  - id: review_existing_architecture
+    prompt: "Review the architecture of our existing codebase for scalability issues."
+    fixtures: []
+    rubric:
+      - "does not activate project-architect (architecture-reviewer skill territory)"
+    trigger_expected: false
+
+  - id: create_diagram_only
+    prompt: "Generate an architecture diagram for our microservices setup."
+    fixtures: []
+    rubric:
+      - "does not activate project-architect (architecture-diagram skill territory)"
+    trigger_expected: false
+
+  - id: implement_from_spec
+    prompt: "Build the API endpoints from this architecture document."
+    fixtures: []
+    rubric:
+      - "does not activate project-architect (full-stack-builder agent territory)"
+    trigger_expected: false

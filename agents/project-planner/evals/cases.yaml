@@ -1,0 +1,43 @@
+cases:
+  - id: full_project_plan
+    prompt: "Plan this project — break down the work, estimate timelines, and identify risks."
+    fixtures: []
+    rubric:
+      - "activates project-planner agent"
+      - "invokes task-decomposer skill for work item breakdown"
+      - "invokes estimate-calibrator skill for three-point estimates"
+      - "produces milestone timeline and risk log"
+      - "includes critical path identification"
+    trigger_expected: true
+
+  - id: task_breakdown_request
+    prompt: "Break down the implementation of this architecture doc into tasks with dependencies."
+    fixtures: []
+    rubric:
+      - "activates project-planner agent"
+      - "decomposes into 1-4 hour tasks with dependency mapping"
+      - "includes parallelization flags"
+    trigger_expected: true
+
+  - id: timeline_estimate_request
+    prompt: "How long will this take to build? Give me a realistic timeline with milestones."
+    fixtures: []
+    rubric:
+      - "activates project-planner agent"
+      - "produces three-point estimates with buffer"
+      - "includes milestone timeline"
+    trigger_expected: true
+
+  - id: architecture_design_only
+    prompt: "Design the architecture for a new authentication service."
+    fixtures: []
+    rubric:
+      - "does not activate project-planner (project-architect territory)"
+    trigger_expected: false
+
+  - id: code_implementation_only
+    prompt: "Implement the user registration endpoint with email validation."
+    fixtures: []
+    rubric:
+      - "does not activate project-planner (full-stack-builder territory)"
+    trigger_expected: false
