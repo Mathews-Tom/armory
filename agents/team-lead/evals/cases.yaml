@@ -1,0 +1,50 @@
+cases:
+  - id: end_to_end_project
+    prompt: "I want to build a task management SaaS app. Handle everything from design to deployment."
+    fixtures: []
+    rubric:
+      - "activates team-lead agent"
+      - "decomposes into multi-agent workflow (architect → planner → builder → auditor → release)"
+      - "presents delegation plan before executing"
+      - "spawns agents in correct dependency order"
+      - "produces unified execution summary"
+    trigger_expected: true
+
+  - id: validate_and_build
+    prompt: "I have an idea for an AI tutoring platform. Validate it and if it's viable, architect the system."
+    fixtures: []
+    rubric:
+      - "activates team-lead agent"
+      - "delegates to idea-scout first"
+      - "conditionally proceeds to project-architect only if validation passes"
+    trigger_expected: true
+
+  - id: multi_domain_request
+    prompt: "Research the competitive landscape for code review tools, then create a proposal and marketing content for our new product."
+    fixtures: []
+    rubric:
+      - "activates team-lead agent"
+      - "delegates to research-analyst, proposal-writer, and content-strategist"
+      - "manages handoffs between agents"
+    trigger_expected: true
+
+  - id: single_agent_task_review
+    prompt: "Review my code for quality issues."
+    fixtures: []
+    rubric:
+      - "does not activate team-lead (code-reviewer or codebase-auditor territory)"
+    trigger_expected: false
+
+  - id: single_agent_task_research
+    prompt: "Research the state of WebAssembly server-side."
+    fixtures: []
+    rubric:
+      - "does not activate team-lead (research-analyst territory)"
+    trigger_expected: false
+
+  - id: single_agent_task_ship
+    prompt: "Ship this branch as a PR."
+    fixtures: []
+    rubric:
+      - "does not activate team-lead (release-captain territory)"
+    trigger_expected: false
