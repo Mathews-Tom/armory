@@ -1,0 +1,55 @@
+cases:
+  - id: multi_channel_content_creation
+    prompt: "Create content about our new API rate limiting feature — need a blog post, LinkedIn announcement, and a slide deck for the engineering all-hands."
+    fixtures: []
+    rubric:
+      - "activates content-strategist agent"
+      - "identifies three target channels: blog, LinkedIn, slides"
+      - "produces content strategy brief with core message"
+      - "invokes linkedin-post-style skill for LinkedIn post"
+      - "invokes html-presentation skill for slide deck"
+      - "invokes humanize skill on all produced content"
+    trigger_expected: true
+
+  - id: repurpose_video_to_content
+    prompt: "Turn this conference talk into a blog post and LinkedIn post: https://youtube.com/watch?v=example"
+    fixtures: []
+    rubric:
+      - "activates content-strategist agent"
+      - "invokes youtube-analysis skill to extract insights from video"
+      - "produces blog article adapted from talk content"
+      - "invokes linkedin-post-style skill for social post"
+      - "invokes humanize skill before delivering"
+    trigger_expected: true
+
+  - id: topic_research_and_content
+    prompt: "Write a thought leadership piece about WebAssembly adoption in production — I need a PDF report for executives and a LinkedIn post."
+    fixtures: []
+    rubric:
+      - "activates content-strategist agent"
+      - "invokes tavily skill to research WebAssembly adoption data"
+      - "produces formal PDF via md-to-pdf skill"
+      - "invokes linkedin-post-style skill for social post"
+      - "content includes specific data and evidence from research"
+    trigger_expected: true
+
+  - id: single_linkedin_post_only
+    prompt: "Write a LinkedIn post about my experience speaking at KubeCon."
+    fixtures: []
+    rubric:
+      - "does not activate content-strategist (linkedin-post-style skill territory)"
+    trigger_expected: false
+
+  - id: markdown_to_pdf_only
+    prompt: "Convert this README.md to a PDF."
+    fixtures: []
+    rubric:
+      - "does not activate content-strategist (md-to-pdf skill territory)"
+    trigger_expected: false
+
+  - id: slide_deck_only
+    prompt: "Build me a slide deck from these bullet points."
+    fixtures: []
+    rubric:
+      - "does not activate content-strategist (html-presentation skill territory)"
+    trigger_expected: false

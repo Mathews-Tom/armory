@@ -1,0 +1,53 @@
+cases:
+  - id: full_proposal_with_pricing
+    prompt: "Write a proposal for a new e-commerce platform migration with pricing tiers and ROI analysis."
+    fixtures: []
+    rubric:
+      - "activates proposal-writer agent"
+      - "invokes estimate-calibrator for effort/cost estimation"
+      - "produces three pricing tiers (Essential/Professional/Enterprise)"
+      - "includes ROI calculation with payback period and 3-year projection"
+      - "includes scope of work with inclusions and exclusions"
+    trigger_expected: true
+
+  - id: proposal_from_architecture
+    prompt: "Take the architecture document from project-architect and turn it into a client-facing proposal with budget options."
+    fixtures: []
+    rubric:
+      - "activates proposal-writer agent"
+      - "accepts architecture document as input"
+      - "frames technical architecture in business language"
+      - "produces deliverables table and timeline"
+      - "includes three pricing tiers"
+    trigger_expected: true
+
+  - id: bid_document_request
+    prompt: "Prepare a bid for the API modernization project — scope, timeline, costs, and ROI."
+    fixtures: []
+    rubric:
+      - "activates proposal-writer agent"
+      - "covers all proposal sections including investment and ROI"
+      - "sets 30-day proposal expiration"
+      - "includes next steps with owners"
+    trigger_expected: true
+
+  - id: architecture_decision_only
+    prompt: "Help me decide between microservices and monolith for this project."
+    fixtures: []
+    rubric:
+      - "does not activate proposal-writer (project-architect territory)"
+    trigger_expected: false
+
+  - id: project_plan_only
+    prompt: "Create a project timeline with milestones for the next quarter."
+    fixtures: []
+    rubric:
+      - "does not activate proposal-writer (project-planner territory)"
+    trigger_expected: false
+
+  - id: effort_estimation_only
+    prompt: "Estimate the effort for building a REST API with 12 endpoints."
+    fixtures: []
+    rubric:
+      - "does not activate proposal-writer (estimate-calibrator skill territory)"
+    trigger_expected: false

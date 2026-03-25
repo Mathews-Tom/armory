@@ -1,0 +1,68 @@
+cases:
+  - id: architecture_diagram_request
+    prompt: "Create a visual showing our microservices architecture with the API gateway, auth service, and three backend services."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "classifies concept as system/architecture"
+      - "routes to architecture-diagram skill"
+      - "provides component list and relationship guidance to the skill"
+    trigger_expected: true
+
+  - id: animated_explainer_request
+    prompt: "Make a video explaining how the binary search algorithm works step by step."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "classifies concept as technical/educational"
+      - "routes to concept-to-video (Manim) over remotion-video"
+      - "includes step-by-step breakdown in skill invocation"
+    trigger_expected: true
+
+  - id: presentation_request
+    prompt: "Build a slide deck for my talk on event-driven architecture patterns."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to html-presentation skill"
+      - "structures slides around the narrative"
+    trigger_expected: true
+
+  - id: format_unspecified_recommendation
+    prompt: "Visualize the data flow between our frontend, API, message queue, and database."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "recommends architecture-diagram format with rationale"
+      - "does not default to concept-to-image for system topology"
+    trigger_expected: true
+
+  - id: branded_video_request
+    prompt: "Produce a product demo video with our brand colors for the landing page."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to remotion-video over concept-to-video for branded content"
+      - "passes brand styling guidance to the skill"
+    trigger_expected: true
+
+  - id: explicit_skill_invocation
+    prompt: "Use concept-to-image to generate a PNG of a neural network diagram."
+    fixtures: []
+    rubric:
+      - "does not activate media-producer (user invoked skill directly)"
+    trigger_expected: false
+
+  - id: text_content_request
+    prompt: "Write a blog post about our new feature launch."
+    fixtures: []
+    rubric:
+      - "does not activate media-producer (text content, no visual output)"
+    trigger_expected: false
+
+  - id: code_generation_request
+    prompt: "Generate a React component for the settings page."
+    fixtures: []
+    rubric:
+      - "does not activate media-producer (code generation, not visual asset)"
+    trigger_expected: false
