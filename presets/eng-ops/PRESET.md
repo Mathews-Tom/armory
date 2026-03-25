@@ -1,18 +1,10 @@
 ---
 name: eng-ops
 type: preset
-description: >
-  Full-cycle engineering operations preset covering the build-test-ship pipeline and
-  surrounding practices. Bundles shipping workflow orchestration, systematic QA and test
-  planning, test scaffolding and harness generation, performance benchmarking, migration
-  safety analysis, effort estimation calibration, engineering retrospectives, and root
-  cause debugging investigation. Use this preset when managing an engineering workflow,
-  running a shipping pipeline, coordinating release management, conducting test planning
-  or QA toolkit setup, executing performance testing or benchmark suites, evaluating
-  migration safety and risk, calibrating effort estimation for sprints, facilitating a
-  retrospective, or assembling a debugging toolkit for incident response.
+description: "DEPRECATED: Superseded by the release-captain and full-stack-builder agents. release-captain orchestrates ship-workflow, changelog-composer, pre-landing-review, dependency-audit with quality gates. full-stack-builder handles implementation with test-harness, code-refiner, and api-docs-generator. Use these agents instead."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
+  status: deprecated
 preset:
   packages:
     skills:
@@ -29,6 +21,12 @@ preset:
 ---
 
 # Eng Ops
+
+> **DEPRECATED** — The `release-captain` and `full-stack-builder` agents supersede this
+> preset. `release-captain` manages the ship lifecycle with quality gates (secret scanning,
+> pre-landing review, changelog generation, PR creation). `full-stack-builder` handles
+> implementation with testing, documentation, and code refinement. Install these agents
+> instead.
 
 End-to-end engineering operations toolkit spanning the plan-build-test-ship-reflect lifecycle.
 

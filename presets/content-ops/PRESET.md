@@ -1,18 +1,10 @@
 ---
 name: content-ops
 type: preset
-description: >
-  Complete writing toolkit and content pipeline for Claude Code. Bundles text
-  humanization, social media formatting, manuscript review and provenance
-  verification, release notes generation, document summarization, PDF export,
-  and markdown conversion into a single publishing workflow. Covers the full
-  content lifecycle from draft through refinement, review, and export. Handles
-  technical writing, document management, and document conversion tasks. Use
-  this preset when setting up a content creation environment, manuscript tools
-  workspace, social content workflow, or any project requiring a cohesive
-  publishing workflow with release notes and format conversion capabilities.
+description: "DEPRECATED: Superseded by the content-strategist agent, which orchestrates content skills (humanize, linkedin-post-style, html-presentation, md-to-pdf, tavily, youtube-analysis) with per-channel adaptation, audience-aware tone, and automated quality passes. Use content-strategist agent instead."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
+  status: deprecated
 preset:
   packages:
     skills:
@@ -29,6 +21,11 @@ preset:
 ---
 
 # Content Ops
+
+> **DEPRECATED** — The `content-strategist` agent supersedes this preset. It creates and
+> adapts content across channels with audience-aware tone, runs humanize passes
+> automatically, and manages the full content lifecycle. Install `content-strategist`
+> instead.
 
 An end-to-end content lifecycle toolkit for drafting, refining, reviewing, publishing, and exporting documents.
 

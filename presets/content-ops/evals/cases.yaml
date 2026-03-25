@@ -1,25 +1,10 @@
 cases:
-  - id: install_content_pipeline
+  - id: negative_deprecated_content_pipeline
     prompt: "I need a writing toolkit for drafting, editing, and exporting documents"
     fixtures: []
     rubric:
-      - "installs all eight content-ops skills as a bundle"
-      - "covers drafting, refinement, review, publishing, and export stages"
-    trigger_expected: true
-
-  - id: release_notes_and_social
-    prompt: "Set up tools for generating release notes and LinkedIn posts for my open source project"
-    fixtures: []
-    rubric:
-      - "recommends the content-ops preset covering changelog-composer and linkedin-post-style"
-    trigger_expected: true
-
-  - id: manuscript_workflow
-    prompt: "I'm preparing a manuscript and need review, provenance checks, and PDF export"
-    fixtures: []
-    rubric:
-      - "recommends the content-ops preset for manuscript-review, manuscript-provenance, and md-to-pdf"
-    trigger_expected: true
+      - "does not activate content-ops preset (deprecated — use content-strategist agent)"
+    trigger_expected: false
 
   - id: negative_code_analysis
     prompt: "I need static analysis and linting tools for my Python codebase"
@@ -32,5 +17,5 @@ cases:
     prompt: "I need to do a systematic literature review and search arXiv for papers"
     fixtures: []
     rubric:
-      - "literature review and paper discovery are covered by the research preset, not content-ops"
+      - "literature review and paper discovery are covered by research-analyst agent, not content-ops"
     trigger_expected: false

@@ -1,33 +1,15 @@
 cases:
-  - id: install_eng_ops_for_shipping
+  - id: negative_deprecated_shipping_pipeline
     prompt: "Set up a complete build-test-ship pipeline for our engineering team."
     fixtures: []
     rubric:
-      - "recommends or activates the eng-ops preset"
-      - "mentions ship-workflow, test-harness, or benchmark-runner as included skills"
-      - "describes the engineering lifecycle coverage"
-    trigger_expected: true
-
-  - id: install_eng_ops_for_retro
-    prompt: "We need tooling for sprint retrospectives and effort estimation calibration."
-    fixtures: []
-    rubric:
-      - "recommends the eng-ops preset"
-      - "mentions engineering-retro and estimate-calibrator as included skills"
-    trigger_expected: true
-
-  - id: single_debug_skill_not_preset
-    prompt: "Help me debug this null pointer exception in the auth service."
-    fixtures: []
-    rubric:
-      - "assists with debugging directly or suggests debug-investigator skill"
-      - "does not activate the eng-ops preset"
+      - "does not activate eng-ops preset (deprecated — use release-captain and full-stack-builder agents)"
     trigger_expected: false
 
-  - id: security_audit_not_eng_ops
+  - id: negative_security_audit_not_eng_ops
     prompt: "Run a security audit and dependency vulnerability scan on our codebase."
     fixtures: []
     rubric:
       - "does not recommend the eng-ops preset"
-      - "suggests security-focused tooling or the sec-strict preset instead"
+      - "suggests codebase-auditor agent or sec-strict preset instead"
     trigger_expected: false

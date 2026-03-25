@@ -1,18 +1,10 @@
 ---
 name: media-craft
 type: preset
-description: >
-  Visual content creation toolkit for Claude Code. Bundles image generation
-  (PNG/SVG from HTML/CSS), video production (MP4/GIF via Manim and React/Remotion),
-  slide deck authoring, interactive HTML visual builders, and system architecture
-  diagrams into a single install. Create visual assets, make an image, generate video,
-  design presentation decks, produce graphics, build slides, and compose animations
-  from natural language descriptions. Serves as a media toolkit for creative assets,
-  visual content pipelines, and animation toolkit workflows. Use this preset when
-  producing graphics, illustrations, explainer videos, branded content, interactive
-  data visualizations, or architectural topology diagrams from concept descriptions.
+description: "DEPRECATED: Superseded by the media-producer agent, which orchestrates the same skills (concept-to-image, concept-to-video, remotion-video, html-presentation, static-web-artifacts-builder, architecture-diagram) with intelligent format routing based on content type. Use media-producer agent instead."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
+  status: deprecated
 preset:
   packages:
     skills:
@@ -27,6 +19,11 @@ preset:
 ---
 
 # Media Craft
+
+> **DEPRECATED** — The `media-producer` agent supersedes this preset. It orchestrates the
+> same six skills with intelligent format selection based on content type — users describe
+> what they want to visualize and the agent routes to the right skill. Install
+> `media-producer` instead.
 
 A concept-to-deliverable pipeline for generating images, videos, presentations, interactive visuals, and diagrams.
 

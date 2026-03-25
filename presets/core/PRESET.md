@@ -63,3 +63,11 @@ Layer additional presets on top of `core`:
 
 - **python-strict** — adds Python-focused testing, security scanning, and stricter rules.
 - **sec-strict** — adds security auditing, dependency scanning, and cost tracking.
+
+## Complementary Agents
+
+These orchestrator agents work well alongside the core preset:
+
+- **codebase-auditor** — unified quality assessment across code, security, and dependencies.
+- **release-captain** — ship lifecycle with quality gates, changelog, and PR creation.
+- **full-stack-builder** — end-to-end implementation with testing and documentation.

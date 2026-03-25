@@ -1,15 +1,10 @@
 ---
 name: research
 type: preset
-description: >
-  Complete academic research workflow for Claude Code. Bundles literature discovery
-  (arXiv search), systematic literature review, single-paper critical analysis,
-  manuscript pre-publication audit, and computational provenance verification into
-  a single install. Covers the full research lifecycle from surveying a field through
-  writing and validating a manuscript. Use this preset when setting up a research
-  project, academic writing environment, or scholarly review workflow.
+description: "DEPRECATED: Superseded by the research-analyst agent, which orchestrates literature-review, tavily, youtube-analysis, competitive-analyzer, and web-fetch with parallel multi-source investigation, cross-referencing, and confidence-rated synthesis. Use research-analyst agent instead."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
+  status: deprecated
 preset:
   packages:
     skills:
@@ -24,6 +19,11 @@ preset:
 ---
 
 # Research Preset
+
+> **DEPRECATED** — The `research-analyst` agent supersedes this preset. It conducts
+> multi-source investigation with parallel Agent spawning across web, academic, video,
+> and competitive sources, cross-references findings with confidence ratings, and
+> produces cited synthesis reports. Install `research-analyst` instead.
 
 An end-to-end scholarly workflow for discovering, evaluating, synthesizing, and publishing
 academic research.

@@ -1,21 +1,10 @@
 ---
 name: biz-validation
-description: >
-  Complete business idea validation toolkit bundling four complementary skills:
-  market analysis (TAM/SAM/SOM, trend assessment), competitive landscape analysis
-  (Porter's Five Forces, feature matrices, positioning), feasibility assessment
-  (unit economics, technical risk, financial viability), and full idea validation
-  (Lean Canvas, JTBD, SWOT/PESTLE, integrated scoring). Install the complete suite
-  for end-to-end business validation, or install individual skills for focused analysis.
-  Triggers on: "validate business idea", "biz validation", "install business
-  analysis tools", "market and competitive analysis", "evaluate business concept",
-  "startup due diligence", "vet a business opportunity", "assess market feasibility",
-  "is this idea viable", "business idea scorecard", "idea validation toolkit".
-  Use this preset when setting up a complete business analysis capability across
-  market research, competition, and feasibility assessment.
+description: "DEPRECATED: Superseded by the idea-scout agent, which orchestrates the same skills (market-analyzer, competitive-analyzer, feasibility-assessor, idea-validator) with parallel research delegation, weighted scoring, and GO/CAUTION/NO-GO verdicts. Use idea-scout agent instead."
 type: preset
 metadata:
-  version: 1.0.0
+  version: 1.1.0
+  status: deprecated
 preset:
   packages:
     skills:
@@ -28,6 +17,10 @@ preset:
 ---
 
 # Biz Validation
+
+> **DEPRECATED** — The `idea-scout` agent supersedes this preset. It orchestrates the
+> same four skills with parallel Agent tool spawning, cross-referencing, weighted
+> validation scorecards, and GO/CAUTION/NO-GO verdicts. Install `idea-scout` instead.
 
 A curated bundle of four skills for comprehensive business idea validation.
 

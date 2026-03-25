@@ -1,18 +1,10 @@
 cases:
-  - id: install_research_workflow
+  - id: negative_deprecated_research_workflow
     prompt: "I need to set up my environment for academic research and paper writing"
     fixtures: []
     rubric:
-      - "installs all five research packages as a bundle"
-      - "covers discovery, review, critique, manuscript audit, and provenance"
-    trigger_expected: true
-
-  - id: thesis_setup
-    prompt: "I'm starting my thesis — what packages do I need for literature review and writing?"
-    fixtures: []
-    rubric:
-      - "recommends the research preset as a complete scholarly workflow"
-    trigger_expected: true
+      - "does not activate research preset (deprecated — use research-analyst agent)"
+    trigger_expected: false
 
   - id: negative_code_review
     prompt: "Set up my environment for code review and pull requests"
