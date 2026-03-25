@@ -1,0 +1,56 @@
+cases:
+  - id: build_from_architecture_doc
+    prompt: "Here's the architecture document for our new user service. Build it out end to end with tests and API docs."
+    fixtures: []
+    rubric:
+      - "activates full-stack-builder agent"
+      - "parses architecture document and identifies components"
+      - "scaffolds project structure"
+      - "implements components in dependency order"
+      - "writes tests alongside code"
+      - "generates API documentation"
+      - "runs pre-delivery review"
+    trigger_expected: true
+
+  - id: implement_feature_spec
+    prompt: "Implement this feature spec for the payment processing module. Full stack — API, database, tests, everything."
+    fixtures: []
+    rubric:
+      - "activates full-stack-builder agent"
+      - "creates database migrations"
+      - "implements API endpoints with error handling"
+      - "invokes security-scan for payment-related code"
+      - "produces production-ready code with test coverage"
+    trigger_expected: true
+
+  - id: scaffold_new_project
+    prompt: "Scaffold a new Node.js API project with TypeScript, PostgreSQL, and full test setup."
+    fixtures: []
+    rubric:
+      - "activates full-stack-builder agent"
+      - "creates directory structure and configuration"
+      - "sets up environment variable templates"
+      - "installs dependencies"
+      - "verifies scaffold builds"
+    trigger_expected: true
+
+  - id: code_review_only
+    prompt: "Review this pull request for code quality issues."
+    fixtures: []
+    rubric:
+      - "does not activate full-stack-builder (code-reviewer or pr-review territory)"
+    trigger_expected: false
+
+  - id: architecture_design_only
+    prompt: "Design the architecture for a microservices-based e-commerce platform."
+    fixtures: []
+    rubric:
+      - "does not activate full-stack-builder (project-architect territory)"
+    trigger_expected: false
+
+  - id: single_file_fix
+    prompt: "Fix the null pointer exception on line 42 of user_service.py."
+    fixtures: []
+    rubric:
+      - "does not activate full-stack-builder (inline fix, single file)"
+    trigger_expected: false

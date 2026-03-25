@@ -1,0 +1,45 @@
+cases:
+  - id: ship_request
+    prompt: "Ship this — run all checks, generate changelog, and open the PR."
+    fixtures: []
+    rubric:
+      - "activates release-captain agent"
+      - "runs pre-flight checks (tests, clean working tree)"
+      - "spawns secret-scanner agent"
+      - "invokes pre-landing-review and pr-review skills"
+      - "invokes changelog-composer skill"
+      - "opens PR via ship-workflow skill"
+    trigger_expected: true
+
+  - id: release_with_version
+    prompt: "Cut a minor release and open a pull request against main."
+    fixtures: []
+    rubric:
+      - "activates release-captain agent"
+      - "uses minor as version bump type"
+      - "runs all quality gates before shipping"
+      - "produces PR URL"
+    trigger_expected: true
+
+  - id: ready_to_merge
+    prompt: "This branch is ready to merge. Run quality gates and open the PR."
+    fixtures: []
+    rubric:
+      - "activates release-captain agent"
+      - "runs secret scanning, pre-landing review, and dependency audit"
+      - "opens PR with quality gate summary in body"
+    trigger_expected: true
+
+  - id: code_review_only
+    prompt: "Review the code changes on this branch for quality issues."
+    fixtures: []
+    rubric:
+      - "does not activate release-captain (code-reviewer or pr-review territory)"
+    trigger_expected: false
+
+  - id: implement_feature
+    prompt: "Build the authentication middleware for the API."
+    fixtures: []
+    rubric:
+      - "does not activate release-captain (full-stack-builder territory)"
+    trigger_expected: false
