@@ -1,0 +1,50 @@
+cases:
+  - id: full_codebase_audit
+    prompt: "Run a full quality audit on this repository before we release."
+    fixtures: []
+    rubric:
+      - "activates codebase-auditor agent"
+      - "spawns code-reviewer, security-reviewer, and secret-scanner agents in parallel"
+      - "runs architecture-reviewer and dependency-audit skills"
+      - "produces unified severity-ranked report"
+      - "includes pass/fail verdict"
+    trigger_expected: true
+
+  - id: comprehensive_review_request
+    prompt: "Check everything — code quality, security, secrets, dependencies."
+    fixtures: []
+    rubric:
+      - "activates codebase-auditor agent"
+      - "covers all five dimensions in a single report"
+      - "deduplicates findings across dimensions"
+    trigger_expected: true
+
+  - id: health_check_request
+    prompt: "Give me a codebase health check with prioritized action items."
+    fixtures: []
+    rubric:
+      - "activates codebase-auditor agent"
+      - "produces priority action items list"
+      - "includes dimension summary table"
+    trigger_expected: true
+
+  - id: code_review_only
+    prompt: "Review this code for naming and complexity issues."
+    fixtures: []
+    rubric:
+      - "does not activate codebase-auditor (code-reviewer territory)"
+    trigger_expected: false
+
+  - id: security_scan_only
+    prompt: "Scan for SQL injection vulnerabilities in the API endpoints."
+    fixtures: []
+    rubric:
+      - "does not activate codebase-auditor (security-reviewer territory)"
+    trigger_expected: false
+
+  - id: dependency_check_only
+    prompt: "Check my dependencies for known CVEs."
+    fixtures: []
+    rubric:
+      - "does not activate codebase-auditor (dependency-audit skill territory)"
+    trigger_expected: false
