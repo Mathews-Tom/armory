@@ -53,3 +53,38 @@ composition:
     agents:
       - code-reviewer
       - security-reviewer
+
+  # Orchestrator agents — invoked on-demand by user or team-lead.
+  # These agents compose skills and other agents into multi-phase workflows.
+  orchestration:
+    build_pipeline:
+      description: >
+        Full project lifecycle from idea to deployment.
+        Sequential with conditional gates.
+      sequence:
+        - project-architect
+        - project-planner
+        - full-stack-builder
+        - codebase-auditor
+        - release-captain
+
+    research_pipeline:
+      description: >
+        Investigation and synthesis across multiple source types.
+      agents:
+        - research-analyst
+        - idea-scout
+
+    content_pipeline:
+      description: >
+        Content creation and visual asset production.
+      agents:
+        - content-strategist
+        - proposal-writer
+        - media-producer
+
+    meta:
+      description: >
+        Orchestrator that delegates to all other agents.
+      agents:
+        - team-lead
