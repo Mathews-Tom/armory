@@ -232,3 +232,46 @@ gh api repos/owner/new-service/branches/main/protection --jq '{
 ```bash
 gh api repos/owner/new-service/contents/.github/workflows --jq '.[].name'
 ```
+
+---
+
+## Inline Workflow Examples
+
+### PR Lifecycle
+
+```bash
+# 1. Create a draft PR from the current branch
+gh pr create --repo owner/repo --title "Add rate limiter" --body "Token bucket at 100 req/min" --draft
+
+# 2. Check CI status on the PR
+gh pr checks 55 --repo owner/repo --watch
+
+# 3. Mark ready once CI passes
+gh pr ready 55 --repo owner/repo
+
+# 4. Approve the PR
+gh pr review 55 --repo owner/repo --approve --body "LGTM"
+
+# 5. Squash-merge and delete branch
+gh pr merge 55 --repo owner/repo --squash --delete-branch
+```
+
+See above in this file for the full lifecycle with label management and reviewer rotation.
+
+### CI Triage
+
+```bash
+# 1. Find the latest failed run on main
+gh run list --repo owner/repo --branch main --status failure --limit 1 --json databaseId --jq '.[0].databaseId'
+
+# 2. View failed step logs (substitute run ID from step 1)
+gh run view 123456789 --repo owner/repo --log-failed
+
+# 3. Rerun only failed jobs
+gh run rerun 123456789 --repo owner/repo --failed
+
+# 4. Watch until complete
+gh run watch 123456789 --repo owner/repo
+```
+
+See above in this file for batch triage across multiple branches and failure pattern analysis.

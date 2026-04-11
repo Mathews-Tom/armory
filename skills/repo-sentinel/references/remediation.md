@@ -257,3 +257,55 @@ Always add a comment with the human-readable version for maintainability.
 | Apache 2.0   | GPL-3.0                   | ✅ (one-way)         | Document in NOTICE                 |
 | GPL-3.0      | Any OSS                   | ✅                   | Attribute in NOTICE                |
 | Proprietary  | GPL                       | ❌                   | Replace dep immediately            |
+
+---
+
+## Quick-Reference Remediation
+
+**Triage decision table:**
+
+| Pushed to public remote? | Contains real credentials? | Action                                                       |
+| ------------------------ | -------------------------- | ------------------------------------------------------------ |
+| No                       | Any                        | `git rm --cached` + fix `.gitignore`                         |
+| Yes                      | No (placeholder)           | `git rm --cached` + fix `.gitignore`. Scrub optional.        |
+| Yes                      | Yes                        | Full history scrub + credential rotation. Assume compromise. |
+
+**git filter-repo (preferred):**
+
+```bash
+cp -r .git .git-backup
+
+# By path
+git filter-repo --invert-paths --path <file> --force
+
+# By glob
+git filter-repo --invert-paths --path-glob '*.pem' --force
+
+# By regex
+git filter-repo --invert-paths --path-regex '.*secret.*' --force
+
+# Re-add remote (filter-repo strips it)
+git remote add origin <url>
+git push --force --all && git push --force --tags
+```
+
+**BFG Repo-Cleaner (fallback):**
+
+```bash
+java -jar bfg.jar --delete-files <filename> .git
+git reflog expire --expire=now --all && git gc --prune=now --aggressive
+```
+
+**Post-scrub protocol (non-optional):**
+
+1. Rotate every exposed credential — scrubbing does not un-expose. GitHub caches objects ~90 days. Mirrors and forks retain indefinitely.
+2. Verify: `git log --all --full-history -- <path>` must return empty.
+3. Update all ignore/exclude rules before next commit.
+4. For severe exposure: consider repo deletion + recreation. Contact GitHub support for cache invalidation.
+5. Rotate CI/CD secrets independently — pipeline stores are unaffected by git history operations.
+6. Document incident internally: what was exposed, how long, which remotes, what was rotated.
+
+## .gitignore Generation
+
+Generate a complete, opinionated `.gitignore` tailored to detected project type with all
+hygiene rules baked in. Read `references/templates.md § .gitignore Generator`.

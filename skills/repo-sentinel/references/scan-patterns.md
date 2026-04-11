@@ -432,3 +432,103 @@ SKILL.md output format template defines how to present findings.
 | 21    | 10      | Platform metadata (CODEOWNERS, FUNDING, etc.) |
 | 22    | 11      | License and legal compliance                  |
 | 23    | 12      | Community surface (SECURITY.md, templates)    |
+
+---
+
+## Quick-Reference Scan Commands
+
+The most critical inline checks. Full pattern set is elsewhere in this file.
+
+```bash
+# 1. Secrets in code
+git grep -rnE '(api[_-]?key|api[_-]?secret|access[_-]?token|auth[_-]?token|secret[_-]?key|private[_-]?key|password|passwd|credential)\s*[:=]\s*["\x27][^\s"'\'']{8,}' -- ':!*.lock' ':!node_modules' ':!vendor'
+
+# 2. Internal URLs
+git grep -rnE 'https?://[^\s)>"]*\.(internal|corp|local|intranet|private)' -- ':!*.lock'
+
+# 3. Private IPs
+git grep -rnE '(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)' -- ':!*.lock' ':!node_modules'
+
+# 4. Cloud resource identifiers
+git grep -rnE '(arn:aws:|projects/[a-z][\w-]+/locations|/subscriptions/[0-9a-f-]{36})' -- ':!*.lock'
+
+# 5. Connection strings
+git grep -rnE '(mongodb|postgres|mysql|redis|amqp|mssql)(\+\w+)?://[^${\s]+@' -- ':!*.lock'
+
+# 6. .env files tracked
+git ls-files | grep -iE '\.env(\.|$)' | grep -v '\.example$\|\.template$'
+
+# 7. Credential files tracked
+git ls-files | grep -iE '\.(pem|key|p12|pfx|keystore|jks|credentials)$'
+
+# 8. .gitignore leakage
+grep -n '^#\|secret\|credential\|oauth\|service.account\|password\|token' .gitignore 2>/dev/null
+
+# 9. .claude/ tracked
+git ls-files | grep '\.claude/'
+
+# 10. Tracked files contradicting .gitignore
+git ls-files -i --exclude-standard 2>/dev/null
+
+# 11. Sensitive TODO/FIXME/HACK comments
+git grep -rnE '(TODO|FIXME|HACK|XXX)\b.*\b(security|auth|bypass|vulnerability|exploit|hack|password|credential|secret|token|admin)' -- ':!*.lock'
+
+# 12. CI/CD secrets inline
+git grep -rnE '(password|token|key|secret)\s*[:=]\s*[^\s${\[]' -- '.github/workflows/' '.gitlab-ci.yml' 'Jenkinsfile' '.circleci/'
+
+# 13. Internal URLs in docs
+git grep -nE 'https?://[^\s)>]*\.(internal|corp|local|intranet|private)' -- '*.md' '*.rst' '*.txt' '*.adoc'
+
+# 14. Private tracker references in docs
+git grep -nE '(JIRA|LINEAR|ASANA|SHORTCUT|CLUBHOUSE|NOTION)-?\s*[A-Z]*-?\d+' -- '*.md' '*.rst' '*.txt'
+
+# 15. Person names in docs
+git grep -nE '(@[a-zA-Z][\w-]+|(ask|contact|ping|reach out to)\s+[A-Z][a-z]+)' -- '*.md' '*.rst' '*.txt'
+
+# 16. CI hardcoded IPs
+git grep -nE '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b' -- '.github/workflows/*.yml' '.gitlab-ci.yml'
+
+# 17. .env.example real values
+grep -E '=' .env.example 2>/dev/null | grep -vE '=(your-|placeholder|changeme|xxx|example|TODO|REPLACE|""|\x27\x27|$)'
+
+# 18. AWS account IDs
+git grep -nE '\b\d{12}\b' -- '*.ts' '*.js' '*.py' '*.yaml' '*.yml' '*.json' '*.tf' | grep -iE '(account|arn|aws)'
+```
+
+**Output format:**
+
+```text
+REPO SENTINEL AUDIT — <repo> — <date>
+
+[CRITICAL — Direct credential exposure]
+  src/config.ts:14 — API_KEY = "sk-live-..." → parameterize
+  .env.production — tracked, contains real values → git rm --cached + history scrub
+
+[HIGH — Infrastructure disclosure]
+  docker-compose.yml:8 — redis://admin:pass@10.0.3.42:6379 → parameterize
+  package-lock.json:892 — resolved: "https://registry.internal.corp/..." → remove internal dep
+
+[MEDIUM — Information leakage]
+  .gitignore:24 — oauth-credentials.json → replace with *.credentials.json
+  README.md:45 — "See https://wiki.internal.corp/auth-design" → remove
+  CODEOWNERS:3 — @john-smith → replace with @team-handle
+
+[LOW — Hygiene]
+  .gitignore:1-8 — verbose comment header → remove all comments
+  LICENSE — missing → add appropriate license file
+
+[TRACKED-BUT-IGNORED CONTRADICTIONS]
+  .env.local — in .gitignore but tracked → git rm --cached
+
+[MISSING FROM .gitignore]
+  .claude/ — directory exists, not ignored
+  *.sqlite — database files present, not ignored
+
+[LICENSE COMPLIANCE]
+  GPL-3.0 dependency in MIT-licensed project: package-x → evaluate compatibility
+
+[ENFORCEMENT STATUS]
+  Pre-commit hooks: NOT CONFIGURED → see references/templates.md
+  CI secret scanning: NOT CONFIGURED → see references/templates.md
+  GitHub secret scanning: UNKNOWN → enable in repo settings
+```
