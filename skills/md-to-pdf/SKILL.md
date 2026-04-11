@@ -1,17 +1,6 @@
 ---
 name: md-to-pdf
-description: 'Convert Markdown files to professionally styled PDF documents with full
-  support for Mermaid diagrams, LaTeX/KaTeX math equations, tables, syntax-highlighted
-  code blocks, and all standard Markdown features. Use this skill whenever the user
-  wants to convert a .md file to .pdf, generate a PDF report from Markdown, or produce
-  print-ready documents from Markdown sources containing diagrams, math, or complex
-  formatting. Trigger phrases include: "convert markdown to pdf", "make a pdf from
-  this md", "render this markdown", "export markdown as pdf", "markdown to pdf with
-  diagrams", "pdf from markdown with equations", "generate a pdf report", "how do
-  I export markdown as PDF", "convert my notes to PDF", "can you make a PDF from this
-  markdown".
-
-  '
+description: 'Convert Markdown to styled PDFs with Mermaid diagrams, LaTeX/KaTeX math, tables, and code highlighting. Triggers on: "convert markdown to pdf", "make a pdf from this md", "export markdown as pdf", "pdf from markdown with equations".'
 license: MIT. See LICENSE.txt for complete terms.
 metadata:
   version: 1.2.1

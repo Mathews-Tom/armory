@@ -1,18 +1,6 @@
 ---
 name: pr-review
-description:
-  'Pull request and code review with diff-based routing across five dimensions:
-  code quality and guideline compliance, test coverage analysis, silent failure detection,
-  type design and invariant analysis, and comment quality auditing. Classifies changed
-  files and loads only relevant review methodologies. Produces severity-ranked findings
-  (Critical, Important, Suggestion) with confidence scoring. Replaces pr-review-toolkit
-  plugin. Trigger phrases: "review my PR", "review this code", "check my changes",
-  "is this ready to merge", "audit this PR", "review before committing", "check code
-  quality", "any issues with this code", "pre-merge review", "look over my changes",
-  "code review". Use this skill when reviewing code before commit or merge, checking
-  PR quality, or when the user asks for feedback on recent modifications.
-
-  '
+description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality with severity-ranked findings. Triggers on: "review my PR", "review this code", "check my changes", "audit this PR", "code review". NOT for pre-landing gate, use pre-landing-review.'
 metadata:
   version: 1.1.1
   category: review

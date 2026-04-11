@@ -1,12 +1,6 @@
 ---
 name: gpu-optimizer
-description:
-  Expert GPU optimization for modern consumer GPUs (8-24GB VRAM). Use this
-  skill when you need to optimize GPU training, speed up CUDA code, reduce OOM errors,
-  tune XGBoost for GPU, migrate NumPy to CuPy, make a model faster, manage GPU memory,
-  optimize VRAM usage, or benchmark PyTorch. Covers mixed precision, gradient checkpointing,
-  XGBoost GPU acceleration, CuPy/cuDF migration, vectorization, torch.compile, and
-  diagnostics. NVIDIA GPUs only. PyTorch, XGBoost, and RAPIDS frameworks.
+description: 'GPU optimization for consumer NVIDIA GPUs (8-24GB VRAM) covering mixed precision, gradient checkpointing, XGBoost GPU, CuPy/cuDF migration, and torch.compile. Triggers on: "optimize GPU training", "speed up CUDA", "reduce OOM", "migrate NumPy to CuPy", "manage GPU memory", "benchmark PyTorch".'
 metadata:
   version: 1.1.1
   category: data

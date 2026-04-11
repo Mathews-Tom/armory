@@ -1,20 +1,6 @@
 ---
 name: repo-sentinel
-description:
-  "Full security audit and enforcement for public repositories across 12
-  attack surfaces: git history, source code, docs, config, .gitignore recon, CI/CD,
-  containers, dependencies, binaries, metadata, platform-specific (GitHub/GitLab),
-  license compliance, and community surface. Provides fast-path and full 20-check
-  audits, pre-commit hooks, CI gates, .gitignore generation, and history scrubbing.
-  Use whenever pushing to a public remote, open-sourcing a repo, writing README/docs,
-  configuring CI/CD or Dockerfiles, adding dependencies, or checking license compliance.
-  Trigger on: push to GitHub, make repo public, open source this, set up the repo,
-  write README, add CI/CD, create Dockerfile, set up pre-commit, add license, write
-  SECURITY.md, secret leaks, credential rotation, .claude/ tracking, repo hygiene,
-  security scanning, or is this safe to push, pre-oss, open source readiness, release
-  audit, or open source audit. This is the gatekeeper between internal and public.
-
-  "
+description: 'Full security audit for public repositories across 12 attack surfaces: git history, secrets, CI/CD, containers, dependencies, licenses. Triggers on: "push to GitHub", "make repo public", "open source this", "is this safe to push", "release audit", "secret leaks".'
 metadata:
   version: 1.1.1
   category: review

@@ -1,16 +1,6 @@
 ---
 name: devils-advocate
-description: 'Challenges AI-generated plans, code, designs, and decisions before you commit.
-  Pairs with any other skill as a review layer. Uses pre-mortem analysis, inversion
-  thinking, and Socratic questioning to find what AI missed — blind spots, hidden
-  assumptions, failure modes, and optimistic shortcuts. The skill that asks "are you sure
-  about that?" so you don''t have to. Triggers on: "challenge this", "devils advocate",
-  "stress test this plan", "what could go wrong", "poke holes in this", "review this
-  critically", "second opinion on this design", "what am I missing". Use this skill when
-  you need critical review of any AI-generated output, architecture decision, implementation
-  plan, or code before committing to it.
-
-  '
+description: 'Challenges AI-generated plans, code, and designs via pre-mortem, inversion, and Socratic questioning to surface blind spots and failure modes. Triggers on: "challenge this", "devils advocate", "stress test this plan", "poke holes in this", "what am I missing".'
 metadata:
   version: 1.0.0
   category: review

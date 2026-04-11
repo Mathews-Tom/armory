@@ -1,18 +1,6 @@
 ---
 name: skill-distiller
-description:
-  'Converts Opus-quality skill packages into deterministic, Haiku-executable workflows
-  through trace-driven distillation. Analyzes reasoning complexity per section, collects
-  execution traces on representative tasks, extracts deterministic decision paths, and
-  rewrites abstract instructions as constrained templates. Validates the distilled skill
-  on lower-cost models and produces a cross-model comparison report. Implements cross-model
-  skill transfer from EvoSkills (+35-45pp gains). Triggers on: "distill this skill",
-  "make this skill work on Haiku", "simplify skill for lower model", "cross-model
-  optimization", "skill distillation", "optimize skill for cost", "reduce skill complexity",
-  "deterministic skill rewrite", "convert to Haiku-compatible". Use this skill when an
-  existing skill works on Opus but needs to run reliably on Sonnet or Haiku. NOT for
-  general code simplification (use code-refiner). NOT for prompt optimization (use
-  prompt-lab).'
+description: 'Converts Opus-quality skills into deterministic Haiku-executable workflows via trace-driven distillation and cross-model validation. Triggers on: "distill this skill", "make this skill work on Haiku", "cross-model optimization", "optimize skill for cost". NOT for code simplification, use code-refiner.'
 metadata:
   version: 1.0.1
   category: development

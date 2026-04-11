@@ -1,15 +1,6 @@
 ---
 name: sql-optimizer
-description:
-  'Analyzes SQL queries for performance issues: missing indexes, N+1 patterns,
-  suboptimal joins, full table scans. Interprets EXPLAIN output, detects anti-patterns,
-  recommends indexes, and rewrites queries with detailed explanations of each optimization.
-  Triggers on: "optimize this query", "slow query", "query performance", "add indexes",
-  "index recommendation", "explain plan", "query plan", "N+1 query", "fix this SQL",
-  "SQL performance", "optimize SQL", "why is this query slow", "index strategy". Use
-  this skill when given a SQL query that needs performance analysis or optimization.
-
-  '
+description: 'Analyzes SQL queries for missing indexes, N+1 patterns, suboptimal joins, and full table scans. Interprets EXPLAIN, detects anti-patterns, rewrites queries. Triggers on: "optimize this query", "slow query", "add indexes", "explain plan", "N+1 query", "why is this query slow".'
 metadata:
   version: 1.1.1
   category: data

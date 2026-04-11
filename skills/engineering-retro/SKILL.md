@@ -1,15 +1,6 @@
 ---
 name: engineering-retro
-description:
-  'Git-based engineering retrospective analyzing commit history, PR patterns,
-  and development velocity over a configurable time window. Use this skill when the
-  user asks for a retrospective, retro, sprint review, weekly review, engineering
-  review, development summary, commit analysis, team velocity report, or says "what
-  did we ship", "what happened this week", "engineering retro", "sprint retro", "dev
-  summary", "/engineering-retro". Supports time windows (7d default, 24h, 14d, 30d)
-  and monorepo path scoping.
-
-  '
+description: 'Git-based engineering retrospective analyzing commits, PRs, and velocity over configurable windows with monorepo path scoping. Triggers on: "retrospective", "sprint retro", "weekly review", "what did we ship", "engineering retro", "dev summary", "commit analysis".'
 metadata:
   version: 1.0.1
   category: review

@@ -1,17 +1,6 @@
 ---
 name: code-refiner
-description:
-  'Deep code simplification, refactoring, and quality refinement. Analyzes
-  structural complexity, anti-patterns, and readability debt, then applies targeted
-  refactoring preserving exact behavior. Language-agnostic: Python, Go, TypeScript/JavaScript,
-  Rust. Use this skill when the goal is simplification and clarity rather than bug-finding.
-  Triggers on: "simplify this code", "clean up my code", "refactor for clarity", "reduce
-  complexity", "make this more readable", "code quality pass", "tech debt cleanup",
-  "run the code refiner", "simplify recent changes", "this code is messy", "too much
-  nesting", "this function is too long", "clean this up before I PR it", "tidy up
-  my code", cyclomatic complexity, cognitive complexity, code smells.
-
-  '
+description: 'Deep code simplification and refactoring preserving behavior across Python, Go, TypeScript, Rust. Targets complexity, anti-patterns, readability debt. Triggers on: "simplify this code", "refactor for clarity", "reduce complexity", "make this more readable", "tech debt cleanup", "too much nesting".'
 metadata:
   version: 1.1.1
   category: review

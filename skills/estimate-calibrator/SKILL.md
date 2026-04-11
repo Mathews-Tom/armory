@@ -1,17 +1,6 @@
 ---
 name: estimate-calibrator
-description:
-  'Produces calibrated three-point estimates (best/likely/worst case) with
-  explicit unknowns, confidence intervals, and assumption documentation. Breaks work
-  into atomic units, identifies technical and scope uncertainties, calculates PERT
-  ranges, and provides confidence rationale. Triggers on: "estimate this", "how long
-  will this take", "effort estimate", "time estimate", "best case worst case", "confidence
-  interval", "sizing", "estimate effort", "how big is this", "story points", "t-shirt
-  sizing", "estimate the work", "PERT". NOT for task decomposition, implementation
-  plans, or dependency mapping — use task-decomposer instead. Use this skill when
-  a task or project needs an effort estimate with explicit uncertainty.
-
-  '
+description: 'Produces calibrated three-point PERT estimates (best/likely/worst) with confidence intervals, unknowns, and assumptions. Triggers on: "estimate this", "how long will this take", "effort estimate", "confidence interval", "story points", "t-shirt sizing". NOT for task decomposition, use task-decomposer.'
 metadata:
   version: 1.1.1
   category: development

@@ -1,16 +1,6 @@
 ---
 name: test-harness
-description:
-  'Generates comprehensive pytest test suites: happy path, edge cases,
-  error conditions, fixture scaffolding, mock strategy, and async patterns. Analyzes
-  function signatures, dependency chains, and complexity hotspots to produce runnable,
-  parametrized test files. Triggers on: "generate tests", "write tests for", "test
-  this function", "test this class", "create test suite", "what tests should I write",
-  "pytest for", "unit tests for", "mock strategy for", "how to test", "test coverage
-  for", "write a test file". Use this skill when given a Python function, class, or
-  module and asked to produce tests.
-
-  '
+description: 'Generates pytest test suites with happy path, edge cases, error conditions, fixture scaffolding, mocks, async patterns. Triggers on: "generate tests", "write tests for", "test this function", "create test suite", "pytest for", "unit tests for", "mock strategy for".'
 metadata:
   version: 1.1.1
   category: development

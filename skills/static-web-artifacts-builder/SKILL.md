@@ -1,16 +1,6 @@
 ---
 name: static-web-artifacts-builder
-description:
-  'Build elaborate, self-contained static HTML artifacts opened in a browser
-  — interactive diagrams, architecture visuals, data dashboards, HTML infographics,
-  and rich interactive deliverables. Use this skill when the output is an HTML file
-  viewed in a browser. Zero build toolchain — no React, no Vite, no Parcel. Pure HTML5
-  + CSS3 (Grid/Flexbox) + inline SVG. Triggers on: "interactive HTML", "self-contained
-  web component", "open in browser", "interactive diagram", "visual dashboard", "HTML
-  artifact", "HTML infographic", "interactive infographic". For image file output
-  (PNG/SVG), use concept-to-image instead.
-
-  '
+description: 'Build self-contained static HTML artifacts opened in a browser: interactive diagrams, dashboards, infographics. Pure HTML5+CSS3+inline SVG, zero toolchain. Triggers on: "interactive HTML", "open in browser", "HTML artifact", "visual dashboard", "HTML infographic". NOT for PNG/SVG output, use concept-to-image.'
 metadata:
   version: 1.1.1
   category: visualization

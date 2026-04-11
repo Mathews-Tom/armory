@@ -1,18 +1,6 @@
 ---
 name: ux-expert
-description: 'UX design expert for auditing and redesigning pages, dashboards, and data-heavy
-  interfaces. Conducts 4-phase collaborative reviews: understand current state and user
-  tasks, audit across 8 UX dimensions (information architecture, visual hierarchy, screen
-  real estate, interaction cost, cognitive load, context orientation, data presentation,
-  responsiveness), propose layout concepts with rationale, and spec actionable implementation
-  details with wireframes and component recommendations. Specializes in B2B SaaS, dashboards,
-  analytics, and data-dense applications. Triggers on: "review UX", "audit this page",
-  "redesign the dashboard", "UX review", "improve the layout", "fix the information
-  hierarchy", "component recommendations", "dashboard UX audit". Use this skill when a
-  page or interface needs professional UX evaluation, layout redesign, or component
-  selection guidance grounded in UX principles and cognitive psychology.
-
-  '
+description: 'UX design expert for auditing and redesigning pages, dashboards, and data-dense interfaces via 4-phase collaborative reviews across 8 UX dimensions. Triggers on: "review UX", "audit this page", "redesign the dashboard", "UX review", "improve the layout", "dashboard UX audit", "component recommendations".'
 metadata:
   version: 1.0.0
   category: review

@@ -1,17 +1,6 @@
 ---
 name: manuscript-provenance
-description:
-  'Computational provenance audit verifying that every number, table, figure,
-  ordering, and terminology in a manuscript is derived from code and scripts — not
-  manually entered. Cross-references LaTeX source against the codebase to detect hardcoded
-  values, stale outputs, broken pipelines, and manual data entry. Companion to manuscript-review:
-  that skill audits the document as prose; this skill audits whether the document
-  is faithfully generated from code. Use when the user says "check provenance", "verify
-  reproducibility", "audit my pipeline", "are my numbers from code", "check manuscript
-  against scripts", "provenance audit", or any request to verify that manuscript content
-  traces back to computational outputs.
-
-  '
+description: 'Computational provenance audit verifying every number, table, and figure in a manuscript derives from code, not manual entry. Triggers on: "check provenance", "verify reproducibility", "audit my pipeline", "are my numbers from code", "provenance audit". Companion to manuscript-review (prose audit).'
 metadata:
   version: 1.1.1
   category: review

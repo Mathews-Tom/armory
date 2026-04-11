@@ -1,20 +1,6 @@
 ---
 name: github
-description:
-  'GitHub CLI operations via `gh` for issues, pull requests, CI/Actions,
-  releases, repos, search, gists, and the REST/GraphQL API. Structured output with
-  `--json` and `--jq` for parsing. Covers `gh issue create/list/view/edit/close`,
-  `gh pr create/review/merge/checks`, `gh run list/view/rerun/watch`, `gh release
-  create`, `gh search repos/issues/prs/code`, `gh api` for REST and GraphQL queries,
-  and `gh gist` operations. Includes error handling for HTTP 401/403/404/422/429,
-  scope troubleshooting, and rate limit management. Trigger phrases: "create an issue",
-  "file a bug", "open a ticket", "submit a PR", "raise a pull request", "check pipeline",
-  "view test results", "CI failing", "why did CI fail", "check CI status", "merge
-  a PR", "manage releases", "query the GitHub API", "search repositories", "triage
-  workflows", "automate GitHub operations". Also triggers when the user pastes a GitHub
-  URL.
-
-  '
+description: 'GitHub CLI operations via `gh` for issues, PRs, Actions, releases, and REST/GraphQL API with `--json`/`--jq` parsing. Triggers on: "create an issue", "submit a PR", "check CI status", "why did CI fail", "merge a PR", or pasted GitHub URLs.'
 metadata:
   version: 1.1.1
   category: review

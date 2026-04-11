@@ -1,20 +1,6 @@
 ---
 name: notebooklm
-description:
-  "Complete API for Google NotebookLM — full programmatic access including
-  features not in the web UI. Create notebooks, add sources (URLs, YouTube, PDFs,
-  audio, video, images), chat with content, generate all artifact types (podcasts,
-  videos, infographics, slide decks, quizzes, flashcards, mind maps, reports, data
-  tables), and download results in multiple formats. Uses the notebooklm-py CLI. Use
-  this skill when the user mentions: notebooklm, notebook lm, create a podcast, generate
-  a podcast, audio overview, create flashcards, generate flashcards, create a quiz,
-  generate quiz, generate infographic, make an infographic, generate slide deck, create
-  mind map, generate mind map, generate report, turn this into a podcast, summarize
-  in notebooklm, add sources to notebooklm, notebooklm analysis, create a video explainer,
-  generate video overview, research with notebooklm, offload analysis, bulk source
-  import, download from notebooklm, notebooklm deliverables, or uses /notebooklm.
-
-  "
+description: 'Full NotebookLM API via notebooklm-py CLI: create notebooks, add sources, generate podcasts, videos, infographics, slides, quizzes, flashcards, mind maps. Triggers on: "notebooklm", "create a podcast", "audio overview", "generate flashcards", "generate infographic", "/notebooklm".'
 metadata:
   version: 1.1.1
   category: research

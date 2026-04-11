@@ -1,14 +1,6 @@
 ---
 name: pre-landing-review
-description:
-  'Gate-oriented safety audit for code changes before landing, using a
-  structured checklist with two-pass severity triage. Distinct from pr-review (which
-  is diff-based multi-dimension review) — this is a blocking safety gate. Use this
-  skill when the user asks for a pre-landing check, safety audit, pre-merge review,
-  gate check, landing review, or says "is this safe to land", "pre-landing review",
-  "safety check before merge", "run the checklist", "gate check", "/pre-landing-review".
-
-  '
+description: 'Gate-oriented safety audit for code changes before landing, using a checklist with two-pass severity triage. Triggers on: "is this safe to land", "pre-landing review", "safety check before merge", "gate check", "/pre-landing-review". NOT for diff review, use pr-review.'
 metadata:
   version: 1.0.1
   category: review

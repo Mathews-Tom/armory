@@ -1,15 +1,6 @@
 ---
 name: usage-audit
-description: >
-  Audit a Claude Code setup for token waste and context bloat. Runs /context
-  for real overhead, then audits MCP servers, CLAUDE.md rules, installed
-  skills, settings.json, and file permissions against five bloat filters.
-  Returns a health score with specific cuts. Triggers on: "audit my context",
-  "usage audit", "context audit", "token audit", "why is Claude slow",
-  "context bloat", "cleanup my setup", "check my CLAUDE.md", "audit settings".
-  Use when a session feels heavy, after installing new packages, or on a
-  recurring cadence to catch drift. NOT for auditing a codebase (use
-  codebase-auditor) or a single package (use package-evaluator).
+description: 'Audit a Claude Code setup for token waste and context bloat. Checks MCP servers, CLAUDE.md, skills, and settings against bloat filters. Triggers on: "audit my context", "usage audit", "token audit", "context bloat". NOT for codebase audits.'
 metadata:
   version: 1.0.0
   category: review

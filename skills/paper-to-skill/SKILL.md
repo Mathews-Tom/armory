@@ -1,18 +1,6 @@
 ---
 name: paper-to-skill
-description:
-  'Converts research papers into executable skill packages by extracting actionable
-  methodologies and feeding them through co-evolutionary refinement. Chains document
-  conversion (to-markdown), critical analysis (research-critique), specification
-  extraction, and automated skill generation (test-engineer). Produces attributed,
-  validated skill packages from arXiv papers, PDFs, or pasted content. Triggers on:
-  "convert this paper to a skill", "paper-to-skill", "implement this paper as a skill",
-  "extract methodology from paper", "turn this research into a skill", "make a skill
-  from this arXiv paper", "create skill from research", "paper implementation".
-  Use this skill when a research paper describes a methodology that should become a
-  reusable skill package. NOT for literature review or paper summarization (use
-  research-critique or literature-review). NOT for general skill creation without
-  a paper source (use test-engineer agent).'
+description: 'Converts research papers into executable skill packages via document conversion, critical analysis, and co-evolutionary refinement. Triggers on: "convert this paper to a skill", "paper-to-skill", "extract methodology from paper", "make a skill from this paper". NOT for literature review, use research-critique.'
 metadata:
   version: 1.0.1
   category: research

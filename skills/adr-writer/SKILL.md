@@ -1,16 +1,6 @@
 ---
 name: adr-writer
-description:
-  'Generates Architecture Decision Records (ADRs) capturing context, decision
-  rationale, alternatives considered, and projected consequences. Produces numbered,
-  status-tracked documents following the standard ADR format with proper metadata
-  lifecycle. Triggers on: "write an ADR", "document this decision", "architecture
-  decision record", "why did we choose", "capture this decision", "record the decision",
-  "ADR for", "document the architecture", "decision record", "design decision", "technical
-  decision". Use this skill when an architectural or technical decision needs to be
-  documented.
-
-  '
+description: 'Generates Architecture Decision Records capturing context, rationale, alternatives, and consequences in numbered status-tracked format. Triggers on: "write an ADR", "document this decision", "architecture decision record", "decision record", "design decision", "ADR for".'
 metadata:
   version: 1.1.1
   category: operations

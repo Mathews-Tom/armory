@@ -1,20 +1,6 @@
 ---
 name: research-critique
-description:
-  'Critical analysis of research papers, academic manuscripts, preprints,
-  and technical studies — evaluating methodology, claims-evidence alignment, contribution
-  significance, and intellectual honesty. Produces coherent analytical responses (not
-  checklists) that distinguish genuine weaknesses from standard field limitations.
-  Governs intellectual posture: collegial reader, not adversarial reviewer. Triggers
-  on: "critique this paper", "review this research", "what do you think of this paper",
-  "analyze this study", "evaluate the methodology", "is this paper sound", "assess
-  this research", "strengths and weaknesses of this paper", "does the evidence support
-  the claims". Use this skill when the user provides a research paper, preprint, or
-  technical study and asks for critical evaluation of its scientific merit, methodology,
-  or contribution — not formatting, citation hygiene, or submission readiness (use
-  manuscript-review for those).
-
-  '
+description: 'Critical analysis of research papers evaluating methodology, claims-evidence alignment, and contribution significance. Triggers on: "critique this paper", "review this research", "analyze this study", "evaluate the methodology", "is this paper sound". NOT for formatting or submission readiness, use manuscript-review.'
 metadata:
   version: 1.0.1
   category: review

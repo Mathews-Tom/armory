@@ -1,17 +1,6 @@
 ---
 name: env-validator
-description:
-  'Validates .env files and environment variable configurations against project
-  requirements. Checks for missing required variables, type mismatches, insecure
-  defaults, unreferenced variables, and common configuration errors. Compares .env
-  against .env.example, code references, and deployment manifests. Produces a
-  structured validation report with severity-ranked findings. Triggers on: "validate
-  env file", "check environment variables", "env file audit", "missing env vars",
-  "env validation", "check .env", "environment config check", "validate configuration",
-  "env file review", "dotenv validation". Use this skill when verifying environment
-  configuration completeness and correctness before deployment or after onboarding.
-  NOT for secret scanning (use repo-sentinel or secret-scanner). NOT for general
-  config file editing (use filesystem skill).'
+description: 'Validates .env files against code references and manifests for missing vars, type mismatches, insecure defaults, and unused entries. Triggers on: "validate env file", "check environment variables", "missing env vars", "check .env", "dotenv validation". NOT for secret scanning, use repo-sentinel.'
 metadata:
   version: 1.0.1
   category: operations

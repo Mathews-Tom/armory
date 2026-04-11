@@ -3,11 +3,9 @@ packages:
   skills:
   - name: adr-writer
     version: 1.1.1
-    description: 'Generates Architecture Decision Records (ADRs) capturing context, decision rationale, alternatives considered,
-      and projected consequences. Produces numbered, status-tracked documents following the standard ADR format with proper
-      metadata lifecycle. Triggers on: "write an ADR", "document this decision", "architecture decision record", "why did
-      we choose", "capture this decision", "record the decision", "ADR for", "document the architecture", "decision record",
-      "design decision", "technical decision". Use this skill when an architectural or technical decision needs to be documented.'
+    description: 'Generates Architecture Decision Records capturing context, rationale, alternatives, and consequences in
+      numbered status-tracked format. Triggers on: "write an ADR", "document this decision", "architecture decision record",
+      "decision record", "design decision", "ADR for".'
     path: skills/adr-writer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/adr-writer/SKILL.md
     tags:
@@ -20,12 +18,9 @@ packages:
     phase: plan
   - name: agent-builder
     version: 1.1.1
-    description: Build AI agents and automate Claude Code programmatically using the Claude Agent SDK and headless CLI mode.
-      Use this skill when you need to build an agent, create a Claude agent, make a bot, work with the agent SDK, run Claude
-      in headless mode, write programmatic agent code, automate with Claude, create an MCP server builder, or query Claude
-      programmatically. Covers the Python SDK, the claude -p headless interface, custom tool creation with SDK MCP servers,
-      hooks for deterministic control, session management, and CLI flag reference. Authentication uses existing ~/.claude/
-      config — no API keys required.
+    description: 'Build AI agents and automate Claude Code programmatically via the Claude Agent SDK and headless CLI mode.
+      Covers Python SDK, claude -p, SDK MCP servers, hooks, sessions. Triggers on: "build an agent", "agent SDK", "headless
+      mode", "automate Claude", "programmatic agent".'
     path: skills/agent-builder
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/agent-builder/SKILL.md
     tags:
@@ -38,11 +33,9 @@ packages:
     phase: build
   - name: api-docs-generator
     version: 1.1.1
-    description: 'Audits and enhances API documentation for FastAPI and REST endpoints. Identifies missing descriptions, incomplete
-      response codes, missing examples, and generates enhanced docstrings, Pydantic model examples, and OpenAPI spec improvements.
-      Triggers on: "generate API docs", "document this API", "OpenAPI for", "add examples to", "improve docstrings", "API
-      documentation audit", "FastAPI docs", "document endpoints", "API reference", "swagger docs", "REST API docs", "endpoint
-      documentation", "response documentation". Use this skill when API endpoints need documentation or documentation audit.'
+    description: 'Audits and enhances FastAPI and REST API documentation: missing descriptions, response codes, examples,
+      docstrings, Pydantic models, OpenAPI spec. Triggers on: "generate API docs", "document this API", "OpenAPI for", "FastAPI
+      docs", "document endpoints", "swagger docs".'
     path: skills/api-docs-generator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/api-docs-generator/SKILL.md
     tags:
@@ -55,12 +48,9 @@ packages:
     phase: ship
   - name: architecture-diagram
     version: 1.1.1
-    description: 'Generate detailed layered architecture diagrams as self-contained HTML artifacts with inline SVG icons,
-      CSS Grid nested container layout, SVG path connection overlays, and color-coded connection legends. Triggers on: "architecture
-      diagram", "infra diagram", "system diagram", "deployment diagram", "network diagram", "topology", "draw architecture",
-      "visualize architecture", "system topology", or any request for visual representation of system components, containment
-      hierarchy, and interconnections. For architecture reviews, audits, critiques, or design assessments, use architecture-reviewer
-      instead.'
+    description: 'Generate layered architecture diagrams as self-contained HTML with inline SVG icons, CSS Grid containers,
+      and connection overlays. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram",
+      "topology", "draw architecture". NOT for architecture reviews, use architecture-reviewer.'
     path: skills/architecture-diagram
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/architecture-diagram/SKILL.md
     tags:
@@ -72,14 +62,9 @@ packages:
     difficulty: intermediate
   - name: architecture-reviewer
     version: 1.1.1
-    description: 'Architecture reviews across 7 dimensions: structural integrity, scalability, enterprise readiness (SOC2/HIPAA/GDPR/PCI-DSS),
-      performance, security, operational excellence, and data architecture. Produces scored reports with prioritized recommendations.
-      Three modes: (1) Codebase review — evidence-based analysis of source code, configs, IaC; (2) Document review — risk-based
-      analysis of design docs, RFCs, specs; (3) Hybrid — drift detection between intent and implementation. Triggers on: "review
-      architecture", "critique design", "audit system", "evaluate codebase", "find design flaws", "assess scalability", "check
-      security", "enterprise readiness", "architecture assessment", "technical due diligence", or when user provides a system
-      design document or codebase and asks for feedback or improvements. For architecture diagrams, visuals, or topology drawings,
-      use architecture-diagram instead.'
+    description: 'Architecture reviews across 7 dimensions (structural, scalability, enterprise readiness, performance, security,
+      ops, data) with scored reports. Triggers on: "review architecture", "critique design", "audit system", "assess scalability",
+      "enterprise readiness", "technical due diligence". NOT for diagrams, use architecture-diagram.'
     path: skills/architecture-reviewer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/architecture-reviewer/SKILL.md
     tags:
@@ -92,12 +77,9 @@ packages:
     phase: review
   - name: benchmark-runner
     version: 1.1.1
-    description: 'Designs structured benchmarks for comparing algorithms, models, or implementations. Selects appropriate
-      metrics (latency, throughput, memory, accuracy), designs representative test cases, captures hardware/software context,
-      produces comparison tables with tradeoff analysis, and includes reproduction instructions. Triggers on: "benchmark",
-      "compare performance", "which is faster", "latency comparison", "memory comparison", "run benchmark", "design benchmark",
-      "compare implementations", "evaluate algorithms", "performance comparison", "throughput test", "speed test". Use this
-      skill when comparing two or more implementations, algorithms, or models.'
+    description: 'Designs structured benchmarks comparing algorithms, models, or implementations with metrics, test cases,
+      hardware context, and reproduction steps. Triggers on: "benchmark", "compare performance", "which is faster", "latency
+      comparison", "run benchmark", "throughput test", "speed test".'
     path: skills/benchmark-runner
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/benchmark-runner/SKILL.md
     tags:
@@ -110,12 +92,9 @@ packages:
     phase: verify
   - name: changelog-composer
     version: 1.1.1
-    description: 'Generates structured changelogs and release notes from git history and PR descriptions. Classifies changes
-      into breaking, features, fixes, performance, and docs. Filters internal-only changes, detects breaking changes, and
-      produces human-readable entries linked to source PRs. Triggers on: "generate changelog", "write release notes", "compose
-      changelog", "what changed since", "changes since last release", "prepare release", "release notes for", "changelog for",
-      "summarize changes", "diff since tag". Use this skill when preparing a release and needing to summarize changes for
-      users.'
+    description: 'Generates structured changelogs and release notes from git history and PRs, classifying breaking changes,
+      features, fixes, performance, docs. Triggers on: "generate changelog", "write release notes", "what changed since",
+      "prepare release", "release notes for", "diff since tag".'
     path: skills/changelog-composer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/changelog-composer/SKILL.md
     tags:
@@ -128,13 +107,9 @@ packages:
     phase: ship
   - name: code-refiner
     version: 1.1.1
-    description: 'Deep code simplification, refactoring, and quality refinement. Analyzes structural complexity, anti-patterns,
-      and readability debt, then applies targeted refactoring preserving exact behavior. Language-agnostic: Python, Go, TypeScript/JavaScript,
-      Rust. Use this skill when the goal is simplification and clarity rather than bug-finding. Triggers on: "simplify this
-      code", "clean up my code", "refactor for clarity", "reduce complexity", "make this more readable", "code quality pass",
-      "tech debt cleanup", "run the code refiner", "simplify recent changes", "this code is messy", "too much nesting", "this
-      function is too long", "clean this up before I PR it", "tidy up my code", cyclomatic complexity, cognitive complexity,
-      code smells.'
+    description: 'Deep code simplification and refactoring preserving behavior across Python, Go, TypeScript, Rust. Targets
+      complexity, anti-patterns, readability debt. Triggers on: "simplify this code", "refactor for clarity", "reduce complexity",
+      "make this more readable", "tech debt cleanup", "too much nesting".'
     path: skills/code-refiner
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/code-refiner/SKILL.md
     tags:
@@ -147,14 +122,9 @@ packages:
     phase: review
   - name: competitive-analyzer
     version: 1.0.1
-    description: 'Systematic competitive landscape analysis covering Porter''s Five Forces, competitor discovery, feature
-      and pricing comparison matrices, market positioning maps, and moat/defensibility assessment. Uses WebSearch to identify
-      direct, indirect, and potential competitors across Product Hunt, G2, Capterra, and Crunchbase. Produces structured reports
-      with force scorecards, feature gap analysis, pricing positioning, white space identification, and strategic recommendations.
-      Triggers on: "competitive analysis", "competitor comparison", "competitive landscape", "Porter''s Five Forces", "feature
-      comparison matrix", "pricing analysis", "market positioning", "moat assessment", "competitive threat", "defensibility
-      analysis", "compare competitors", "competitive intelligence". Use this skill when analyzing competitors, comparing features,
-      or evaluating market positioning and defensibility.'
+    description: 'Competitive landscape analysis: Porter''s Five Forces, competitor discovery, feature/pricing matrices, positioning
+      maps, moat assessment via WebSearch. Triggers on: "competitive analysis", "competitor comparison", "competitive landscape",
+      "Porter''s Five Forces", "market positioning", "moat assessment", "defensibility analysis".'
     path: skills/competitive-analyzer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/competitive-analyzer/SKILL.md
     complements:
@@ -172,14 +142,9 @@ packages:
     phase: define
   - name: concept-to-image
     version: 1.2.1
-    description: 'Turn any concept, idea, or description into a polished static HTML visual, then export it as a PNG or SVG
-      image file. Use this skill when the user explicitly needs an image file output (PNG or SVG). This includes: concept
-      diagrams, flowcharts, comparison charts, process visuals, educational diagrams, social media graphics, data visualizations,
-      posters, cards, badges, icons, logo sketches, or any "make me an image of X" request achievable with HTML/CSS/SVG rather
-      than photographic AI generation. Also trigger when the user has an existing HTML visual and wants to export/convert
-      it to PNG or SVG. Trigger phrases: "create an image of", "export as PNG", "save as SVG", "concept to image", "turn this
-      into an image", "screenshot this HTML", "design a graphic for export". For interactive HTML visuals opened in a browser,
-      use static-web-artifacts-builder instead.'
+    description: 'Turn concepts into static HTML visuals exported as PNG or SVG files via HTML/CSS/SVG. Triggers on: "create
+      an image of", "export as PNG", "save as SVG", "concept to image", "screenshot this HTML". NOT for interactive HTML,
+      use static-web-artifacts-builder.'
     path: skills/concept-to-image
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/concept-to-image/SKILL.md
     tags:
@@ -191,14 +156,9 @@ packages:
     difficulty: intermediate
   - name: concept-to-video
     version: 1.2.0
-    description: 'Turn any concept into an animated explainer video using Manim (Python). Use whenever the user wants animated
-      visualizations, motion graphics, or video output (MP4/GIF) for technical concepts. Covers: architecture animations,
-      data flows, algorithm step-throughs, pipeline explainers, math proofs, comparisons, agent interactions, training loops,
-      image embedding, multi-scene composition. Supports audio overlay via ffmpeg, parametric templates, and subtitles. Works
-      headless — no browser or Node.js required. Also trigger for Manim scene edits or re-renders. Trigger on: "create a video",
-      "animate this", "make an explainer", "concept to video", "manim animation", "show this as a video", "motion graphic",
-      "visualize this process", "add voiceover to video", "animate with audio", or any concept + video/animation request.
-      For branded motion graphics or React-based video, use remotion-video instead.'
+    description: 'Turn concepts into animated explainer videos using Manim (Python) with MP4/GIF output, audio overlay, multi-scene
+      composition. Triggers on: "create a video", "animate this", "make an explainer", "manim animation", "motion graphic".
+      NOT for React video, use remotion-video.'
     path: skills/concept-to-video
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/concept-to-video/SKILL.md
     tags:
@@ -210,13 +170,9 @@ packages:
     difficulty: advanced
   - name: debug-investigator
     version: 1.1.1
-    description: 'Hypothesis-driven debugging methodology: ranked hypotheses with confirming/refuting tests, git bisect strategy,
-      log analysis, instrumentation point planning, and minimal reproduction design. Triggers on: "debug this systematically",
-      "root cause analysis", "bisect this bug", "rank hypotheses for this error", "help me isolate this issue", "create a
-      minimal reproduction", "instrumentation plan for this bug", "why does this keep failing". The differentiator is the
-      structured investigation methodology (hypothesis ranking, bisection strategy, instrumentation points) — use this skill
-      for non-obvious bugs that need systematic investigation, not simple errors the model diagnoses directly. NOT for abstract
-      reasoning or problem decomposition without a specific error — the model handles general reasoning natively.'
+    description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal
+      reproduction design. Triggers on: "debug this systematically", "root cause analysis", "bisect this bug", "rank hypotheses",
+      "isolate this issue", "minimal reproduction". NOT for general reasoning.'
     path: skills/debug-investigator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/debug-investigator/SKILL.md
     tags:
@@ -229,12 +185,9 @@ packages:
     phase: build
   - name: dependency-audit
     version: 1.1.1
-    description: 'Audits project dependencies for license compliance, maintenance health, security vulnerabilities, and bloat.
-      Analyzes both direct and transitive dependency trees, detects abandoned packages, identifies license conflicts (copyleft,
-      unknown), checks for known CVEs, and finds unused or duplicate dependencies. Triggers on: "audit dependencies", "dependency
-      check", "license check", "dependency health", "abandoned packages", "bloat check", "unused dependencies", "security
-      audit dependencies", "dependency review", "license compliance", "package audit", "supply chain", "dependency risk".
-      Use this skill when reviewing project dependencies for risk.'
+    description: 'Audits direct and transitive dependencies for license compliance, maintenance health, CVEs, abandoned packages,
+      and bloat. Triggers on: "audit dependencies", "license check", "dependency health", "abandoned packages", "unused dependencies",
+      "license compliance", "supply chain", "dependency risk".'
     path: skills/dependency-audit
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/dependency-audit/SKILL.md
     tags:
@@ -247,13 +200,9 @@ packages:
     phase: review
   - name: devils-advocate
     version: 1.0.0
-    description: 'Challenges AI-generated plans, code, designs, and decisions before you commit. Pairs with any other skill
-      as a review layer. Uses pre-mortem analysis, inversion thinking, and Socratic questioning to find what AI missed — blind
-      spots, hidden assumptions, failure modes, and optimistic shortcuts. The skill that asks "are you sure about that?" so
-      you don''t have to. Triggers on: "challenge this", "devils advocate", "stress test this plan", "what could go wrong",
-      "poke holes in this", "review this critically", "second opinion on this design", "what am I missing". Use this skill
-      when you need critical review of any AI-generated output, architecture decision, implementation plan, or code before
-      committing to it.'
+    description: 'Challenges AI-generated plans, code, and designs via pre-mortem, inversion, and Socratic questioning to
+      surface blind spots and failure modes. Triggers on: "challenge this", "devils advocate", "stress test this plan", "poke
+      holes in this", "what am I missing".'
     path: skills/devils-advocate
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/devils-advocate/SKILL.md
     tags:
@@ -280,11 +229,9 @@ packages:
     difficulty: beginner
   - name: engineering-retro
     version: 1.0.1
-    description: Git-based engineering retrospective analyzing commit history, PR patterns, and development velocity over
-      a configurable time window. Use this skill when the user asks for a retrospective, retro, sprint review, weekly review,
-      engineering review, development summary, commit analysis, team velocity report, or says "what did we ship", "what happened
-      this week", "engineering retro", "sprint retro", "dev summary", "/engineering-retro". Supports time windows (7d default,
-      24h, 14d, 30d) and monorepo path scoping.
+    description: 'Git-based engineering retrospective analyzing commits, PRs, and velocity over configurable windows with
+      monorepo path scoping. Triggers on: "retrospective", "sprint retro", "weekly review", "what did we ship", "engineering
+      retro", "dev summary", "commit analysis".'
     path: skills/engineering-retro
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/engineering-retro/SKILL.md
     tags:
@@ -297,13 +244,9 @@ packages:
     phase: ship
   - name: env-validator
     version: 1.0.1
-    description: 'Validates .env files and environment variable configurations against project requirements. Checks for missing
-      required variables, type mismatches, insecure defaults, unreferenced variables, and common configuration errors. Compares
-      .env against .env.example, code references, and deployment manifests. Produces a structured validation report with severity-ranked
-      findings. Triggers on: "validate env file", "check environment variables", "env file audit", "missing env vars", "env
-      validation", "check .env", "environment config check", "validate configuration", "env file review", "dotenv validation".
-      Use this skill when verifying environment configuration completeness and correctness before deployment or after onboarding.
-      NOT for secret scanning (use repo-sentinel or secret-scanner). NOT for general config file editing (use filesystem skill).'
+    description: 'Validates .env files against code references and manifests for missing vars, type mismatches, insecure defaults,
+      and unused entries. Triggers on: "validate env file", "check environment variables", "missing env vars", "check .env",
+      "dotenv validation". NOT for secret scanning, use repo-sentinel.'
     path: skills/env-validator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/env-validator/SKILL.md
     tags:
@@ -317,13 +260,9 @@ packages:
     phase: build
   - name: estimate-calibrator
     version: 1.1.1
-    description: 'Produces calibrated three-point estimates (best/likely/worst case) with explicit unknowns, confidence intervals,
-      and assumption documentation. Breaks work into atomic units, identifies technical and scope uncertainties, calculates
-      PERT ranges, and provides confidence rationale. Triggers on: "estimate this", "how long will this take", "effort estimate",
-      "time estimate", "best case worst case", "confidence interval", "sizing", "estimate effort", "how big is this", "story
-      points", "t-shirt sizing", "estimate the work", "PERT". NOT for task decomposition, implementation plans, or dependency
-      mapping — use task-decomposer instead. Use this skill when a task or project needs an effort estimate with explicit
-      uncertainty.'
+    description: 'Produces calibrated three-point PERT estimates (best/likely/worst) with confidence intervals, unknowns,
+      and assumptions. Triggers on: "estimate this", "how long will this take", "effort estimate", "confidence interval",
+      "story points", "t-shirt sizing". NOT for task decomposition, use task-decomposer.'
     path: skills/estimate-calibrator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/estimate-calibrator/SKILL.md
     tags:
@@ -336,12 +275,9 @@ packages:
     phase: plan
   - name: feasibility-assessor
     version: 1.0.1
-    description: 'Evaluate whether a business idea, product concept, or feature is technically buildable and financially viable.
-      Covers unit economics (CAC, LTV, margins), revenue modeling, break-even analysis, architecture risk scoring, build estimation,
-      and integrated feasibility verdicts. Triggers on: feasibility assessment, viability analysis, unit economics review,
-      business case evaluation, technical risk assessment, break-even calculation, build vs buy analysis, go/no-go decision,
-      idea validation, market feasibility, cost-benefit analysis, ROI projection. Use this skill when someone needs to determine
-      whether a business idea, feature, or product is worth pursuing from financial and technical perspectives.'
+    description: 'Evaluates whether a business idea is technically buildable and financially viable. Covers unit economics
+      (CAC, LTV), revenue modeling, break-even, and go/no-go verdicts. Triggers on: "feasibility assessment", "viability analysis",
+      "unit economics", "build vs buy", "go/no-go decision", "ROI projection".'
     path: skills/feasibility-assessor
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/feasibility-assessor/SKILL.md
     tags:
@@ -356,13 +292,9 @@ packages:
     - idea-validator
   - name: filesystem
     version: 1.1.1
-    description: 'File and directory operations using Claude Code built-in tools — replaces the Filesystem MCP server. Maps
-      all 11 MCP tools to native equivalents: Read, Write, Edit, Glob, Grep, and Bash. Covers file reading with line ranges,
-      parallel reads, pattern-based file search, regex content search, directory listing, tree traversal, move/copy/rename,
-      and metadata inspection. Trigger phrases: "read this file", "write to file", "create a file", "edit file", "find files
-      matching", "search for text in files", "list directory", "show directory tree", "move file", "rename file", "copy file",
-      "file info", "find all Python files", "search codebase for". Use this skill when performing file operations, navigating
-      codebases, or managing directories.'
+    description: 'File and directory operations via Claude Code built-in tools, replacing the Filesystem MCP server. Triggers
+      on: "read this file", "write to file", "edit file", "find files matching", "search for text in files", "list directory",
+      "show directory tree", "rename file".'
     path: skills/filesystem
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/filesystem/SKILL.md
     tags:
@@ -374,14 +306,9 @@ packages:
     difficulty: beginner
   - name: github
     version: 1.1.1
-    description: 'GitHub CLI operations via `gh` for issues, pull requests, CI/Actions, releases, repos, search, gists, and
-      the REST/GraphQL API. Structured output with `--json` and `--jq` for parsing. Covers `gh issue create/list/view/edit/close`,
-      `gh pr create/review/merge/checks`, `gh run list/view/rerun/watch`, `gh release create`, `gh search repos/issues/prs/code`,
-      `gh api` for REST and GraphQL queries, and `gh gist` operations. Includes error handling for HTTP 401/403/404/422/429,
-      scope troubleshooting, and rate limit management. Trigger phrases: "create an issue", "file a bug", "open a ticket",
-      "submit a PR", "raise a pull request", "check pipeline", "view test results", "CI failing", "why did CI fail", "check
-      CI status", "merge a PR", "manage releases", "query the GitHub API", "search repositories", "triage workflows", "automate
-      GitHub operations". Also triggers when the user pastes a GitHub URL.'
+    description: 'GitHub CLI operations via `gh` for issues, PRs, Actions, releases, and REST/GraphQL API with `--json`/`--jq`
+      parsing. Triggers on: "create an issue", "submit a PR", "check CI status", "why did CI fail", "merge a PR", or pasted
+      GitHub URLs.'
     path: skills/github
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/github/SKILL.md
     tags:
@@ -393,11 +320,9 @@ packages:
     difficulty: intermediate
   - name: gpu-optimizer
     version: 1.1.1
-    description: Expert GPU optimization for modern consumer GPUs (8-24GB VRAM). Use this skill when you need to optimize
-      GPU training, speed up CUDA code, reduce OOM errors, tune XGBoost for GPU, migrate NumPy to CuPy, make a model faster,
-      manage GPU memory, optimize VRAM usage, or benchmark PyTorch. Covers mixed precision, gradient checkpointing, XGBoost
-      GPU acceleration, CuPy/cuDF migration, vectorization, torch.compile, and diagnostics. NVIDIA GPUs only. PyTorch, XGBoost,
-      and RAPIDS frameworks.
+    description: 'GPU optimization for consumer NVIDIA GPUs (8-24GB VRAM) covering mixed precision, gradient checkpointing,
+      XGBoost GPU, CuPy/cuDF migration, and torch.compile. Triggers on: "optimize GPU training", "speed up CUDA", "reduce
+      OOM", "migrate NumPy to CuPy", "manage GPU memory", "benchmark PyTorch".'
     path: skills/gpu-optimizer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/gpu-optimizer/SKILL.md
     tags:
@@ -410,14 +335,9 @@ packages:
     phase: build
   - name: html-presentation
     version: 1.1.1
-    description: Convert any document, outline, or content into a polished, self-contained HTML slide presentation. Use this
-      skill whenever the user wants to create a presentation, slide deck, pitch deck, or talk from a document, markdown file,
-      outline, notes, or any textual content and wants the output as an HTML file (not PPTX). Also trigger when the user asks
-      for an "HTML presentation", "web-based slides", "reveal.js deck", "browser presentation", or wants to convert a document
-      into slides they can present from a browser. Supports two navigation modes - horizontal (left/right, Reveal.js-powered)
-      and vertical scroll (top-to-bottom, keyboard/scroll navigation). Includes multiple visual themes (dark editorial, light
-      minimal, corporate, hacker terminal). Consider asking the user for clarification on theme, navigation direction, and
-      content structure if not already specified.
+    description: 'Converts documents, outlines, or notes into self-contained HTML slide decks with horizontal (Reveal.js)
+      or vertical scroll navigation and multiple themes. Triggers on: "create a presentation", "slide deck", "pitch deck",
+      "HTML presentation", "web-based slides", "reveal.js deck", "convert document into slides".'
     path: skills/html-presentation
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/html-presentation/SKILL.md
     tags:
@@ -429,12 +349,9 @@ packages:
     difficulty: intermediate
   - name: humanize
     version: 1.0.1
-    description: Detect and remove AI-generated writing patterns from text while preserving semantic meaning and factual accuracy.
-      Rewrites text to sound natural, varied, and human-authored across domains including academic, technical, blog, professional,
-      and social media writing. Use this skill when the user asks to "humanize text", "make this sound human", "remove AI
-      patterns", "rewrite to sound natural", "make this less AI", "de-slop this", "clean up AI writing", "make this not sound
-      like ChatGPT", or provides AI-generated text and asks for a natural rewrite. Also trigger when reviewing drafts for
-      AI tells, checking if text sounds AI-generated, or requesting a "human pass" on content.
+    description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts. Triggers on: "humanize
+      text", "make this sound human", "remove AI patterns", "rewrite to sound natural", "make this less AI", "de-slop this",
+      "not sound like ChatGPT", "human pass".'
     path: skills/humanize
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/humanize/SKILL.md
     tags:
@@ -446,15 +363,9 @@ packages:
     difficulty: intermediate
   - name: idea-validator
     version: 1.0.1
-    description: 'Comprehensive business idea validation orchestrator that delegates parallel research to sub-agents and synthesizes
-      a structured report. Constructs a Lean Canvas, applies Jobs-to-be-Done analysis, spawns market research, competitive
-      analysis, and feasibility assessment agents, runs SWOT/PESTLE, and produces a weighted validation scorecard with verdict
-      and recommended experiments. Triggers on: "validate this idea", "assess this business idea", "evaluate my startup idea",
-      "analyze this concept", "critique this business plan", "review my idea", "check if this idea is viable", "audit this
-      business concept", "is this idea worth pursuing", "rate this startup idea", "score this business idea", "business idea
-      validation", "idea feasibility check", "validate my pitch", "evaluate this product concept". Use this skill when the
-      user presents a business idea, startup concept, product proposal, feature pitch, or pivot scenario and wants a structured
-      viability assessment with scoring.'
+    description: 'Orchestrates business idea validation via parallel sub-agents: Lean Canvas, JTBD, market/competitive/feasibility
+      research, SWOT/PESTLE, and a weighted scorecard with verdict. Triggers on: "validate this idea", "evaluate my startup
+      idea", "is this idea worth pursuing", "score this business idea", "validate my pitch".'
     path: skills/idea-validator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/idea-validator/SKILL.md
     complements:
@@ -471,12 +382,9 @@ packages:
     phase: define
   - name: immune
     version: 1.0.1
-    description: 'Hybrid adaptive memory system with two complementary memories: Cheatsheet (positive patterns injected before
-      generation) and Immune (negative patterns scanned after generation). Uses Hot/Cold tiered memory with multi-domain support
-      and auto-learning. Detects known errors via antibodies, discovers new threats, and learns winning strategies over time.
-      Triggers on: "scan for errors", "immune scan", "check output quality", "detect patterns", "scan content", "cheatsheet
-      injection", "antibody scan", "adaptive memory scan", "immune check", "quality scan", "pattern detection". NOT for general
-      code review or PR review — use pr-review instead. NOT for security audits of repositories — use repo-sentinel instead.'
+    description: 'Hybrid adaptive memory: Cheatsheet (positive patterns pre-generation) and Immune (negative patterns post-generation)
+      with Hot/Cold tiered auto-learning. Triggers on: "scan for errors", "immune scan", "check output quality", "antibody
+      scan". NOT for PR review (use pr-review) or repo audits (use repo-sentinel).'
     path: skills/immune
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/immune/SKILL.md
     tags:
@@ -488,12 +396,9 @@ packages:
     difficulty: intermediate
   - name: lightpanda-browser
     version: 1.0.1
-    description: Lightweight headless browser automation using Lightpanda as the backend engine with agent-browser CLI. 9x
-      lower memory, 11x faster than Chromium. Use for web scraping, DOM interaction, data extraction, form automation, and
-      API testing where visual rendering is not required. Triggers on "lightpanda", "lightweight browser", "fast headless
-      browser", "headless scraping", "low memory browser", "browser without rendering", "is lightpanda faster than chromium",
-      "which headless browser uses less memory", "how do I scrape without chromium", or any browser automation task where
-      speed and resource efficiency matter more than visual fidelity.
+    description: 'Lightweight headless browser automation via Lightpanda and agent-browser CLI: 9x lower memory, 11x faster
+      than Chromium, for scraping and DOM interaction without rendering. Triggers on: "lightpanda", "lightweight browser",
+      "fast headless browser", "headless scraping", "low memory browser", "browser without rendering".'
     path: skills/lightpanda-browser
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/lightpanda-browser/SKILL.md
     tags:
@@ -505,13 +410,9 @@ packages:
     difficulty: beginner
   - name: linkedin-post-style
     version: 1.2.2
-    description: Write LinkedIn posts matching a specific technical author's voice — direct, analytical, dry-humored, and
-      precise. Use this skill whenever the user asks to write, draft, rewrite, review, improve, or refine a LinkedIn post,
-      social media post, tech commentary, or any public-facing short-form writing about technology, AI, software engineering,
-      or developer tools. Also trigger when the user says "write this in my style", "post about this", "rewrite this for LinkedIn",
-      "draft a post in my style", "does this sound right", "how should I phrase this", or provides raw content/notes and wants
-      it shaped into a post. Includes visual companion guidance for pairing posts with document carousels (via md-to-pdf with
-      Mermaid diagrams), custom images (via concept-to-image), or animations (via concept-to-video).
+    description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance.
+      Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I
+      phrase this".'
     path: skills/linkedin-post-style
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/linkedin-post-style/SKILL.md
     tags:
@@ -523,12 +424,9 @@ packages:
     difficulty: intermediate
   - name: literature-review
     version: 1.0.1
-    description: 'Systematic literature review workflow for surveying, synthesizing, and analyzing academic research. Covers
-      the full lifecycle: scope definition, searching academic databases (arXiv, Semantic Scholar, Google Scholar), screening,
-      structured extraction, thematic synthesis, gap identification, and producing a cited review document. Triggers on: "literature
-      review", "survey the literature", "research landscape", "related work", "systematic review", "scoping review", "synthesize
-      the research", "bibliography on", "find papers about", "review the state of the art", "research gap analysis". Use this
-      skill when surveying a research area, mapping a topic landscape, identifying gaps, or writing a related work section.'
+    description: 'Systematic literature review workflow: scope, search (arXiv, Semantic Scholar, Google Scholar), screen,
+      extract, synthesize, and identify gaps. Triggers on: "literature review", "survey the literature", "related work", "systematic
+      review", "synthesize the research", "find papers about", "research gap analysis".'
     path: skills/literature-review
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/literature-review/SKILL.md
     complements:
@@ -545,13 +443,9 @@ packages:
     difficulty: intermediate
   - name: manuscript-provenance
     version: 1.1.1
-    description: 'Computational provenance audit verifying that every number, table, figure, ordering, and terminology in
-      a manuscript is derived from code and scripts — not manually entered. Cross-references LaTeX source against the codebase
-      to detect hardcoded values, stale outputs, broken pipelines, and manual data entry. Companion to manuscript-review:
-      that skill audits the document as prose; this skill audits whether the document is faithfully generated from code. Use
-      when the user says "check provenance", "verify reproducibility", "audit my pipeline", "are my numbers from code", "check
-      manuscript against scripts", "provenance audit", or any request to verify that manuscript content traces back to computational
-      outputs.'
+    description: 'Computational provenance audit verifying every number, table, and figure in a manuscript derives from code,
+      not manual entry. Triggers on: "check provenance", "verify reproducibility", "audit my pipeline", "are my numbers from
+      code", "provenance audit". Companion to manuscript-review (prose audit).'
     path: skills/manuscript-provenance
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/manuscript-provenance/SKILL.md
     tags:
@@ -566,14 +460,9 @@ packages:
     - literature-review
   - name: manuscript-review
     version: 1.2.2
-    description: Systematic pre-publication manuscript audit producing a structured refactoring report with section-level
-      diagnostics, citation hygiene analysis, and submission-readiness assessment. Use this skill whenever the user uploads
-      a manuscript, paper, thesis chapter, journal submission, or conference paper and asks for review, feedback, editing,
-      refactoring, pre-submission check, proofreading, or quality audit. Also trigger when the user says "review my paper",
-      "check before submission", "is this ready to submit", "pre-pub checklist", "manuscript review", "refactor my paper",
-      or asks about citation consistency, argument coherence, or formatting compliance. Covers partial requests like "check
-      my references" or "does the abstract work" — the full diagnostic surfaces issues across all facets even when only one
-      was asked about.
+    description: 'Pre-publication manuscript audit producing a section-level refactoring report with citation hygiene and
+      submission-readiness checks. Triggers on: "review my paper", "check before submission", "is this ready to submit", "pre-pub
+      checklist", "refactor my paper", "check my references", "does the abstract work".'
     path: skills/manuscript-review
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/manuscript-review/SKILL.md
     tags:
@@ -588,14 +477,9 @@ packages:
     - literature-review
   - name: market-analyzer
     version: 1.0.1
-    description: 'Performs structured market analysis including TAM/SAM/SOM sizing, trend identification, and competitive
-      landscape assessment. Uses WebSearch to gather industry data, growth rates, funding signals, and consumer trends. Produces
-      investor-grade market reports with cited sources and confidence-rated estimates. Triggers on: "market analysis", "market
-      size", "TAM SAM SOM", "total addressable market", "market opportunity", "market research", "industry analysis", "market
-      sizing", "how big is the market", "market potential", "analyze this market", "market landscape", "competitive landscape",
-      "market trends", "growth rate", "market assessment". NOT for financial modeling, revenue forecasting, or pricing strategy.
-      Use this skill when a product, feature, or business idea needs market size estimation, trend analysis, or industry assessment
-      with sourced data.'
+    description: 'Structured market analysis with TAM/SAM/SOM sizing, trends, and competitive landscape via WebSearch, producing
+      investor-grade cited reports. Triggers on: "market size", "TAM SAM SOM", "market opportunity", "industry analysis",
+      "how big is the market", "market trends". NOT for financial modeling or pricing.'
     path: skills/market-analyzer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/market-analyzer/SKILL.md
     tags:
@@ -611,13 +495,9 @@ packages:
     - idea-validator
   - name: mcp-to-skill
     version: 1.1.1
-    description: 'Convert MCP (Model Context Protocol) servers into on-demand skills to dramatically reduce active context
-      window usage. MCP tool schemas consume tokens on every turn whether used or not; skills load only when needed. Analyzes
-      MCP tool definitions, classifies each tool by replacement strategy, and generates a complete skill package. Use this
-      skill whenever the user mentions: convert MCP, MCP to skill, reduce context size, too many tools, tool token bloat,
-      slim down MCPs, context window full, replace MCP, MCP migration. Also trigger when the user has many active MCP servers
-      and wants to optimize context usage, asks about reducing token overhead from tool definitions, or says my context is
-      too big or running out of context when MCPs are active.'
+    description: 'Converts MCP servers into on-demand skills to cut context window usage, classifying each tool by replacement
+      strategy and generating the skill package. Triggers on: "convert MCP", "MCP to skill", "reduce context size", "too many
+      tools", "tool token bloat", "MCP migration".'
     path: skills/mcp-to-skill
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/mcp-to-skill/SKILL.md
     tags:
@@ -630,13 +510,9 @@ packages:
     phase: build
   - name: md-to-pdf
     version: 1.2.1
-    description: 'Convert Markdown files to professionally styled PDF documents with full support for Mermaid diagrams, LaTeX/KaTeX
-      math equations, tables, syntax-highlighted code blocks, and all standard Markdown features. Use this skill whenever
-      the user wants to convert a .md file to .pdf, generate a PDF report from Markdown, or produce print-ready documents
-      from Markdown sources containing diagrams, math, or complex formatting. Trigger phrases include: "convert markdown to
-      pdf", "make a pdf from this md", "render this markdown", "export markdown as pdf", "markdown to pdf with diagrams",
-      "pdf from markdown with equations", "generate a pdf report", "how do I export markdown as PDF", "convert my notes to
-      PDF", "can you make a PDF from this markdown".'
+    description: 'Convert Markdown to styled PDFs with Mermaid diagrams, LaTeX/KaTeX math, tables, and code highlighting.
+      Triggers on: "convert markdown to pdf", "make a pdf from this md", "export markdown as pdf", "pdf from markdown with
+      equations".'
     path: skills/md-to-pdf
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/md-to-pdf/SKILL.md
     tags:
@@ -648,12 +524,9 @@ packages:
     difficulty: intermediate
   - name: migration-risk-analyzer
     version: 1.1.1
-    description: 'Analyzes database migration scripts for risk: lock contention, downtime estimation, rollback strategy, and
-      deployment recommendations. Classifies DDL and DML operations by lock type and duration, identifies irreversible changes,
-      generates rollback scripts, and produces pre/post validation queries. Triggers on: "analyze this migration", "migration
-      risk", "is this migration safe", "schema change risk", "DDL risk", "downtime for this migration", "lock risk", "rollback
-      strategy", "how to roll back", "migration review", "alter table risk". Use this skill when reviewing database migrations
-      before deployment.'
+    description: 'Analyzes database migration scripts for lock contention, downtime, rollback strategy, and deployment risk.
+      Triggers on: "analyze this migration", "migration risk", "is this migration safe", "schema change risk", "DDL risk",
+      "rollback strategy", "migration review".'
     path: skills/migration-risk-analyzer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/migration-risk-analyzer/SKILL.md
     tags:
@@ -666,15 +539,9 @@ packages:
     phase: review
   - name: notebooklm
     version: 1.1.1
-    description: 'Complete API for Google NotebookLM — full programmatic access including features not in the web UI. Create
-      notebooks, add sources (URLs, YouTube, PDFs, audio, video, images), chat with content, generate all artifact types (podcasts,
-      videos, infographics, slide decks, quizzes, flashcards, mind maps, reports, data tables), and download results in multiple
-      formats. Uses the notebooklm-py CLI. Use this skill when the user mentions: notebooklm, notebook lm, create a podcast,
-      generate a podcast, audio overview, create flashcards, generate flashcards, create a quiz, generate quiz, generate infographic,
-      make an infographic, generate slide deck, create mind map, generate mind map, generate report, turn this into a podcast,
-      summarize in notebooklm, add sources to notebooklm, notebooklm analysis, create a video explainer, generate video overview,
-      research with notebooklm, offload analysis, bulk source import, download from notebooklm, notebooklm deliverables, or
-      uses /notebooklm.'
+    description: 'Full NotebookLM API via notebooklm-py CLI: create notebooks, add sources, generate podcasts, videos, infographics,
+      slides, quizzes, flashcards, mind maps. Triggers on: "notebooklm", "create a podcast", "audio overview", "generate flashcards",
+      "generate infographic", "/notebooklm".'
     path: skills/notebooklm
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/notebooklm/SKILL.md
     tags:
@@ -686,13 +553,9 @@ packages:
     difficulty: intermediate
   - name: package-evaluator
     version: 1.3.1
-    description: 'Evaluate Claude Code package quality across 6 weighted dimensions: frontmatter quality, trigger coverage,
-      structural completeness, content depth, consistency and integrity, and CONTRIBUTING.md compliance. Covers all 7 package
-      types with type-specific signals. Produces scored audit reports with severity-classified findings. Two modes: Quick
-      Audit (single package, full report) and Full Audit (all packages, ranking table). Triggers on: "evaluate package", "audit
-      agent quality", "score this hook", "package quality", "package audit", "skill review", "skill quality check", "how good
-      is this skill", "AGENT.md feedback". Use this skill when reviewing packages before deployment or diagnosing activation
-      failures. NOT for LLM prompts (use prompt-lab) or PRs (use pr-review).'
+    description: 'Evaluates Claude Code package quality across 6 dimensions for all 7 package types, producing scored audit
+      reports. Triggers on: "evaluate package", "audit agent quality", "score this hook", "package audit", "skill quality
+      check". NOT for LLM prompts, use prompt-lab.'
     path: skills/package-evaluator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/package-evaluator/SKILL.md
     tags:
@@ -705,14 +568,9 @@ packages:
     phase: review
   - name: paper-to-skill
     version: 1.0.1
-    description: 'Converts research papers into executable skill packages by extracting actionable methodologies and feeding
-      them through co-evolutionary refinement. Chains document conversion (to-markdown), critical analysis (research-critique),
-      specification extraction, and automated skill generation (test-engineer). Produces attributed, validated skill packages
-      from arXiv papers, PDFs, or pasted content. Triggers on: "convert this paper to a skill", "paper-to-skill", "implement
-      this paper as a skill", "extract methodology from paper", "turn this research into a skill", "make a skill from this
-      arXiv paper", "create skill from research", "paper implementation". Use this skill when a research paper describes a
-      methodology that should become a reusable skill package. NOT for literature review or paper summarization (use research-critique
-      or literature-review). NOT for general skill creation without a paper source (use test-engineer agent).'
+    description: 'Converts research papers into executable skill packages via document conversion, critical analysis, and
+      co-evolutionary refinement. Triggers on: "convert this paper to a skill", "paper-to-skill", "extract methodology from
+      paper", "make a skill from this paper". NOT for literature review, use research-critique.'
     path: skills/paper-to-skill
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/paper-to-skill/SKILL.md
     tags:
@@ -726,11 +584,9 @@ packages:
     phase: build
   - name: plan-review
     version: 1.0.1
-    description: Pre-implementation plan audit that stress-tests scope, assumptions, risks, and failure modes before code
-      is written. Use this skill when the user asks to review a plan, audit a proposal, challenge scope, stress-test an approach,
-      evaluate a technical design, or says "review this plan", "is this plan solid", "what am I missing", "challenge my assumptions",
-      "plan review", "scope check", "stress-test this", "/plan-review". Supports product lens, engineering lens, or combined
-      review.
+    description: 'Pre-implementation plan audit stress-testing scope, assumptions, risks, and failure modes before code is
+      written. Triggers on: "review this plan", "is this plan solid", "what am I missing", "challenge my assumptions", "stress-test
+      this", "/plan-review".'
     path: skills/plan-review
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/plan-review/SKILL.md
     tags:
@@ -742,13 +598,9 @@ packages:
     difficulty: intermediate
   - name: pr-review
     version: 1.1.1
-    description: 'Pull request and code review with diff-based routing across five dimensions: code quality and guideline
-      compliance, test coverage analysis, silent failure detection, type design and invariant analysis, and comment quality
-      auditing. Classifies changed files and loads only relevant review methodologies. Produces severity-ranked findings (Critical,
-      Important, Suggestion) with confidence scoring. Replaces pr-review-toolkit plugin. Trigger phrases: "review my PR",
-      "review this code", "check my changes", "is this ready to merge", "audit this PR", "review before committing", "check
-      code quality", "any issues with this code", "pre-merge review", "look over my changes", "code review". Use this skill
-      when reviewing code before commit or merge, checking PR quality, or when the user asks for feedback on recent modifications.'
+    description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality
+      with severity-ranked findings. Triggers on: "review my PR", "review this code", "check my changes", "audit this PR",
+      "code review". NOT for pre-landing gate, use pre-landing-review.'
     path: skills/pr-review
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/pr-review/SKILL.md
     tags:
@@ -761,10 +613,9 @@ packages:
     phase: review
   - name: pre-landing-review
     version: 1.0.1
-    description: Gate-oriented safety audit for code changes before landing, using a structured checklist with two-pass severity
-      triage. Distinct from pr-review (which is diff-based multi-dimension review) — this is a blocking safety gate. Use this
-      skill when the user asks for a pre-landing check, safety audit, pre-merge review, gate check, landing review, or says
-      "is this safe to land", "pre-landing review", "safety check before merge", "run the checklist", "gate check", "/pre-landing-review".
+    description: 'Gate-oriented safety audit for code changes before landing, using a checklist with two-pass severity triage.
+      Triggers on: "is this safe to land", "pre-landing review", "safety check before merge", "gate check", "/pre-landing-review".
+      NOT for diff review, use pr-review.'
     path: skills/pre-landing-review
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/pre-landing-review/SKILL.md
     tags:
@@ -777,13 +628,9 @@ packages:
     phase: review
   - name: prompt-lab
     version: 1.1.1
-    description: 'Systematic LLM prompt engineering: analyzes existing prompts for failure modes, generates structured variants
-      (direct, few-shot, chain-of-thought), designs evaluation rubrics with weighted criteria, and produces test case suites
-      for comparing prompt performance. Triggers on: "prompt engineering", "prompt lab", "generate prompt variants", "A/B
-      test prompts", "evaluate prompt", "optimize prompt", "write a better prompt", "prompt design", "prompt iteration", "few-shot
-      examples", "chain-of-thought prompt", "prompt failure modes", "improve this prompt". Use this skill when designing,
-      improving, or evaluating LLM prompts specifically. NOT for evaluating Claude Code skills or SKILL.md files — use skill-evaluator
-      instead.'
+    description: 'LLM prompt engineering: analyzes failure modes, generates variants (direct, few-shot, CoT), designs rubrics,
+      produces test suites. Triggers on: "prompt engineering", "generate prompt variants", "A/B test prompts", "optimize prompt",
+      "improve this prompt". NOT for SKILL.md files, use skill-evaluator.'
     path: skills/prompt-lab
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/prompt-lab/SKILL.md
     tags:
@@ -796,10 +643,8 @@ packages:
     phase: build
   - name: qa-systematic
     version: 1.0.1
-    description: Systematic web application QA testing with structured issue taxonomy, health scoring, and regression tracking.
-      Use this skill when the user asks for QA testing, systematic testing, smoke testing, regression testing, web app testing,
-      browser testing, or says "QA this", "test the app", "smoke test", "run QA", "systematic test", "check the site", "regression
-      test", "full QA", "/qa-systematic". Supports full, quick, and regression modes.
+    description: 'Systematic web application QA testing with issue taxonomy, health scoring, and regression tracking. Triggers
+      on: "QA this", "test the app", "smoke test", "run QA", "systematic test", "regression test", "full QA", "/qa-systematic".'
     path: skills/qa-systematic
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/qa-systematic/SKILL.md
     tags:
@@ -812,13 +657,9 @@ packages:
     phase: verify
   - name: rag-auditor
     version: 1.1.1
-    description: 'Evaluates RAG (Retrieval-Augmented Generation) pipeline quality across retrieval and generation stages.
-      Measures precision, recall, MRR for retrieval; groundedness, completeness, and hallucination rate for generation. Diagnoses
-      failure root causes and recommends chunk, retrieval, and prompt improvements. Triggers on: "audit RAG pipeline", "RAG
-      quality", "evaluate RAG retrieval", "hallucination detection", "retrieval precision", "why is RAG failing", "RAG diagnosis",
-      "retrieval quality", "RAG evaluation", "chunk quality", "RAG pipeline review", "grounding check". Use this skill when
-      diagnosing or evaluating a RAG pipeline''s quality. For general architecture or system audits, use architecture-reviewer
-      instead.'
+    description: 'Evaluates RAG pipeline quality across retrieval (precision, recall, MRR) and generation (groundedness, hallucination
+      rate). Triggers on: "audit RAG pipeline", "RAG quality", "hallucination detection", "why is RAG failing", "grounding
+      check". NOT for general architecture audits, use architecture-reviewer.'
     path: skills/rag-auditor
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/rag-auditor/SKILL.md
     tags:
@@ -844,14 +685,9 @@ packages:
     difficulty: beginner
   - name: remotion-video
     version: 1.1.1
-    description: 'Create production-grade motion graphics and videos using Remotion (React). Use whenever the user wants branded
-      video content, product demos, data-driven video generation, or motion graphics with audio sync, web fonts, TailwindCSS
-      styling, or media embedding. Covers: marketing videos, product launches, data visualizations, social media content,
-      personalized video at scale, explainer videos with voiceover, animated charts, 3D scenes via Three.js. Requires Node.js
-      and Claude Code environment. Trigger on: "create a Remotion video", "React video", "motion graphics", "branded video",
-      "product demo video", "remotion", "video with audio", "TailwindCSS video", "data-driven video generation", "personalized
-      video at scale", "video with voiceover". For mathematical animations, algorithm visualizations, or headless container
-      rendering, use concept-to-video (Manim) instead.'
+    description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers
+      on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with
+      voiceover". NOT for math animations, use concept-to-video.'
     path: skills/remotion-video
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/remotion-video/SKILL.md
     tags:
@@ -863,15 +699,9 @@ packages:
     difficulty: advanced
   - name: repo-sentinel
     version: 1.1.1
-    description: 'Full security audit and enforcement for public repositories across 12 attack surfaces: git history, source
-      code, docs, config, .gitignore recon, CI/CD, containers, dependencies, binaries, metadata, platform-specific (GitHub/GitLab),
-      license compliance, and community surface. Provides fast-path and full 20-check audits, pre-commit hooks, CI gates,
-      .gitignore generation, and history scrubbing. Use whenever pushing to a public remote, open-sourcing a repo, writing
-      README/docs, configuring CI/CD or Dockerfiles, adding dependencies, or checking license compliance. Trigger on: push
-      to GitHub, make repo public, open source this, set up the repo, write README, add CI/CD, create Dockerfile, set up pre-commit,
-      add license, write SECURITY.md, secret leaks, credential rotation, .claude/ tracking, repo hygiene, security scanning,
-      or is this safe to push, pre-oss, open source readiness, release audit, or open source audit. This is the gatekeeper
-      between internal and public.'
+    description: 'Full security audit for public repositories across 12 attack surfaces: git history, secrets, CI/CD, containers,
+      dependencies, licenses. Triggers on: "push to GitHub", "make repo public", "open source this", "is this safe to push",
+      "release audit", "secret leaks".'
     path: skills/repo-sentinel
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/repo-sentinel/SKILL.md
     tags:
@@ -884,14 +714,9 @@ packages:
     phase: review
   - name: research-critique
     version: 1.0.1
-    description: 'Critical analysis of research papers, academic manuscripts, preprints, and technical studies — evaluating
-      methodology, claims-evidence alignment, contribution significance, and intellectual honesty. Produces coherent analytical
-      responses (not checklists) that distinguish genuine weaknesses from standard field limitations. Governs intellectual
-      posture: collegial reader, not adversarial reviewer. Triggers on: "critique this paper", "review this research", "what
-      do you think of this paper", "analyze this study", "evaluate the methodology", "is this paper sound", "assess this research",
-      "strengths and weaknesses of this paper", "does the evidence support the claims". Use this skill when the user provides
-      a research paper, preprint, or technical study and asks for critical evaluation of its scientific merit, methodology,
-      or contribution — not formatting, citation hygiene, or submission readiness (use manuscript-review for those).'
+    description: 'Critical analysis of research papers evaluating methodology, claims-evidence alignment, and contribution
+      significance. Triggers on: "critique this paper", "review this research", "analyze this study", "evaluate the methodology",
+      "is this paper sound". NOT for formatting or submission readiness, use manuscript-review.'
     path: skills/research-critique
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/research-critique/SKILL.md
     tags:
@@ -919,10 +744,9 @@ packages:
     difficulty: intermediate
   - name: ship-workflow
     version: 1.0.1
-    description: Automated release pipeline that merges main, runs tests, performs pre-landing review, bumps version, updates
-      changelog, creates bisectable commits, and opens a pull request. Use this skill when the user says "ship it", "ship
-      this", "release this", "prepare for release", "open a PR", "push and PR", "land this", "get this ready to ship", "create
-      release", "/ship-workflow". Handles the full lifecycle from pre-flight checks through PR creation.
+    description: 'Automated release pipeline: merges main, runs tests, pre-landing review, version bump, changelog, bisectable
+      commits, and PR creation. Triggers on: "ship it", "release this", "prepare for release", "open a PR", "push and PR",
+      "land this", "/ship-workflow".'
     path: skills/ship-workflow
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/ship-workflow/SKILL.md
     tags:
@@ -935,15 +759,9 @@ packages:
     phase: ship
   - name: skill-distiller
     version: 1.0.1
-    description: 'Converts Opus-quality skill packages into deterministic, Haiku-executable workflows through trace-driven
-      distillation. Analyzes reasoning complexity per section, collects execution traces on representative tasks, extracts
-      deterministic decision paths, and rewrites abstract instructions as constrained templates. Validates the distilled skill
-      on lower-cost models and produces a cross-model comparison report. Implements cross-model skill transfer from EvoSkills
-      (+35-45pp gains). Triggers on: "distill this skill", "make this skill work on Haiku", "simplify skill for lower model",
-      "cross-model optimization", "skill distillation", "optimize skill for cost", "reduce skill complexity", "deterministic
-      skill rewrite", "convert to Haiku-compatible". Use this skill when an existing skill works on Opus but needs to run
-      reliably on Sonnet or Haiku. NOT for general code simplification (use code-refiner). NOT for prompt optimization (use
-      prompt-lab).'
+    description: 'Converts Opus-quality skills into deterministic Haiku-executable workflows via trace-driven distillation
+      and cross-model validation. Triggers on: "distill this skill", "make this skill work on Haiku", "cross-model optimization",
+      "optimize skill for cost". NOT for code simplification, use code-refiner.'
     path: skills/skill-distiller
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/skill-distiller/SKILL.md
     tags:
@@ -957,13 +775,9 @@ packages:
     phase: build
   - name: skill-library
     version: 2.0.1
-    description: 'Agent-native catalog and installer for armory packages across all 7 types: skills, agents, hooks, rules,
-      commands, utilities, and presets. Browse, search, install, update, sync, and remove packages without leaving your agent
-      session. Supports type filtering and profile-based bundles. Triggers on: "list available packages", "install skill",
-      "install agent", "pull skill", "what packages are available", "update my skills", "search packages for", "package catalog",
-      "armory list", "armory install", "armory search", "remove skill", "/library list", "/library use", "/library remove",
-      "/library profiles", "show me armory packages". Use this skill when discovering, installing, updating, or removing armory
-      packages within a session.'
+    description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update,
+      and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory
+      search", "/library list", "package catalog".'
     path: skills/skill-library
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/skill-library/SKILL.md
     tags:
@@ -976,11 +790,9 @@ packages:
     difficulty: beginner
   - name: sql-optimizer
     version: 1.1.1
-    description: 'Analyzes SQL queries for performance issues: missing indexes, N+1 patterns, suboptimal joins, full table
-      scans. Interprets EXPLAIN output, detects anti-patterns, recommends indexes, and rewrites queries with detailed explanations
-      of each optimization. Triggers on: "optimize this query", "slow query", "query performance", "add indexes", "index recommendation",
-      "explain plan", "query plan", "N+1 query", "fix this SQL", "SQL performance", "optimize SQL", "why is this query slow",
-      "index strategy". Use this skill when given a SQL query that needs performance analysis or optimization.'
+    description: 'Analyzes SQL queries for missing indexes, N+1 patterns, suboptimal joins, and full table scans. Interprets
+      EXPLAIN, detects anti-patterns, rewrites queries. Triggers on: "optimize this query", "slow query", "add indexes", "explain
+      plan", "N+1 query", "why is this query slow".'
     path: skills/sql-optimizer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/sql-optimizer/SKILL.md
     tags:
@@ -993,12 +805,9 @@ packages:
     phase: build
   - name: static-web-artifacts-builder
     version: 1.1.1
-    description: 'Build elaborate, self-contained static HTML artifacts opened in a browser — interactive diagrams, architecture
-      visuals, data dashboards, HTML infographics, and rich interactive deliverables. Use this skill when the output is an
-      HTML file viewed in a browser. Zero build toolchain — no React, no Vite, no Parcel. Pure HTML5 + CSS3 (Grid/Flexbox)
-      + inline SVG. Triggers on: "interactive HTML", "self-contained web component", "open in browser", "interactive diagram",
-      "visual dashboard", "HTML artifact", "HTML infographic", "interactive infographic". For image file output (PNG/SVG),
-      use concept-to-image instead.'
+    description: 'Build self-contained static HTML artifacts opened in a browser: interactive diagrams, dashboards, infographics.
+      Pure HTML5+CSS3+inline SVG, zero toolchain. Triggers on: "interactive HTML", "open in browser", "HTML artifact", "visual
+      dashboard", "HTML infographic". NOT for PNG/SVG output, use concept-to-image.'
     path: skills/static-web-artifacts-builder
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/static-web-artifacts-builder/SKILL.md
     tags:
@@ -1010,15 +819,9 @@ packages:
     difficulty: intermediate
   - name: surrogate-verifier
     version: 1.0.1
-    description: 'Information-isolated verification skill that generates structured test assertions and failure diagnostics
-      for skill packages. Given a skill definition and task prompt, produces machine-checkable assertions (contains, regex,
-      format, tool-call checks) and root-cause diagnostics when assertions fail. Implements the surrogate verifier role from
-      co-evolutionary skill generation (EvoSkills). Triggers on: "verify this skill", "generate assertions for", "surrogate
-      verification", "test this skill output", "diagnose skill failure", "generate test cases for skill", "skill verification",
-      "assertion generation", "check skill quality against tasks", "generate eval assertions". Use this skill when evaluating
-      skill output quality through automated assertion testing rather than manual review. NOT for general code review (use
-      pr-review). NOT for package metadata evaluation (use package-evaluator). NOT for test suite generation for application
-      code (use test-harness).'
+    description: 'Generates structured test assertions and failure diagnostics for skill packages from a definition and task
+      prompt. Triggers on: "verify this skill", "generate assertions", "surrogate verification", "diagnose skill failure".
+      NOT for code review, use pr-review.'
     path: skills/surrogate-verifier
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/surrogate-verifier/SKILL.md
     tags:
@@ -1033,12 +836,9 @@ packages:
     phase: verify
   - name: task-decomposer
     version: 1.1.1
-    description: 'Produces structured phased task boards from feature requests: dependency-mapped work items with parallelization
-      flags, risk flags, edge case tables, and test strategy matrices. Triggers on: "decompose this feature", "task breakdown
-      with dependencies", "phased implementation plan", "dependency map for", "break this into tasks with phases", "work breakdown
-      structure". The differentiator is the structured output format (phased tables, parallelization flags, dependency chains)
-      — use this skill when you need a formal task board, not ad-hoc decomposition the model handles natively. NOT for effort
-      estimates, PERT calculations, or confidence intervals — use estimate-calibrator instead.'
+    description: 'Produces phased task boards from feature requests: dependency-mapped work items, parallelization flags,
+      risk flags, edge cases, test matrices. Triggers on: "decompose this feature", "task breakdown with dependencies", "phased
+      implementation plan", "work breakdown structure". NOT for effort estimates, use estimate-calibrator.'
     path: skills/task-decomposer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/task-decomposer/SKILL.md
     tags:
@@ -1051,11 +851,9 @@ packages:
     phase: plan
   - name: tavily
     version: 1.1.1
-    description: 'AI-optimized web search via Tavily API. Use this skill when no specific URL is provided and the user needs
-      to search the web for current information, recent events, technical documentation, or news. Triggers on: "search the
-      web", "look this up online", "find recent information about", "search for", "google this", "web search", "look up",
-      "find current data on", "what does the web say about", "research online". NOT for fetching a known URL — use web-fetch
-      for that. Tavily returns clean, AI-ready snippets optimized for search-first intent.'
+    description: 'AI-optimized web search via Tavily API when no URL is provided. Returns clean AI-ready snippets for current
+      info and news. Triggers on: "search the web", "look up online", "find recent information", "web search". NOT for known
+      URLs, use web-fetch.'
     path: skills/tavily
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/tavily/SKILL.md
     tags:
@@ -1069,12 +867,9 @@ packages:
     - competitive-analyzer
   - name: test-harness
     version: 1.1.1
-    description: 'Generates comprehensive pytest test suites: happy path, edge cases, error conditions, fixture scaffolding,
-      mock strategy, and async patterns. Analyzes function signatures, dependency chains, and complexity hotspots to produce
-      runnable, parametrized test files. Triggers on: "generate tests", "write tests for", "test this function", "test this
-      class", "create test suite", "what tests should I write", "pytest for", "unit tests for", "mock strategy for", "how
-      to test", "test coverage for", "write a test file". Use this skill when given a Python function, class, or module and
-      asked to produce tests.'
+    description: 'Generates pytest test suites with happy path, edge cases, error conditions, fixture scaffolding, mocks,
+      async patterns. Triggers on: "generate tests", "write tests for", "test this function", "create test suite", "pytest
+      for", "unit tests for", "mock strategy for".'
     path: skills/test-harness
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/test-harness/SKILL.md
     tags:
@@ -1087,13 +882,9 @@ packages:
     phase: build
   - name: to-markdown
     version: 1.0.1
-    description: 'Convert any file or URL to clean Markdown. Handles PDF, Word (DOCX), Excel (XLSX), PowerPoint (PPTX), HTML,
-      images (EXIF + OCR), audio (transcription), CSV, JSON, XML, YouTube URLs, EPubs, and more. Output is optimised for LLM
-      pipelines, knowledge bases, and document ingestion workflows. Use this skill whenever the user wants to: convert a file
-      to markdown, extract text from a document, scrape a URL to markdown, turn a PDF into readable text, "get the content
-      of this file", ingest documents for RAG, prepare files for an LLM, or says "convert to md / markdown". Trigger on: "convert
-      to markdown", "extract text from PDF", "turn this into markdown", "scrape this URL", "file to md", "document ingestion",
-      "read this PDF", "get contents of", "parse this document", "ingest for RAG".'
+    description: 'Convert any file or URL to clean Markdown: PDF, DOCX, XLSX, PPTX, HTML, images (OCR), audio, CSV, YouTube.
+      Optimised for LLM pipelines. Triggers on: "convert to markdown", "extract text from PDF", "parse this document", "ingest
+      for RAG".'
     path: skills/to-markdown
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/to-markdown/SKILL.md
     tags:
@@ -1105,12 +896,9 @@ packages:
     difficulty: beginner
   - name: usage-audit
     version: 1.0.0
-    description: 'Audit a Claude Code setup for token waste and context bloat. Runs /context for real overhead, then audits
-      MCP servers, CLAUDE.md rules, installed skills, settings.json, and file permissions against five bloat filters. Returns
-      a health score with specific cuts. Triggers on: "audit my context", "usage audit", "context audit", "token audit", "why
-      is Claude slow", "context bloat", "cleanup my setup", "check my CLAUDE.md", "audit settings". Use when a session feels
-      heavy, after installing new packages, or on a recurring cadence to catch drift. NOT for auditing a codebase (use codebase-auditor)
-      or a single package (use package-evaluator).'
+    description: 'Audit a Claude Code setup for token waste and context bloat. Checks MCP servers, CLAUDE.md, skills, and
+      settings against bloat filters. Triggers on: "audit my context", "usage audit", "token audit", "context bloat". NOT
+      for codebase audits.'
     path: skills/usage-audit
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/usage-audit/SKILL.md
     tags:
@@ -1123,14 +911,9 @@ packages:
     difficulty: intermediate
   - name: ux-expert
     version: 1.0.0
-    description: 'UX design expert for auditing and redesigning pages, dashboards, and data-heavy interfaces. Conducts 4-phase
-      collaborative reviews: understand current state and user tasks, audit across 8 UX dimensions (information architecture,
-      visual hierarchy, screen real estate, interaction cost, cognitive load, context orientation, data presentation, responsiveness),
-      propose layout concepts with rationale, and spec actionable implementation details with wireframes and component recommendations.
-      Specializes in B2B SaaS, dashboards, analytics, and data-dense applications. Triggers on: "review UX", "audit this page",
-      "redesign the dashboard", "UX review", "improve the layout", "fix the information hierarchy", "component recommendations",
-      "dashboard UX audit". Use this skill when a page or interface needs professional UX evaluation, layout redesign, or
-      component selection guidance grounded in UX principles and cognitive psychology.'
+    description: 'UX design expert for auditing and redesigning pages, dashboards, and data-dense interfaces via 4-phase collaborative
+      reviews across 8 UX dimensions. Triggers on: "review UX", "audit this page", "redesign the dashboard", "UX review",
+      "improve the layout", "dashboard UX audit", "component recommendations".'
     path: skills/ux-expert
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/ux-expert/SKILL.md
     tags:
@@ -1144,13 +927,9 @@ packages:
     phase: review
   - name: web-fetch
     version: 1.1.1
-    description: 'Web content fetching and URL retrieval via curl and WebFetch — replaces the Fetch MCP server (fetch_html,
-      fetch_json, fetch_markdown, fetch_txt). Use this skill when a specific URL is provided and the user wants its content.
-      Covers HTTP GET/POST, JSON API consumption with jq, HTML retrieval, markdown conversion, plain text extraction, authenticated
-      requests, redirects, cookies, and timeouts. Trigger phrases: "fetch this URL", "get the page content", "download HTML",
-      "call this API", "curl this endpoint", "grab the JSON", "fetch markdown from", "retrieve web content", "hit this endpoint",
-      "scrape this page", "read this URL", "pull data from API", "make an HTTP request", "extract page content", "get article
-      text". NOT for web searches without a URL — use tavily for that.'
+    description: 'Web content fetching via curl and WebFetch when a specific URL is provided. Covers HTTP GET/POST, JSON APIs,
+      HTML, auth, cookies. Triggers on: "fetch this URL", "download HTML", "call this API", "curl this endpoint". NOT for
+      search, use tavily.'
     path: skills/web-fetch
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/web-fetch/SKILL.md
     tags:
@@ -1164,13 +943,9 @@ packages:
     - competitive-analyzer
   - name: youtube-analysis
     version: 1.1.1
-    description: 'Extract YouTube video transcripts and produce structured concept analysis with multi-level summaries, key
-      concepts, and actionable takeaways. Pure Python, no API keys, no MCP dependency. Fetches transcripts via youtube-transcript-api
-      with yt-dlp fallback, then Claude analyzes the content directly. Use this skill when the user mentions: analyze youtube
-      video, youtube transcript, summarize this video, what does this video cover, extract concepts from video, video analysis,
-      watch this for me, break down this talk, youtube URL, video summary, lecture notes from video, podcast transcript, conference
-      talk notes, tech talk breakdown, video key points, TL;DR of video, video takeaways, or pastes any URL containing youtube.com
-      or youtu.be.'
+    description: 'Extract YouTube transcripts and produce structured concept analysis with multi-level summaries, key concepts,
+      takeaways. Uses youtube-transcript-api with yt-dlp fallback. Triggers on: "analyze youtube video", "youtube transcript",
+      "summarize this video", "extract concepts from video", "video key points", or any youtube.com/youtu.be URL.'
     path: skills/youtube-analysis
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/youtube-analysis/SKILL.md
     tags:
@@ -1181,12 +956,9 @@ packages:
     difficulty: intermediate
   - name: youtube-search
     version: 1.1.1
-    description: 'Search YouTube by keyword and return structured video metadata (title, URL, channel, views, duration, upload
-      date). Uses yt-dlp for scraping — no API keys required. Returns ranked results for discovery, trend analysis, and source
-      curation. Use this skill when the user mentions: search youtube, youtube search, find youtube videos, find videos about,
-      top youtube videos on, trending videos on, youtube results for, look up on youtube, what videos exist about, discover
-      youtube content, youtube for research, curate youtube sources, yt search, search for videos, find me videos, youtube
-      trending, popular videos about, latest videos on, youtube discovery, or uses /yt-search.'
+    description: 'Search YouTube by keyword and return structured video metadata (title, URL, channel, views, duration, date)
+      via yt-dlp. No API keys. Triggers on: "search youtube", "find youtube videos", "top youtube videos on", "trending videos
+      on", "youtube results for", "yt search", "/yt-search".'
     path: skills/youtube-search
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/youtube-search/SKILL.md
     tags:

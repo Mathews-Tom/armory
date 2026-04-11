@@ -1,19 +1,6 @@
 ---
 name: market-analyzer
-description:
-  'Performs structured market analysis including TAM/SAM/SOM sizing, trend
-  identification, and competitive landscape assessment. Uses WebSearch to gather industry
-  data, growth rates, funding signals, and consumer trends. Produces investor-grade
-  market reports with cited sources and confidence-rated estimates. Triggers on: "market
-  analysis", "market size", "TAM SAM SOM", "total addressable market", "market opportunity",
-  "market research", "industry analysis", "market sizing", "how big is the market",
-  "market potential", "analyze this market", "market landscape", "competitive landscape",
-  "market trends", "growth rate", "market assessment". NOT for financial modeling,
-  revenue forecasting, or pricing strategy. Use this skill when a product, feature,
-  or business idea needs market size estimation, trend analysis, or industry assessment
-  with sourced data.
-
-  '
+description: 'Structured market analysis with TAM/SAM/SOM sizing, trends, and competitive landscape via WebSearch, producing investor-grade cited reports. Triggers on: "market size", "TAM SAM SOM", "market opportunity", "industry analysis", "how big is the market", "market trends". NOT for financial modeling or pricing.'
 metadata:
   version: 1.0.1
   category: research

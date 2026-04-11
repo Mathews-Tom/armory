@@ -1,19 +1,6 @@
 ---
 name: competitive-analyzer
-description:
-  'Systematic competitive landscape analysis covering Porter''s Five Forces,
-  competitor discovery, feature and pricing comparison matrices, market positioning
-  maps, and moat/defensibility assessment. Uses WebSearch to identify direct, indirect,
-  and potential competitors across Product Hunt, G2, Capterra, and Crunchbase. Produces
-  structured reports with force scorecards, feature gap analysis, pricing positioning,
-  white space identification, and strategic recommendations. Triggers on: "competitive
-  analysis", "competitor comparison", "competitive landscape", "Porter''s Five Forces",
-  "feature comparison matrix", "pricing analysis", "market positioning", "moat assessment",
-  "competitive threat", "defensibility analysis", "compare competitors", "competitive
-  intelligence". Use this skill when analyzing competitors, comparing features, or
-  evaluating market positioning and defensibility.
-
-  '
+description: 'Competitive landscape analysis: Porter''s Five Forces, competitor discovery, feature/pricing matrices, positioning maps, moat assessment via WebSearch. Triggers on: "competitive analysis", "competitor comparison", "competitive landscape", "Porter''s Five Forces", "market positioning", "moat assessment", "defensibility analysis".'
 metadata:
   version: 1.0.1
   complements: [market-analyzer, tavily, web-fetch]

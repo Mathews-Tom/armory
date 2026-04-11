@@ -1,18 +1,6 @@
 ---
 name: to-markdown
-description:
-  'Convert any file or URL to clean Markdown. Handles PDF, Word (DOCX),
-  Excel (XLSX), PowerPoint (PPTX), HTML, images (EXIF + OCR), audio (transcription),
-  CSV, JSON, XML, YouTube URLs, EPubs, and more. Output is optimised for LLM pipelines,
-  knowledge bases, and document ingestion workflows. Use this skill whenever the user
-  wants to: convert a file to markdown, extract text from a document, scrape a URL
-  to markdown, turn a PDF into readable text, "get the content of this file", ingest
-  documents for RAG, prepare files for an LLM, or says "convert to md / markdown".
-  Trigger on: "convert to markdown", "extract text from PDF", "turn this into markdown",
-  "scrape this URL", "file to md", "document ingestion", "read this PDF", "get contents
-  of", "parse this document", "ingest for RAG".
-
-  '
+description: 'Convert any file or URL to clean Markdown: PDF, DOCX, XLSX, PPTX, HTML, images (OCR), audio, CSV, YouTube. Optimised for LLM pipelines. Triggers on: "convert to markdown", "extract text from PDF", "parse this document", "ingest for RAG".'
 metadata:
   version: 1.0.1
   category: visualization

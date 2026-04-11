@@ -1,19 +1,6 @@
 ---
 name: manuscript-review
-description:
-  'Systematic pre-publication manuscript audit producing a structured refactoring
-  report with section-level diagnostics, citation hygiene analysis, and submission-readiness
-  assessment. Use this skill whenever the user uploads a manuscript, paper, thesis
-  chapter, journal submission, or conference paper and asks for review, feedback,
-  editing, refactoring, pre-submission check, proofreading, or quality audit. Also
-  trigger when the user says "review my paper", "check before submission", "is this
-  ready to submit", "pre-pub checklist", "manuscript review", "refactor my paper",
-  or asks about citation consistency, argument coherence, or formatting compliance.
-  Covers partial requests like "check my references" or "does the abstract work" —
-  the full diagnostic surfaces issues across all facets even when only one was asked
-  about.
-
-  '
+description: 'Pre-publication manuscript audit producing a section-level refactoring report with citation hygiene and submission-readiness checks. Triggers on: "review my paper", "check before submission", "is this ready to submit", "pre-pub checklist", "refactor my paper", "check my references", "does the abstract work".'
 metadata:
   version: 1.2.2
   category: review

@@ -1,17 +1,6 @@
 ---
 name: humanize
-description:
-  'Detect and remove AI-generated writing patterns from text while preserving
-  semantic meaning and factual accuracy. Rewrites text to sound natural, varied, and
-  human-authored across domains including academic, technical, blog, professional,
-  and social media writing. Use this skill when the user asks to "humanize text",
-  "make this sound human", "remove AI patterns", "rewrite to sound natural", "make
-  this less AI", "de-slop this", "clean up AI writing", "make this not sound like
-  ChatGPT", or provides AI-generated text and asks for a natural rewrite. Also trigger
-  when reviewing drafts for AI tells, checking if text sounds AI-generated, or requesting
-  a "human pass" on content.
-
-  '
+description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts. Triggers on: "humanize text", "make this sound human", "remove AI patterns", "rewrite to sound natural", "make this less AI", "de-slop this", "not sound like ChatGPT", "human pass".'
 metadata:
   version: 1.0.1
   category: review

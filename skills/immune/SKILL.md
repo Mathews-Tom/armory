@@ -1,17 +1,6 @@
 ---
 name: immune
-description:
-  'Hybrid adaptive memory system with two complementary memories: Cheatsheet
-  (positive patterns injected before generation) and Immune (negative patterns scanned
-  after generation). Uses Hot/Cold tiered memory with multi-domain support and auto-learning.
-  Detects known errors via antibodies, discovers new threats, and learns winning strategies
-  over time. Triggers on: "scan for errors", "immune scan", "check output quality",
-  "detect patterns", "scan content", "cheatsheet injection", "antibody scan", "adaptive
-  memory scan", "immune check", "quality scan", "pattern detection". NOT for general
-  code review or PR review — use pr-review instead. NOT for security audits of repositories
-  — use repo-sentinel instead.
-
-  '
+description: 'Hybrid adaptive memory: Cheatsheet (positive patterns pre-generation) and Immune (negative patterns post-generation) with Hot/Cold tiered auto-learning. Triggers on: "scan for errors", "immune scan", "check output quality", "antibody scan". NOT for PR review (use pr-review) or repo audits (use repo-sentinel).'
 metadata:
   version: 1.0.1
   status: active

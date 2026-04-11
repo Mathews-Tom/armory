@@ -1,18 +1,6 @@
 ---
 name: debug-investigator
-description:
-  'Hypothesis-driven debugging methodology: ranked hypotheses with confirming/refuting
-  tests, git bisect strategy, log analysis, instrumentation point planning, and minimal
-  reproduction design. Triggers on: "debug this systematically", "root cause analysis",
-  "bisect this bug", "rank hypotheses for this error", "help me isolate this issue",
-  "create a minimal reproduction", "instrumentation plan for this bug", "why does
-  this keep failing". The differentiator is the structured investigation methodology
-  (hypothesis ranking, bisection strategy, instrumentation points) — use this skill
-  for non-obvious bugs that need systematic investigation, not simple errors the model
-  diagnoses directly. NOT for abstract reasoning or problem decomposition without
-  a specific error — the model handles general reasoning natively.
-
-  '
+description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal reproduction design. Triggers on: "debug this systematically", "root cause analysis", "bisect this bug", "rank hypotheses", "isolate this issue", "minimal reproduction". NOT for general reasoning.'
 metadata:
   version: 1.1.1
   category: development

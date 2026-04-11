@@ -1,18 +1,6 @@
 ---
 name: surrogate-verifier
-description:
-  'Information-isolated verification skill that generates structured test assertions
-  and failure diagnostics for skill packages. Given a skill definition and task prompt,
-  produces machine-checkable assertions (contains, regex, format, tool-call checks) and
-  root-cause diagnostics when assertions fail. Implements the surrogate verifier role
-  from co-evolutionary skill generation (EvoSkills). Triggers on: "verify this skill",
-  "generate assertions for", "surrogate verification", "test this skill output",
-  "diagnose skill failure", "generate test cases for skill", "skill verification",
-  "assertion generation", "check skill quality against tasks", "generate eval assertions".
-  Use this skill when evaluating skill output quality through automated assertion testing
-  rather than manual review. NOT for general code review (use pr-review). NOT for
-  package metadata evaluation (use package-evaluator). NOT for test suite generation
-  for application code (use test-harness).'
+description: 'Generates structured test assertions and failure diagnostics for skill packages from a definition and task prompt. Triggers on: "verify this skill", "generate assertions", "surrogate verification", "diagnose skill failure". NOT for code review, use pr-review.'
 metadata:
   version: 1.0.1
   category: review

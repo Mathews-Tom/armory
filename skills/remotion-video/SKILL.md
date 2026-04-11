@@ -1,19 +1,6 @@
 ---
 name: remotion-video
-description:
-  'Create production-grade motion graphics and videos using Remotion (React).
-  Use whenever the user wants branded video content, product demos, data-driven video
-  generation, or motion graphics with audio sync, web fonts, TailwindCSS styling,
-  or media embedding. Covers: marketing videos, product launches, data visualizations,
-  social media content, personalized video at scale, explainer videos with voiceover,
-  animated charts, 3D scenes via Three.js. Requires Node.js and Claude Code environment.
-  Trigger on: "create a Remotion video", "React video", "motion graphics", "branded
-  video", "product demo video", "remotion", "video with audio", "TailwindCSS video",
-  "data-driven video generation", "personalized video at scale", "video with voiceover".
-  For mathematical animations, algorithm visualizations, or headless container rendering,
-  use concept-to-video (Manim) instead.
-
-  '
+description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with voiceover". NOT for math animations, use concept-to-video.'
 metadata:
   version: 1.1.1
   category: business

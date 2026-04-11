@@ -1,17 +1,6 @@
 ---
 name: youtube-search
-description:
-  "Search YouTube by keyword and return structured video metadata (title,
-  URL, channel, views, duration, upload date). Uses yt-dlp for scraping — no API keys
-  required. Returns ranked results for discovery, trend analysis, and source curation.
-  Use this skill when the user mentions: search youtube, youtube search, find youtube
-  videos, find videos about, top youtube videos on, trending videos on, youtube results
-  for, look up on youtube, what videos exist about, discover youtube content, youtube
-  for research, curate youtube sources, yt search, search for videos, find me videos,
-  youtube trending, popular videos about, latest videos on, youtube discovery, or
-  uses /yt-search.
-
-  "
+description: 'Search YouTube by keyword and return structured video metadata (title, URL, channel, views, duration, date) via yt-dlp. No API keys. Triggers on: "search youtube", "find youtube videos", "top youtube videos on", "trending videos on", "youtube results for", "yt search", "/yt-search".'
 metadata:
   version: 1.1.1
   category: research

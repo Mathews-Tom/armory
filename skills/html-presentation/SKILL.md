@@ -1,17 +1,6 @@
 ---
 name: html-presentation
-description:
-  Convert any document, outline, or content into a polished, self-contained
-  HTML slide presentation. Use this skill whenever the user wants to create a presentation,
-  slide deck, pitch deck, or talk from a document, markdown file, outline, notes,
-  or any textual content and wants the output as an HTML file (not PPTX). Also trigger
-  when the user asks for an "HTML presentation", "web-based slides", "reveal.js deck",
-  "browser presentation", or wants to convert a document into slides they can present
-  from a browser. Supports two navigation modes - horizontal (left/right, Reveal.js-powered)
-  and vertical scroll (top-to-bottom, keyboard/scroll navigation). Includes multiple
-  visual themes (dark editorial, light minimal, corporate, hacker terminal). Consider
-  asking the user for clarification on theme, navigation direction, and content structure
-  if not already specified.
+description: 'Converts documents, outlines, or notes into self-contained HTML slide decks with horizontal (Reveal.js) or vertical scroll navigation and multiple themes. Triggers on: "create a presentation", "slide deck", "pitch deck", "HTML presentation", "web-based slides", "reveal.js deck", "convert document into slides".'
 metadata:
   version: 1.1.1
   category: visualization

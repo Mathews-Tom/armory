@@ -1,19 +1,6 @@
 ---
 name: concept-to-image
-description:
-  'Turn any concept, idea, or description into a polished static HTML visual,
-  then export it as a PNG or SVG image file. Use this skill when the user explicitly
-  needs an image file output (PNG or SVG). This includes: concept diagrams, flowcharts,
-  comparison charts, process visuals, educational diagrams, social media graphics,
-  data visualizations, posters, cards, badges, icons, logo sketches, or any "make
-  me an image of X" request achievable with HTML/CSS/SVG rather than photographic
-  AI generation. Also trigger when the user has an existing HTML visual and wants
-  to export/convert it to PNG or SVG. Trigger phrases: "create an image of", "export
-  as PNG", "save as SVG", "concept to image", "turn this into an image", "screenshot
-  this HTML", "design a graphic for export". For interactive HTML visuals opened in
-  a browser, use static-web-artifacts-builder instead.
-
-  '
+description: 'Turn concepts into static HTML visuals exported as PNG or SVG files via HTML/CSS/SVG. Triggers on: "create an image of", "export as PNG", "save as SVG", "concept to image", "screenshot this HTML". NOT for interactive HTML, use static-web-artifacts-builder.'
 metadata:
   version: 1.2.1
   category: business

@@ -1,18 +1,6 @@
 ---
 name: package-evaluator
-description:
-  'Evaluate Claude Code package quality across 6 weighted dimensions: frontmatter
-  quality, trigger coverage, structural completeness, content depth, consistency and
-  integrity, and CONTRIBUTING.md compliance. Covers all 7 package types with type-specific
-  signals. Produces scored audit reports with severity-classified findings. Two modes:
-  Quick Audit (single package, full report) and Full Audit (all packages, ranking
-  table). Triggers on: "evaluate package", "audit agent quality", "score this hook",
-  "package quality", "package audit", "skill review", "skill quality check", "how
-  good is this skill", "AGENT.md feedback". Use this skill when reviewing packages
-  before deployment or diagnosing activation failures. NOT for LLM prompts (use prompt-lab)
-  or PRs (use pr-review).
-
-  '
+description: 'Evaluates Claude Code package quality across 6 dimensions for all 7 package types, producing scored audit reports. Triggers on: "evaluate package", "audit agent quality", "score this hook", "package audit", "skill quality check". NOT for LLM prompts, use prompt-lab.'
 metadata:
   version: 1.3.1
   category: review

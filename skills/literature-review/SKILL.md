@@ -1,17 +1,6 @@
 ---
 name: literature-review
-description:
-  'Systematic literature review workflow for surveying, synthesizing, and
-  analyzing academic research. Covers the full lifecycle: scope definition, searching
-  academic databases (arXiv, Semantic Scholar, Google Scholar), screening, structured
-  extraction, thematic synthesis, gap identification, and producing a cited review
-  document. Triggers on: "literature review", "survey the literature", "research landscape",
-  "related work", "systematic review", "scoping review", "synthesize the research",
-  "bibliography on", "find papers about", "review the state of the art", "research
-  gap analysis". Use this skill when surveying a research area, mapping a topic landscape,
-  identifying gaps, or writing a related work section.
-
-  '
+description: 'Systematic literature review workflow: scope, search (arXiv, Semantic Scholar, Google Scholar), screen, extract, synthesize, and identify gaps. Triggers on: "literature review", "survey the literature", "related work", "systematic review", "synthesize the research", "find papers about", "research gap analysis".'
 metadata:
   version: 1.0.1
   complements:

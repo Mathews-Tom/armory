@@ -1,14 +1,6 @@
 ---
 name: qa-systematic
-description:
-  'Systematic web application QA testing with structured issue taxonomy,
-  health scoring, and regression tracking. Use this skill when the user asks for QA
-  testing, systematic testing, smoke testing, regression testing, web app testing,
-  browser testing, or says "QA this", "test the app", "smoke test", "run QA", "systematic
-  test", "check the site", "regression test", "full QA", "/qa-systematic". Supports
-  full, quick, and regression modes.
-
-  '
+description: 'Systematic web application QA testing with issue taxonomy, health scoring, and regression tracking. Triggers on: "QA this", "test the app", "smoke test", "run QA", "systematic test", "regression test", "full QA", "/qa-systematic".'
 metadata:
   version: 1.0.1
   category: development

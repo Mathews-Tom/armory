@@ -1,15 +1,6 @@
 ---
 name: skill-library
-description: >
-  Agent-native catalog and installer for armory packages across all 7 types: skills,
-  agents, hooks, rules, commands, utilities, and presets. Browse, search, install,
-  update, sync, and remove packages without leaving your agent session. Supports
-  type filtering and profile-based bundles. Triggers on: "list available packages",
-  "install skill", "install agent", "pull skill", "what packages are available",
-  "update my skills", "search packages for", "package catalog", "armory list",
-  "armory install", "armory search", "remove skill", "/library list", "/library use",
-  "/library remove", "/library profiles", "show me armory packages". Use this skill
-  when discovering, installing, updating, or removing armory packages within a session.
+description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update, and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory search", "/library list", "package catalog".'
 metadata:
   version: 2.0.1
   category: operations

@@ -1,17 +1,6 @@
 ---
 name: rag-auditor
-description:
-  'Evaluates RAG (Retrieval-Augmented Generation) pipeline quality across
-  retrieval and generation stages. Measures precision, recall, MRR for retrieval;
-  groundedness, completeness, and hallucination rate for generation. Diagnoses failure
-  root causes and recommends chunk, retrieval, and prompt improvements. Triggers on:
-  "audit RAG pipeline", "RAG quality", "evaluate RAG retrieval", "hallucination detection",
-  "retrieval precision", "why is RAG failing", "RAG diagnosis", "retrieval quality",
-  "RAG evaluation", "chunk quality", "RAG pipeline review", "grounding check". Use
-  this skill when diagnosing or evaluating a RAG pipeline''s quality. For general
-  architecture or system audits, use architecture-reviewer instead.
-
-  '
+description: 'Evaluates RAG pipeline quality across retrieval (precision, recall, MRR) and generation (groundedness, hallucination rate). Triggers on: "audit RAG pipeline", "RAG quality", "hallucination detection", "why is RAG failing", "grounding check". NOT for general architecture audits, use architecture-reviewer.'
 metadata:
   version: 1.1.1
   category: review
