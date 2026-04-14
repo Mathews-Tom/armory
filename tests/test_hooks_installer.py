@@ -128,6 +128,32 @@ class TestMergeHookConfig:
         assert len(groups) == 1
         assert len(groups[0]["hooks"]) == 1
 
+    def test_merge_removes_legacy_entries_without_hook_name(
+        self, empty_settings: dict, git_protection_meta: dict
+    ) -> None:
+        """Reinstalling a hook removes legacy entries that lack _hook_name tracking."""
+        claude_dir = Path("/home/user/.claude")
+        resolved_cmd = "bash /home/user/.claude/hooks/git-protection/handler.sh"
+        # Simulate two legacy entries installed before _hook_name tracking existed
+        empty_settings["hooks"] = {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [
+                        {"type": "command", "command": resolved_cmd},
+                        {"type": "command", "command": resolved_cmd},
+                    ],
+                }
+            ]
+        }
+        result = merge_hook_config(
+            empty_settings, "git-protection", git_protection_meta, claude_dir
+        )
+        groups = result["hooks"]["PreToolUse"]
+        assert len(groups) == 1
+        assert len(groups[0]["hooks"]) == 1
+        assert groups[0]["hooks"][0].get("_hook_name") == "git-protection"
+
     def test_merge_preserves_existing_settings(
         self, git_protection_meta: dict
     ) -> None:
