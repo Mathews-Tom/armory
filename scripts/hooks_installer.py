@@ -140,9 +140,13 @@ def merge_hook_config(
             matcher_group = {"matcher": matcher, "hooks": []}
             event_list.append(matcher_group)
 
-        # Remove any existing entry from this hook package, then append
+        # Remove existing entries by hook name OR by command to prevent duplicates.
+        # Command deduplication cleans up legacy entries that predate _hook_name tracking.
+        new_command = hook_entry.get("command", "")
         matcher_group["hooks"] = [
-            h for h in matcher_group["hooks"] if h.get("_hook_name") != hook_name
+            h for h in matcher_group["hooks"]
+            if h.get("_hook_name") != hook_name
+            and (not new_command or h.get("command") != new_command)
         ]
         matcher_group["hooks"].append(hook_entry)
 
