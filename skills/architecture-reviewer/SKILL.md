@@ -59,6 +59,18 @@ FORMULA:  Overall% = (Σ dimension_score × weight) / 5 × 100
 
 ## Phase 1: Input Classification & Context Gathering
 
+### Step 0: Project Context Scan
+
+Before classifying the input, check for repo-local agent context when reviewing a codebase:
+
+- `docs/agents/domain.md` for `CONTEXT.md`, `CONTEXT-MAP.md`, and ADR lookup rules
+- root or context-local `CONTEXT.md` files for domain vocabulary
+- `docs/adr/` and context-local ADR directories for accepted architecture decisions
+
+Use glossary terms in findings and recommendations. Treat ADRs as constraints unless the
+observed friction is severe enough to justify reopening the decision. If context files are
+absent, continue with inferred vocabulary.
+
 ### Step 1: Classify Input Mode
 
 Determine the review mode from what the user provides:
@@ -160,6 +172,10 @@ Evaluate the architecture across 7 weighted dimensions. For each dimension:
 
 **Progressive loading:** Read each reference file only when analyzing that dimension. Do not
 load all references at once.
+
+When analyzing Structural Integrity, also consult `references/deep-module-analysis.md` if
+the review involves module boundaries, testability, service decomposition, or refactoring
+recommendations.
 
 **Mode-specific guidance:**
 
