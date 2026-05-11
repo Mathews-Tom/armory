@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 125](https://img.shields.io/badge/packages-125-informational)](manifest.yaml)
+[![packages: 126](https://img.shields.io/badge/packages-126-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -63,6 +63,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [tavily](skills/tavily/)                         | AI-optimized web search and content extraction via Tavily API with structured output parsing                                                                |
 | [test-harness](skills/test-harness/)             | Comprehensive pytest suite generation — happy path, edge cases, error conditions, fixtures, mocks, async, parametrized tests                                |
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
+| [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |

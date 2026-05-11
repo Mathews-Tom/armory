@@ -46,6 +46,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Competitive analysis | `competitive-analyzer` skill | `market-analyzer` |
 | Feasibility assessment | `feasibility-assessor` skill | `estimate-calibrator` |
 | Full business validation pipeline | `idea-scout` agent | (orchestrates all four above) |
+| Set up repo-local agent context | `project-context-setup` skill | `adr-writer`, `github` |
 
 ## Plan Phase — "I need to plan the work"
 
@@ -53,6 +54,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 |------|----------------|-------------|
 | Break down a project into tasks | `task-decomposer` skill | `estimate-calibrator` |
 | Estimate effort/timeline | `estimate-calibrator` skill | `task-decomposer` |
+| Configure issue tracker, triage labels, glossary, and ADR lookup | `project-context-setup` skill | `task-decomposer`, `project-planner` |
 | Design system architecture | `project-architect` agent | `architecture-diagram` skill |
 | Record architecture decisions | `adr-writer` skill | `architecture-reviewer` skill |
 | Plan a full project | `project-planner` agent | `task-decomposer`, `estimate-calibrator` |

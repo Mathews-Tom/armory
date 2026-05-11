@@ -846,6 +846,23 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
+  - name: project-context-setup
+    version: 1.0.0
+    description: 'Scaffolds per-repository agent context so coding agents share the same issue tracker rules, triage label
+      vocabulary, domain glossary, ADR layout, and handoff conventions. Triggers on: "set up project context", "configure
+      agent docs", "create CONTEXT.md", "setup agent workflow", "agent issue tracker setup", "triage labels", "domain glossary
+      for agents". Use when a repo needs durable context files before planning, triage, debugging, TDD, architecture review,
+      or multi-agent implementation.'
+    path: skills/project-context-setup
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/project-context-setup/SKILL.md
+    tags:
+    - agent-context
+    - project-setup
+    - domain-glossary
+    - triage
+    category: development
+    difficulty: intermediate
+    phase: define
   - name: prompt-lab
     version: 1.1.1
     description: 'LLM prompt engineering: analyzes failure modes, generates variants (direct, few-shot, CoT), designs rubrics,
