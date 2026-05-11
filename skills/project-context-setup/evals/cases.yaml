@@ -1,0 +1,52 @@
+cases:
+  - id: setup_agent_context_docs
+    prompt: "Set up project context docs for this repo so agents know the issue tracker, triage labels, and domain glossary layout."
+    fixtures: []
+    rubric:
+      - "activates project-context-setup"
+      - "creates or updates docs/agents issue tracker, triage labels, and domain docs"
+      - "preserves existing AGENTS.md or CLAUDE.md content while adding an agent context block"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "docs/agents/(issue-tracker|triage-labels|domain)\\.md"
+        weight: 1.0
+      - type: matches_regex
+        target: "(CONTEXT\\.md|CONTEXT-MAP\\.md|domain glossary)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(needs-triage|ready-for-agent|ready-for-human)"
+        weight: 0.8
+
+  - id: create_domain_glossary
+    prompt: "Create a CONTEXT.md convention for our agents and document how ADRs should be discovered."
+    fixtures: []
+    rubric:
+      - "activates project-context-setup"
+      - "uses domain glossary conventions instead of implementation documentation"
+      - "documents ADR lookup rules"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "CONTEXT\\.md"
+        weight: 1.0
+      - type: matches_regex
+        target: "(docs/adr|ADR)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(Language|Relationships|Flagged Ambiguities)"
+        weight: 0.8
+
+  - id: negative_single_adr
+    prompt: "Write an ADR for choosing Postgres over MongoDB."
+    fixtures: []
+    rubric:
+      - "single decision record is adr-writer territory, not project context setup"
+    trigger_expected: false
+
+  - id: negative_direct_github_issue
+    prompt: "Create a GitHub issue for this bug using gh."
+    fixtures: []
+    rubric:
+      - "direct GitHub issue creation is github skill territory, not project context setup"
+    trigger_expected: false
