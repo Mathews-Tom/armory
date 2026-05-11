@@ -12,9 +12,9 @@ metadata:
 # Task Decomposer
 
 Transforms ambiguous feature requests into concrete, implementable task sequences:
-identifies acceptance criteria, decomposes into phased work items with effort sizing,
-maps dependencies and parallelization, enumerates edge cases, plans testing, and flags
-risks — producing a ready-to-execute task board.
+identifies acceptance criteria, decomposes into tracer-bullet vertical slices with effort
+sizing, maps dependencies and parallelization, enumerates edge cases, plans testing, labels
+HITL/AFK readiness, and flags risks — producing a ready-to-execute task board.
 
 > **When to use this skill vs native decomposition:** The base model decomposes features
 > well in an ad-hoc format. Use this skill specifically when you need the structured output:
@@ -36,6 +36,17 @@ risks — producing a ready-to-execute task board.
 - Feature description or requirements (can be vague — the skill handles ambiguity)
 - Project context (tech stack, existing architecture, team size)
 
+## Project Context
+
+Before decomposing, check for repo-local agent context:
+
+- `docs/agents/domain.md` for `CONTEXT.md`, `CONTEXT-MAP.md`, and ADR lookup rules
+- `docs/agents/triage-labels.md` for readiness labels when tasks become issues
+- `CONTEXT.md` or relevant context-local glossary for task titles and acceptance criteria
+- `.out-of-scope/` for durable rejections that may affect scope
+
+Continue if these files are absent, but state that the plan is using inferred vocabulary.
+
 ## Workflow
 
 ### Phase 1: Understand the Feature
@@ -49,27 +60,36 @@ risks — producing a ready-to-execute task board.
 4. **Clarify scope boundaries** — What is explicitly out of scope? State this to
    prevent scope creep during implementation.
 
-### Phase 2: Decompose into Tasks
+### Phase 2: Decompose into Vertical Slices
 
-Break the feature into tasks at the right granularity:
+Break the feature into tracer-bullet slices first, then split oversized slices into tasks.
+Each slice should deliver a narrow but complete path through the affected layers. Avoid
+horizontal breakdowns where one issue only creates schema, another only creates API, and
+another only creates UI unless the work is pure infrastructure.
 
 | Granularity | Size                                           | Example                      |
 | ----------- | ---------------------------------------------- | ---------------------------- |
 | Too coarse  | "Build the search feature"                     | Not actionable               |
-| Right level | "Add full-text search index to products table" | Single PR, testable          |
+| Right level | "Exact-match product search returns results end-to-end" | Single PR, testable |
 | Too fine    | "Import the search library"                    | Not independently meaningful |
 
 **Right granularity test:** Each task should be completable in a single PR, testable
-in isolation, and deliverable independently (even if not user-visible alone).
+in isolation, and deliverable independently. A completed vertical slice should be demoable
+or verifiable without waiting for unrelated slices.
 
 Group tasks into phases:
 
-| Phase       | Purpose                              | Contains                                   |
-| ----------- | ------------------------------------ | ------------------------------------------ |
-| Foundation  | Data models, schemas, interfaces     | Types, database tables, API contracts      |
-| Core logic  | Business logic, algorithms           | The actual feature implementation          |
-| Integration | Connecting components, API endpoints | Routes, controllers, wire-up               |
-| Polish      | Edge cases, error handling, UX       | Validation, error messages, loading states |
+| Phase | Purpose | Contains |
+| ----- | ------- | -------- |
+| Setup | Shared contracts or migrations that unblock slices | Types, schemas, fixtures |
+| Slice 1 | First end-to-end behavior | Minimal data, logic, API, UI/CLI path |
+| Slice N | Incremental capability | One user-visible behavior or operational capability |
+| Hardening | Cross-slice edge cases and quality gates | Performance, security, docs, cleanup |
+
+Label each slice:
+
+- **AFK** — an agent can implement it from the issue brief with no further human context.
+- **HITL** — requires human judgment, external access, product approval, design review, or release authority.
 
 ### Phase 3: Identify Edge Cases
 
@@ -130,26 +150,21 @@ For each risk, identify mitigation:
 ### Task Breakdown
 
 #### Phase 1: Foundation
-| # | Task | Effort | Dependencies | Parallel |
-|---|------|--------|--------------|----------|
-| 1.1 | {task description} | {S/M/L} | None | Yes |
-| 1.2 | {task description} | {S/M/L} | 1.1 | No |
+| # | Slice / Task | Type | Effort | Dependencies | Parallel |
+|---|--------------|------|--------|--------------|----------|
+| 1.1 | {task description} | {AFK/HITL} | {S/M/L} | None | Yes |
+| 1.2 | {task description} | {AFK/HITL} | {S/M/L} | 1.1 | No |
 
-#### Phase 2: Core Logic
-| # | Task | Effort | Dependencies | Parallel |
-|---|------|--------|--------------|----------|
-| 2.1 | {task description} | {S/M/L} | 1.x | Yes |
-| 2.2 | {task description} | {S/M/L} | 1.x | Yes |
+#### Phase 2: Vertical Slices
+| # | Slice / Task | Type | Effort | Dependencies | Parallel |
+|---|--------------|------|--------|--------------|----------|
+| 2.1 | {end-to-end behavior} | {AFK/HITL} | {S/M/L} | 1.x | Yes |
+| 2.2 | {end-to-end behavior} | {AFK/HITL} | {S/M/L} | 1.x | Yes |
 
-#### Phase 3: Integration
-| # | Task | Effort | Dependencies | Parallel |
-|---|------|--------|--------------|----------|
-| 3.1 | {task description} | {S/M/L} | 2.x | No |
-
-#### Phase 4: Polish
-| # | Task | Effort | Dependencies | Parallel |
-|---|------|--------|--------------|----------|
-| 4.1 | {task description} | {S/M/L} | 3.x | Yes |
+#### Phase 3: Hardening
+| # | Task | Type | Effort | Dependencies | Parallel |
+|---|------|------|--------|--------------|----------|
+| 3.1 | {cross-slice quality gate} | {AFK/HITL} | {S/M/L} | 2.x | No |
 
 ### Edge Cases
 
@@ -170,12 +185,15 @@ For each risk, identify mitigation:
 
 ### Risk Flags
 - {Risk}: {mitigation strategy}
+
+### Agent Brief Notes
+- {Any interface contracts, acceptance criteria, or out-of-scope boundaries that should be copied into ready-for-agent issues}
 ```
 
 ## Calibration Rules
 
-1. **Right granularity.** Each task should be 1-3 days of work. Larger → decompose further.
-   Smaller → merge into a parent task.
+1. **Right granularity.** Each slice should be 1-3 days of work and each implementation task
+   should fit in one PR. Larger → decompose further. Smaller → merge into a parent slice.
 2. **Testable acceptance criteria.** "Make search work" is not testable. "Search returns
    relevant results within 200ms for queries up to 100 characters" is testable.
 3. **Dependencies are sacred.** If Task B truly depends on Task A, mark it. False
@@ -184,6 +202,10 @@ For each risk, identify mitigation:
    is empty, the analysis is incomplete.
 5. **Parallel = velocity.** Maximize parallel tasks. If 4 tasks can be done simultaneously,
    the phase takes the duration of the longest, not the sum.
+6. **Vertical first.** Prefer end-to-end slices over layer-only tasks. Use horizontal tasks
+   only for shared contracts, migrations, or infrastructure that genuinely unblocks slices.
+7. **Ready-for-agent requires a brief.** AFK slices need desired behavior, key interfaces,
+   acceptance criteria, and out-of-scope boundaries clear enough for a fresh agent.
 
 ## Error Handling
 

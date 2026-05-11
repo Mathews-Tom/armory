@@ -6,23 +6,9 @@ Strategies for breaking features into implementable tasks at the right granulari
 
 ## Decomposition Strategies
 
-### By Layer (Vertical Slicing)
+### By Capability (Vertical Slicing)
 
-Break by architectural layer:
-
-```text
-Feature: User search
-├── Data layer: Add search index, write query function
-├── Logic layer: Search ranking, filtering, pagination
-├── API layer: GET /search endpoint, query params
-└── UI layer: Search bar, results list, loading state
-```
-
-**When to use:** Full-stack features touching multiple layers.
-
-### By Capability (Horizontal Slicing)
-
-Break by user-visible capability, implementing thin vertical slices:
+Break by user-visible capability, implementing thin tracer bullets:
 
 ```text
 Feature: User search
@@ -32,7 +18,24 @@ Feature: User search
 └── Slice 4: Add pagination
 ```
 
-**When to use:** When incremental delivery is valuable. Each slice is deployable.
+**When to use:** Default for feature implementation. Each slice is deployable,
+demoable, or independently verifiable.
+
+### By Layer (Horizontal Slicing)
+
+Break by architectural layer only when a shared contract or infrastructure step
+genuinely unblocks later vertical slices:
+
+```text
+Feature: User search
+├── Data layer: Add search index, write query function
+├── Logic layer: Search ranking, filtering, pagination
+├── API layer: GET /search endpoint, query params
+└── UI layer: Search bar, results list, loading state
+```
+
+**When to use:** Pure infrastructure, migrations, or contract setup. Avoid using this
+as the main plan for user-facing features because it creates non-demoable work queues.
 
 ### By Component
 
@@ -77,6 +80,7 @@ Each task should be:
 - **Independently testable** (can verify it works alone)
 - **Single PR** (one review, one merge)
 - **Describable in one sentence** (clear scope)
+- **Vertically meaningful** when user-facing behavior is involved
 
 ### Size Indicators
 
@@ -110,14 +114,14 @@ Tasks should be merged if:
 
 ## Phase Organization
 
-### Standard 4-Phase Model
+### Preferred Vertical-Slice Model
 
-| Phase       | Purpose                          | Characteristics                            |
-| ----------- | -------------------------------- | ------------------------------------------ |
-| Foundation  | Data models, schemas, interfaces | No business logic, defines contracts       |
-| Core        | Business logic, algorithms       | Implements the actual feature              |
-| Integration | Connecting pieces, endpoints     | Wiring, API routes, event handlers         |
-| Polish      | Edge cases, UX, error handling   | Validation, error messages, loading states |
+| Phase | Purpose | Characteristics |
+| ----- | ------- | --------------- |
+| Setup | Shared contract work that unblocks slices | Minimal schema/types/fixtures only |
+| Slice 1 | First narrow end-to-end behavior | Demoable tracer bullet |
+| Slice N | Additional capabilities | Each adds one observable behavior |
+| Hardening | Cross-slice quality gates | Performance, security, docs, cleanup |
 
 ### When to Collapse Phases
 

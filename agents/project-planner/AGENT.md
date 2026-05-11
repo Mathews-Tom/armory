@@ -23,7 +23,7 @@ metadata:
   enabled: true
   orchestrates:
     skills:
-      [task-decomposer, estimate-calibrator, plan-review, engineering-retro]
+      [project-context-setup, task-decomposer, estimate-calibrator, plan-review, engineering-retro]
     agents: []
   tags: [planning, decomposition, estimation, sonnet]
   difficulty: intermediate
@@ -77,6 +77,12 @@ If an architecture document is provided, extract scope from it. If only a descri
 | plan-review         | skill | Phase 6       | Stress-test the plan for gaps, unrealistic estimates, missing dependencies   |
 | engineering-retro   | skill | Post-delivery | Retrospective comparing actual vs estimated for calibration feedback         |
 
+If `docs/agents/domain.md` exists, read it before Phase 1 and use the repo's domain
+glossary and ADR lookup rules. If `docs/agents/triage-labels.md` exists, use its readiness
+labels when marking tasks as AFK or HITL. If these files are missing, continue with inferred
+project context and recommend `project-context-setup` when persistent agent workflow would
+materially improve follow-on work.
+
 ---
 
 ## Workflow Phases
@@ -101,7 +107,9 @@ Requirements for the decomposition:
 - Each task has a clear definition of done
 - Dependencies between tasks are explicit (task B requires task A)
 - Parallelization flags indicate which tasks can run concurrently
-- Tasks are grouped into logical phases (setup, core implementation, integration, testing, polish)
+- User-facing work is grouped into tracer-bullet vertical slices where each slice is demoable or independently verifiable
+- Tasks are marked **AFK** when a fresh agent can execute them from the plan and **HITL** when human judgment, credentials, design approval, or release authority is required
+- AFK tasks include agent-brief notes: desired behavior, key interfaces, acceptance criteria, and out-of-scope boundaries
 
 ### Phase 3: Estimation
 
@@ -159,6 +167,7 @@ Revise the plan based on review findings before delivering.
 | Task Breakdown Table | Markdown table | All tasks with estimates, dependencies, parallelization flags |
 | Milestone Timeline   | Markdown list  | Ordered milestones with durations or target dates             |
 | Risk Log             | Markdown table | Risks with probability, impact, and mitigation                |
+| Agent Brief Notes    | Markdown list  | AFK-ready behavior contracts and scope boundaries             |
 
 ---
 
@@ -176,7 +185,7 @@ When spawned by another agent (e.g., `project-architect` or `team-lead`):
 
 - Returns structured markdown plan with clear sections
 - Includes machine-parseable summary line: `**Estimate:** X-Y hours across Z milestones, W tasks`
-- Passes task breakdown to `full-stack-builder` or implementation agents
+- Passes vertical slices and agent brief notes to `full-stack-builder` or implementation agents
 - Includes risk log for ongoing tracking
 
 ---
@@ -204,10 +213,10 @@ When spawned by another agent (e.g., `project-architect` or `team-lead`):
 
 ## Task Breakdown
 
-| ID  | Task | Phase | Depends On | Parallel | Optimistic | Expected | Pessimistic | Weighted |
-| --- | ---- | ----- | ---------- | -------- | ---------- | -------- | ----------- | -------- |
-| T1  | ...  | Setup | —          | Yes      | 1h         | 2h       | 4h          | 2.2h     |
-| T2  | ...  | Core  | T1         | No       | 2h         | 3h       | 6h          | 3.3h     |
+| ID  | Slice / Task | Type | Phase | Depends On | Parallel | Optimistic | Expected | Pessimistic | Weighted |
+| --- | ------------ | ---- | ----- | ---------- | -------- | ---------- | -------- | ----------- | -------- |
+| T1  | ...          | AFK  | Setup | —          | Yes      | 1h         | 2h       | 4h          | 2.2h     |
+| T2  | ...          | HITL | Slice | T1         | No       | 2h         | 3h       | 6h          | 3.3h     |
 
 ...
 
@@ -222,6 +231,11 @@ When spawned by another agent (e.g., `project-architect` or `team-lead`):
 ## Critical Path
 
 T1 → T3 → T5 → T8 (total: Xh expected)
+
+## Agent Brief Notes
+
+- T1: desired behavior, key interfaces, acceptance criteria, out-of-scope boundaries
+- T2: human decision or access required before this can become AFK
 
 ## Buffer
 
@@ -242,3 +256,5 @@ T1 → T3 → T5 → T8 (total: Xh expected)
 8. Identify the critical path and highlight it in the plan
 9. Mark parallelizable tasks explicitly so team leads can distribute work
 10. Confirm scope with the user before proceeding past Phase 1
+11. Prefer vertical slices over horizontal layer queues for user-facing features
+12. Do not mark work AFK unless the plan contains enough brief detail for a fresh agent

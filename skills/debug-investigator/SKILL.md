@@ -12,9 +12,10 @@ metadata:
 # Debug Investigator
 
 Structured debugging methodology that replaces ad-hoc exploration with hypothesis-driven
-investigation. Captures symptoms, analyzes evidence (stacktraces, logs, state), generates
-ranked hypotheses, designs bisection strategies, identifies instrumentation points, and
-produces minimal reproductions — documenting every step so dead ends are never revisited.
+investigation. Captures symptoms, builds a deterministic feedback loop, analyzes evidence
+(stacktraces, logs, state), generates ranked hypotheses, designs bisection strategies,
+identifies instrumentation points, and produces minimal reproductions — documenting every
+step so dead ends are never revisited.
 
 > **When to use this skill vs native debugging:** The base model handles straightforward
 > debugging (clear stacktraces, obvious errors) natively. Use this skill for non-obvious bugs
@@ -37,6 +38,17 @@ produces minimal reproductions — documenting every step so dead ends are never
 - **Access to source code** — cannot debug opaque binaries
 - **Reproducible environment** — or at minimum, error output (stacktrace, logs)
 
+## Project Context
+
+Before deep investigation, check for repo-local agent context:
+
+- `docs/agents/domain.md` for `CONTEXT.md`, `CONTEXT-MAP.md`, and ADR lookup rules
+- `CONTEXT.md` or relevant context-local glossary for domain vocabulary
+- `docs/adr/` and context-local ADRs for decisions near the failing area
+
+Use the project glossary in hypotheses, repro names, and prevention recommendations. If the
+repo lacks these files, continue normally; do not block debugging on context setup.
+
 ## Workflow
 
 ### Phase 1: Symptom Capture
@@ -54,7 +66,35 @@ Before touching code, document the observable problem:
 5. **Environment** — Python version, OS, dependency versions, configuration differences
    between working and broken environments.
 
-### Phase 2: Evidence Analysis
+### Phase 2: Build a Feedback Loop
+
+Create a fast, deterministic pass/fail signal for the reported bug before ranking hypotheses
+or changing production code. The loop must reproduce the user's symptom, not a nearby failure.
+
+Try these seams in order:
+
+1. Failing test at the smallest public interface that reaches the bug.
+2. CLI or script invocation with fixture input and asserted output.
+3. Curl or HTTP request against a local server with asserted response, logs, or state.
+4. Browser automation for UI bugs with DOM, console, and network assertions.
+5. Replayed trace, event payload, HAR, or log fixture through the real code path.
+6. Throwaway harness that boots the minimal subsystem needed to trigger the path.
+7. Property, fuzz, or stress loop for intermittent failures.
+8. `git bisect run` harness when the bug appeared between known good and bad revisions.
+
+Improve the loop before moving on:
+
+- Make it faster by narrowing setup and caching expensive fixtures.
+- Make it sharper by asserting the exact symptom.
+- Make it more deterministic by pinning time, seeds, filesystem paths, and network access.
+- For intermittent bugs, raise reproduction rate with repeated runs, concurrency, stress, or
+  timing probes until the failure is frequent enough to debug.
+
+If no credible loop can be built, stop and state what was tried. Request the missing artifact:
+environment access, captured payloads, logs, screen recording with timestamps, or permission
+for temporary instrumentation. Do not proceed to speculative fixes.
+
+### Phase 3: Evidence Analysis
 
 Examine all available evidence before forming hypotheses:
 
@@ -81,7 +121,7 @@ Examine all available evidence before forming hypotheses:
    - Focus on files touched by the error's call chain
    - Look for typos, wrong variable names, missing null checks
 
-### Phase 3: Hypothesis Generation
+### Phase 4: Hypothesis Generation
 
 Generate ranked hypotheses — never start fixing without a hypothesis:
 
@@ -103,7 +143,7 @@ Generate ranked hypotheses — never start fixing without a hypothesis:
    - Concurrency bugs: race condition, deadlock, resource starvation
    - Environment bugs: missing dependency, wrong config, version mismatch
 
-### Phase 4: Investigation Plan
+### Phase 5: Investigation Plan
 
 Design specific steps to test each hypothesis:
 
@@ -125,7 +165,7 @@ Design specific steps to test each hypothesis:
    - At decision points (if/else branches)
    - See `references/instrumentation-points.md`
 
-### Phase 5: Execution
+### Phase 6: Execution
 
 Execute the investigation plan, updating hypotheses as evidence arrives:
 
@@ -138,7 +178,7 @@ Execute the investigation plan, updating hypotheses as evidence arrives:
 4. **Know when to escalate** — If all hypotheses are exhausted, the bug is in a
    category you haven't considered. Step back and re-examine assumptions.
 
-### Phase 6: Resolution Documentation
+### Phase 7: Resolution Documentation
 
 After finding the root cause:
 
@@ -238,8 +278,8 @@ After finding the root cause:
    Record what was tested and what was learned.
 4. **Simplest explanation first.** Test typos, wrong variable names, and missing imports
    before considering race conditions, compiler bugs, or cosmic rays.
-5. **Reproduce before fixing.** If you cannot reproduce the bug in a controlled environment,
-   any fix is speculative. Invest in reproduction first.
+5. **Feedback loop before hypotheses.** If you cannot reproduce the bug with a controlled
+   pass/fail signal, any fix is speculative. Invest in the loop first.
 6. **Root cause, not symptoms.** A fix that addresses the symptom (adding a null check)
    without understanding the root cause (why was it null?) leaves the real bug alive.
 
