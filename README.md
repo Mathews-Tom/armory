@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 126](https://img.shields.io/badge/packages-126-informational)](manifest.yaml)
+[![packages: 130](https://img.shields.io/badge/packages-130-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -39,6 +39,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [proposal-writer](agents/proposal-writer/)       | opus   | Technical proposals with ROI calculations, three-tier pricing, and Problem-Agitate-Solve framing                |
 | [content-strategist](agents/content-strategist/) | sonnet | Multi-channel content creation with per-channel adaptation and automated quality passes                         |
 | [media-producer](agents/media-producer/)         | sonnet | Visual and video format router — selects the right skill based on concept type and output needs                 |
+| [skill-librarian](agents/skill-librarian/)       | sonnet | Reflective write-phase orchestrator — turns completed task transcripts into skill proposals or augmentations    |
 
 ### Agents — Analyzers
 
@@ -47,6 +48,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [code-reviewer](agents/code-reviewer/)         | sonnet | Multi-phase code review with severity-ranked findings |
 | [security-reviewer](agents/security-reviewer/) | sonnet | OWASP Top 10 vulnerability scanning                   |
 | [secret-scanner](agents/secret-scanner/)       | haiku  | Pre-commit detection of hardcoded credentials         |
+| [skill-router](agents/skill-router/)           | haiku  | Outcome-weighted package routing using historical eval results |
 | [test-engineer](agents/test-engineer/)         | sonnet | Co-evolutionary skill evolution with generate-verify-refine loops |
 
 > **Model routing:** Agents marked `opus` run on Claude Opus 4.7 with `xhigh` effort by default in Claude Code. Use `max` effort only for genuinely hard novel problems (diminishing returns, overthinking risk); `high` when running concurrent sessions or for cost-sensitive work. Opus 4.7 uses adaptive thinking — there is no fixed thinking budget to tune.
@@ -64,6 +66,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [test-harness](skills/test-harness/)             | Comprehensive pytest suite generation — happy path, edge cases, error conditions, fixtures, mocks, async, parametrized tests                                |
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
+| [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, merge, and clean up stack topology                      |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |
@@ -88,16 +91,22 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [architecture-reviewer](skills/architecture-reviewer/) | Architecture reviews across 7 scored dimensions — structural integrity, scalability, security, performance, enterprise readiness, operations, data  |
 | [code-refiner](skills/code-refiner/)                   | Deep code simplification and refactoring — structural complexity analysis, anti-pattern detection, idiomatic rewrites across Python, Go, TS, Rust   |
+| [citation-audit](skills/citation-audit/)               | Citation verification for manuscripts — checks that references are real, correctly attributed, and accurately described                              |
+| [figure-rhetoric](skills/figure-rhetoric/)             | Figure and plot communication audit — evaluates whether visuals support the claims they are meant to carry                                      |
+| [figure-table-quality](skills/figure-table-quality/)   | Figure and table rendering audit — checks readability, label collisions, accessibility, formatting, and consistency                              |
 | [pr-review](skills/pr-review/)                         | Diff-based PR review across 5 dimensions — code quality, test coverage, silent failures, type design, comment quality with severity-ranked output   |
 | [pre-landing-review](skills/pre-landing-review/)       | Gate-oriented safety audit with two-pass severity triage — CRITICAL (SQL, races, trust) blocks landing, INFORMATIONAL is advisory                   |
 | [plan-review](skills/plan-review/)                     | Pre-implementation plan audit stress-testing scope, assumptions, risks, and failure modes with product and engineering lenses                       |
 | [manuscript-review](skills/manuscript-review/)         | Pre-publication manuscript audit with 24 diagnostic dimensions, citation hygiene, and cross-element coherence                                       |
 | [manuscript-provenance](skills/manuscript-provenance/) | Computational provenance audit verifying every number, table, and figure in a manuscript traces back to code                                        |
+| [manuscript-typography](skills/manuscript-typography/) | Academic typography audit — booktabs, captions, units, references, page layout, visual hierarchy, and LaTeX polish                                  |
+| [opus-4-7-migration](skills/opus-4-7-migration/)       | Repository scanner for Opus 4.7 migration issues — fixed thinking budgets, retired model aliases, and stale prompt assumptions                     |
 | [repo-sentinel](skills/repo-sentinel/)                 | Security audit and enforcement for public repos — 12 attack surfaces, pre-release readiness, history scrubbing, CI gates                            |
 | [package-evaluator](skills/package-evaluator/)         | Evaluate package quality across 6 weighted dimensions with type-specific signals — frontmatter, triggers, structure, depth, consistency, compliance |
 | [devils-advocate](skills/devils-advocate/)             | Challenges AI-generated plans, code, designs, and decisions — pre-mortem, inversion, Socratic questioning with steel-manning and clear verdicts     |
 | [dependency-audit](skills/dependency-audit/)           | Dependency risk assessment — license compliance, maintenance health scoring, CVE detection, bloat identification, supply chain analysis             |
 | [qa-systematic](skills/qa-systematic/)                 | Systematic web QA testing with 8-category health scoring, issue taxonomy, and regression tracking — full, quick, and regression modes               |
+| [usage-audit](skills/usage-audit/)                     | Claude Code setup audit for token waste and context bloat across MCP servers, CLAUDE.md, skills, and settings                                      |
 | [ux-expert](skills/ux-expert/)                         | UX audit and redesign for B2B SaaS dashboards — 8-dimension analysis, wireframes, component recommendations, severity-ranked findings               |
 
 ### Skills — Visualization & Documents
@@ -109,6 +118,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [concept-to-video](skills/concept-to-video/)                         | Turn concepts into animated explainer videos using Manim — MP4/GIF output with audio overlay, templates, multi-scene |
 | [remotion-video](skills/remotion-video/)                             | Production motion graphics using Remotion (React) — branded content, data-driven video, audio sync, TailwindCSS      |
 | [html-presentation](skills/html-presentation/)                       | Convert documents and outlines into self-contained HTML slide presentations                                          |
+| [marp-slides](skills/marp-slides/)                                   | Author MARP Markdown slide decks exportable to PDF, PPTX, and HTML via marp-cli                                     |
 | [static-web-artifacts-builder](skills/static-web-artifacts-builder/) | Self-contained interactive HTML artifacts — infographics, dashboards, diagrams                                       |
 | [md-to-pdf](skills/md-to-pdf/)                                       | Markdown to styled PDF with Mermaid diagrams, KaTeX math, and syntax highlighting                                    |
 
@@ -121,6 +131,9 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [engineering-retro](skills/engineering-retro/)   | Git-based engineering retrospective — commit analysis, velocity metrics, session patterns, health scoring over time windows |
 | [adr-writer](skills/adr-writer/)                 | Architecture Decision Records — context capture, alternatives analysis, consequence projection, status lifecycle            |
 | [api-docs-generator](skills/api-docs-generator/) | API documentation audit and enhancement — FastAPI docstrings, Pydantic examples, OpenAPI spec enrichment, coverage reports  |
+| [arxiv-preflight](skills/arxiv-preflight/)       | arXiv submission readiness audit across TeX source, PDF, figures, metadata, bibliography, and file organization             |
+| [arxiv-figures](skills/arxiv-figures/)           | Optimize and convert figures for arXiv processor constraints, file formats, and size limits                                |
+| [arxiv-package](skills/arxiv-package/)           | Package TeX/LaTeX projects into clean tarballs or zip archives ready for arXiv upload                                      |
 
 ### Skills — Backend & Data
 
@@ -179,6 +192,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 
 | Rule                                            | Description                                    |
 | ----------------------------------------------- | ---------------------------------------------- |
+| [adaptive-thinking-control](rules/adaptive-thinking-control/) | Prompt-level control for Opus 4.7 adaptive thinking and effort-level trade-offs |
 | [commit-standards](rules/commit-standards/)     | Conventional commit format, branch naming      |
 | [test-standards](rules/test-standards/)         | Coverage thresholds, test quality requirements |
 | [security-standards](rules/security-standards/) | Secret management, input validation, auth      |
@@ -193,6 +207,8 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [refactor](commands/refactor/)           | Code simplification workflow     |
 | [evolve](commands/evolve/)               | Co-evolutionary skill generation |
 | [handoff](commands/handoff/)             | Refresh or scaffold `.docs/handoff.md` |
+| [route](commands/route/)                 | Package discovery and task-to-package routing |
+| [stack-pr](commands/stack-pr/)           | Stacked PR workflow command surface |
 
 ## Hooks
 
@@ -205,6 +221,8 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [read-dedup](hooks/read-dedup/)           | Warn on duplicate file reads within a session        |
 | [prompt-context](hooks/prompt-context/)   | Inject text file as additionalContext on every prompt |
 | [handoff-on-stop](hooks/handoff-on-stop/) | Refresh `.docs/handoff.md` on Stop when present      |
+| [simplify-ignore](hooks/simplify-ignore/) | Collapse protected code regions before agent reads   |
+| [stack-guard](hooks/stack-guard/)         | Add stacked-PR-specific git safety checks            |
 
 ## Utilities
 
@@ -227,6 +245,7 @@ Presets install curated bundles of passive packages (rules, hooks, commands) in 
 | [skill-evolution](presets/skill-evolution/) | 6 skills, 1 agent, 1 command               | EvoSkills pipeline — co-evolutionary skill factory with paper-to-skill, distillation, and verification. |
 | [terse-mode](presets/terse-mode/)       | 1 hook                                           | Terse output enforcement via prompt-context hook with compaction-immune rule injection.          |
 | [session-continuity](presets/session-continuity/) | 1 skill, 1 command, 1 hook          | Atomic handoff install: `/handoff`, greenfield scaffold, and opt-in Stop refresh gated by `.docs/handoff.md`. |
+| [stack-workflow](presets/stack-workflow/) | 3 skills, 1 command, 2 hooks                     | Stacked PR workflow stack with topology management, guard hooks, and review gates.               |
 
 ### Deprecated Presets
 
@@ -234,11 +253,11 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 
 | Preset             | Replacement                                     |
 | ------------------ | ----------------------------------------------- |
-| ~~biz-validation~~ | `idea-scout` agent                              |
-| ~~media-craft~~    | `media-producer` agent                          |
-| ~~content-ops~~    | `content-strategist` agent                      |
-| ~~research~~       | `research-analyst` agent                        |
-| ~~eng-ops~~        | `release-captain` + `full-stack-builder` agents |
+| [biz-validation](presets/biz-validation/) | `idea-scout` agent                              |
+| [media-craft](presets/media-craft/)       | `media-producer` agent                          |
+| [content-ops](presets/content-ops/)       | `content-strategist` agent                      |
+| [research](presets/research/)             | `research-analyst` agent                        |
+| [eng-ops](presets/eng-ops/)               | `release-captain` + `full-stack-builder` agents |
 
 ---
 
@@ -415,7 +434,7 @@ uv run scripts/validate_agentskills.py           # Warnings only (default)
 uv run scripts/validate_agentskills.py --strict   # Extra fields are errors
 ```
 
-All 57 skills pass with 0 errors. The validator checks the 6-field frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
+All 76 skills pass with 0 errors. The validator checks the 6-field frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
 
 ---
 
