@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 126](https://img.shields.io/badge/packages-126-informational)](manifest.yaml)
+[![packages: 130](https://img.shields.io/badge/packages-130-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -39,6 +39,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [proposal-writer](agents/proposal-writer/)       | opus   | Technical proposals with ROI calculations, three-tier pricing, and Problem-Agitate-Solve framing                |
 | [content-strategist](agents/content-strategist/) | sonnet | Multi-channel content creation with per-channel adaptation and automated quality passes                         |
 | [media-producer](agents/media-producer/)         | sonnet | Visual and video format router — selects the right skill based on concept type and output needs                 |
+| [skill-librarian](agents/skill-librarian/)       | sonnet | Reflective write-phase orchestrator — turns completed task transcripts into skill proposals or augmentations    |
 
 ### Agents — Analyzers
 
@@ -47,6 +48,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [code-reviewer](agents/code-reviewer/)         | sonnet | Multi-phase code review with severity-ranked findings |
 | [security-reviewer](agents/security-reviewer/) | sonnet | OWASP Top 10 vulnerability scanning                   |
 | [secret-scanner](agents/secret-scanner/)       | haiku  | Pre-commit detection of hardcoded credentials         |
+| [skill-router](agents/skill-router/)           | haiku  | Outcome-weighted package routing using historical eval results |
 | [test-engineer](agents/test-engineer/)         | sonnet | Co-evolutionary skill evolution with generate-verify-refine loops |
 
 > **Model routing:** Agents marked `opus` run on Claude Opus 4.7 with `xhigh` effort by default in Claude Code. Use `max` effort only for genuinely hard novel problems (diminishing returns, overthinking risk); `high` when running concurrent sessions or for cost-sensitive work. Opus 4.7 uses adaptive thinking — there is no fixed thinking budget to tune.
