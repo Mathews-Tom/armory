@@ -63,6 +63,7 @@ cases:
       - "activates stacked-prs"
       - "merges root PR before children"
       - "retargets each child after the parent lands"
+      - "does not delete parent branches while child PRs still target them"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -70,6 +71,9 @@ cases:
         weight: 0.8
       - type: matches_regex
         target: "gh pr merge"
+        weight: 0.8
+      - type: matches_regex
+        target: "baseRefName"
         weight: 0.8
       - type: matches_regex
         target: "gh pr edit[\\s\\S]*--base"
