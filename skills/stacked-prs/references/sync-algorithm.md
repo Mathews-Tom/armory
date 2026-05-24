@@ -60,10 +60,13 @@ If `--force-with-lease` fails, the remote branch changed since fetch. Stop and r
 
 ## Validation After Sync
 
-Run validation according to the repository's detected gates. For armory package development:
+Run validation according to the target repository's detected gates and required provider checks. Do not substitute armory package-evaluation commands for another repository's local gate.
+
+For armory package development only:
 
 ```bash
 uv run python scripts/validate_evals.py
+uv run python scripts/generate_manifest.py
 uv run python scripts/evaluate_package.py --path skills/stacked-prs
 ```
 

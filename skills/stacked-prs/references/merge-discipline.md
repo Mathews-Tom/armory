@@ -7,15 +7,20 @@ Stacked PRs land bottom-up from the base perspective: merge the root PR first, t
 - Require parent PR checks before merging a child.
 - Merge only one stack PR at a time.
 - After each merge, fetch, rebase the next child onto the updated base, push with lease, and retarget the child PR.
-- Delete remote branches only through provider-confirmed merge or explicit cleanup.
+- Do not delete a branch while any open PR still has that branch as its base.
+- Delete remote stack branches only during final cleanup after descendants are merged or retargeted.
 - Delete local branches only when `git branch --merged <base>` proves they are merged.
 
 ## Root Merge
 
 ```bash
-gh pr merge <root-pr> --merge --delete-branch
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<branch-being-merged>")'
+gh pr merge <root-pr> --merge
 git fetch origin --prune
 ```
+
+If the child-base guard returns any PRs, keep the parent branch. On GitHub, deleting a branch that is still a child PR base can close the child PR unmerged.
 
 ## Promote Next Child
 
@@ -38,7 +43,27 @@ git branch --merged main
 git branch -d <merged-stack-branch>
 ```
 
+Before deleting any remote stack branch, verify no open PR still targets it:
+
+```bash
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<merged-stack-branch>")'
+git push origin --delete <merged-stack-branch>
+```
+
 Never use `git branch -D` for stack cleanup unless the user explicitly asks to delete an unmerged branch after reviewing the risk.
+
+## Recovery: Deleted Parent Branch Closed A Child PR
+
+Use this path only for the specific provider failure where a child PR was closed unmerged because its base branch disappeared.
+
+1. Confirm the closed child PR has `mergedAt: null`.
+2. Confirm the deleted branch was the closed PR's `baseRefName`.
+3. Confirm the child `headRefName` still exists on `origin`.
+4. Confirm the child head commit is still the intended stack slice.
+5. Recreate the PR against `main` or the current merged parent.
+6. Wait for required provider checks on the recreated PR.
+7. Continue root-to-leaf merging.
 
 ## Stop Conditions
 
@@ -47,5 +72,6 @@ Never use `git branch -D` for stack cleanup unless the user explicitly asks to d
 - Provider reports branch protection failure.
 - Rebase conflict occurs after parent merge.
 - Local branch is not listed by `git branch --merged <base>`.
+- A closed unmerged child PR cannot be traced to deleted-base recovery.
 
 Report the stopped branch and next safe command.

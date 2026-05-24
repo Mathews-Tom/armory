@@ -45,15 +45,34 @@ View checks:
 gh pr checks <number>
 ```
 
+Watch current PR checks:
+
+```bash
+gh pr checks <number> --watch --fail-fast
+```
+
+When using `gh pr view --json statusCheckRollup`, filter results to the current head SHA. Retargeting and rebasing can leave duplicate historical check runs in rollup output.
+
+Find child PRs that still use a branch as their base:
+
+```bash
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<branch-being-merged>")'
+```
+
 Merge a root PR:
 
 ```bash
-gh pr merge <number> --merge --delete-branch
+gh pr merge <number> --merge
 ```
 
-Delete a remote branch only after provider-confirmed merge:
+Do not use `--delete-branch` while any open PR still has the branch being merged as `baseRefName`. For GitHub stacks, branch deletion can close descendant PRs unmerged when their base branch disappears.
+
+Delete a remote stack branch only after provider-confirmed merge and after no open PR targets it as a base:
 
 ```bash
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<merged-stack-branch>")'
 git push origin --delete <branch>
 ```
 
@@ -83,6 +102,7 @@ Regenerate the stack section after publish, sync, retarget, or merge.
 - Provider rejects changing a PR base.
 - Required checks fail.
 - Branch protection prevents merge.
+- An open child PR still targets a branch selected for deletion.
 - Provider reports branch deletion failure after merge.
 
 Do not retry by changing topology. Report the provider error and the exact command that failed.

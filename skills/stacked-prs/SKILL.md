@@ -119,7 +119,9 @@ Start at the first branch above the base and continue toward the leaf. Stop on c
 
 Validate the stack as reviewable slices. Run cheap checks on every branch when practical; run expensive full checks on the leaf when branch-by-branch validation is not reasonable. Record exactly what ran in each PR body.
 
-For this armory package implementation, use:
+Use the target repository's detected local gate and provider checks. Do not run armory package-evaluation commands when operating on another repository's stack.
+
+For this armory package implementation only, use:
 
 ```bash
 uv run python scripts/validate_evals.py
@@ -132,7 +134,9 @@ uv run python scripts/evaluate_package.py --path skills/stacked-prs
 Merge root to leaf:
 
 ```bash
-gh pr merge <root-pr> --merge --delete-branch
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<branch-being-merged>")'
+gh pr merge <root-pr> --merge
 git fetch origin --prune
 git switch <child-branch>
 git rebase origin/main
@@ -140,7 +144,7 @@ git push --force-with-lease origin <child-branch>
 gh pr edit <child-pr> --base main
 ```
 
-Repeat for each child. Require parent checks and provider merge confirmation before moving to the next branch.
+On GitHub, do not pass `--delete-branch` while any open PR still has the branch being merged as its `baseRefName`. Deleting a parent branch that is still a child PR base can close the child PR unmerged. Repeat for each child. Require parent checks and provider merge confirmation before moving to the next branch.
 
 ### 6. Cleanup
 
@@ -155,6 +159,14 @@ git branch -d <merged-stack-branch>
 ```
 
 Delete only branches confirmed merged into the current base.
+
+Delete remote stack branches only after every stack PR has landed or been retargeted away from the branch:
+
+```bash
+gh pr list --state open --json number,baseRefName,headRefName \
+  --jq '.[] | select(.baseRefName == "<merged-stack-branch>")'
+git push origin --delete <merged-stack-branch>
+```
 
 ## Splitting One Branch Into A Stack
 
@@ -196,10 +208,23 @@ Do not publish if the leaf differs from the source branch.
 | Dirty worktree before mutation | Stop and report changed paths |
 | Ambiguous parent order | Request explicit branch order or `.stack-prs.yaml` |
 | Existing closed unmerged PR | Stop before creating replacements |
+| Closed unmerged child after parent branch deletion | Confirm the head branch and intended commit still exist, recreate the PR against `main` or the current merged parent, wait for checks, then continue |
 | Rebase or cherry-pick conflict | Stop, report branch and conflicted files, do not continue children |
 | Remote branch changed since fetch | Stop; do not retry without a fresh inspect |
 | Failed validation | Record the failed command and stop merge or publish |
 | Top split branch differs from source | Stop before PR creation and report remaining diff |
+
+## Recovery: Deleted Parent Branch Closed A Child PR
+
+Use this only when a provider closed a child PR because its base branch was deleted during stack landing.
+
+1. Confirm the closed PR is unmerged.
+2. Confirm the closed PR's base branch was deleted by the parent merge or cleanup command.
+3. Confirm the child head branch still exists on `origin`.
+4. Confirm the child head commit is the intended stack slice.
+5. Recreate the PR against `main` or the current merged parent.
+6. Wait for required checks on the recreated PR.
+7. Continue the root-to-leaf merge sequence.
 
 ## Output Format
 
