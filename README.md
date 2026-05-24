@@ -192,6 +192,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 
 | Rule                                            | Description                                    |
 | ----------------------------------------------- | ---------------------------------------------- |
+| [adaptive-thinking-control](rules/adaptive-thinking-control/) | Prompt-level control for Opus 4.7 adaptive thinking and effort-level trade-offs |
 | [commit-standards](rules/commit-standards/)     | Conventional commit format, branch naming      |
 | [test-standards](rules/test-standards/)         | Coverage thresholds, test quality requirements |
 | [security-standards](rules/security-standards/) | Secret management, input validation, auth      |
@@ -206,6 +207,8 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [refactor](commands/refactor/)           | Code simplification workflow     |
 | [evolve](commands/evolve/)               | Co-evolutionary skill generation |
 | [handoff](commands/handoff/)             | Refresh or scaffold `.docs/handoff.md` |
+| [route](commands/route/)                 | Package discovery and task-to-package routing |
+| [stack-pr](commands/stack-pr/)           | Stacked PR workflow command surface |
 
 ## Hooks
 
@@ -218,6 +221,8 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [read-dedup](hooks/read-dedup/)           | Warn on duplicate file reads within a session        |
 | [prompt-context](hooks/prompt-context/)   | Inject text file as additionalContext on every prompt |
 | [handoff-on-stop](hooks/handoff-on-stop/) | Refresh `.docs/handoff.md` on Stop when present      |
+| [simplify-ignore](hooks/simplify-ignore/) | Collapse protected code regions before agent reads   |
+| [stack-guard](hooks/stack-guard/)         | Add stacked-PR-specific git safety checks            |
 
 ## Utilities
 
@@ -240,6 +245,7 @@ Presets install curated bundles of passive packages (rules, hooks, commands) in 
 | [skill-evolution](presets/skill-evolution/) | 6 skills, 1 agent, 1 command               | EvoSkills pipeline — co-evolutionary skill factory with paper-to-skill, distillation, and verification. |
 | [terse-mode](presets/terse-mode/)       | 1 hook                                           | Terse output enforcement via prompt-context hook with compaction-immune rule injection.          |
 | [session-continuity](presets/session-continuity/) | 1 skill, 1 command, 1 hook          | Atomic handoff install: `/handoff`, greenfield scaffold, and opt-in Stop refresh gated by `.docs/handoff.md`. |
+| [stack-workflow](presets/stack-workflow/) | 3 skills, 1 command, 2 hooks                     | Stacked PR workflow stack with topology management, guard hooks, and review gates.               |
 
 ### Deprecated Presets
 
@@ -247,11 +253,11 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 
 | Preset             | Replacement                                     |
 | ------------------ | ----------------------------------------------- |
-| ~~biz-validation~~ | `idea-scout` agent                              |
-| ~~media-craft~~    | `media-producer` agent                          |
-| ~~content-ops~~    | `content-strategist` agent                      |
-| ~~research~~       | `research-analyst` agent                        |
-| ~~eng-ops~~        | `release-captain` + `full-stack-builder` agents |
+| [biz-validation](presets/biz-validation/) | `idea-scout` agent                              |
+| [media-craft](presets/media-craft/)       | `media-producer` agent                          |
+| [content-ops](presets/content-ops/)       | `content-strategist` agent                      |
+| [research](presets/research/)             | `research-analyst` agent                        |
+| [eng-ops](presets/eng-ops/)               | `release-captain` + `full-stack-builder` agents |
 
 ---
 
