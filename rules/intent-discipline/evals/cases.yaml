@@ -1,0 +1,67 @@
+cases:
+  - id: ambiguous_export_request
+    prompt: "Add a feature to export users from the system."
+    fixtures: []
+    rubric:
+      - "surfaces scope ambiguity (all users vs filtered subset)"
+      - "asks about format target (file download, API endpoint, background job)"
+      - "names privacy/field-selection assumption before implementing"
+      - "does not silently pick one interpretation and write code"
+    trigger_expected: true
+
+  - id: overengineering_single_use
+    prompt: "Write a function to apply a percentage discount to an order total."
+    fixtures: []
+    rubric:
+      - "produces a minimal function, not a class hierarchy or strategy pattern"
+      - "rejects speculative DiscountStrategy/Calculator abstractions for single use"
+      - "cites the 200-to-50-line simplicity test or equivalent"
+    trigger_expected: true
+
+  - id: drive_by_refactor_temptation
+    prompt: "Fix the off-by-one bug in the pagination helper — but the file also has inconsistent quote styles I should probably normalize."
+    fixtures: []
+    rubric:
+      - "scopes the diff to the off-by-one fix only"
+      - "advises mentioning the quote-style drift in the response but not including it in the diff"
+      - "warns that mixing the cleanup makes the diff untraceable to the bug fix"
+    trigger_expected: true
+
+  - id: imperative_to_verifiable
+    prompt: "Make the search faster."
+    fixtures: []
+    rubric:
+      - "refuses to start implementation without a concrete success criterion"
+      - "asks for a target metric (e.g., p95 latency reduction from N ms to M ms)"
+      - "offers candidate criteria (response time, throughput, perceived speed) with tradeoffs"
+    trigger_expected: true
+
+  - id: plan_with_verification_steps
+    prompt: "Walk me through how you would migrate this module to the new logging API."
+    fixtures: []
+    rubric:
+      - "produces numbered steps with explicit per-step verification"
+      - "verification entries are executable checks, not 'looks good'"
+      - "calls out cleanup of newly orphaned imports as part of the surgical-change discipline"
+    trigger_expected: true
+
+  - id: negative_typing_question
+    prompt: "Should I use list[str] or List[str] for Python type hints?"
+    fixtures: []
+    rubric:
+      - "typing convention is the domain of typing-standards, not intent-discipline"
+    trigger_expected: false
+
+  - id: negative_test_coverage_thresholds
+    prompt: "What is the minimum unit test coverage we require on new code?"
+    fixtures: []
+    rubric:
+      - "coverage thresholds belong to test-standards, not intent-discipline"
+    trigger_expected: false
+
+  - id: negative_commit_message_format
+    prompt: "What prefix should I use for a commit that adds a new endpoint?"
+    fixtures: []
+    rubric:
+      - "commit message format belongs to commit-standards, not intent-discipline"
+    trigger_expected: false
