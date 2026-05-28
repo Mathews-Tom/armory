@@ -1752,6 +1752,28 @@ packages:
     - branch-naming
     category: content
     difficulty: beginner
+  - name: intent-discipline
+    version: 1.0.0
+    description: 'Behavioral guardrails keeping coding agents honest about intent, scope, and verifiability. Forces explicit
+      assumption surfacing on ambiguous requests, minimum-viable code over speculative abstractions, surgical diffs that trace
+      every changed line to the request, and conversion of imperative tasks ("fix it", "make it faster") into verifiable success
+      criteria the agent can loop against. Counters silent assumption-running, bloated abstractions, drive-by refactors, and
+      weak success criteria. Use on non-trivial dev, refactor, or review work where scope creep or misinterpreted intent would
+      be costly. Triggers on: "intent discipline", "surface assumptions", "stop overengineering", "scope creep", "surgical
+      changes", "minimum viable code", "goal-driven", "verifiable success criteria", "stay surgical", "no drive-by refactor",
+      "ambiguous request", "multiple interpretations", "push back when warranted", "Karpathy guidelines".'
+    path: rules/intent-discipline
+    source: https://github.com/Mathews-Tom/armory/blob/main/rules/intent-discipline/RULE.md
+    scope: global
+    tags:
+    - intent
+    - scope
+    - simplicity
+    - surgical-edits
+    - verifiability
+    - karpathy
+    category: development
+    difficulty: beginner
   - name: security-standards
     version: 1.0.0
     description: Defines security standards for application development including secret management (environment variables,

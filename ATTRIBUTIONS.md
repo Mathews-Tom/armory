@@ -85,6 +85,7 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 | Porter's Five Forces / Lean Canvas / JTBD      | Standard business frameworks                                                                                            | `competitive-analyzer`, `idea-validator` |
 | OWASP Top 10                                   | [OWASP Foundation](https://owasp.org/www-project-top-ten/)                                                              | `security-reviewer`                      |
 | ADR format                                     | [joelparkerhenderson/architecture-decision-record](https://github.com/joelparkerhenderson/architecture-decision-record) | `adr-writer`                             |
+| Four-principle LLM coding guidelines           | [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876); Claude-Code packaging by [forrestchang/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) (MIT) | `intent-discipline`                      |
 
 ## Community & Research
 

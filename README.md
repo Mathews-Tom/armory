@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 130](https://img.shields.io/badge/packages-130-informational)](manifest.yaml)
+[![packages: 131](https://img.shields.io/badge/packages-131-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -194,6 +194,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 | ----------------------------------------------- | ---------------------------------------------- |
 | [adaptive-thinking-control](rules/adaptive-thinking-control/) | Prompt-level control for Opus 4.7 adaptive thinking and effort-level trade-offs |
 | [commit-standards](rules/commit-standards/)     | Conventional commit format, branch naming      |
+| [intent-discipline](rules/intent-discipline/)   | Surface assumptions, minimum-viable code, surgical diffs, verifiable success criteria |
 | [test-standards](rules/test-standards/)         | Coverage thresholds, test quality requirements |
 | [security-standards](rules/security-standards/) | Secret management, input validation, auth      |
 | [token-efficiency](rules/token-efficiency/)     | Token-efficient tool usage patterns            |
