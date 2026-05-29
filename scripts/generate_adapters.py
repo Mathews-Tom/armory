@@ -12,6 +12,7 @@ Usage:
     uv run scripts/generate_adapters.py --platform cursor --type rules --type skills
     uv run scripts/generate_adapters.py --dry-run                 # Preview only
 """
+
 from __future__ import annotations
 
 import argparse
@@ -98,7 +99,9 @@ def truncate_description(description: str, max_chars: int = 200) -> str:
     description = description.strip()
     if len(description) <= max_chars:
         return description
-    truncated = description[:max_chars].rsplit(" ", 1)[0]
+    if max_chars <= 3:
+        return "." * max_chars
+    truncated = description[: max_chars - 3].rsplit(" ", 1)[0]
     return truncated.rstrip(".,;:") + "..."
 
 
@@ -146,7 +149,10 @@ def load_packages(
             try:
                 fm = parse_frontmatter(content)
             except ValueError:
-                print(f"WARNING: {def_file} has invalid frontmatter, skipping", file=sys.stderr)
+                print(
+                    f"WARNING: {def_file} has invalid frontmatter, skipping",
+                    file=sys.stderr,
+                )
                 continue
 
             name = fm.get("name", "")
@@ -177,7 +183,9 @@ def inline_references(pkg: PackageContent) -> str:
     """Combine package body with all reference file contents."""
     parts = [pkg.body]
     for ref_name, ref_content in pkg.references.items():
-        parts.append(f"\n\n---\n\n## Reference: {ref_name.removesuffix('.md')}\n\n{ref_content}")
+        parts.append(
+            f"\n\n---\n\n## Reference: {ref_name.removesuffix('.md')}\n\n{ref_content}"
+        )
     return "\n".join(parts)
 
 
@@ -223,7 +231,9 @@ class AdapterGenerator(ABC):
     def _copy_dir(self, src: Path, dst: Path) -> None:
         """Copy directory tree (or log in dry-run mode)."""
         if self.dry_run:
-            print(f"  [dry-run] copy {src.relative_to(REPO_ROOT)} → {dst.relative_to(REPO_ROOT)}")
+            print(
+                f"  [dry-run] copy {src.relative_to(REPO_ROOT)} → {dst.relative_to(REPO_ROOT)}"
+            )
             return
         if dst.exists():
             shutil.rmtree(dst)
@@ -279,7 +289,10 @@ class CursorAdapter(AdapterGenerator):
         for skipped_type in ("hook", "utility", "preset"):
             count = len(packages.get(skipped_type, []))
             if count:
-                print(f"  cursor: skipped {count} {skipped_type}(s) (no equivalent)", file=sys.stderr)
+                print(
+                    f"  cursor: skipped {count} {skipped_type}(s) (no equivalent)",
+                    file=sys.stderr,
+                )
 
     def _build_mdc(self, pkg: PackageContent, *, always_apply: bool) -> str:
         """Build .mdc file content with YAML frontmatter + body."""
@@ -331,6 +344,7 @@ class CodexAdapter(AdapterGenerator):
 
     platform = "codex"
     SIZE_BUDGET_BYTES = 32 * 1024  # 32 KiB default
+    ROOT_DESCRIPTION_MAX_CHARS = 200
 
     def generate(self, packages: dict[str, list[PackageContent]]) -> None:
         # Root AGENTS.md: condensed index referencing subdirectory files
@@ -342,7 +356,10 @@ class CodexAdapter(AdapterGenerator):
             root_sections.append("# Project Standards\n")
             root_sections.append("Full standards in `standards/AGENTS.md`.\n")
             for pkg in rules:
-                description = truncate_description(pkg.frontmatter.get("description", ""), 300)
+                description = truncate_description(
+                    pkg.frontmatter.get("description", ""),
+                    self.ROOT_DESCRIPTION_MAX_CHARS,
+                )
                 root_sections.append(f"- **{_title_case(pkg.name)}**: {description}")
             root_sections.append("")
 
@@ -352,7 +369,9 @@ class CodexAdapter(AdapterGenerator):
                 std_parts.append(f"## {_title_case(pkg.name)}\n")
                 std_parts.append(pkg.body)
                 std_parts.append("")
-            self._write(self.output_dir / "standards" / "AGENTS.md", "\n".join(std_parts))
+            self._write(
+                self.output_dir / "standards" / "AGENTS.md", "\n".join(std_parts)
+            )
 
         # Agents → condensed in root, full body in agents/AGENTS.md
         agents = packages.get("agent", [])
@@ -360,7 +379,10 @@ class CodexAdapter(AdapterGenerator):
             root_sections.append("# Agents\n")
             root_sections.append("Full agent instructions in `agents/AGENTS.md`.\n")
             for pkg in agents:
-                description = truncate_description(pkg.frontmatter.get("description", ""), 300)
+                description = truncate_description(
+                    pkg.frontmatter.get("description", ""),
+                    self.ROOT_DESCRIPTION_MAX_CHARS,
+                )
                 root_sections.append(f"- **{_title_case(pkg.name)}**: {description}")
             root_sections.append("")
 
@@ -370,15 +392,22 @@ class CodexAdapter(AdapterGenerator):
                 agent_parts.append(f"## {_title_case(pkg.name)}\n")
                 agent_parts.append(pkg.body)
                 agent_parts.append("")
-            self._write(self.output_dir / "agents" / "AGENTS.md", "\n".join(agent_parts))
+            self._write(
+                self.output_dir / "agents" / "AGENTS.md", "\n".join(agent_parts)
+            )
 
         # Commands → condensed in root, full body in workflows/AGENTS.md
         commands = packages.get("command", [])
         if commands:
             root_sections.append("# Workflows\n")
-            root_sections.append("Full workflow instructions in `workflows/AGENTS.md`.\n")
+            root_sections.append(
+                "Full workflow instructions in `workflows/AGENTS.md`.\n"
+            )
             for pkg in commands:
-                description = truncate_description(pkg.frontmatter.get("description", ""), 300)
+                description = truncate_description(
+                    pkg.frontmatter.get("description", ""),
+                    self.ROOT_DESCRIPTION_MAX_CHARS,
+                )
                 root_sections.append(f"- **{_title_case(pkg.name)}**: {description}")
             root_sections.append("")
 
@@ -388,7 +417,9 @@ class CodexAdapter(AdapterGenerator):
                 wf_parts.append(f"## {_title_case(pkg.name)}\n")
                 wf_parts.append(pkg.body)
                 wf_parts.append("")
-            self._write(self.output_dir / "workflows" / "AGENTS.md", "\n".join(wf_parts))
+            self._write(
+                self.output_dir / "workflows" / "AGENTS.md", "\n".join(wf_parts)
+            )
 
         # Skills → condensed in root, full body in skills/AGENTS.md
         skills = packages.get("skill", [])
@@ -396,7 +427,10 @@ class CodexAdapter(AdapterGenerator):
             root_sections.append("# Skills Reference\n")
             root_sections.append("Full skill instructions in `skills/AGENTS.md`.\n")
             for pkg in skills:
-                description = truncate_description(pkg.frontmatter.get("description", ""), 300)
+                description = truncate_description(
+                    pkg.frontmatter.get("description", ""),
+                    self.ROOT_DESCRIPTION_MAX_CHARS,
+                )
                 root_sections.append(f"- **{_title_case(pkg.name)}**: {description}")
             root_sections.append("")
 
@@ -406,13 +440,18 @@ class CodexAdapter(AdapterGenerator):
                 skill_parts.append(f"## {_title_case(pkg.name)}\n")
                 skill_parts.append(pkg.body)
                 skill_parts.append("")
-            self._write(self.output_dir / "skills" / "AGENTS.md", "\n".join(skill_parts))
+            self._write(
+                self.output_dir / "skills" / "AGENTS.md", "\n".join(skill_parts)
+            )
 
         # Hooks, utilities, presets → skipped
         for skipped_type in ("hook", "utility", "preset"):
             count = len(packages.get(skipped_type, []))
             if count:
-                print(f"  codex: skipped {count} {skipped_type}(s) (no equivalent)", file=sys.stderr)
+                print(
+                    f"  codex: skipped {count} {skipped_type}(s) (no equivalent)",
+                    file=sys.stderr,
+                )
 
         root_content = "\n".join(root_sections)
         size = len(root_content.encode("utf-8"))
@@ -423,7 +462,10 @@ class CodexAdapter(AdapterGenerator):
                 file=sys.stderr,
             )
         else:
-            print(f"  codex: root AGENTS.md is {size:,} bytes ({pct:.0f}% of 32 KiB budget)", file=sys.stderr)
+            print(
+                f"  codex: root AGENTS.md is {size:,} bytes ({pct:.0f}% of 32 KiB budget)",
+                file=sys.stderr,
+            )
 
         self._write(self.output_dir / "AGENTS.md", root_content)
 
@@ -486,12 +528,17 @@ class GeminiAdapter(AdapterGenerator):
         # Commands → .gemini/commands/workflow/{name}.toml
         for pkg in packages.get("command", []):
             content = self._build_command_toml(pkg)
-            self._write(gemini_dir / "commands" / "workflow" / f"{pkg.name}.toml", content)
+            self._write(
+                gemini_dir / "commands" / "workflow" / f"{pkg.name}.toml", content
+            )
 
         # Hooks → documented as manual setup
         hooks = packages.get("hook", [])
         if hooks:
-            print(f"  gemini: skipped {len(hooks)} hook(s) (different event model)", file=sys.stderr)
+            print(
+                f"  gemini: skipped {len(hooks)} hook(s) (different event model)",
+                file=sys.stderr,
+            )
 
         # Utilities → wrap as skills
         for pkg in packages.get("utility", []):
@@ -500,13 +547,18 @@ class GeminiAdapter(AdapterGenerator):
         # Presets → skipped
         presets = packages.get("preset", [])
         if presets:
-            print(f"  gemini: skipped {len(presets)} preset(s) (no equivalent)", file=sys.stderr)
+            print(
+                f"  gemini: skipped {len(presets)} preset(s) (no equivalent)",
+                file=sys.stderr,
+            )
 
     def _generate_skill(self, skill_dir: Path, pkg: PackageContent) -> None:
         """Generate a Gemini skill directory (SKILL.md + references/)."""
         # Build cleaned frontmatter (remove Claude-specific fields)
         clean_fm = self._clean_skill_frontmatter(pkg.frontmatter)
-        fm_yaml = yaml.dump(clean_fm, default_flow_style=False, sort_keys=False, width=120).strip()
+        fm_yaml = yaml.dump(
+            clean_fm, default_flow_style=False, sort_keys=False, width=120
+        ).strip()
         content = f"---\n{fm_yaml}\n---\n\n{pkg.body}"
         self._write(skill_dir / "SKILL.md", content)
 
@@ -550,12 +602,16 @@ class GeminiAdapter(AdapterGenerator):
         """Build a Gemini agent markdown file."""
         description = pkg.frontmatter.get("description", "").strip()
         fm = {"name": pkg.name, "description": description}
-        fm_yaml = yaml.dump(fm, default_flow_style=False, sort_keys=False, width=120).strip()
+        fm_yaml = yaml.dump(
+            fm, default_flow_style=False, sort_keys=False, width=120
+        ).strip()
         return f"---\n{fm_yaml}\n---\n\n{pkg.body}"
 
     def _build_command_toml(self, pkg: PackageContent) -> str:
         """Build a Gemini TOML command file."""
-        description = truncate_description(pkg.frontmatter.get("description", "").strip())
+        description = truncate_description(
+            pkg.frontmatter.get("description", "").strip()
+        )
         body_escaped = pkg.body.replace('"""', '\\"\\"\\"')
         lines = [
             "[command]",
@@ -571,7 +627,15 @@ class GeminiAdapter(AdapterGenerator):
 
     def validate(self) -> list[str]:
         errors: list[str] = []
-        claude_fields = {"type", "model", "color", "hook", "command", "utility", "preset"}
+        claude_fields = {
+            "type",
+            "model",
+            "color",
+            "hook",
+            "command",
+            "utility",
+            "preset",
+        }
         gemini_dir = self.output_dir / ".gemini"
         skills_dir = gemini_dir / "skills"
         if not skills_dir.is_dir():
@@ -584,7 +648,9 @@ class GeminiAdapter(AdapterGenerator):
             try:
                 fm = parse_frontmatter(content)
             except (ValueError, Exception):
-                errors.append(f"gemini: {skill_dir.name}/SKILL.md has invalid frontmatter")
+                errors.append(
+                    f"gemini: {skill_dir.name}/SKILL.md has invalid frontmatter"
+                )
                 continue
             if isinstance(fm, dict):
                 leaked = claude_fields & set(fm.keys())
