@@ -63,8 +63,12 @@ gh pr list --state open --json number,baseRefName,headRefName \
 Merge a root PR:
 
 ```bash
+gh api repos/{owner}/{repo} \
+  --jq '{merge: .allow_merge_commit, squash: .allow_squash_merge, rebase: .allow_rebase_merge}'
 gh pr merge <number> --merge
 ```
+
+Prefer `--merge` when merge commits are allowed. If the repository is squash-only, use the squash-body merge path in `references/provenance.md` so `Stack-Id` and `Stack-Position` survive in history.
 
 Do not use `--delete-branch` while any open PR still has the branch being merged as `baseRefName`. For GitHub stacks, branch deletion can close descendant PRs unmerged when their base branch disappears.
 
@@ -83,10 +87,16 @@ Every generated or updated stack PR body must include:
 ```markdown
 ## Stack
 
+Stack-Id: `auth-refactor-a1b2c3`
 Base: `main`
+Position: 1/3
 
 1. `feat/parser-core` -> this PR
-2. `feat/parser-cache` -> depends on #102
+2. `feat/parser-cache` -> #102
+3. `feat/parser-cli` -> #103
+
+Depends on: (none - root)
+Upstack: #102
 
 ## Validation
 

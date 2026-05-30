@@ -24,6 +24,7 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 | `references/sync-algorithm.md` | Rebase and force-with-lease synchronization workflow | Syncing a stack after a parent or base moves |
 | `references/merge-discipline.md` | Bottom-up merge and branch cleanup rules | Merging or closing out a stack |
 | `references/metadata-format.md` | Optional metadata schema and validation rules | `.stack-prs.yaml` exists or inference is ambiguous |
+| `references/provenance.md` | Commit-trailer stack identity, stamping, verification, merge-mode coupling | Creating, splitting, syncing, or merging any stack |
 
 ## When To Use
 
@@ -44,6 +45,9 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Never use plain `git push --force`; use `git push --force-with-lease origin <branch>`.
 - Merge from root to leaf. Never merge a child before its parent.
 - Do not delete unmerged stack branches without explicit user instruction.
+- Stamp `Stack-Id` and `Stack-Position` trailers on every commit the skill creates or splits; copy the ID from `.stack-prs.yaml` or mint it once when absent.
+- Verify trailers are present and consistent before merge.
+- Detect the provider merge mode before merging. Under squash-only repos, fold trailers into the squash body or stack identity is lost.
 
 ## Workflow
 
@@ -89,15 +93,23 @@ Generated PR bodies must include the stack order and validation state:
 ```markdown
 ## Stack
 
+Stack-Id: `auth-refactor-a1b2c3`
 Base: `main`
+Position: 1/3
 
 1. `feat/parser-core` -> this PR
-2. `feat/parser-cache` -> depends on #102
+2. `feat/parser-cache` -> #102
+3. `feat/parser-cli` -> #103
+
+Depends on: (none - root)
+Upstack: #102
 
 ## Validation
 
 - Pending: commands not run yet
 ```
+
+For non-root PRs, `Depends on:` lists the parent PR number. `Upstack:` lists the immediate child PR number when known.
 
 Stop when a branch has no commits beyond its parent, an existing PR is closed and unmerged, or the provider rejects base retargeting.
 
@@ -134,6 +146,9 @@ uv run python scripts/evaluate_package.py --path skills/stacked-prs
 Merge root to leaf:
 
 ```bash
+git log --format='%H %(trailers:key=Stack-Id,valueonly)' <parent>..<branch>
+gh api repos/{owner}/{repo} \
+  --jq '{merge: .allow_merge_commit, squash: .allow_squash_merge, rebase: .allow_rebase_merge}'
 gh pr list --state open --json number,baseRefName,headRefName \
   --jq '.[] | select(.baseRefName == "<branch-being-merged>")'
 gh pr merge <root-pr> --merge
@@ -144,7 +159,9 @@ git push --force-with-lease origin <child-branch>
 gh pr edit <child-pr> --base main
 ```
 
-On GitHub, do not pass `--delete-branch` while any open PR still has the branch being merged as its `baseRefName`. Deleting a parent branch that is still a child PR base can close the child PR unmerged. Repeat for each child. Require parent checks and provider merge confirmation before moving to the next branch.
+If merge commits are allowed, use `gh pr merge <pr> --merge`. If the repository is squash-only, use the squash-body path from `references/provenance.md` so the `Stack-Id` and `Stack-Position` trailers land in the squash commit body.
+
+On GitHub, do not pass `--delete-branch` while any open PR still has the branch being merged as its `baseRefName`. Deleting a parent branch that is still a child PR base can close the child PR unmerged. Repeat for each child. Require trailer verification, parent checks, and provider merge confirmation before moving to the next branch.
 
 ### 6. Cleanup
 
@@ -195,9 +212,14 @@ Select the safest split mode:
 After creating branches, compare the leaf with the source branch before publishing:
 
 ```bash
+git commit --amend --no-edit \
+  --trailer "Stack-Id: <stack-id>" \
+  --trailer "Stack-Position: <n>/<total>"
 git diff --stat <source-branch>...<leaf-branch>
 git diff --exit-code <source-branch>...<leaf-branch>
 ```
+
+Stamp trailers on each slice's commits per `references/provenance.md` before publishing. Stamping amends commit messages but does not change tree content, so the leaf-vs-source comparison remains a tree comparison with `git diff` and must still pass.
 
 Do not publish if the leaf differs from the source branch.
 
@@ -213,6 +235,9 @@ Do not publish if the leaf differs from the source branch.
 | Remote branch changed since fetch | Stop; do not retry without a fresh inspect |
 | Failed validation | Record the failed command and stop merge or publish |
 | Top split branch differs from source | Stop before PR creation and report remaining diff |
+| Commit in stack range missing `Stack-Id` trailer | Stop; stamp via provenance backfill before merge |
+| Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
+| Squash-only repo without trailers folded into squash body | Stop; use the squash-body merge path |
 
 ## Recovery: Deleted Parent Branch Closed A Child PR
 
