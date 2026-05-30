@@ -111,6 +111,99 @@ cases:
         target: "(PR body|Validation)"
         weight: 0.8
 
+  - id: create_stack_with_commit_trailers
+    prompt: "Create stacked PRs for feat/parser-core, feat/parser-cache, and feat/parser-cli and preserve the stack identity in git history."
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "mints or reads one canonical stack id"
+      - "stamps every created stack commit with Stack-Id and Stack-Position trailers"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "Stack-Id"
+        weight: 1.0
+      - type: matches_regex
+        target: "Stack-Position"
+        weight: 1.0
+      - type: matches_regex
+        target: "(git interpret-trailers|git commit --amend --no-edit[\\s\\S]*--trailer)"
+        weight: 1.0
+
+  - id: recover_landed_stack_from_git_log
+    prompt: "After this stack lands, show me how to recover every slice from git history by stack id."
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "uses Stack-Id trailers as the durable identity"
+      - "recovers stack commits with git log rather than provider metadata"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "git log --grep ['\"]Stack-Id:"
+        weight: 1.0
+      - type: matches_regex
+        target: "trailers:key=Stack-Position"
+        weight: 0.8
+
+  - id: squash_only_merge_preserves_stack_id
+    prompt: "Merge this stacked PR sequence in a repo that only allows squash merges without losing provenance."
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "detects provider merge policy before merge"
+      - "folds stack trailers into the squash commit body"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh api repos/\\{owner\\}/\\{repo\\}"
+        weight: 0.8
+      - type: matches_regex
+        target: "allow_squash_merge"
+        weight: 0.8
+      - type: matches_regex
+        target: "gh pr merge[\\s\\S]*--squash[\\s\\S]*--body[\\s\\S]*Stack-Id"
+        weight: 1.0
+
+  - id: backfill_existing_stack_trailers
+    prompt: "Backfill Stack-Id trailers onto this existing unmerged stack and prove the leaf tree still matches the original source branch."
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "rewrites only unmerged stack branches"
+      - "adds trailers without altering tree content"
+      - "pushes rewritten branches with force-with-lease"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "git rebase[\\s\\S]*--exec[\\s\\S]*git commit --amend --no-edit[\\s\\S]*--trailer"
+        weight: 1.0
+      - type: matches_regex
+        target: "git diff --exit-code"
+        weight: 0.8
+      - type: matches_regex
+        target: "--force-with-lease"
+        weight: 0.8
+
+  - id: stack_id_mismatch_stops_mutation
+    prompt: "Validate this stack before merge; one commit has a Stack-Id trailer that differs from .stack-prs.yaml."
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "compares commit trailers against the canonical .stack-prs.yaml stack_id"
+      - "stops mutation when the ids differ"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "Stack-Id"
+        weight: 0.8
+      - type: matches_regex
+        target: "\\.stack-prs\\.yaml"
+        weight: 0.8
+      - type: matches_regex
+        target: "(stop|stops|do not|must not)[\\s\\S]*(mismatch|differs|different)"
+        weight: 1.0
+
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."
     fixtures: []
