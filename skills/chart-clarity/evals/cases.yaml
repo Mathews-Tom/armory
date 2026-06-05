@@ -1,0 +1,89 @@
+cases:
+  - id: recharts_line_chart_creation
+    prompt: >
+      Create a Recharts line chart showing monthly revenue against target. Use a Tufte-style design with direct labels and accessible colors.
+    fixtures: []
+    rubric:
+      - "generates Recharts chart code rather than generic advice"
+      - "removes legend and uses direct labels at series endpoints"
+      - "uses minimal or no gridlines and no top/right borders"
+      - "includes comparison context between revenue and target"
+      - "adds accessible text alternative or aria-label"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(Recharts|ResponsiveContainer|LineChart)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(direct label|ReferenceLine|end label|no legend|Legend.*remove)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(aria-label|text alternative|accessible|contrast)"
+        weight: 0.8
+
+  - id: plotly_chart_review
+    prompt: >
+      Review this Plotly chart for misleading data visualization choices: it has a legend, two y-axes, bright rainbow colors, and heavy gridlines.
+    fixtures: []
+    rubric:
+      - "identifies dual y-axes as misleading"
+      - "recommends direct labels instead of legend"
+      - "recommends reducing gridlines and chartjunk"
+      - "replaces rainbow palette with gray plus selective highlight"
+      - "grounds critique in chart clarity or Tufte principles"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(dual y-axis|dual y-axes|two y-axes)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(direct label|legend)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(gridline|chartjunk|rainbow|gray|grey|highlight)"
+        weight: 0.8
+
+  - id: matplotlib_accessibility_restyle
+    prompt: >
+      Make this matplotlib bar chart clearer and accessible. It uses color-only encoding, a pure white background, and rotated category labels.
+    fixtures: []
+    rubric:
+      - "applies matplotlib-specific cleanup such as hiding top/right spines"
+      - "addresses color-only encoding with labels, shape, pattern, or text"
+      - "uses off-white background and readable typography"
+      - "fixes rotated labels by changing orientation, abbreviation, or layout"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(top.*spine|right.*spine|despine|matplotlib)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(color-only|direct label|pattern|accessible|contrast)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(#fffff8|off-white|rotated labels|horizontal)"
+        weight: 0.6
+
+  - id: negative_logo_design
+    prompt: >
+      Design a new logo for our analytics product using a serif wordmark and a blue accent color.
+    fixtures: []
+    rubric:
+      - "should not trigger because this is brand or logo design, not data visualization"
+    trigger_expected: false
+
+  - id: negative_dashboard_layout
+    prompt: >
+      Redesign our admin dashboard layout. It has twelve KPI cards, a left navigation rail, filters, and a customer table, but no charts need to change.
+    fixtures: []
+    rubric:
+      - "should not trigger because this is broad dashboard UX, not chart generation or chart review"
+    trigger_expected: false
+
+  - id: negative_sql_reporting
+    prompt: >
+      Optimize the SQL query that feeds our revenue report. It joins invoices, customers, and payments and is running slowly.
+    fixtures: []
+    rubric:
+      - "should not trigger because this is query optimization, not visualization design"
+    trigger_expected: false
