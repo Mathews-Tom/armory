@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tufte-data-viz - Edward Tufte's Data Visualization Principles for Every Charting Library</title>
+<meta name="description" content="Interactive demo of Tufte data visualization principles applied across ECharts, Chart.js, Plotly, and D3.js. See before/after transformations live.">
+
+<!-- ET Book font -->
+<style>
+@font-face {
+  font-family: "ET Book";
+  src: url("https://cdn.jsdelivr.net/gh/edwardtufte/tufte-css@gh-pages/et-book/et-book-roman-line-figures/et-book-roman-line-figures.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ET Book";
+  src: url("https://cdn.jsdelivr.net/gh/edwardtufte/tufte-css@gh-pages/et-book/et-book-bold-line-figures/et-book-bold-line-figures.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ET Book";
+  src: url("https://cdn.jsdelivr.net/gh/edwardtufte/tufte-css@gh-pages/et-book/et-book-display-italic-old-style-figures/et-book-display-italic-old-style-figures.woff") format("woff");
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+</style>
+
+<style>
+/* ================================================================
+   CSS Custom Properties — Light / Dark
+   ================================================================ */
+:root {
+  --bg: #fffff8;
+  --bg-card: #fffff8;
+  --text-1: #111111;
+  --text-2: #666666;
+  --text-3: #999999;
+  --axis: #cccccc;
+  --grid: #eeeeee;
+  --series-default: #666666;
+  --highlight: #e41a1c;
+  --border: #e0e0e0;
+  --code-bg: #f4f4f0;
+  --toggle-bg: #ddd;
+  --toggle-thumb: #fff;
+  --toggle-active: #4e79a7;
+  --shadow: rgba(0,0,0,0.04);
+}
+
+[data-theme="dark"] {
+  --bg: #151515;
+  --bg-card: #1a1a1a;
+  --text-1: #dddddd;
+  --text-2: #999999;
+  --text-3: #666666;
+  --axis: #444444;
+  --grid: #333333;
+  --series-default: #999999;
+  --highlight: #fc8d62;
+  --border: #333333;
+  --code-bg: #1e1e1e;
+  --toggle-bg: #444;
+  --toggle-thumb: #222;
+  --toggle-active: #76b7b2;
+  --shadow: rgba(0,0,0,0.2);
+}
+
+/* ================================================================
+   Reset & Base
+   ================================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: "ET Book", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  background: var(--bg);
+  color: var(--text-1);
+  line-height: 1.6;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
+/* ================================================================
+   Layout
+   ================================================================ */
+.page-wrapper {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+@media (max-width: 600px) {
+  .page-wrapper { padding: 1.25rem 1rem 2rem; }
+}
+
+/* ================================================================
+   Header
+   ================================================================ */
+.site-header {
+  margin-bottom: 3rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.site-title {
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+@media (max-width: 600px) {
+  .site-title { font-size: 1.5rem; }
+}
+
+.site-subtitle {
+  color: var(--text-2);
+  font-size: 1.1rem;
+  margin-top: 0.35rem;
+  font-style: italic;
+  max-width: 600px;
+}
+
+.install-cmd {
+  display: inline-block;
+  margin-top: 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.85rem;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  border-radius: 4px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.install-cmd:hover {
+  border-color: var(--text-3);
+}
+
+.install-cmd .copy-hint {
+  display: none;
+  position: absolute;
+  top: -1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-1);
+  color: var(--bg);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-family: system-ui, sans-serif;
+}
+
+.install-cmd:hover .copy-hint,
+.install-cmd:focus .copy-hint {
+  display: block;
+}
+
+.install-cmd.copied .copy-hint {
+  display: block;
+}
+
+/* ================================================================
+   Dark Mode Toggle
+   ================================================================ */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-3);
+  font-family: system-ui, sans-serif;
+  flex-shrink: 0;
+}
+
+.theme-toggle-label { cursor: pointer; }
+
+.theme-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--toggle-bg);
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.theme-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--toggle-thumb);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.theme-switch[aria-checked="true"] {
+  background: var(--toggle-active);
+}
+
+.theme-switch[aria-checked="true"]::after {
+  transform: translateX(20px);
+}
+
+.theme-switch:focus-visible {
+  outline: 2px solid var(--toggle-active);
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   Section Intro
+   ================================================================ */
+.section-intro {
+  margin-bottom: 2.5rem;
+  max-width: 680px;
+}
+
+.section-intro p {
+  color: var(--text-2);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+}
+
+.section-intro p:last-child { margin-bottom: 0; }
+
+/* ================================================================
+   Demo Cards
+   ================================================================ */
+.demo-card {
+  margin-bottom: 3rem;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.demo-card:last-of-type {
+  border-bottom: none;
+  margin-bottom: 2rem;
+}
+
+.demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.demo-title {
+  font-size: 1.35rem;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.demo-lib {
+  font-family: system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-3);
+  background: var(--code-bg);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.demo-description {
+  color: var(--text-2);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  max-width: 640px;
+  font-style: italic;
+}
+
+/* Before/After Toggle */
+.ba-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.ba-toggle-label {
+  color: var(--text-3);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.ba-toggle-label.active {
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.ba-switch {
+  position: relative;
+  width: 50px;
+  height: 26px;
+  background: var(--toggle-bg);
+  border-radius: 13px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.ba-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: var(--toggle-thumb);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.ba-switch[aria-checked="true"] {
+  background: var(--toggle-active);
+}
+
+.ba-switch[aria-checked="true"]::after {
+  transform: translateX(24px);
+}
+
+.ba-switch:focus-visible {
+  outline: 2px solid var(--toggle-active);
+  outline-offset: 2px;
+}
+
+/* Chart containers */
+.chart-wrap {
+  width: 100%;
+  background: var(--bg-card);
+  border-radius: 2px;
+  position: relative;
+  transition: background 0.3s ease;
+}
+
+.chart-container {
+  width: 100%;
+  min-height: 300px;
+  position: relative;
+}
+
+@media (max-width: 600px) {
+  .chart-container { min-height: 250px; }
+}
+
+/* ================================================================
+   Principle Callouts
+   ================================================================ */
+.principles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.principle-tag {
+  font-family: system-ui, sans-serif;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+/* ================================================================
+   Footer
+   ================================================================ */
+.site-footer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--text-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.site-footer a {
+  color: var(--text-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  transition: border-color 0.15s ease;
+}
+
+.site-footer a:hover {
+  border-color: var(--text-2);
+}
+
+/* ================================================================
+   D3 Small Multiples Specifics
+   ================================================================ */
+.small-multiples-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 700px) {
+  .small-multiples-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.sm-panel { position: relative; }
+
+.sm-panel svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.sm-panel .panel-title {
+  font-family: "ET Book", Georgia, serif;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  margin-bottom: 0.25rem;
+}
+
+.sm-hover-line {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  stroke-dasharray: 3,3;
+  pointer-events: none;
+}
+
+.sm-hover-dot {
+  pointer-events: none;
+}
+
+.sm-tooltip {
+  position: absolute;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: system-ui, sans-serif;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.4rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* ================================================================
+   Utility
+   ================================================================ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  border: 0;
+}
+</style>
+</head>
+
+<body>
+<div class="page-wrapper">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <header class="site-header">
+    <div class="header-row">
+      <div>
+        <h1 class="site-title">tufte-data-viz</h1>
+        <p class="site-subtitle">Edward Tufte's data visualization principles, applied across every major charting library.</p>
+        <code class="install-cmd" role="button" tabindex="0" aria-label="Copy install command: npx skills add caylent/tufte-data-viz" onclick="copyInstall(this)" onkeydown="if(event.key==='Enter')copyInstall(this)">
+          npx skills add caylent/tufte-data-viz
+          <span class="copy-hint">Click to copy</span>
+        </code>
+      </div>
+      <div class="theme-toggle">
+        <span class="theme-toggle-label" id="theme-label">Dark</span>
+        <button class="theme-switch" role="switch" aria-checked="false" aria-labelledby="theme-label" onclick="toggleTheme()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       INTRO
+       ============================================================ -->
+  <div class="section-intro">
+    <p>Each chart below starts in <strong>default library styling</strong> -- gridlines, legends, bright colors, borders. Toggle to <strong>Tufte styling</strong> to see the transformation: higher data-ink ratio, direct labels, range-frame axes, and honest use of color.</p>
+  </div>
+
+  <!-- ============================================================
+       DEMO 1: ECHARTS LINE
+       ============================================================ -->
+  <article class="demo-card" aria-label="ECharts line chart demo">
+    <div class="demo-header">
+      <h2 class="demo-title">Revenue Grew Steadily, Surpassing Target by Q4</h2>
+      <span class="demo-lib">ECharts</span>
+    </div>
+    <p class="demo-description">Monthly revenue vs. annual target. Direct end-labels replace the legend, and the axis spans only the data range.</p>
+    <div class="ba-toggle">
+      <span class="ba-toggle-label active" id="echarts-before-label">Before</span>
+      <button class="ba-switch" role="switch" aria-checked="false" aria-label="Toggle between default and Tufte styling for ECharts chart" data-chart="echarts" onclick="toggleBA(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBA(this)}"></button>
+      <span class="ba-toggle-label" id="echarts-after-label">Tufte</span>
+    </div>
+    <div class="chart-wrap">
+      <div id="echarts-container" class="chart-container" style="height:400px" role="img" aria-label="Line chart showing monthly revenue growing from $42K in January to $82K in December, consistently above the target line which grew from $40K to $62K."></div>
+    </div>
+    <div class="principles">
+      <span class="principle-tag">Rule 2: Direct labels</span>
+      <span class="principle-tag">Rule 3: No gridlines</span>
+      <span class="principle-tag">Rule 4: Range-frame axes</span>
+      <span class="principle-tag">Rule 8: Gray + highlight</span>
+      <span class="principle-tag">Rule 14: Minimal tooltip</span>
+    </div>
+  </article>
+
+  <!-- ============================================================
+       DEMO 2: CHART.JS BAR
+       ============================================================ -->
+  <article class="demo-card" aria-label="Chart.js horizontal bar chart demo">
+    <div class="demo-header">
+      <h2 class="demo-title">Product A Leads Revenue, 2.2x the Nearest Competitor</h2>
+      <span class="demo-lib">Chart.js</span>
+    </div>
+    <p class="demo-description">Five products ranked by revenue. The leader is highlighted; value labels replace the axis and legend entirely.</p>
+    <div class="ba-toggle">
+      <span class="ba-toggle-label active" id="chartjs-before-label">Before</span>
+      <button class="ba-switch" role="switch" aria-checked="false" aria-label="Toggle between default and Tufte styling for Chart.js chart" data-chart="chartjs" onclick="toggleBA(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBA(this)}"></button>
+      <span class="ba-toggle-label" id="chartjs-after-label">Tufte</span>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-container" style="height:300px; position:relative;">
+        <canvas id="chartjs-container" role="img" aria-label="Horizontal bar chart showing Product A at $42K revenue leading over Product B at $38K, Product C at $27K, Product D at $19K, and Product E at $12K."></canvas>
+      </div>
+    </div>
+    <div class="principles">
+      <span class="principle-tag">Rule 1: No top/right borders</span>
+      <span class="principle-tag">Rule 6: Bars, not pie</span>
+      <span class="principle-tag">Rule 8: Highlight the leader</span>
+      <span class="principle-tag">Rule 21: Human numbers ($42K)</span>
+    </div>
+  </article>
+
+  <!-- ============================================================
+       DEMO 3: PLOTLY SCATTER
+       ============================================================ -->
+  <article class="demo-card" aria-label="Plotly scatter plot demo">
+    <div class="demo-header">
+      <h2 class="demo-title">Enterprise Customers Drive Higher Revenue per Deal</h2>
+      <span class="demo-lib">Plotly</span>
+    </div>
+    <p class="demo-description">Three customer segments plotted by deal size and annual revenue. Annotations at segment centroids replace the legend.</p>
+    <div class="ba-toggle">
+      <span class="ba-toggle-label active" id="plotly-before-label">Before</span>
+      <button class="ba-switch" role="switch" aria-checked="false" aria-label="Toggle between default and Tufte styling for Plotly chart" data-chart="plotly" onclick="toggleBA(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBA(this)}"></button>
+      <span class="ba-toggle-label" id="plotly-after-label">Tufte</span>
+    </div>
+    <div class="chart-wrap">
+      <div id="plotly-container" class="chart-container" style="height:420px" role="img" aria-label="Scatter plot showing three customer segments: Enterprise with high deal sizes around $80-120K and revenue around $400-900K, Mid-Market around $40-70K deals and $150-400K revenue, and SMB with smaller deals under $30K and revenue under $200K."></div>
+    </div>
+    <div class="principles">
+      <span class="principle-tag">Rule 2: Annotation, not legend</span>
+      <span class="principle-tag">Rule 9: Off-white background</span>
+      <span class="principle-tag">Rule 16: Dual encoding (shape + color)</span>
+    </div>
+  </article>
+
+  <!-- ============================================================
+       DEMO 4: D3 SMALL MULTIPLES
+       ============================================================ -->
+  <article class="demo-card" aria-label="D3.js small multiples demo">
+    <div class="demo-header">
+      <h2 class="demo-title">North America and Europe Grew Fastest in H2</h2>
+      <span class="demo-lib">D3.js</span>
+    </div>
+    <p class="demo-description">Four regional revenue panels sharing a y-scale. Hover links across all panels to compare the same month.</p>
+    <div class="ba-toggle">
+      <span class="ba-toggle-label active" id="d3-before-label">Before</span>
+      <button class="ba-switch" role="switch" aria-checked="false" aria-label="Toggle between default and Tufte styling for D3 chart" data-chart="d3" onclick="toggleBA(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBA(this)}"></button>
+      <span class="ba-toggle-label" id="d3-after-label">Tufte</span>
+    </div>
+    <div class="chart-wrap">
+      <div id="d3-container" class="chart-container" style="min-height:220px">
+        <div class="small-multiples-grid" id="d3-grid" role="img" aria-label="Small multiples showing quarterly revenue for North America peaking at $90K, Europe at $72K, Asia Pacific at $55K, and Latin America at $32K, all sharing the same y-axis scale for honest comparison."></div>
+      </div>
+    </div>
+    <div class="principles">
+      <span class="principle-tag">Rule 11: No dual y-axes</span>
+      <span class="principle-tag">Rule 15: Linked hover</span>
+      <span class="principle-tag">Rule 17: Responsive grid</span>
+    </div>
+  </article>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="site-footer">
+    <span>Built with Tufte's principles. No chartjunk was harmed.</span>
+    <a href="https://github.com/caylent/tufte-data-viz" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+  </footer>
+
+</div><!-- /.page-wrapper -->
+
+<!-- ================================================================
+     CDN Libraries
+     ================================================================ -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+<script>
+/* ================================================================
+   GLOBAL HELPERS
+   ================================================================ */
+function getTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function c(light, dark) {
+  return getTheme() === 'dark' ? dark : light;
+}
+
+/* Color tokens */
+function colors() {
+  const dark = getTheme() === 'dark';
+  return {
+    bg:       dark ? '#151515' : '#fffff8',
+    bgCard:   dark ? '#1a1a1a' : '#fffff8',
+    text1:    dark ? '#dddddd' : '#111111',
+    text2:    dark ? '#999999' : '#666666',
+    text3:    dark ? '#666666' : '#999999',
+    axis:     dark ? '#444444' : '#cccccc',
+    grid:     dark ? '#333333' : '#eeeeee',
+    series:   dark ? '#999999' : '#666666',
+    highlight:dark ? '#fc8d62' : '#e41a1c',
+    steel:    '#4e79a7',
+    tangerine:'#f28e2b',
+    coral:    '#e15759',
+    sage:     '#76b7b2',
+  };
+}
+
+const FONT_SERIF = '"ET Book", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif';
+const FONT_SANS  = 'system-ui, -apple-system, sans-serif';
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const REVENUE = [42,48,51,49,56,62,58,65,71,68,75,82];
+const TARGET  = [40,42,44,46,48,50,52,54,56,58,60,62];
+
+/* Track before/after state per chart */
+const baState = { echarts: false, chartjs: false, plotly: false, d3: false };
+
+/* Copy install command */
+function copyInstall(el) {
+  navigator.clipboard.writeText('npx skills add caylent/tufte-data-viz').then(() => {
+    el.querySelector('.copy-hint').textContent = 'Copied!';
+    el.classList.add('copied');
+    setTimeout(() => {
+      el.querySelector('.copy-hint').textContent = 'Click to copy';
+      el.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+/* ================================================================
+   THEME TOGGLE
+   ================================================================ */
+function toggleTheme() {
+  const btn = document.querySelector('.theme-switch');
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    btn.setAttribute('aria-checked', 'false');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    btn.setAttribute('aria-checked', 'true');
+  }
+  /* Re-render all charts with current before/after state */
+  renderECharts(baState.echarts);
+  renderChartJS(baState.chartjs);
+  renderPlotly(baState.plotly);
+  renderD3(baState.d3);
+}
+
+/* ================================================================
+   BEFORE/AFTER TOGGLE
+   ================================================================ */
+function toggleBA(btn) {
+  const chart = btn.getAttribute('data-chart');
+  const isChecked = btn.getAttribute('aria-checked') === 'true';
+  const newState = !isChecked;
+  btn.setAttribute('aria-checked', String(newState));
+
+  /* Update labels */
+  const beforeLabel = btn.previousElementSibling;
+  const afterLabel = btn.nextElementSibling;
+  if (newState) {
+    beforeLabel.classList.remove('active');
+    afterLabel.classList.add('active');
+  } else {
+    beforeLabel.classList.add('active');
+    afterLabel.classList.remove('active');
+  }
+
+  baState[chart] = newState;
+
+  if (chart === 'echarts') renderECharts(newState);
+  if (chart === 'chartjs') renderChartJS(newState);
+  if (chart === 'plotly')  renderPlotly(newState);
+  if (chart === 'd3')      renderD3(newState);
+}
+
+/* ================================================================
+   ECHARTS — Line Chart
+   ================================================================ */
+let echartsInstance = null;
+
+function renderECharts(tufte) {
+  const container = document.getElementById('echarts-container');
+  if (echartsInstance) { echartsInstance.dispose(); }
+  echartsInstance = echarts.init(container);
+  const cl = colors();
+
+  let option;
+  if (!tufte) {
+    /* ---- DEFAULT (ugly) ---- */
+    option = {
+      backgroundColor: c('#ffffff','#1e1e1e'),
+      legend: {
+        data: ['Revenue ($K)', 'Target ($K)'],
+        textStyle: { fontFamily: FONT_SANS, color: cl.text1 }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: c('#fff','#333'),
+        borderColor: c('#ccc','#555'),
+        borderWidth: 1,
+        textStyle: { fontFamily: FONT_SANS, color: cl.text1, fontSize: 12 }
+      },
+      grid: { left: 60, right: 30, top: 60, bottom: 40, show: true, borderColor: cl.grid },
+      xAxis: {
+        type: 'category',
+        data: MONTHS,
+        axisLine: { lineStyle: { color: cl.text3 } },
+        axisTick: { show: true },
+        axisLabel: { fontFamily: FONT_SANS, fontSize: 11, color: cl.text3 },
+        splitLine: { show: true, lineStyle: { color: cl.grid, type: 'dashed' } }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        axisLine: { show: true, lineStyle: { color: cl.text3 } },
+        axisTick: { show: true },
+        axisLabel: { fontFamily: FONT_SANS, fontSize: 11, color: cl.text3 },
+        splitLine: { show: true, lineStyle: { color: cl.grid, type: 'dashed' } }
+      },
+      series: [
+        {
+          name: 'Revenue ($K)',
+          type: 'line',
+          data: REVENUE,
+          lineStyle: { width: 2.5, color: '#5470c6' },
+          itemStyle: { color: '#5470c6' },
+          symbol: 'circle',
+          symbolSize: 8
+        },
+        {
+          name: 'Target ($K)',
+          type: 'line',
+          data: TARGET,
+          lineStyle: { width: 2.5, color: '#91cc75' },
+          itemStyle: { color: '#91cc75' },
+          symbol: 'circle',
+          symbolSize: 8
+        }
+      ]
+    };
+  } else {
+    /* ---- TUFTE ---- */
+    const revMin = Math.min(...REVENUE);
+    const revMax = Math.max(...REVENUE);
+    const tarMin = Math.min(...TARGET);
+    const tarMax = Math.max(...TARGET);
+    const yMin = Math.min(revMin, tarMin);
+    const yMax = Math.max(revMax, tarMax);
+
+    option = {
+      backgroundColor: cl.bg,
+      legend: { show: false },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        padding: [4, 8],
+        textStyle: {
+          fontFamily: FONT_SANS,
+          fontSize: 12,
+          color: cl.text2
+        },
+        formatter: function(params) {
+          let s = '<span style="font-size:12px;color:' + cl.text2 + '">' + params[0].axisValue + '</span>';
+          params.forEach(function(p) {
+            s += '<br/><span style="color:' + cl.text2 + ';font-size:12px;">' + p.seriesName + ': $' + p.value + 'K</span>';
+          });
+          return s;
+        },
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: cl.axis, type: 'dashed', width: 1 }
+        }
+      },
+      grid: { left: 50, right: 90, top: 20, bottom: 40, show: false },
+      xAxis: {
+        type: 'category',
+        data: MONTHS,
+        axisLine: { lineStyle: { color: cl.axis }, onZero: false },
+        axisTick: { show: false },
+        axisLabel: { fontFamily: FONT_SANS, fontSize: 11, color: cl.text3, margin: 10 },
+        splitLine: { show: false },
+        boundaryGap: false
+      },
+      yAxis: {
+        type: 'value',
+        min: yMin - 2,
+        max: yMax + 2,
+        axisLine: { show: true, lineStyle: { color: cl.axis } },
+        axisTick: { show: false },
+        axisLabel: {
+          fontFamily: FONT_SANS,
+          fontSize: 11,
+          color: cl.text3,
+          formatter: '${value}K'
+        },
+        splitLine: { show: false }
+      },
+      series: [
+        {
+          name: 'Revenue',
+          type: 'line',
+          data: REVENUE,
+          lineStyle: { width: 2, color: cl.highlight },
+          itemStyle: { color: cl.highlight },
+          symbol: 'none',
+          endLabel: {
+            show: true,
+            formatter: 'Revenue',
+            fontFamily: FONT_SERIF,
+            fontSize: 13,
+            color: cl.highlight
+          },
+          markPoint: {
+            data: [
+              {
+                name: 'Peak',
+                coord: [MONTHS[11], 82],
+                value: '$82K',
+                symbol: 'circle',
+                symbolSize: 6,
+                itemStyle: { color: cl.highlight },
+                label: { show: false }
+              }
+            ]
+          }
+        },
+        {
+          name: 'Target',
+          type: 'line',
+          data: TARGET,
+          lineStyle: { width: 1.5, color: cl.series, type: 'dashed' },
+          itemStyle: { color: cl.series },
+          symbol: 'none',
+          endLabel: {
+            show: true,
+            formatter: 'Target',
+            fontFamily: FONT_SERIF,
+            fontSize: 13,
+            color: cl.text3
+          }
+        }
+      ]
+    };
+  }
+
+  echartsInstance.setOption(option);
+}
+
+/* ================================================================
+   CHART.JS — Horizontal Bar
+   ================================================================ */
+let chartjsInstance = null;
+
+function renderChartJS(tufte) {
+  const canvas = document.getElementById('chartjs-container');
+  if (chartjsInstance) { chartjsInstance.destroy(); }
+
+  const cl = colors();
+  const labels = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
+  const values = [42, 38, 27, 19, 12];
+
+  let config;
+  if (!tufte) {
+    /* ---- DEFAULT ---- */
+    config = {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Revenue ($K)',
+          data: values,
+          backgroundColor: ['#5470c6','#91cc75','#fac858','#ee6666','#73c0de'],
+          borderColor: ['#3b5998','#6fa84d','#d4a730','#c44040','#4da0b8'],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, labels: { font: { family: FONT_SANS, size: 12 }, color: cl.text1 } },
+          datalabels: { display: false },
+          tooltip: {
+            backgroundColor: c('#fff','#333'),
+            titleColor: cl.text1,
+            bodyColor: cl.text1,
+            borderColor: c('#ccc','#555'),
+            borderWidth: 1,
+            titleFont: { family: FONT_SANS },
+            bodyFont: { family: FONT_SANS }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: true, color: cl.grid, drawBorder: true },
+            border: { display: true, color: cl.text3 },
+            ticks: { font: { family: FONT_SANS, size: 11 }, color: cl.text3 },
+            beginAtZero: true,
+            max: 50
+          },
+          y: {
+            grid: { display: true, color: cl.grid, drawBorder: true },
+            border: { display: true, color: cl.text3 },
+            ticks: { font: { family: FONT_SANS, size: 12 }, color: cl.text1 }
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    };
+  } else {
+    /* ---- TUFTE ---- */
+    const barColors = values.map((v, i) => i === 0 ? cl.highlight : cl.series);
+
+    config = {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: barColors,
+          borderWidth: 0,
+          borderRadius: 1,
+          barPercentage: 0.65
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 10 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            backgroundColor: 'transparent',
+            titleColor: cl.text2,
+            bodyColor: cl.text2,
+            borderWidth: 0,
+            titleFont: { family: FONT_SANS, size: 12, weight: 'normal' },
+            bodyFont: { family: FONT_SANS, size: 12 },
+            displayColors: false,
+            callbacks: {
+              title: function(items) { return items[0].label; },
+              label: function(item) { return '$' + item.raw + 'K'; }
+            }
+          },
+          datalabels: {
+            anchor: 'end',
+            align: 'right',
+            offset: 6,
+            color: function(ctx) {
+              return ctx.dataIndex === 0 ? cl.highlight : cl.text2;
+            },
+            font: { family: FONT_SERIF, size: 13, weight: '400' },
+            formatter: function(value) { return '$' + value + 'K'; }
+          }
+        },
+        scales: {
+          x: {
+            display: false
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              font: { family: FONT_SERIF, size: 13 },
+              color: function(ctx) {
+                return ctx.index === 0 ? cl.text1 : cl.text2;
+              },
+              crossAlign: 'far'
+            }
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    };
+  }
+
+  chartjsInstance = new Chart(canvas, config);
+}
+
+/* ================================================================
+   PLOTLY — Scatter Plot
+   ================================================================ */
+function renderPlotly(tufte) {
+  const container = document.getElementById('plotly-container');
+  const cl = colors();
+
+  /* Segment data */
+  const enterprise = {
+    x: [85,95,110,120,88,105,98,115,92,108],
+    y: [420,580,750,890,460,680,520,820,490,710],
+    name: 'Enterprise'
+  };
+  const midmarket = {
+    x: [42,55,48,62,50,58,45,65,52,60],
+    y: [180,290,220,380,250,340,200,400,260,320],
+    name: 'Mid-Market'
+  };
+  const smb = {
+    x: [12,18,22,15,25,20,14,28,16,24],
+    y: [45,80,120,60,150,95,55,170,70,140],
+    name: 'SMB'
+  };
+
+  function centroid(seg) {
+    const cx = seg.x.reduce((a,b) => a+b, 0) / seg.x.length;
+    const cy = seg.y.reduce((a,b) => a+b, 0) / seg.y.length;
+    return { x: cx, y: cy };
+  }
+
+  let data, layout, config;
+
+  if (!tufte) {
+    /* ---- DEFAULT ---- */
+    data = [
+      {
+        x: enterprise.x, y: enterprise.y, mode: 'markers', name: 'Enterprise',
+        marker: { size: 10, color: '#5470c6', line: { width: 1, color: '#3b5998' } }
+      },
+      {
+        x: midmarket.x, y: midmarket.y, mode: 'markers', name: 'Mid-Market',
+        marker: { size: 10, color: '#91cc75', line: { width: 1, color: '#6fa84d' } }
+      },
+      {
+        x: smb.x, y: smb.y, mode: 'markers', name: 'SMB',
+        marker: { size: 10, color: '#fac858', line: { width: 1, color: '#d4a730' } }
+      }
+    ];
+    layout = {
+      paper_bgcolor: c('#ffffff','#1e1e1e'),
+      plot_bgcolor: c('#ffffff','#1e1e1e'),
+      font: { family: FONT_SANS, color: cl.text1 },
+      showlegend: true,
+      legend: { x: 0.02, y: 0.98, bgcolor: 'rgba(255,255,255,0.7)', bordercolor: cl.grid, borderwidth: 1 },
+      xaxis: {
+        title: 'Deal Size ($K)',
+        showgrid: true, gridcolor: cl.grid, gridwidth: 1,
+        zeroline: true, zerolinecolor: cl.grid,
+        linecolor: cl.text3, linewidth: 1,
+        tickfont: { size: 11 }
+      },
+      yaxis: {
+        title: 'Annual Revenue ($K)',
+        showgrid: true, gridcolor: cl.grid, gridwidth: 1,
+        zeroline: true, zerolinecolor: cl.grid,
+        linecolor: cl.text3, linewidth: 1,
+        tickfont: { size: 11 }
+      },
+      margin: { l: 65, r: 20, t: 20, b: 50 }
+    };
+  } else {
+    /* ---- TUFTE ---- */
+    const ec = centroid(enterprise);
+    const mc = centroid(midmarket);
+    const sc = centroid(smb);
+
+    data = [
+      {
+        x: enterprise.x, y: enterprise.y, mode: 'markers', name: 'Enterprise',
+        marker: { size: 8, color: cl.highlight, symbol: 'circle', opacity: 0.7 },
+        hovertemplate: '<b>Enterprise</b><br>Deal: $%{x}K<br>Revenue: $%{y}K<extra></extra>'
+      },
+      {
+        x: midmarket.x, y: midmarket.y, mode: 'markers', name: 'Mid-Market',
+        marker: { size: 8, color: cl.steel, symbol: 'diamond', opacity: 0.7 },
+        hovertemplate: '<b>Mid-Market</b><br>Deal: $%{x}K<br>Revenue: $%{y}K<extra></extra>'
+      },
+      {
+        x: smb.x, y: smb.y, mode: 'markers', name: 'SMB',
+        marker: { size: 8, color: cl.series, symbol: 'square', opacity: 0.7 },
+        hovertemplate: '<b>SMB</b><br>Deal: $%{x}K<br>Revenue: $%{y}K<extra></extra>'
+      }
+    ];
+    layout = {
+      paper_bgcolor: cl.bg,
+      plot_bgcolor: cl.bg,
+      font: { family: FONT_SERIF, color: cl.text1 },
+      showlegend: false,
+      annotations: [
+        { x: ec.x, y: ec.y + 60, text: 'Enterprise', showarrow: false, font: { size: 13, color: cl.highlight, family: FONT_SERIF } },
+        { x: mc.x, y: mc.y + 45, text: 'Mid-Market', showarrow: false, font: { size: 13, color: cl.steel, family: FONT_SERIF } },
+        { x: sc.x, y: sc.y + 30, text: 'SMB', showarrow: false, font: { size: 13, color: cl.text3, family: FONT_SERIF } }
+      ],
+      xaxis: {
+        title: { text: 'Deal Size ($K)', font: { size: 12, color: cl.text3, family: FONT_SANS } },
+        showgrid: false,
+        zeroline: false,
+        linecolor: cl.axis,
+        linewidth: 1,
+        tickfont: { size: 11, color: cl.text3, family: FONT_SANS },
+        range: [5, 130]
+      },
+      yaxis: {
+        title: { text: 'Annual Revenue ($K)', font: { size: 12, color: cl.text3, family: FONT_SANS } },
+        showgrid: false,
+        zeroline: false,
+        linecolor: cl.axis,
+        linewidth: 1,
+        tickfont: { size: 11, color: cl.text3, family: FONT_SANS },
+        range: [0, 950]
+      },
+      margin: { l: 65, r: 20, t: 20, b: 50 }
+    };
+  }
+
+  config = {
+    responsive: true,
+    displayModeBar: false
+  };
+
+  Plotly.react(container, data, layout, config);
+}
+
+/* ================================================================
+   D3 — Small Multiples
+   ================================================================ */
+const D3_DATA = {
+  'North America': [55,58,52,60,63,68,65,72,78,82,85,90],
+  'Europe':        [38,42,40,45,48,52,50,55,60,63,68,72],
+  'Asia Pacific':  [22,25,28,30,32,35,33,38,42,45,48,55],
+  'Latin America': [15,16,18,20,19,22,24,25,27,28,30,32]
+};
+
+function renderD3(tufte) {
+  const grid = document.getElementById('d3-grid');
+  grid.innerHTML = '';
+
+  const cl = colors();
+  const allValues = Object.values(D3_DATA).flat();
+  const yMax = Math.max(...allValues);
+  const yMin = Math.min(...allValues);
+
+  /* Responsive dimensions */
+  const gridEl = grid;
+  const cols = window.innerWidth > 700 ? 4 : 2;
+  const panelW = (gridEl.clientWidth - (cols - 1) * 8) / cols;
+  const aspectRatio = 1.2;
+  const panelH = panelW / aspectRatio;
+  const margin = tufte
+    ? { top: 6, right: 8, bottom: 22, left: 30 }
+    : { top: 6, right: 8, bottom: 22, left: 34 };
+  const w = panelW - margin.left - margin.right;
+  const h = panelH - margin.top - margin.bottom;
+
+  const regions = Object.keys(D3_DATA);
+
+  /* Scales */
+  const xScale = d3.scaleLinear().domain([0, 11]).range([0, w]);
+  const yMinScale = tufte ? yMin - 2 : 0;
+  const yMaxScale = tufte ? yMax + 2 : yMax + 10;
+  const yScale = d3.scaleLinear().domain([yMinScale, yMaxScale]).range([h, 0]);
+
+  const line = d3.line()
+    .x((d, i) => xScale(i))
+    .y(d => yScale(d));
+
+  const panels = [];
+
+  regions.forEach((region, ri) => {
+    const panel = document.createElement('div');
+    panel.className = 'sm-panel';
+    panel.style.position = 'relative';
+
+    const title = document.createElement('div');
+    title.className = 'panel-title';
+    title.textContent = region;
+    title.style.color = cl.text2;
+    title.style.fontFamily = FONT_SERIF;
+    title.style.fontSize = '0.8rem';
+    panel.appendChild(title);
+
+    const svg = d3.select(panel).append('svg')
+      .attr('viewBox', `0 0 ${panelW} ${panelH}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
+      .style('overflow', 'visible');
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    if (!tufte) {
+      /* ---- DEFAULT: gridlines, borders, thick lines ---- */
+      /* Background rect */
+      g.append('rect')
+        .attr('width', w)
+        .attr('height', h)
+        .attr('fill', c('#ffffff','#1e1e1e'))
+        .attr('stroke', cl.grid)
+        .attr('stroke-width', 1);
+
+      /* Horizontal gridlines */
+      const yTicks = yScale.ticks(4);
+      yTicks.forEach(t => {
+        g.append('line')
+          .attr('x1', 0).attr('x2', w)
+          .attr('y1', yScale(t)).attr('y2', yScale(t))
+          .attr('stroke', cl.grid).attr('stroke-width', 1)
+          .attr('stroke-dasharray', '3,3');
+      });
+
+      /* Vertical gridlines */
+      [0, 3, 6, 9, 11].forEach(i => {
+        g.append('line')
+          .attr('x1', xScale(i)).attr('x2', xScale(i))
+          .attr('y1', 0).attr('y2', h)
+          .attr('stroke', cl.grid).attr('stroke-width', 1)
+          .attr('stroke-dasharray', '3,3');
+      });
+
+      /* Y-axis */
+      g.append('line')
+        .attr('x1', 0).attr('x2', 0)
+        .attr('y1', 0).attr('y2', h)
+        .attr('stroke', cl.text3).attr('stroke-width', 1);
+
+      /* X-axis */
+      g.append('line')
+        .attr('x1', 0).attr('x2', w)
+        .attr('y1', h).attr('y2', h)
+        .attr('stroke', cl.text3).attr('stroke-width', 1);
+
+      /* Y labels */
+      yTicks.forEach(t => {
+        g.append('text')
+          .attr('x', -4).attr('y', yScale(t))
+          .attr('text-anchor', 'end')
+          .attr('dominant-baseline', 'middle')
+          .attr('font-size', '9px')
+          .attr('font-family', FONT_SANS)
+          .attr('fill', cl.text3)
+          .text(t);
+      });
+
+      /* X labels */
+      [0, 5, 11].forEach(i => {
+        g.append('text')
+          .attr('x', xScale(i)).attr('y', h + 14)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '9px')
+          .attr('font-family', FONT_SANS)
+          .attr('fill', cl.text3)
+          .text(MONTHS[i]);
+      });
+
+      /* Line */
+      g.append('path')
+        .datum(D3_DATA[region])
+        .attr('fill', 'none')
+        .attr('stroke', '#5470c6')
+        .attr('stroke-width', 2.5)
+        .attr('d', line);
+
+      /* Dots */
+      D3_DATA[region].forEach((v, i) => {
+        g.append('circle')
+          .attr('cx', xScale(i)).attr('cy', yScale(v))
+          .attr('r', 3)
+          .attr('fill', '#5470c6')
+          .attr('stroke', c('#fff','#1e1e1e'))
+          .attr('stroke-width', 1.5);
+      });
+    } else {
+      /* ---- TUFTE ---- */
+      /* Minimal y-axis - just range frame */
+      const regionData = D3_DATA[region];
+      const regionMin = Math.min(...regionData);
+      const regionMax = Math.max(...regionData);
+
+      g.append('line')
+        .attr('x1', 0).attr('x2', 0)
+        .attr('y1', yScale(regionMin)).attr('y2', yScale(regionMax))
+        .attr('stroke', cl.axis).attr('stroke-width', 1);
+
+      /* Range frame x-axis */
+      g.append('line')
+        .attr('x1', xScale(0)).attr('x2', xScale(11))
+        .attr('y1', h).attr('y2', h)
+        .attr('stroke', cl.axis).attr('stroke-width', 1);
+
+      /* Y labels - just min and max */
+      g.append('text')
+        .attr('x', -4).attr('y', yScale(regionMin))
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('font-size', '9px')
+        .attr('font-family', FONT_SANS)
+        .attr('fill', cl.text3)
+        .text('$' + regionMin + 'K');
+
+      g.append('text')
+        .attr('x', -4).attr('y', yScale(regionMax))
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('font-size', '9px')
+        .attr('font-family', FONT_SANS)
+        .attr('fill', cl.text3)
+        .text('$' + regionMax + 'K');
+
+      /* X labels */
+      g.append('text')
+        .attr('x', xScale(0)).attr('y', h + 14)
+        .attr('text-anchor', 'start')
+        .attr('font-size', '9px')
+        .attr('font-family', FONT_SANS)
+        .attr('fill', cl.text3)
+        .text('Jan');
+
+      g.append('text')
+        .attr('x', xScale(11)).attr('y', h + 14)
+        .attr('text-anchor', 'end')
+        .attr('font-size', '9px')
+        .attr('font-family', FONT_SANS)
+        .attr('fill', cl.text3)
+        .text('Dec');
+
+      /* Line */
+      g.append('path')
+        .datum(regionData)
+        .attr('fill', 'none')
+        .attr('stroke', ri === 0 ? cl.highlight : cl.series)
+        .attr('stroke-width', 1.5)
+        .attr('d', line);
+
+      /* End dot + label */
+      g.append('circle')
+        .attr('cx', xScale(11)).attr('cy', yScale(regionData[11]))
+        .attr('r', 2.5)
+        .attr('fill', ri === 0 ? cl.highlight : cl.series);
+
+      /* Hover elements (initially hidden) */
+      const hoverLine = g.append('line')
+        .attr('class', 'sm-hover-line')
+        .attr('y1', 0).attr('y2', h)
+        .style('display', 'none')
+        .attr('stroke', cl.text3)
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3');
+
+      const hoverDot = g.append('circle')
+        .attr('class', 'sm-hover-dot')
+        .attr('r', 3)
+        .attr('fill', ri === 0 ? cl.highlight : cl.series)
+        .style('display', 'none');
+
+      /* Tooltip */
+      const tooltip = document.createElement('div');
+      tooltip.className = 'sm-tooltip';
+      panel.appendChild(tooltip);
+    }
+
+    grid.appendChild(panel);
+    panels.push({ g, region, panel, svg });
+  });
+
+  if (tufte) {
+    /* Linked hover across all panels */
+    const overlay = panels.map(p => {
+      const rect = p.g.append('rect')
+        .attr('width', w)
+        .attr('height', h)
+        .attr('fill', 'transparent')
+        .attr('cursor', 'crosshair');
+      return { rect, ...p };
+    });
+
+    function handleHover(mouseX) {
+      const idx = Math.round(xScale.invert(mouseX));
+      const clampedIdx = Math.max(0, Math.min(11, idx));
+
+      panels.forEach((p, pi) => {
+        const val = D3_DATA[p.region][clampedIdx];
+        const hoverLine = p.g.select('.sm-hover-line');
+        const hoverDot = p.g.select('.sm-hover-dot');
+        const tooltip = p.panel.querySelector('.sm-tooltip');
+
+        hoverLine
+          .attr('x1', xScale(clampedIdx))
+          .attr('x2', xScale(clampedIdx))
+          .style('display', null);
+
+        hoverDot
+          .attr('cx', xScale(clampedIdx))
+          .attr('cy', yScale(val))
+          .style('display', null);
+
+        tooltip.textContent = MONTHS[clampedIdx] + ': $' + val + 'K';
+        tooltip.style.opacity = '1';
+
+        /* Position tooltip */
+        const svgRect = p.panel.querySelector('svg').getBoundingClientRect();
+        const panelRect = p.panel.getBoundingClientRect();
+        const scaleX = svgRect.width / panelW;
+        const tooltipX = margin.left * scaleX + xScale(clampedIdx) * scaleX + (svgRect.left - panelRect.left);
+        const tooltipY = margin.top * scaleX + yScale(val) * scaleX - 20 + (svgRect.top - panelRect.top);
+        tooltip.style.left = tooltipX + 'px';
+        tooltip.style.top = tooltipY + 'px';
+        tooltip.style.transform = 'translateX(-50%)';
+      });
+    }
+
+    function handleLeave() {
+      panels.forEach(p => {
+        p.g.select('.sm-hover-line').style('display', 'none');
+        p.g.select('.sm-hover-dot').style('display', 'none');
+        const tooltip = p.panel.querySelector('.sm-tooltip');
+        if (tooltip) tooltip.style.opacity = '0';
+      });
+    }
+
+    overlay.forEach(o => {
+      o.rect.on('mousemove touchmove', function(event) {
+        const [mx] = d3.pointer(event, this);
+        handleHover(mx);
+      });
+      o.rect.on('mouseleave touchend', handleLeave);
+    });
+  }
+}
+
+/* ================================================================
+   RESPONSIVE RESIZE
+   ================================================================ */
+let resizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function() {
+    if (echartsInstance) echartsInstance.resize();
+    if (chartjsInstance) chartjsInstance.resize();
+    /* Plotly auto-resizes with responsive:true */
+    renderD3(baState.d3);
+  }, 150);
+});
+
+/* ================================================================
+   INITIAL RENDER
+   ================================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+  /* Check system preference for dark mode */
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.querySelector('.theme-switch').setAttribute('aria-checked', 'true');
+  }
+
+  renderECharts(false);
+  renderChartJS(false);
+  renderPlotly(false);
+  renderD3(false);
+});
+</script>
+</body>
+</html>
