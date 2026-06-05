@@ -74,6 +74,34 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 
 **Re-sync policy:** Prompt templates are pinned to the commit SHA above. Re-sync opportunistically when the upstream repo makes substantive prompt changes — do not auto-update. Compare diffs against the pinned commit before merging any upstream changes.
 
+
+### tufte-data-viz — used by `chart-clarity`
+
+**Upstream repo:** [caylent/tufte-data-viz](https://github.com/caylent/tufte-data-viz)
+**License:** MIT (text preserved at `skills/chart-clarity/references/upstream/LICENSE`)
+**Pinned commit:** `ae7ca0de7819db83241b24a2618810d5f1171145`
+
+**What we vendored:**
+
+- Core chart guidance from upstream `SKILL.md`, adapted into `skills/chart-clarity/SKILL.md`.
+- Library-specific rules from upstream `rules/`, copied into `skills/chart-clarity/references/rules/`.
+- Working examples from upstream `examples/`, copied into `skills/chart-clarity/references/examples/`.
+- Interactive demo from upstream `docs/index.html`, copied into `skills/chart-clarity/references/interactive-demo.html`.
+- Showcase images from upstream `_docs/`, copied into `skills/chart-clarity/assets/showcase/`.
+
+**What we adapted:**
+
+- Package name changed from `tufte-data-viz` to `chart-clarity`.
+- Frontmatter, trigger language, local references, TypeScript example types, and chart titles were adjusted for armory conventions.
+- Evals and provenance metadata were added.
+
+**What we skipped:**
+
+- `_docs/generate_showcase.py`: upstream-local showcase generator with a machine-specific absolute output path.
+- Upstream README installation instructions: not applicable to armory's manifest-driven packaging.
+
+**Re-sync policy:** Compare upstream against the pinned commit before merging updates. Do not auto-sync.
+
 ## Conceptual Inspiration
 
 | Concept                                        | Source                                                                                                                  | Used by                                  |

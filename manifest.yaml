@@ -170,6 +170,26 @@ packages:
     category: content
     difficulty: intermediate
     phase: ship
+  - name: chart-clarity
+    version: 1.0.0
+    description: 'Create, review, and restyle data visualizations using Edward Tufte principles: high data-ink ratio, direct
+      labels, range-frame axes, small multiples, accessible color, responsive charts, and honest comparisons. Triggers on:
+      "create a chart", "style this chart", "review this graph", "Tufte chart", "data visualization", "Recharts", "Plotly",
+      "matplotlib", "Chart.js", "ECharts", "D3". Use when generating or critiquing charts, dashboards, sparklines, and data
+      tables.'
+    path: skills/chart-clarity
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/chart-clarity/SKILL.md
+    complements:
+    - static-web-artifacts-builder
+    - ux-expert
+    tags:
+    - charts
+    - data-viz
+    - tufte
+    - accessibility
+    - visualization
+    category: visualization
+    difficulty: intermediate
   - name: citation-audit
     version: 1.0.0
     description: 'Verify that every citation in a manuscript is real, correctly attributed, and accurately described. Detects
@@ -1073,6 +1093,8 @@ packages:
     - svg
     category: visualization
     difficulty: intermediate
+    complements:
+    - chart-clarity
   - name: surrogate-verifier
     version: 1.0.1
     description: 'Generates structured test assertions and failure diagnostics for skill packages from a definition and task
@@ -1181,6 +1203,8 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
+    complements:
+    - chart-clarity
   - name: web-fetch
     version: 1.1.1
     description: 'Web content fetching via curl and WebFetch when a specific URL is provided. Covers HTTP GET/POST, JSON APIs,
