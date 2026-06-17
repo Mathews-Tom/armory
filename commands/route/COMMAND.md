@@ -58,6 +58,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Design system architecture | `project-architect` agent | `architecture-diagram` skill |
 | Record architecture decisions | `adr-writer` skill | `architecture-reviewer` skill |
 | Plan a full project | `project-planner` agent | `task-decomposer`, `estimate-calibrator` |
+| Turn repo findings into implementation plans | `codebase-advisor` skill | `codebase-auditor` for report-only audit |
 
 ## Build Phase — "I need to write code"
 
@@ -89,7 +90,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Task | Primary Package | Complements |
 |------|----------------|-------------|
 | Review a PR | `pr-review` skill | `code-refiner` |
-| Full codebase audit | `codebase-auditor` agent | (orchestrates multiple reviewers) |
+| Full codebase audit / release quality gate | `codebase-auditor` agent | `codebase-advisor` when plan files are requested |
 | Architecture review | `architecture-reviewer` skill | `architecture-diagram` |
 | Security review | `security-reviewer` agent | `secret-scanner` agent |
 | Scan for secrets/credentials | `secret-scanner` agent | — |

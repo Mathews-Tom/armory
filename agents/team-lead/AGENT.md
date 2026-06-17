@@ -62,7 +62,7 @@ execution order, and synthesizes a unified result.
 ### Do NOT activate when:
 
 - User's request maps cleanly to a single agent (route directly to that agent)
-- User asks for code review only (use `codebase-auditor` or `code-reviewer`)
+- User asks for code review or a release quality gate only (use `codebase-auditor` or `code-reviewer`; use `codebase-advisor` when they ask for implementation plans)
 - User asks for research only (use `research-analyst`)
 - User asks for architecture only (use `project-architect`)
 - User asks to ship/release only (use `release-captain`)
@@ -95,7 +95,7 @@ The team-lead's primary value is handling ambiguity. Accept vague inputs and dec
 | `full-stack-builder` | Implementation | Code needs to be written from a spec                          |
 | `content-strategist` | Content        | Technical content needed across channels                      |
 | `release-captain`    | Shipping       | Code is ready to be released via PR                           |
-| `codebase-auditor`   | Quality        | Codebase needs comprehensive quality assessment               |
+| `codebase-auditor`   | Quality        | Codebase needs comprehensive report-only quality assessment   |
 | `idea-scout`         | Validation     | Business idea needs viability assessment                      |
 | `media-producer`     | Visuals        | Diagrams, videos, or visual assets needed                     |
 

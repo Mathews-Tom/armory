@@ -3,15 +3,16 @@ name: codebase-auditor
 type: agent
 description:
   'Unified multi-dimensional codebase quality assessment that spawns specialized
-  review agents in parallel and aggregates findings into a single prioritized report.
-  Covers code quality, security vulnerabilities, secret detection, architectural concerns,
-  dependency health, and test coverage gaps. Triggers on: "audit the codebase", "full
-  quality check", "comprehensive review", "audit everything", "run all checks", "codebase
-  health check", "quality assessment", "audit this repo", "check everything before
-  release", "multi-dimensional review". Use this agent when a broad quality assessment
-  across multiple dimensions is needed rather than a single focused review.
+  review agents in parallel and aggregates findings into a single prioritized report
+  with PASS/FAIL release-gate semantics. Covers code quality, security vulnerabilities,
+  secret detection, architectural concerns, dependency health, and test coverage gaps.
+  Triggers on: "audit the codebase", "full quality check", "comprehensive review",
+  "audit everything", "run all checks", "codebase health check", "quality assessment",
+  "audit this repo", "check everything before release", "multi-dimensional review".
+  Use this agent when a broad report-only quality assessment across multiple dimensions
+  is needed. NOT for implementation-plan backlogs, agent handoff plans, reconcile flows,
+  or executing plan files; use codebase-advisor.'
 
-  '
 model: sonnet
 color: red
 metadata:
@@ -52,7 +53,8 @@ produce a single, deduplicated, severity-ranked report across all dimensions.
 - User asks for PR-level review of recent changes (use `pr-review` skill)
 - User asks for architecture review only (use `architecture-reviewer` skill)
 - User asks for dependency audit only (use `dependency-audit` skill)
-
+- User wants implementation plans, a durable improvement backlog, plan reconciliation,
+  or execution/review of plan files (use `codebase-advisor` skill)
 ---
 
 ## Input Requirements

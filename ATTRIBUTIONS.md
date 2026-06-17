@@ -102,6 +102,32 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 
 **Re-sync policy:** Compare upstream against the pinned commit before merging updates. Do not auto-sync.
 
+### improve — used by `codebase-advisor`
+
+**Upstream repo:** [shadcn/improve](https://github.com/shadcn/improve)
+**License:** MIT (text preserved at `skills/codebase-advisor/references/upstream/LICENSE`)
+**Pinned commit:** `03369ee6d7cafbfcecc4346539b05b3dc0a603bb`
+
+**What we vendored:**
+
+- Senior-advisor workflow from upstream `skills/improve/SKILL.md`, adapted into `skills/codebase-advisor/SKILL.md`.
+- Audit categories from upstream `skills/improve/references/audit-playbook.md`, adapted into `skills/codebase-advisor/references/audit-playbook.md`.
+- Plan and backlog structure from upstream `skills/improve/references/plan-template.md`, adapted into `skills/codebase-advisor/references/plan-template.md`.
+- Execute/reconcile/issue-publishing flow from upstream `skills/improve/references/closing-the-loop.md`, adapted into `skills/codebase-advisor/references/closing-the-loop.md`.
+
+**What we adapted:**
+
+- Package name changed from `improve` to `codebase-advisor` to avoid generic trigger collisions and clarify the role beside `codebase-auditor`.
+- Trigger language and scope boundaries were rewritten for armory routing: `codebase-auditor` remains the report-only quality gate; `codebase-advisor` owns implementation-plan backlogs.
+- Armory metadata and eval coverage were added.
+
+**What we skipped:**
+
+- Upstream Claude plugin marketplace manifests under `.claude-plugin/`; armory generates its own manifest.
+- The upstream example plan under `examples/`; useful as a demonstration, not needed for the installed skill package.
+
+**Re-sync policy:** Compare upstream against the pinned commit before merging updates. Preserve armory's `codebase-advisor` naming and routing boundary unless `codebase-auditor` is formally deprecated.
+
 ## Conceptual Inspiration
 
 | Concept                                        | Source                                                                                                                  | Used by                                  |

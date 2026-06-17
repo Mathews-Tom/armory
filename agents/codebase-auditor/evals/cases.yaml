@@ -48,3 +48,19 @@ cases:
     rubric:
       - "does not activate codebase-auditor (dependency-audit skill territory)"
     trigger_expected: false
+
+  - id: negative_implementation_plan_backlog
+    prompt: "Audit this repo and write self-contained implementation plans for the top fixes."
+    fixtures: []
+    rubric:
+      - "implementation-plan backlog requests are codebase-advisor territory"
+      - "does not activate codebase-auditor"
+    trigger_expected: false
+
+  - id: negative_reconcile_plans
+    prompt: "Reconcile the existing plans directory and refresh any drifted implementation plans."
+    fixtures: []
+    rubric:
+      - "plan reconciliation is codebase-advisor territory"
+      - "does not activate codebase-auditor"
+    trigger_expected: false
