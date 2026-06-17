@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 131](https://img.shields.io/badge/packages-131-informational)](manifest.yaml)
+[![packages: 133](https://img.shields.io/badge/packages-133-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -90,6 +90,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | Skill                                                  | Description                                                                                                                                         |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [architecture-reviewer](skills/architecture-reviewer/) | Architecture reviews across 7 scored dimensions — structural integrity, scalability, security, performance, enterprise readiness, operations, data  |
+| [codebase-advisor](skills/codebase-advisor/)           | Senior repo advisor — audits codebase evidence, vets findings, and writes self-contained implementation plans for executor agents                   |
 | [code-refiner](skills/code-refiner/)                   | Deep code simplification and refactoring — structural complexity analysis, anti-pattern detection, idiomatic rewrites across Python, Go, TS, Rust   |
 | [citation-audit](skills/citation-audit/)               | Citation verification for manuscripts — checks that references are real, correctly attributed, and accurately described                              |
 | [figure-rhetoric](skills/figure-rhetoric/)             | Figure and plot communication audit — evaluates whether visuals support the claims they are meant to carry                                      |
@@ -274,6 +275,7 @@ npx skills add Mathews-Tom/armory
 
 # Install a specific skill or agent
 npx skills add Mathews-Tom/armory -s architecture-reviewer
+npx skills add Mathews-Tom/armory -s codebase-advisor
 npx skills add Mathews-Tom/armory -s codebase-auditor
 
 # List available packages without installing
@@ -330,6 +332,7 @@ git clone https://github.com/Mathews-Tom/armory.git
 
 # Skills
 ln -s "$(pwd)/armory/skills/architecture-reviewer" ~/.claude/skills/architecture-reviewer
+ln -s "$(pwd)/armory/skills/codebase-advisor" ~/.claude/skills/codebase-advisor
 
 # Agents
 ln -s "$(pwd)/armory/agents/codebase-auditor" ~/.claude/agents/codebase-auditor

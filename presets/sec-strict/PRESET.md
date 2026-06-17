@@ -7,7 +7,7 @@ description:
   scanning, dependency vulnerability auditing, repository configuration sentinel,
   cost tracking, and security coding standards. Use this preset for applications handling
   sensitive data, regulated environments, or any codebase where security posture is
-  a primary concern. Bundles 12 packages across skills, agents, rules, hooks, and
+  a primary concern. Bundles 13 packages across skills, agents, rules, hooks, and
   commands.
 
   "
@@ -43,7 +43,7 @@ preset:
 # Sec Strict Preset
 
 An audit-grade security stack for projects where security posture is a primary concern.
-Installs 12 packages providing layered defense across the development lifecycle.
+Installs 13 packages providing layered defense across the development lifecycle.
 
 ## Included Packages
 
@@ -56,7 +56,7 @@ Installs 12 packages providing layered defense across the development lifecycle.
 | Skill   | dependency-audit   | Dependency vulnerability and license scanning   |
 | Agent   | security-reviewer  | Security-focused automated code review          |
 | Agent   | secret-scanner     | Detects leaked credentials and API keys         |
-| Agent   | codebase-auditor   | Unified multi-dimensional quality assessment    |
+| Agent   | codebase-auditor   | Report-only multi-dimensional quality gate       |
 | Rule    | security-standards | Enforces secure coding patterns                 |
 | Rule    | commit-standards   | Enforces conventional commit message formatting |
 | Hook    | git-protection     | Blocks force-push and branch deletion on main   |
@@ -75,7 +75,8 @@ Installs 12 packages providing layered defense across the development lifecycle.
    incident is suspected or before a release.
 5. **Comprehensive Audit** — `codebase-auditor` agent spawns code-reviewer,
    security-reviewer, and secret-scanner in parallel, then aggregates findings
-   into a unified severity-ranked report with pass/fail verdict.
+   into a unified severity-ranked report with pass/fail verdict. Use
+   `codebase-advisor` instead when the desired output is implementation plans.
 6. **Baseline** — `pr-review`, `code-refiner`, `pre-landing-review`, `git-protection`,
    and `commit-standards` provide the same review-commit lifecycle as the core preset.
 
