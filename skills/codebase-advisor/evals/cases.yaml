@@ -1,0 +1,110 @@
+cases:
+  - id: audit_to_implementation_plans
+    prompt: >
+      Audit this repository and write self-contained implementation plans for the top
+      fixes so another agent can execute them later.
+    fixtures: []
+    rubric:
+      - "activates codebase-advisor skill"
+      - "audits and vets findings before planning"
+      - "writes agent-executable plans with drift checks, scope boundaries, verification gates, and STOP conditions"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(implementation plan|plans/)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(drift check|STOP conditions|verification)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(in scope|out of scope)"
+        weight: 0.8
+
+  - id: improvement_backlog
+    prompt: >
+      Create a prioritized improvement backlog from this codebase with plan files
+      that weaker coding agents can pick up.
+    fixtures: []
+    rubric:
+      - "activates codebase-advisor skill"
+      - "prioritizes findings by impact, effort, confidence, and risk"
+      - "produces plan index plus one plan per selected finding"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(priority|effort|risk|confidence)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(weaker|executor|agent-executable|handoff)"
+        weight: 0.8
+      - type: output_format
+        target: markdown_table
+        weight: 0.6
+
+  - id: reconcile_existing_plans
+    prompt: >
+      Reconcile the existing plans directory: refresh drifted TODO plans, verify DONE
+      plans, and retire anything that was fixed independently.
+    fixtures: []
+    rubric:
+      - "activates codebase-advisor skill"
+      - "uses reconcile flow from closing-the-loop reference"
+      - "checks drift and updates plan statuses without editing source code"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(reconcile|drift|DONE|TODO|BLOCKED|REJECTED)"
+        weight: 1.0
+      - type: matches_regex
+        target: '(?i)(plans/README\.md|status)'
+        weight: 0.8
+
+  - id: direction_grounded_next_steps
+    prompt: >
+      What should we improve next in this repo? Give grounded technical/product options
+      from the codebase and turn the best ones into design or spike plans.
+    fixtures: []
+    rubric:
+      - "activates codebase-advisor skill"
+      - "runs direction-focused audit grounded in repository evidence"
+      - "keeps direction suggestions separate from defect findings"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(direction|roadmap|next|spike|design plan)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(evidence|trade.?off|repo)"
+        weight: 0.8
+
+  - id: negative_report_only_audit
+    prompt: "Run a full quality gate on this codebase and tell me PASS or FAIL before release."
+    fixtures: []
+    rubric:
+      - "report-only quality gates are codebase-auditor territory"
+      - "does not activate codebase-advisor because no plan backlog is requested"
+    trigger_expected: false
+
+  - id: negative_pr_review
+    prompt: "Review this pull request for bugs, silent failures, test gaps, and type design issues."
+    fixtures: []
+    rubric:
+      - "PR diff review is pr-review territory"
+      - "does not activate codebase-advisor"
+    trigger_expected: false
+
+  - id: negative_feature_breakdown
+    prompt: "Break down this OAuth migration feature into tasks with dependencies and edge cases."
+    fixtures: []
+    rubric:
+      - "known feature decomposition is task-decomposer territory"
+      - "does not activate codebase-advisor"
+    trigger_expected: false
+
+  - id: negative_plan_critique
+    prompt: "Stress-test this implementation plan and tell me what assumptions are wrong."
+    fixtures: []
+    rubric:
+      - "plan critique is plan-review territory unless the user asks to rewrite a repo plan file"
+      - "does not activate codebase-advisor"
+    trigger_expected: false
