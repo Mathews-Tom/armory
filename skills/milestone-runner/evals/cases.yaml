@@ -1,0 +1,79 @@
+cases:
+  - id: sequential_milestone_execution
+    prompt: >
+      Run the milestone prompts in .docs/EXECUTION_PROMPTS.md one after another. Stop after each milestone stack is open, reviewed, and green so I can decide whether to merge before continuing.
+    fixtures: []
+    rubric:
+      - "parses EXECUTION_PROMPTS.md and identifies milestone /goal blocks"
+      - "runs dependent milestones sequentially rather than launching the whole file blindly"
+      - "uses external gates such as PR state, CI, verification commands, and review status before advancing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(EXECUTION_PROMPTS\\.md|/goal|milestone)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(sequential|one after another|dependency|Depends on)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(CI|checks|verification|PR state|review)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(stop|halt|human review|merge before continuing)"
+        weight: 0.7
+
+  - id: parallel_independent_milestones
+    prompt: >
+      The plan has M2 and M3 with no dependency between them. Run the independent milestone prompts in parallel, but keep the runs isolated and stop the sequence if either one fails.
+    fixtures: []
+    rubric:
+      - "detects independent milestones from the dependency graph"
+      - "uses isolated worktrees or sessions for concurrent runs"
+      - "halts downstream work if any parallel lane fails"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(independent|parallel|wave|dependency graph|DAG)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(worktree|isolated|separate session|profile)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(fail|halt|stop|downstream)"
+        weight: 0.7
+
+  - id: merge_stack_and_cleanup
+    prompt: >
+      Let's merge the stack for the current milestone. Ensure CI is green for each PR. Once done, clean up all local and remote merged branches.
+    fixtures: []
+    rubric:
+      - "routes merge-and-clean workflow through stacked PR discipline"
+      - "requires green CI/checks before each merge"
+      - "cleans only branches verified as merged"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(merge root|root-to-leaf|stacked-prs|stack order)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(CI|checks|green)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(clean|cleanup|local.*remote|merged branches)"
+        weight: 0.7
+
+  - id: negative_generate_plan_prompts
+    prompt: >
+      Create DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md from the documents in docs/ and save them in .docs.
+    fixtures: []
+    rubric:
+      - "generating plan and prompt files is plan-prompts territory"
+    trigger_expected: false
+
+  - id: negative_single_stack_repair
+    prompt: >
+      This existing stacked PR chain has the wrong base on PR #42. Fix the branch topology and retarget the child PR.
+    fixtures: []
+    rubric:
+      - "repairing one existing stack is stacked-prs territory, not milestone orchestration"
+    trigger_expected: false
