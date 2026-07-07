@@ -120,7 +120,7 @@ Use this file structure:
 - No attribution of any kind: no `Co-authored-by`, no AI/tool mentions, no generated-by text, no emoji.
 - Each PR is one coherent, independently reviewable unit.
 - Review each PR individually, then review the full stack for cumulative coherence.
-- Done = all PRs open and correctly based, checks green, individual and stack review complete, zero attribution, ready for human review.
+- Done = all PRs open and correctly based, checks green, individual and stack review complete, zero attribution, and a final `GO`/`NO-GO` merge verdict with evidence. `GO` authorizes an autonomous runner to merge after it independently verifies the gates; `NO-GO` blocks merge and downstream milestones.
 
 ### M1 — <title>
 ```text
@@ -154,7 +154,12 @@ Whole stack:
 - CI/checks: checks green on every PR or pending provider checks are explicitly reported.
 - Rebase-clean: stack can be rebased from root to leaf without unresolved conflicts.
 - Human handoff: PR URLs, verification output, risks, and manual gates are reported.
-DONE: stack open and correctly based, checks green, per-PR and whole-stack reviews complete. Report PR URLs and verification output.
+FINAL VERDICT:
+- Report exactly one verdict: `GO` or `NO-GO`.
+- `GO` only when every PR is open, correctly based, reviewed, green, locally verified, and the whole stack satisfies every milestone acceptance row.
+- `NO-GO` when any check is failing or pending, review is incomplete, branch topology is wrong, verification is missing, scope leaked, a human/manual gate remains, or merge readiness is ambiguous.
+- Evidence: list PR URLs, branch bases, CI/check status per PR, verification command output, review completion, residual risks, and any manual gate.
+DONE: stack open and correctly based, checks green, per-PR and whole-stack reviews complete, final `GO`/`NO-GO` verdict reported with evidence.
 ```
 ```
 
@@ -173,7 +178,7 @@ Before yielding, check and fix:
 - Every milestone has binary acceptance and command-backed verification.
 - No milestone exceeds `STACK_DEPTH_HINT` PRs.
 - Every `/goal` block traces to one milestone's deliverables and verification.
-- Every `/goal` block contains no-attribution rules, per-PR review, and whole-stack review.
+- Every `/goal` block contains no-attribution rules, per-PR review, whole-stack review, and final `GO`/`NO-GO` verdict requirements.
 - Assumptions and gaps are visible, not buried in prose.
 - Mermaid diagrams parse when Mermaid validation tooling is available.
 - The only files written are `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` unless the user explicitly requests otherwise.
