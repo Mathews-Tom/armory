@@ -839,6 +839,29 @@ packages:
     category: research
     difficulty: advanced
     phase: build
+  - name: plan-prompts
+    version: 1.0.0
+    description: Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from system, design, architecture,
+      or enhancement docs in a folder or explicit file list. Use when asked "create a development plan from docs", "generate
+      execution prompts", "turn these design docs into milestones", "write DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md",
+      "plan implementation from .docs", "create milestone execution prompts", "convert architecture docs into stacked PR prompts",
+      or when given DOCS_DIR / REPO_CONTEXT / GLOBAL_CONSTRAINTS / STACK_DEPTH_HINT placeholders. NOT for auditing an existing
+      plan; use plan-review. NOT for executing the stack; use stacked-prs.
+    path: skills/plan-prompts
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/plan-prompts/SKILL.md
+    complements:
+    - stacked-prs
+    - plan-review
+    - task-decomposer
+    tags:
+    - planning
+    - execution-prompts
+    - milestones
+    - stacked-prs
+    - docs
+    category: development
+    difficulty: advanced
+    phase: plan
   - name: plan-review
     version: 1.0.1
     description: 'Pre-implementation plan audit stress-testing scope, assumptions, risks, and failure modes before code is
@@ -853,6 +876,8 @@ packages:
     - assumptions
     category: review
     difficulty: intermediate
+    complements:
+    - plan-prompts
   - name: pr-review
     version: 1.1.1
     description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality
@@ -1096,6 +1121,8 @@ packages:
     category: development
     difficulty: advanced
     phase: ship
+    complements:
+    - plan-prompts
   - name: static-web-artifacts-builder
     version: 1.1.1
     description: 'Build self-contained static HTML artifacts opened in a browser: interactive diagrams, dashboards, infographics.
@@ -1144,6 +1171,8 @@ packages:
     category: development
     difficulty: intermediate
     phase: plan
+    complements:
+    - plan-prompts
   - name: tavily
     version: 1.1.1
     description: 'AI-optimized web search via Tavily API when no URL is provided. Returns clean AI-ready snippets for current

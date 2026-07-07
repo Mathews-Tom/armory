@@ -1,0 +1,88 @@
+cases:
+  - id: docs_folder_to_plan_and_prompts
+    prompt: >
+      Use the system docs in docs/ to create a source-faithful development plan and execution prompts.
+      Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md. Make the review process in each execution prompt robust enough for per-PR and whole-stack review.
+    fixtures: []
+    rubric:
+      - "creates exactly DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md under .docs"
+      - "includes source map, assumptions/gaps, dependency graph, milestones, acceptance, and verification"
+      - "includes one /goal block per milestone with detailed per-PR and whole-stack review criteria"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: ".docs/DEVELOPMENT_PLAN.md"
+        weight: 1.0
+      - type: contains
+        target: ".docs/EXECUTION_PROMPTS.md"
+        weight: 1.0
+      - type: matches_regex
+        target: "(Source Map|Assumptions|Gaps|Dependency Graph|Milestones)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(/goal|PLANNED STACK|Per PR|Whole stack|whole-stack)"
+        weight: 0.8
+      - type: output_format
+        target: markdown_table
+        weight: 0.6
+
+  - id: explicit_files_with_stack_depth
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md from docs/overview.md and docs/design.md,
+      treating docs/overview.md as the primary source of truth. Use STACK_DEPTH_HINT=4 and save the final files in .docs.
+    fixtures: []
+    rubric:
+      - "treats the first explicit file as primary source of truth"
+      - "caps each milestone planned stack at the requested depth"
+      - "keeps assumptions and gaps visible rather than burying them in prose"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(primary source|source of truth|docs/overview\\.md)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(STACK_DEPTH_HINT|4 PRs|≤ 4|<= 4)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(> ASSUMPTION:|> GAP:|Assumptions & Gaps)"
+        weight: 0.8
+      - type: contains
+        target: "EXECUTION_PROMPTS.md"
+        weight: 0.6
+
+  - id: greenfield_verification_surface
+    prompt: >
+      I have architecture notes in specs/ for a greenfield CLI tool. Turn them into .docs/DEVELOPMENT_PLAN.md
+      and .docs/EXECUTION_PROMPTS.md. There is no repo setup yet, so include whatever first milestone is needed to make later work verifiable.
+    fixtures: []
+    rubric:
+      - "plans a first milestone that establishes project skeleton and verification surface"
+      - "does not assume an existing CI, linter, type checker, or test runner without evidence"
+      - "keeps later milestones self-verifiable through the M1 tooling"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(M1|first milestone).*(verification|test|CI|skeleton|scaffold)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(greenfield|no repo setup|verification surface)"
+        weight: 0.6
+      - type: contains
+        target: "DEVELOPMENT_PLAN.md"
+        weight: 0.6
+
+  - id: negative_existing_plan_review
+    prompt: >
+      Review this existing DEVELOPMENT_PLAN.md and stress-test its assumptions, scope, risk, and failure modes before we implement it.
+    fixtures: []
+    rubric:
+      - "existing plan review is plan-review territory, not generation from source docs"
+    trigger_expected: false
+
+  - id: negative_execute_stack
+    prompt: >
+      Use the execution prompts in .docs/EXECUTION_PROMPTS.md to create the stacked PRs and drive them to green.
+    fixtures: []
+    rubric:
+      - "executing stacked PRs is stacked-prs territory, not plan/prompt generation"
+    trigger_expected: false
