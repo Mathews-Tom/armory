@@ -1,12 +1,13 @@
 cases:
   - id: sequential_milestone_execution
     prompt: >
-      Run the milestone prompts in .docs/EXECUTION_PROMPTS.md one after another. Stop after each milestone stack is open, reviewed, and green so I can decide whether to merge before continuing.
+      Run the milestone prompts in .docs/EXECUTION_PROMPTS.md one after another. For each milestone, after the stack reports GO and external gates pass, merge the stack root-to-leaf and clean merged branches before continuing.
     fixtures: []
     rubric:
       - "parses EXECUTION_PROMPTS.md and identifies milestone /goal blocks"
       - "runs dependent milestones sequentially rather than launching the whole file blindly"
       - "uses external gates such as PR state, CI, verification commands, and review status before advancing"
+      - "merges automatically only after a GO verdict and external gates clear, then cleans verified merged branches"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -19,7 +20,7 @@ cases:
         target: "(CI|checks|verification|PR state|review)"
         weight: 0.8
       - type: matches_regex
-        target: "(stop|halt|human review|merge before continuing)"
+        target: "(merge|root-to-leaf|GO|NO-GO|cleanup|merged branches)"
         weight: 0.7
 
   - id: parallel_independent_milestones
@@ -49,6 +50,7 @@ cases:
     rubric:
       - "routes merge-and-clean workflow through stacked PR discipline"
       - "requires green CI/checks before each merge"
+      - "treats explicit merge request as equivalent to a GO merge decision when gates are green"
       - "cleans only branches verified as merged"
     trigger_expected: true
     assertions:

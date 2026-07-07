@@ -2,12 +2,13 @@ cases:
   - id: docs_folder_to_plan_and_prompts
     prompt: >
       Use the system docs in docs/ to create a source-faithful development plan and execution prompts.
-      Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md. Make the review process in each execution prompt robust enough for per-PR and whole-stack review.
+      Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md. Make the review process in each execution prompt robust enough for per-PR and whole-stack review, and make every milestone end with a structured GO/NO-GO merge decision.
     fixtures: []
     rubric:
       - "creates exactly DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md under .docs"
       - "includes source map, assumptions/gaps, dependency graph, milestones, acceptance, and verification"
       - "includes one /goal block per milestone with detailed per-PR and whole-stack review criteria"
+      - "requires every milestone run to report GO/NO-GO with evidence for merge readiness"
     trigger_expected: true
     assertions:
       - type: contains
@@ -20,7 +21,7 @@ cases:
         target: "(Source Map|Assumptions|Gaps|Dependency Graph|Milestones)"
         weight: 0.8
       - type: matches_regex
-        target: "(/goal|PLANNED STACK|Per PR|Whole stack|whole-stack)"
+        target: "(/goal|PLANNED STACK|Per PR|Whole stack|whole-stack|GO/NO-GO)"
         weight: 0.8
       - type: output_format
         target: markdown_table

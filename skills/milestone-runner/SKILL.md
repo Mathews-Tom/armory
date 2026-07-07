@@ -21,7 +21,7 @@ This skill executes existing milestone prompts. It does not generate `DEVELOPMEN
 
 ## Core model
 
-Milestone prompts are designed to stop at "PR stack open, checks green, reviewed, ready for human review." That is intentional. A milestone process exiting successfully or reporting `DONE` is not proof that the milestone is safe to advance from. Advance only when external state proves it.
+Milestone prompts are designed to end with a structured `GO`/`NO-GO` merge verdict. A milestone process exiting successfully or reporting `DONE` is not proof that the milestone is safe to advance from. Advance only when the milestone reports `GO` and external state proves every gate.
 
 | Evidence | Use |
 | --- | --- |
@@ -30,18 +30,19 @@ Milestone prompts are designed to stop at "PR stack open, checks green, reviewed
 | Git branch/worktree state | Ensure isolated runs do not share an index or branch. |
 | Provider PR metadata | Confirm PRs exist and are based correctly. |
 | CI/check provider state | Confirm each PR is green before merge or handoff. |
+| Milestone `GO`/`NO-GO` verdict | Confirm the implementation session reached an explicit merge-readiness decision. |
 | Milestone verification commands | Confirm behavior after the stack is built and again after merge when continuing. |
 
 ## Modes
 
 | Mode | Trigger | Behavior |
 | --- | --- | --- |
-| Sequential build | "run milestones", "run them one after another" | Run the next ready milestone, verify its stack, then stop for review/merge unless the user explicitly asked to continue after observed merge. |
-| Parallel build | "run independent milestones in parallel" | Run a wave of dependency-ready milestones concurrently, one isolated worktree/session per milestone. Halt the wave on any failure. |
+| Sequential build | "run milestones", "run them one after another" | Run the next ready milestone, verify its stack, merge automatically after `GO` plus external gates, clean merged branches, then continue to the next dependency-ready milestone. |
+| Parallel build | "run independent milestones in parallel" | Run a wave of dependency-ready milestones concurrently, one isolated worktree/session per milestone. Halt the wave on any `NO-GO` or failed external gate. Merge only stacks whose lane reports `GO` and whose external gates pass. |
 | Resume | "continue the milestone sequence" | Read prior state, observe which milestone stacks are merged, then launch the next dependency-ready milestone or wave. |
-| Merge and clean | "merge the stack", "ensure CI is green", "clean branches" | Use stacked-PR merge discipline: verify order and CI, merge root-to-leaf, retarget children, clean merged local and remote branches. |
+| Merge and clean | "merge the stack", "ensure CI is green", "clean branches" | Treat the request as an explicit `GO` candidate for the current stack, then use stacked-PR discipline: verify order and CI, merge root-to-leaf, retarget children, clean merged local and remote branches. |
 
-Default to sequential build when the user does not explicitly request parallel execution. Default to human-review stop points; do not merge unless the user explicitly requests merge/cleanup.
+Default to sequential build when the user does not explicitly request parallel execution. Default to autonomous merge-and-continue after a milestone reports `GO` and all external gates pass. Stop instead when the user explicitly requests human-review stop points, the milestone reports `NO-GO`, a required gate fails or is pending, or the milestone contains a `HUMAN REVIEW GATE`.
 
 ## Workflow
 
@@ -92,6 +93,7 @@ Treat runner output as a hint. Verify with external state:
 
 | Gate | Requirement |
 | --- | --- |
+| Stack verdict | Milestone final output contains `GO` with evidence; `NO-GO`, missing verdict, or ambiguous verdict stops the sequence. |
 | PR existence | Expected PR stack exists. |
 | PR bases | Root PR targets the intended base; child PRs target the previous PR branch. |
 | Checks | CI/checks are green or pending state is explicitly reported and treated as not done. |
@@ -103,7 +105,7 @@ If any gate fails, stop the sequence. Report the failure, the last safe state, a
 
 ### 5. Merge and continue
 
-Only merge when the user explicitly asks. Use the `stacked-prs` skill for stack topology and merge discipline.
+After a milestone reports `GO` and every external gate passes, merge the stack automatically unless the user explicitly requested no merge or the milestone contains a `HUMAN REVIEW GATE`. Use the `stacked-prs` skill for stack topology and merge discipline.
 
 Safe merge loop:
 
@@ -115,7 +117,7 @@ Safe merge loop:
 6. After the final PR merges, clean merged local and remote branches.
 7. Re-run the milestone verification commands on the merged base before launching dependent milestones.
 
-If the user wants to preserve the human review gate, stop after reporting the stack as ready and wait for observed merge before continuing.
+If the user wants to preserve the human review gate, stop after reporting the stack as ready and wait for observed merge before continuing. If the milestone reports `NO-GO`, do not merge; report the failed or pending gates.
 
 ## Output Format
 
@@ -131,13 +133,14 @@ For inspection or launch planning, output:
 - M1: <command/session/worktree summary>
 
 ## Gates
+- Stack verdict: <GO/NO-GO/missing>
 - PR bases: <pass/fail/pending>
 - CI: <pass/fail/pending>
 - Verification: <pass/fail/pending>
 - Review: <pass/fail/pending>
 
 ## Stop/Continue Decision
-<Continue to next ready milestone | Stop for human review | Stop on failure | Merge requested and complete>
+<Continue to next ready milestone | Merge complete and continue | Stop for human review | Stop on NO-GO | Stop on failed gate>
 ```
 
 For merge-and-clean requests, output:
@@ -167,15 +170,15 @@ For merge-and-clean requests, output:
 | A milestone fails | Stop all downstream work, report failed gate, leave worktrees/branches intact for debugging. |
 | CI pending | Treat as not complete; wait or stop with pending status. |
 | Merge conflict | Stop and invoke stack conflict resolution; do not continue to downstream milestones. |
-| User asks to merge without green checks | Refuse the merge and report failing checks. |
+| Missing or `NO-GO` verdict | Refuse the merge and report the failed, pending, or ambiguous gates. |
 
 ## Safety checklist
 
 Before yielding:
 
-- Every launched milestone has an observed state: pending, running, ready for review, merged, or failed.
+- Every launched milestone has an observed state: pending, running, `GO`, `NO-GO`, merged, or failed.
 - No downstream milestone launched before its dependencies were externally observed as merged.
 - Parallel milestones used isolated worktrees/sessions.
-- Merge happened only after explicit user request.
+- Merge happened only after a `GO` verdict and green external gates, or after an explicit merge-and-clean request whose gates passed.
 - CI and verification evidence is reported exactly, not inferred from agent self-report.
 - Local/remote cleanup only removed branches verified as merged.
