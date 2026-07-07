@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 133](https://img.shields.io/badge/packages-133-informational)](manifest.yaml)
+[![packages: 134](https://img.shields.io/badge/packages-134-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -67,6 +67,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, merge, and clean up stack topology                      |
+| [plan-prompts](skills/plan-prompts/)             | Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from source docs, with reviewed stacked-PR prompts |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |
