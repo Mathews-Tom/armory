@@ -776,6 +776,28 @@ packages:
     category: review
     difficulty: advanced
     phase: review
+  - name: milestone-runner
+    version: 1.0.0
+    description: Run milestone `/goal` blocks from `.docs/EXECUTION_PROMPTS.md` in dependency order, sequentially or in parallel
+      when milestones are independent. Use when asked "run these milestone prompts", "execute EXECUTION_PROMPTS.md", "run
+      the milestones sequentially", "run independent milestones in parallel", "orchestrate plan-prompts output", "continue
+      the milestone sequence", "merge the stack", or "ensure CI is green and clean branches". NOT for generating plan files;
+      use plan-prompts. NOT for repairing one existing stack; use stacked-prs.
+    path: skills/milestone-runner
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/milestone-runner/SKILL.md
+    complements:
+    - plan-prompts
+    - stacked-prs
+    - ship-workflow
+    tags:
+    - milestones
+    - orchestration
+    - stacked-prs
+    - ci
+    - execution-prompts
+    category: development
+    difficulty: advanced
+    phase: ship
   - name: notebooklm
     version: 1.1.1
     description: 'Full NotebookLM API via notebooklm-py CLI: create notebooks, add sources, generate podcasts, videos, infographics,
@@ -853,6 +875,7 @@ packages:
     - stacked-prs
     - plan-review
     - task-decomposer
+    - milestone-runner
     tags:
     - planning
     - execution-prompts
@@ -1058,6 +1081,8 @@ packages:
     category: review
     difficulty: intermediate
     phase: ship
+    complements:
+    - milestone-runner
   - name: skill-distiller
     version: 1.0.1
     description: 'Converts Opus-quality skills into deterministic Haiku-executable workflows via trace-driven distillation
@@ -1122,6 +1147,7 @@ packages:
     difficulty: advanced
     phase: ship
     complements:
+    - milestone-runner
     - plan-prompts
   - name: static-web-artifacts-builder
     version: 1.1.1
