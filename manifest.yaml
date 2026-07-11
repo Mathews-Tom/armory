@@ -777,7 +777,7 @@ packages:
     difficulty: advanced
     phase: review
   - name: milestone-runner
-    version: 1.0.0
+    version: 1.1.0
     description: Run milestone `/goal` blocks from `.docs/EXECUTION_PROMPTS.md` in dependency order, sequentially or in parallel
       when milestones are independent. Use when asked "run these milestone prompts", "execute EXECUTION_PROMPTS.md", "run
       the milestones sequentially", "run independent milestones in parallel", "orchestrate plan-prompts output", "continue
@@ -794,6 +794,7 @@ packages:
     - orchestration
     - stacked-prs
     - ci
+    - release-management
     - execution-prompts
     category: development
     difficulty: advanced
@@ -862,7 +863,7 @@ packages:
     difficulty: advanced
     phase: build
   - name: plan-prompts
-    version: 1.0.0
+    version: 1.1.0
     description: Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from system, design, architecture,
       or enhancement docs in a folder or explicit file list. Use when asked "create a development plan from docs", "generate
       execution prompts", "turn these design docs into milestones", "write DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md",
@@ -881,6 +882,7 @@ packages:
     - execution-prompts
     - milestones
     - stacked-prs
+    - release-management
     - docs
     category: development
     difficulty: advanced
