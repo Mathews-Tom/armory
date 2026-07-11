@@ -64,6 +64,62 @@ cases:
         target: "(clean|cleanup|local.*remote|merged branches)"
         weight: 0.7
 
+  - id: shared_release_train_preparation
+    prompt: >
+      M1 and M2 both target release v2.4.0. M1 is merged, but M2 is still open; do not update release artifacts yet.
+      After M2 merges, prepare the release using the repository's VERSION file and CHANGELOG.md, create a reviewed green
+      release-preparation PR, and do not tag or publish because the plan does not require it.
+    fixtures: []
+    rubric:
+      - "defers release preparation while M2 remains unmerged"
+      - "recomputes release-train completion from external merge state"
+      - "runs ship-workflow release preparation after the train completes"
+      - "updates and verifies VERSION and CHANGELOG.md through a reviewed green release-preparation PR"
+      - "does not tag or publish without an explicit release-train requirement"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(release train|v2\\.4\\.0|M1|M2)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(unmerged|incomplete|defer|Continue within release train)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(ship-workflow|release preparation|release-preparation PR)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(VERSION|CHANGELOG\\.md)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(do not tag|do not publish|not.*publish)"
+        weight: 0.8
+
+  - id: failed_release_preparation_isolation
+    prompt: >
+      Release v2.4.0 has completed its train, but its release-preparation PR fails CI. Preserve that branch and PR for remediation,
+      stop v2.4.0 and only milestones whose declared dependency closure includes it, and continue the independent v2.5.0 train
+      in an isolated lane. Do not tag or publish either release without an explicit requirement.
+    fixtures: []
+    rubric:
+      - "marks v2.4.0 release preparation as NO-GO and preserves its branch and PR"
+      - "stops only the affected train and declared dependency-closure consumers"
+      - "permits the independent v2.5.0 train to continue in an isolated lane"
+      - "does not tag or publish without an explicit train requirement"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(v2\\.4\\.0|release preparation).*(NO-GO|fail|failed|pending)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(leave.*branch.*PR|preserve.*branch.*PR|intact for remediation)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(dependency closure|affected train|independent.*v2\\.5\\.0|isolated lane)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(do not tag|do not publish|not.*publish)"
+        weight: 0.8
+
   - id: negative_generate_plan_prompts
     prompt: >
       Create DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md from the documents in docs/ and save them in .docs.

@@ -72,6 +72,54 @@ cases:
         target: "DEVELOPMENT_PLAN.md"
         weight: 0.6
 
+  - id: shared_release_train_planning
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for a repository where M1 and M2 both ship in v2.4.0.
+      The repository stores its version in VERSION, maintains CHANGELOG.md, and does not publish tags automatically.
+      Keep version and changelog preparation deferred until both milestones merge; do not create one release entry per milestone.
+    fixtures: []
+    rubric:
+      - "assigns M1 and M2 to the shared v2.4.0 release train"
+      - "records VERSION and CHANGELOG.md as release artifacts, with no publication step"
+      - "requires release preparation only after every train milestone merges"
+      - "emits release-aware GO/NO-GO verdicts that name the target release"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(Release Trains|release train|Target release|v2\\.4\\.0)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(VERSION|CHANGELOG\\.md)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(all.*milestones.*merge|all included milestones.*merged|deferred|release preparation)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(GO.*RELEASE|NO-GO.*RELEASE|RELEASE PREP)"
+        weight: 0.9
+
+  - id: unresolved_release_target
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for source docs that do not identify a release target.
+      The repository has VERSION and CHANGELOG.md, but no documented release policy. Do not infer a version, changelog entry,
+      tag, or publication action.
+    fixtures: []
+    rubric:
+      - "emits a visible release-target GAP rather than inventing a semantic version"
+      - "propagates the unresolved release target into the release-aware NO-GO path"
+      - "does not prescribe a version bump, changelog entry, tag, or publication action without source evidence"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(> GAP:|GAP:|unresolved release target|release target.*unresolved)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(NO-GO.*RELEASE|RELEASE.*NO-GO|REASON.*blocking)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(do not infer|do not invent|not requested|without source evidence)"
+        weight: 0.8
+
   - id: negative_existing_plan_review
     prompt: >
       Review this existing DEVELOPMENT_PLAN.md and stress-test its assumptions, scope, risk, and failure modes before we implement it.
