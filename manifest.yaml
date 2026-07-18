@@ -777,12 +777,10 @@ packages:
     difficulty: advanced
     phase: review
   - name: milestone-runner
-    version: 1.1.0
-    description: Run milestone `/goal` blocks from `.docs/EXECUTION_PROMPTS.md` in dependency order, sequentially or in parallel
-      when milestones are independent. Use when asked "run these milestone prompts", "execute EXECUTION_PROMPTS.md", "run
-      the milestones sequentially", "run independent milestones in parallel", "orchestrate plan-prompts output", "continue
-      the milestone sequence", "merge the stack", or "ensure CI is green and clean branches". NOT for generating plan files;
-      use plan-prompts. NOT for repairing one existing stack; use stacked-prs.
+    version: 1.2.0
+    description: Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run
+      independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design.
+      Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.
     path: skills/milestone-runner
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/milestone-runner/SKILL.md
     complements:
@@ -792,6 +790,7 @@ packages:
     tags:
     - milestones
     - orchestration
+    - adaptive-planning
     - stacked-prs
     - ci
     - release-management
@@ -863,24 +862,22 @@ packages:
     difficulty: advanced
     phase: build
   - name: plan-prompts
-    version: 1.1.0
-    description: Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from system, design, architecture,
-      or enhancement docs in a folder or explicit file list. Use when asked "create a development plan from docs", "generate
-      execution prompts", "turn these design docs into milestones", "write DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md",
-      "plan implementation from .docs", "create milestone execution prompts", "convert architecture docs into stacked PR prompts",
-      or when given DOCS_DIR / REPO_CONTEXT / GLOBAL_CONSTRAINTS / STACK_DEPTH_HINT placeholders. NOT for auditing an existing
-      plan; use plan-review. NOT for executing the stack; use stacked-prs.
+    version: 1.2.0
+    description: Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update
+      DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository
+      design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.
     path: skills/plan-prompts
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/plan-prompts/SKILL.md
     complements:
+    - milestone-runner
     - stacked-prs
     - plan-review
     - task-decomposer
-    - milestone-runner
     tags:
     - planning
     - execution-prompts
     - milestones
+    - adaptive-planning
     - stacked-prs
     - release-management
     - docs

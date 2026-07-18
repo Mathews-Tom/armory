@@ -67,8 +67,8 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, merge, and clean up stack topology                      |
-| [plan-prompts](skills/plan-prompts/)             | Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from source docs, with reviewed stacked-PR prompts |
-| [milestone-runner](skills/milestone-runner/)     | Run `.docs/EXECUTION_PROMPTS.md` milestone stacks sequentially or in dependency-safe parallel waves, with CI/review gates and cleanup |
+| [plan-prompts](skills/plan-prompts/)             | Generate adaptive development plans, execution prompts, and an ignored local design-evidence ledger from source docs |
+| [milestone-runner](skills/milestone-runner/)     | Run milestones through serialized design reconciliation, reviewed PR gates, CI, cleanup, and release preparation |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |
