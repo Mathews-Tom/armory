@@ -5,7 +5,7 @@ cases:
       Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md. Make the review process in each execution prompt robust enough for per-PR and whole-stack review, and make every milestone end with a structured GO/NO-GO merge decision.
     fixtures: []
     rubric:
-      - "creates exactly DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md under .docs"
+      - "creates DEVELOPMENT_PLAN.md, EXECUTION_PROMPTS.md, and the mandatory ignored DEVELOPMENT_PLAN_HISTORY.md ledger under .docs"
       - "includes source map, assumptions/gaps, dependency graph, milestones, acceptance, and verification"
       - "includes one /goal block per milestone with detailed per-PR and whole-stack review criteria"
       - "requires every milestone run to report GO/NO-GO with evidence for merge readiness"
@@ -17,6 +17,12 @@ cases:
       - type: contains
         target: ".docs/EXECUTION_PROMPTS.md"
         weight: 1.0
+      - type: contains
+        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
+        weight: 0.9
+      - type: matches_regex
+        target: "(gitignore|gitignored|check-ignore)"
+        weight: 0.8
       - type: matches_regex
         target: "(Source Map|Assumptions|Gaps|Dependency Graph|Milestones)"
         weight: 0.8
@@ -135,3 +141,57 @@ cases:
     rubric:
       - "executing stacked PRs is stacked-prs territory, not plan/prompt generation"
     trigger_expected: false
+
+  - id: adaptive_milestone_design_gate
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for M1 through M6. M4 changed
+      the persistence interface that M5 and M6 depend on. Before M5 implementation, require an
+      evidence-backed design gate that updates M5 and every affected future milestone before code
+      can start.
+    fixtures: []
+    rubric:
+      - "adds a mandatory DESIGN GO or DESIGN NO-GO gate before implementation"
+      - "requires repository and predecessor-evidence analysis rather than relying on the old plan"
+      - "updates the current milestone and every affected transitive dependent prompt and plan section"
+      - "blocks code when the design is invalid or reconciliation is incomplete"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(DESIGN GO|DESIGN NO-GO|design gate|design reconciliation)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(predecessor|merged PR|current codebase|repository evidence)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(dependent|downstream|transitive|M6)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(block.*code|before.*implementation|do not.*implement)"
+        weight: 0.9
+
+  - id: ignored_plan_history_ledger
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md with one local,
+      gitignored .docs/DEVELOPMENT_PLAN_HISTORY.md ledger. It must record each design-gate
+      decision, evidence, plan/prompt changes, and downstream impact, but the committed plan
+      and prompts remain authoritative.
+    fixtures: []
+    rubric:
+      - "creates exactly one additional history artifact at the requested path"
+      - "ensures the exact history path is gitignored without assuming a broader ignore rule"
+      - "treats the ledger as local evidence rather than authoritative planning state"
+      - "records no-change and changed design-gate decisions with evidence and impact"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
+        weight: 1.0
+      - type: matches_regex
+        target: "(gitignore|gitignored|check-ignore)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(authoritative|source of truth|committed plan)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(evidence|downstream impact|PLAN REVISION)"
+        weight: 0.8
