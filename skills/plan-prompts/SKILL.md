@@ -1,13 +1,14 @@
 ---
 name: plan-prompts
-description: 'Generate `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` from system, design, architecture, or enhancement docs in a folder or explicit file list. Use when asked "create a development plan from docs", "generate execution prompts", "turn these design docs into milestones", "write DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md", "plan implementation from .docs", "create milestone execution prompts", "convert architecture docs into stacked PR prompts", or when given DOCS_DIR / REPO_CONTEXT / GLOBAL_CONSTRAINTS / STACK_DEPTH_HINT placeholders. NOT for auditing an existing plan; use plan-review. NOT for executing the stack; use stacked-prs.'
+description: 'Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.'
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   category: development
-  tags: [planning, execution-prompts, milestones, stacked-prs, release-management, docs]
+  tags: [planning, execution-prompts, milestones, adaptive-planning, stacked-prs, release-management, docs]
   difficulty: advanced
   phase: plan
   complements:
+    - milestone-runner
     - stacked-prs
     - plan-review
     - task-decomposer
@@ -15,10 +16,11 @@ metadata:
 
 # Development Plan and Execution Prompts
 
-Convert source documents into two standalone Markdown files:
+Convert source documents into a plan that remains valid as milestones merge:
 
-- `.docs/DEVELOPMENT_PLAN.md` — milestone plan with source traceability, dependencies, acceptance, verification, risks, and rollback notes.
-- `.docs/EXECUTION_PROMPTS.md` — one copy-paste `/goal` block per milestone that drives a reviewed stacked-PR implementation.
+- `.docs/DEVELOPMENT_PLAN.md` — the committed, authoritative milestone plan.
+- `.docs/EXECUTION_PROMPTS.md` — the committed, authoritative `/goal` contract for each milestone.
+- `.docs/DEVELOPMENT_PLAN_HISTORY.md` — the single local, append-only design-evidence ledger. It must be gitignored.
 
 This skill plans from documents only. Do not implement product code, create branches, open PRs, or execute the generated prompts.
 
@@ -35,8 +37,8 @@ Optional context:
 
 | Field | Meaning | Default |
 | --- | --- | --- |
-| `REPO_CONTEXT` | Target repo path or description; use actual repo structure, tooling, CI, style, and release conventions when a path exists. | Greenfield planning if absent. |
-| `GLOBAL_CONSTRAINTS` | Cross-cutting constraints not present in source docs: compliance, dependency policy, deadlines, perf budgets, release policy. | None. |
+| `REPO_CONTEXT` | Target repo path or description; inspect its current structure, tooling, CI, style, release conventions, and partial implementation. | Greenfield planning if absent. |
+| `GLOBAL_CONSTRAINTS` | Cross-cutting constraints absent from source docs. | None. |
 | `STACK_DEPTH_HINT` | Maximum PRs per milestone stack. | 6. |
 
 ## Workflow
@@ -44,26 +46,27 @@ Optional context:
 ### Phase 0 — Ingest and ground the plan
 
 1. Inventory every capability, contract, data model, integration, workflow, and non-functional requirement in the source docs.
-2. Preserve source order, but resolve authority by input shape: explicit file list order wins; otherwise newer or more specific design docs refine broader overview docs.
+2. Preserve source order, but resolve authority by input shape: explicit file-list order wins; otherwise newer or more-specific design docs refine broader overview docs.
 3. Build a traceability table from source references to planned capabilities. Use document paths plus section names or line ranges when available.
-4. Record `> ASSUMPTION:` for defensible defaults where docs are silent.
-5. Record `> GAP:` for missing, ambiguous, or contradictory requirements. Contradictions that change architecture, data semantics, security posture, or acceptance block file creation until resolved.
-6. Map dependencies between capabilities. Dependencies must be implementation-relevant, not topical adjacency.
-7. Inspect the target repo when available: CI workflows, package manager, test runner, type checker, linter, existing test naming, existing partial implementations, repository conventions, version source, `CHANGELOG.md`, tags, release branches, and documented release commands. Copy exact verification and release commands from the repo's own config or CI when possible.
-8. Identify source-traceable release targets and group milestones into shared release trains. Every milestone must explicitly target a named release, an unversioned release train, `none`, or a visible `> GAP:`. Never infer a semantic version from feature scope.
-9. If the repo is greenfield, make M1 establish the minimal skeleton and verification surface needed for later milestones to be testable.
+4. Record `> ASSUMPTION:` for defensible defaults. Record `> GAP:` for missing, ambiguous, or contradictory requirements. A contradiction affecting architecture, data semantics, security posture, or acceptance blocks output until resolved.
+5. Map implementation-relevant dependencies. Inspect the target repo when available: CI, package manager, test/type/lint commands, naming conventions, partial implementations, version source, `CHANGELOG.md`, tags, branches, and release commands.
+6. Identify source-traceable release targets and group milestones into shared release trains. Every milestone must target a named release, `unversioned`, `none`, or visible `> GAP:`. Never infer a version.
+7. For a greenfield repo, make M1 establish the minimum verification surface required by later milestones.
+8. If existing plan/prompt artifacts are present, read them before regenerating. Treat them as the current committed contract, not as immutable truth.
 
-Summarize Phase 0 in the chat response only. Do not duplicate the full ingest inventory inside the generated files.
+Summarize the inventory, dependencies, release trains, assumptions, gaps, and verification surface in chat only.
 
-### Phase 1 — Write `.docs/DEVELOPMENT_PLAN.md`
+### Phase 1 — Write plan and local history
 
-Create `.docs` if it does not exist. Write a standalone plan with this structure:
+Create `.docs` when absent. Create `.docs/DEVELOPMENT_PLAN_HISTORY.md` with a header stating that it is local evidence only; `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` are authoritative. Verify the exact history path is ignored with `git check-ignore`. When it is not ignored, add only `.docs/DEVELOPMENT_PLAN_HISTORY.md` to `.gitignore`; create `.gitignore` with that one rule only when it does not exist.
+
+Write `.docs/DEVELOPMENT_PLAN.md` with this structure:
 
 ```markdown
 # Development Plan — <System>
 
 ## 1. Context & Source Map
-<2–4 sentences, then a table mapping plan sections and milestone groups to source documents/sections.>
+<2–4 sentences and a table mapping plan sections and milestone groups to source documents/sections.>
 
 ## 2. Assumptions & Gaps
 <Visible `> ASSUMPTION:` and `> GAP:` entries, or "None.">
@@ -79,7 +82,14 @@ graph TD
 | --- | --- | --- | --- | --- | --- |
 | `<version | unversioned | none>` | `<M1, M2>` | All included milestones are externally merged. | `<version update | CHANGELOG.md | both | none>` | `<exact command or binary manual check>` | `<required command/workflow | not requested>` |
 
-## 5. Sections & Milestones
+## 5. Plan Evolution Protocol
+- The committed plan and prompt files are authoritative. The ignored history ledger is reconstructible local evidence.
+- Before each milestone, inspect its current plan/prompt, source map, current codebase, merged predecessor diffs, predecessor verification/CI evidence, and the local history when available.
+- Record exactly one `DESIGN GO — PLAN REVISION: none`, `DESIGN GO — PLAN REVISION: <entry IDs>`, or `DESIGN NO-GO — REASON: <blocking evidence>`.
+- A material mismatch updates the current milestone and every directly or transitively affected future milestone in both authoritative files. Recompute the dependency graph, critical path, and release-train membership when affected.
+- `DESIGN NO-GO` blocks code, branches, and implementation PRs. A material plan revision requires a docs-only reconciliation PR that is reviewed, green, and externally merged before implementation.
+
+## 6. Sections & Milestones
 ### Section A — <name>
 #### M1 — <title>
 | Field | Value |
@@ -91,90 +101,87 @@ graph TD
 | Deliverables | Concrete artifacts or behavior. |
 | Acceptance | Binary, testable statements. |
 | Verification | Exact command(s) and expected result. |
-| Risks & rollback | Failure modes; stack is the rollback unit unless a finer rollback is doc-traceable. |
-| Est. PRs | Integer ≤ `STACK_DEPTH_HINT`. |
+| Design reevaluation | Evidence to inspect before implementation; list direct/transitive dependent milestone IDs that require review if this design changes. |
+| Risks & rollback | Failure modes; stack is the rollback unit unless a finer rollback is source-traceable. |
+| Est. PRs | Integer ≤ `STACK_DEPTH_HINT`; exclude a conditional docs-only reconciliation root PR. |
 
-## 6. Cross-Cutting Concerns
+## 7. Cross-Cutting Concerns
 <Security, privacy, perf, observability, migrations, back-compat, release management — only when source-traceable.>
 
-## 7. Critical Path
+## 8. Critical Path
 <Ordered table or Mermaid diagram through the DAG and release-train completion.>
 ```
 
 Planning rules:
 
-- Decompose by capability or layer, not by file.
-- Each milestone must be standalone and self-verifiable.
-- Split any milestone estimated above `STACK_DEPTH_HINT` PRs.
-- Order foundations before consumers.
-- Keep shared context in the preamble; do not repeat it in every milestone.
-- Every acceptance row must be checkable by a command, asserted script output, CI signal, or clearly flagged minimal manual check.
-- Assign release preparation once per shared release train, after all included milestones merge. Do not create a version bump or changelog entry per feature milestone.
-- Derive version and changelog requirements from source documents and repository conventions. Use `none` only when evidence shows that no release artifact is required; use `> GAP:` rather than inventing a release target or versioning policy.
-- Use Mermaid and Markdown tables only for visuals.
-- Validate the Mermaid DAG before final output when Mermaid validation tooling is available.
+- Decompose by capability or layer, not by file. Keep milestones standalone and self-verifiable.
+- Every acceptance row needs a command, asserted output, CI signal, or clearly flagged minimum manual check.
+- Assign release preparation once per shared release train, after every included milestone merges.
+- Derive version/changelog requirements from source and repo evidence. Use `> GAP:` rather than inventing release policy.
+- Use Mermaid and Markdown tables only. Validate Mermaid when tooling is available.
 
-### Phase 2 — Write `.docs/EXECUTION_PROMPTS.md`
+### Phase 2 — Write execution prompts
 
-Create one `/goal` block per milestone. The prompt must trace directly to the matching milestone's objective, deliverables, acceptance, and verification rows. Do not invent scope that is not in the plan.
-
-Use this file structure:
+Create one `/goal` block per milestone. It must trace to that milestone’s objective, deliverables, acceptance, verification, design-reevaluation row, and release train. Do not invent scope.
 
 ```markdown
 # Execution Prompts — <System>
 
 ## Global execution rules (apply to every goal)
-- Use the `stacked-prs` skill: each PR is based on the previous PR's branch until that base merges.
-- Conventional Commits, atomic commits, multiple commits per PR grouped into a reviewable narrative.
-- No attribution of any kind: no `Co-authored-by`, no AI/tool mentions, no generated-by text, no emoji.
-- Each PR is one coherent, independently reviewable unit.
-- Review each PR individually, then review the full stack for cumulative coherence.
-- A `GO` makes only the milestone stack eligible for merge. Release preparation is deferred until every milestone in its shared release train is externally merged; the runner owns that release workflow.
-- Done = all PRs open and correctly based, checks green, individual and stack review complete, zero attribution, and a final release-aware `GO`/`NO-GO` merge verdict with evidence. `GO` authorizes an autonomous runner to merge after it independently verifies the gates; `NO-GO` blocks merge and downstream milestones.
+- Use `stacked-prs`; each implementation PR is based on the preceding stack branch until that base merges.
+- Use Conventional Commits, atomic commits, no attribution, and independently reviewable PRs.
+- Run the mandatory pre-implementation design gate before creating product-code branches or changing product code.
+- The committed plan/prompt files are authoritative. The local ignored history ledger is evidence; rebuild it from committed artifacts, merged PRs, CI, and current code when absent.
+- A material plan change must update the current milestone and every affected future milestone before implementation. Rebuild the DAG and release trains after the update.
+- A docs-only reconciliation PR is required for a material revision. It must be reviewed, green, and externally merged before code begins.
+- A shared mismatch in a proposed parallel wave blocks product-code work in every affected lane. Do not continue scaffolding, partial implementation, or isolated ledger writes while reconciliation is pending.
+- `GO` only makes the milestone stack merge-eligible. Release preparation remains deferred until every milestone in its train is externally merged.
 
 ### M1 — <title>
 ```text
 /goal Deliver milestone M1 (<title>) from DEVELOPMENT_PLAN.md as a reviewed stack of PRs.
 
-CONTEXT: DEVELOPMENT_PLAN.md §5 M1 + source docs. Preconditions: <none | Mx merged>. Repo: <language, package manager, test runner, type/lint/CI surface>.
+CONTEXT: DEVELOPMENT_PLAN.md §6 M1 + source docs. Preconditions: <none | Mx merged>. Repo: <language, package manager, test runner, type/lint/CI surface>.
 OBJECTIVE: <objective and acceptance criteria as the success contract>.
 RELEASE TRAIN: target=<named version | unversioned | none | > GAP: unresolved>; included milestones=<Mx>; preparation trigger=<all included milestones externally merged>; required artifacts=<version update | CHANGELOG.md | both | none>; release verification=<exact command or binary manual check>; publication=<required command/workflow | not requested>.
 
-PLANNED STACK (stacked-prs skill; refine only to keep PRs reviewable):
+PRE-IMPLEMENTATION DESIGN GATE:
+1. Read this milestone, its source-map rows, current prompt, and `.docs/DEVELOPMENT_PLAN_HISTORY.md` when present.
+2. Inspect the current codebase plus merged predecessor diffs, merged predecessor PR outcomes, CI/check evidence, and predecessor verification output.
+3. Revalidate objective, interfaces, dependencies, acceptance, verification, risks, release train, and every listed dependent milestone.
+4. Append one ledger entry: timestamp, milestone, decision, trigger, evidence, plan/prompt sections changed, downstream impact, and implementation authorization.
+5. If no material mismatch exists, report `DESIGN GO — PLAN REVISION: none`; this authorizes implementation.
+6. If a mismatch exists, update both authoritative artifacts for M1 and every affected future milestone, append the revision ID, and report `DESIGN GO — PLAN REVISION: <entry IDs>`. This records a completed diagnosis but blocks product-code work until the reconciliation prerequisite merges.
+7. If validity cannot be established, report `DESIGN NO-GO — REASON: <evidence>` and stop. After a reconciliation PR merges, repeat this gate and require `DESIGN GO — PLAN REVISION: none` before implementation.
+
+RECONCILIATION RULE: A material revision opens `docs(plan): reconcile M1 design` as a docs-only prerequisite PR. It contains no product code, must be reviewed, green, and externally merged before any code PR, and must not be folded into an implementation PR.
+
+PLANNED STACK (refine only to keep PRs reviewable):
+0. Conditional prerequisite `docs(plan): reconcile M1 design` — scope: authoritative plan/prompt updates only; gate: reviewed, green, and merged before the implementation stack.
 1. PR-1 <purpose> — scope: <areas>; commits: <c1>, <c2>; verification: <PR-specific command if narrower than milestone command>
 2. PR-2 <purpose, on PR-1> — scope: <areas>; commits: <c1>, <c2>
 
-CONSTRAINTS: Conventional Commits, atomic commits, multi-commit PRs, no attribution, no scope leakage across PRs, minimal dependencies, respect repo style. Do not update version or changelog artifacts before the release-train trigger unless the milestone itself is the source-traceable release-preparation unit.
-VERIFICATION (must pass): <exact command(s) + expected result from M1>.
+CONSTRAINTS: no scope leakage, minimal dependencies, repo style, no version/changelog updates before the release-train trigger unless source-traceable.
+VERIFICATION (must pass): <exact command(s) and expected result>.
 REVIEW:
 Per PR:
-- Scope boundary: diff matches PR purpose; no milestone leakage; no grab-bag changes.
-- Contract integrity: public APIs, schemas, CLI flags, config keys, and data shapes match the plan.
-- Tests: changed behavior has meaningful unit/integration coverage; assertions test behavior and invariants, not implementation trivia.
-- Error handling: failures are loud, typed/classified where useful, and not hidden behind broad fallbacks.
-- Security/privacy: input validation, secret handling, auth/authz, and data exposure risks are addressed where relevant.
-- Data safety: migrations or destructive operations are dry-run or opt-in where applicable, reversible where possible, and covered by rollback notes.
-- Maintainability: follows repo conventions; no speculative abstractions; no duplicate source of truth.
-- History: Conventional Commits, atomic commits, no attribution, no unrelated formatting churn.
-- Local verification: PR-specific commands pass and output is captured.
+- Scope matches its purpose; contracts match the reconciled plan; behavior is meaningfully tested.
+- Failures are loud; security, data safety, and rollback requirements are addressed where relevant.
+- History is atomic, conventional, attribution-free, and free of unrelated formatting churn.
+- PR-specific verification output is captured.
 Whole stack:
-- Topology: every PR is based on the previous PR branch; no orphan or duplicate commits.
-- Cumulative acceptance: the leaf stack satisfies every Mx acceptance row.
-- Integration: interfaces added lower in the stack are consumed consistently higher in the stack.
-- Regression surface: existing behavior remains covered; no test deletions without replacement.
-- CI/checks: checks green on every PR or pending provider checks are explicitly reported.
-- Rebase-clean: stack can be rebased from root to leaf without unresolved conflicts.
-- Human handoff: PR URLs, verification output, risks, and manual gates are reported.
-FINAL VERDICT:
-- Report exactly one verdict: `GO — RELEASE: <target> — RELEASE PREP: <pending | not-required>` or `NO-GO — RELEASE: <target> — REASON: <blocking gate>`.
-- `GO` only when every PR is open, correctly based, reviewed, green, locally verified, and the whole stack satisfies every milestone acceptance row. Use `pending` whenever release preparation has not started; only use `not-required` when the release train requires no release artifacts.
-- `NO-GO` when any check is failing or pending, review is incomplete, branch topology is wrong, verification is missing, scope leaked, a human/manual gate remains, merge readiness is ambiguous, or the target release is unresolved.
-- Evidence: list target release, included and remaining train milestones, PR URLs, branch bases, CI/check status per PR, verification command output, review completion, residual risks, and any manual gate.
-DONE: stack open and correctly based, checks green, per-PR and whole-stack reviews complete, final release-aware `GO`/`NO-GO` verdict reported with evidence.
+- Bases form one valid stack; cumulative acceptance and integration hold; CI is green; no regression coverage is removed without replacement.
+- The docs-only root, when present, is reviewed and green before dependent code PRs.
+- Report PR URLs, bases, verification, risks, manual gates, and review completion.
+FINAL VERDICTS:
+- Report the design verdict before the merge verdict.
+- Then report exactly one merge verdict: `GO — RELEASE: <target> — RELEASE PREP: <pending | not-required>` or `NO-GO — RELEASE: <target> — REASON: <blocking gate>`.
+- `GO` requires `DESIGN GO`, every PR correctly based/reviewed/green, local verification, and full milestone acceptance. `NO-GO` applies to pending or failed checks, incomplete review, scope drift, ambiguous readiness, manual gates, or unresolved release target.
+DONE: design verdict with evidence; when authorized, a reviewed stack with a release-aware merge verdict and evidence.
 ```
 ```
 
-For any milestone involving deletion, destructive migrations, irreversible rewrites, user-data mutation, or source pruning, add this inside that milestone prompt:
+Add this to destructive milestones:
 
 ```text
 HUMAN REVIEW GATE: Do not merge or run destructive paths unattended until a human reviews dry-run output, rollback notes, and audit/tombstone logging.
@@ -184,36 +191,25 @@ HUMAN REVIEW GATE: Do not merge or run destructive paths unattended until a huma
 
 Before yielding, check and fix:
 
-- Every inventoried capability maps to at least one milestone.
-- The dependency graph is acyclic.
-- Every milestone has binary acceptance and command-backed verification.
-- Every milestone has an explicit named target, `unversioned`, `none`, or a visible `> GAP:`.
-- Each shared release train lists included milestones, trigger, required artifacts, and verification; version or changelog work is assigned only once per train.
-- No milestone exceeds `STACK_DEPTH_HINT` PRs.
-- Every `/goal` block traces to one milestone's deliverables, verification, and release train.
-- Every `/goal` block contains no-attribution rules, per-PR review, whole-stack review, and final release-aware `GO`/`NO-GO` verdict requirements.
-- Assumptions and gaps are visible, not buried in prose.
-- Mermaid diagrams parse when Mermaid validation tooling is available.
-- The only files written are `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md` unless the user explicitly requests otherwise.
+- Every capability maps to a milestone; the DAG is acyclic; every milestone has binary acceptance and command-backed verification.
+- Every milestone has an explicit release target and design-reevaluation row.
+- Every prompt includes the design gate, dependency-impact propagation, local-history treatment, docs-only reconciliation rule, per-PR/whole-stack review, and both verdict formats.
+- Release preparation is assigned once per train and only after every train milestone merges.
+- `.docs/DEVELOPMENT_PLAN_HISTORY.md` exists, is the only history ledger, and is ignored by an exact or broader verified rule.
+- Only the two authoritative artifacts, the one local history ledger, and the minimum `.gitignore` update required to ignore it are written.
 
 ## Error handling
 
 | Problem | Resolution |
 | --- | --- |
-| Folder contains no readable docs | Stop and report the empty input set. Do not invent a plan. |
-| Explicit file path is missing | Stop and report the missing path. Do not silently skip it. |
-| Source docs contradict each other | Emit blocking `> GAP:` items in chat; proceed only if a defensible default does not change architecture, data semantics, security posture, or acceptance. |
+| Folder contains no readable docs or an explicit path is missing | Stop; report the missing input. |
+| Source docs contradict on architecture, data semantics, security, or acceptance | Emit blocking `> GAP:`; do not invent a resolution. |
 | Repo tooling is absent | Treat as greenfield and make M1 establish verification. |
-| Verification cannot be fully automated | Use the smallest manual binary check, flag it in the milestone, and explain why automation is unavailable. |
-| Release target or policy is absent | Emit a visible `> GAP:`. Do not invent a semantic version, version bump, changelog entry, tag, or publication step. |
-| Existing `.docs/DEVELOPMENT_PLAN.md` or `.docs/EXECUTION_PROMPTS.md` exists | Read it first, then overwrite only when the user requested regeneration. Preserve no stale milestones. |
+| Release policy is absent | Emit visible `> GAP:`; do not invent version, changelog, tag, or publication work. |
+| Existing authoritative artifacts exist | Read them first; overwrite only on requested regeneration; preserve no stale milestones. |
+| History path is not ignored | Add only the exact ignore rule, verify it, then write the ledger. |
+| History ledger is missing later | Reconstruct evidence from committed artifacts, merged PRs, CI, and current code; do not treat its absence as plan loss. |
 
-## Output Format and Chat Response
+## Output and chat response
 
-1. Phase 0 ingest summary: capabilities, dependencies, release trains, assumptions, gaps, verification surface, and release conventions.
-2. Paths written.
-3. Quality-gate result.
-4. Any destructive milestones requiring human review.
-5. Release trains blocked by unresolved targets or manual release gates.
-
-Do not paste the full generated files into chat unless requested.
+Report the Phase 0 summary, paths written, ignored-history verification, quality-gate result, destructive human gates, and unresolved release targets. Do not paste generated files unless requested.
