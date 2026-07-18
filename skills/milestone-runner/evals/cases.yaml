@@ -135,3 +135,83 @@ cases:
     rubric:
       - "repairing one existing stack is stacked-prs territory, not milestone orchestration"
     trigger_expected: false
+
+  - id: design_reconciliation_before_parallel_wave
+    prompt: >
+      M5 and M6 are currently independent and ready for a parallel implementation wave. Before
+      launch, M5's design gate finds that a shared authentication assumption invalidates both
+      milestones. Reconcile the plan and prompts, preserve the gitignored local history, and
+      only then decide whether either implementation lane may run.
+    fixtures: []
+    rubric:
+      - "serializes design reconciliation before launching or continuing parallel implementation"
+      - "updates the current and every affected downstream milestone, then rebuilds the DAG and waves"
+      - "requires a reviewed green merged docs-only reconciliation PR before dependent code PRs"
+      - "preserves one canonical ignored history ledger without concurrent writes"
+      - "halts every affected implementation lane and rejects continued scaffolding or partial code work"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(design gate|design reconciliation|DESIGN GO|DESIGN NO-GO)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(serial|sequential|before.*parallel|rebuild.*DAG|reload.*plan)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(docs-only|reconciliation.*PR|reviewed.*green)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(history.*canonical|single.*history|concurrent.*write)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(halt all|stop all|no.*scaffolding|do not.*continue.*code)"
+        weight: 0.9
+
+  - id: missing_ignored_history_reconstruction
+    prompt: >
+      Start M5 in a fresh worktree where the gitignored
+      .docs/DEVELOPMENT_PLAN_HISTORY.md is absent. The committed plan and prompts, merged
+      predecessor PRs, CI evidence, and current codebase are available. Reconstruct the required
+      design context and decide whether implementation may begin.
+    fixtures: []
+    rubric:
+      - "does not treat a missing ignored ledger as authoritative plan loss"
+      - "reconstructs design evidence from committed artifacts, merged predecessors, CI, and current code"
+      - "restores the local ledger after evidence is verified"
+      - "blocks implementation when reconciliation finds plan drift"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
+        weight: 1.0
+      - type: matches_regex
+        target: "(merged PR|CI|current codebase|committed plan)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(reconstruct|restore|regenerate)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(block|DESIGN NO-GO|drift)"
+        weight: 0.8
+
+  - id: overlapping_parallel_milestones
+    prompt: >
+      M5 and M6 have no dependency edge and both report DESIGN GO, but their reconciled plans
+      modify the same authentication files. Run them in parallel anyway unless an explicit
+      exception is required.
+    fixtures: []
+    rubric:
+      - "detects file overlap after reconciliation before launching the implementation wave"
+      - "runs overlapping milestones sequentially unless the user explicitly accepts conflict risk"
+      - "does not treat dependency independence as sufficient parallel-safety evidence"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(overlap|same files|shared files|file conflict)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(sequential|serialize|one at a time)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(explicit.*accept|user.*accept|conflict risk)"
+        weight: 0.8
