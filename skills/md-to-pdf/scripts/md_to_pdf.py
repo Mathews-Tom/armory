@@ -371,7 +371,7 @@ def markdown_to_html(md_path: Path, title: str = "") -> str:
         "pandoc", str(md_path),
         "-f", "markdown+pipe_tables+fenced_code_blocks+backtick_code_blocks+fenced_divs"
               "+tex_math_dollars+yaml_metadata_block+strikeout+footnotes+definition_lists"
-              "+smart+autolink_bare_uris",
+              "+smart+autolink_bare_uris+lists_without_preceding_blankline",
         "-t", "html5",
         "--katex",
         "--standalone",
