@@ -3,7 +3,7 @@ name: md-to-pdf
 description: 'Convert Markdown to styled PDFs with Mermaid diagrams, LaTeX/KaTeX math, tables, and code highlighting. Triggers on: "convert markdown to pdf", "make a pdf from this md", "export markdown as pdf", "pdf from markdown with equations".'
 license: MIT. See LICENSE.txt for complete terms.
 metadata:
-  version: 1.2.1
+  version: 1.2.2
   category: visualization
   tags: [pdf, markdown, mermaid, latex]
   difficulty: intermediate

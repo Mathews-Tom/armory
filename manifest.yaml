@@ -748,7 +748,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: md-to-pdf
-    version: 1.2.1
+    version: 1.2.2
     description: 'Convert Markdown to styled PDFs with Mermaid diagrams, LaTeX/KaTeX math, tables, and code highlighting.
       Triggers on: "convert markdown to pdf", "make a pdf from this md", "export markdown as pdf", "pdf from markdown with
       equations".'
