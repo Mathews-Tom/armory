@@ -862,7 +862,7 @@ packages:
     difficulty: advanced
     phase: build
   - name: plan-prompts
-    version: 1.2.0
+    version: 1.3.0
     description: Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update
       DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository
       design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.

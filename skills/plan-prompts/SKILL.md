@@ -2,7 +2,7 @@
 name: plan-prompts
 description: 'Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.'
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   category: development
   tags: [planning, execution-prompts, milestones, adaptive-planning, stacked-prs, release-management, docs]
   difficulty: advanced
@@ -177,7 +177,15 @@ FINAL VERDICTS:
 - Report the design verdict before the merge verdict.
 - Then report exactly one merge verdict: `GO — RELEASE: <target> — RELEASE PREP: <pending | not-required>` or `NO-GO — RELEASE: <target> — REASON: <blocking gate>`.
 - `GO` requires `DESIGN GO`, every PR correctly based/reviewed/green, local verification, and full milestone acceptance. `NO-GO` applies to pending or failed checks, incomplete review, scope drift, ambiguous readiness, manual gates, or unresolved release target.
-DONE: design verdict with evidence; when authorized, a reviewed stack with a release-aware merge verdict and evidence.
+NEXT STEPS: (required after either merge verdict; concrete, ordered, and evidence-backed)
+1. Current milestone: `<merge the reviewed stack | already merged | stop on NO-GO>`.
+2. Release: `<deferred until listed train members merge | begin declared preparation | not-required | blocked with reason>`.
+3. Next milestone: `<M# and dependency/release-train evidence | SKIP <current> FOR NOW; RUN M# — independent of <closure> | none — reason>`.
+4. For `NO-GO`: `<specific remediation and exact retry gate>`; otherwise `not applicable`.
+- On `GO`, steps 1–3 are mandatory. On `NO-GO`, steps 1–4 are mandatory; never advance a dependent milestone.
+- Render the literal heading `NEXT STEPS:`. A prose follow-up or JSON `next_steps` key is insufficient.
+- Never infer a milestone, remediation, version/changelog artifact, tag, or publication action.
+DONE: design verdict with evidence; when authorized, a reviewed stack with a release-aware merge verdict and the required next-steps list.
 ```
 ```
 
@@ -193,7 +201,7 @@ Before yielding, check and fix:
 
 - Every capability maps to a milestone; the DAG is acyclic; every milestone has binary acceptance and command-backed verification.
 - Every milestone has an explicit release target and design-reevaluation row.
-- Every prompt includes the design gate, dependency-impact propagation, local-history treatment, docs-only reconciliation rule, per-PR/whole-stack review, and both verdict formats.
+- Every prompt includes the design gate, dependency-impact propagation, local-history treatment, docs-only reconciliation rule, per-PR/whole-stack review, both verdict formats, and a concrete `NEXT STEPS` contract.
 - Release preparation is assigned once per train and only after every train milestone merges.
 - `.docs/DEVELOPMENT_PLAN_HISTORY.md` exists, is the only history ledger, and is ignored by an exact or broader verified rule.
 - Only the two authoritative artifacts, the one local history ledger, and the minimum `.gitignore` update required to ignore it are written.
