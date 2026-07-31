@@ -195,3 +195,37 @@ cases:
       - type: matches_regex
         target: "(evidence|downstream impact|PLAN REVISION)"
         weight: 0.8
+
+  - id: terminal_next_steps_contract
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for M4 and M5 in release v3.1.0,
+      plus M6 in independent release v3.2.0. Every milestone must report concrete next steps:
+      a green M4 stack needs merge, deferred v3.1.0 preparation, and its next milestone; a
+      migration-verification NO-GO for M4 needs remediation and may skip to independent M6.
+      Do not tag or publish without source evidence.
+    fixtures: []
+    rubric:
+      - "requires ordered NEXT STEPS after both GO and NO-GO terminal verdicts"
+      - "links GO handoff to merge state, deferred or required release preparation, and a next dependency-ready milestone"
+      - "links NO-GO handoff to the failed gate, remediation and retry, and only an independent milestone that may proceed"
+      - "does not invent tag or publication work"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "NEXT STEPS"
+        weight: 1.0
+      - type: matches_regex
+        target: "(GO.*merge|merge.*GO|NO-GO)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(release preparation|RELEASE PREP|deferred)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(migration|remediat|retry)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(M6|independent|SKIP.*RUN)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(do not tag|do not publish|without source evidence)"
+        weight: 0.8
