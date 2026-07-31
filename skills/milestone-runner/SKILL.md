@@ -2,7 +2,7 @@
 name: milestone-runner
 description: 'Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design. Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.'
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   category: development
   tags: [milestones, orchestration, adaptive-planning, stacked-prs, ci, release-management, execution-prompts]
   difficulty: advanced
@@ -27,6 +27,8 @@ A milestone has two independent gates:
 2. **Merge gate.** After implementation, require release-aware `GO` plus external PR, CI, verification, and review evidence.
 
 An ignored history ledger is reconstructible local evidence, not authoritative state. `.docs/DEVELOPMENT_PLAN.md` and `.docs/EXECUTION_PROMPTS.md`, merged PRs, CI, and current code remain authoritative.
+
+Every terminal milestone result must print the literal heading `NEXT STEPS:` followed by concrete, ordered actions: the current milestone action, release-preparation state, and the next runnable milestone. A `NO-GO` must name remediation and either an independent milestone that can proceed or the reason no milestone can. A prose follow-up or JSON `next_steps` key is insufficient.
 
 | Evidence | Use |
 | --- | --- |
@@ -139,6 +141,7 @@ After all gates pass, merge with `stacked-prs` root-to-leaf. Recheck CI after ea
 5. If the train is incomplete, continue only with dependency-ready design gates.
 6. If target or required artifacts are `none`, record `RELEASE PREP: not-required`.
 7. If required, run `ship-workflow` in an isolated release-preparation branch only after all train milestones merge. Update only source-traceable version/changelog artifacts; require reviewed green merged release-preparation PR and post-merge release verification. Do not tag, publish, or create a hosted release without explicit plan evidence.
+8. After every `GO` or `NO-GO`, derive and report `NEXT STEPS` from the observed DAG, external merge state, and release-train contract. On `GO`, state whether to merge or record the milestone as merged, whether release preparation is deferred or must begin, and the next dependency-ready milestone. On `NO-GO`, state the exact remediation and retry gate, then either `SKIP <current milestone> FOR NOW; RUN <next milestone> — independent of <blocked dependency closure>` or `NO NEXT MILESTONE — <blocking reason>`. Do not advance a dependent milestone or invent release work.
 
 ## Output format
 
@@ -163,6 +166,12 @@ After all gates pass, merge with `stacked-prs` root-to-leaf. Recheck CI after ea
 - Review:
 - Release train:
 - Release preparation:
+
+## NEXT STEPS:
+1. Current milestone: <merge the reviewed stack | already merged | stop on NO-GO>.
+2. Release: <deferred until listed train members merge | begin declared preparation | not-required | blocked with reason>.
+3. Next milestone: <M# and dependency/release-train evidence | `SKIP <current> FOR NOW; RUN M# — independent of <closure>` | `none — reason`>.
+4. For `NO-GO`: <specific remediation and exact retry gate>; otherwise `not applicable`.
 
 ## Stop/Continue Decision
 <Run design gate | Reconcile plan | Launch implementation wave | Continue within release train | Prepare release | Stop on DESIGN NO-GO | Stop on failed gate>
@@ -194,5 +203,6 @@ Before yielding:
 - Every material revision merged through a reviewed green docs-only reconciliation PR before implementation.
 - Parallel work used isolated worktrees only after serialized design gates and a stable artifact revision.
 - Every merged milestone has verified post-merge behavior and recorded downstream reevaluation requirements.
+- Every terminal milestone result includes ordered `NEXT STEPS` covering the current action, release-preparation state, next runnable milestone or blocking reason, and `NO-GO` remediation when applicable.
 - Every completed release train has observed `RELEASE PREP` state and no early version/changelog work.
 - Cleanup removed only branches verified as merged.

@@ -215,3 +215,36 @@ cases:
       - type: matches_regex
         target: "(explicit.*accept|user.*accept|conflict risk)"
         weight: 0.8
+
+  - id: terminal_next_steps_handoff
+    prompt: >
+      M4 is NO-GO because migration verification fails. M5 shares M4's v3.1.0 release train and
+      depends on M4. M6 is dependency-independent and targets v3.2.0. Report the required
+      terminal next steps without tagging or publishing.
+    fixtures: []
+    rubric:
+      - "reports an ordered NEXT STEPS handoff after the NO-GO verdict"
+      - "names migration remediation and a retry gate"
+      - "blocks dependent M5 and v3.1.0 release preparation"
+      - "permits only independent M6 to proceed and explicitly identifies the skip"
+      - "does not tag or publish"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "NEXT STEPS"
+        weight: 1.0
+      - type: matches_regex
+        target: "(migration|verification).*(remediat|retry|fix)|(remediat|retry|fix).*(migration|verification)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(M5|dependent|blocked)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(M6|independent|SKIP.*RUN)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(release preparation|RELEASE PREP|deferred|blocked)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(do not tag|do not publish|not.*publish)"
+        weight: 0.8
