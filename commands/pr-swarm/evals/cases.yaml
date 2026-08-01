@@ -1,0 +1,78 @@
+cases:
+  - id: slash_two_numbers
+    prompt: "/pr-swarm #482 #491"
+    fixtures: []
+    rubric:
+      - "activates the pr-swarm command"
+      - "parses both PR numbers, stripping the leading #"
+      - "delegates to skills/pr-swarm for independence checking, worktree setup, and launch"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "skills/pr-swarm"
+        weight: 0.9
+      - type: matches_regex
+        target: "482"
+        weight: 0.8
+      - type: matches_regex
+        target: "491"
+        weight: 0.8
+
+  - id: slash_comma_separated_bare_numbers
+    prompt: "/pr-swarm 201, 205, 212"
+    fixtures: []
+    rubric:
+      - "activates the pr-swarm command"
+      - "parses bare (no #) comma-separated numbers into three PR numbers"
+      - "does not treat argument order as a dependency chain"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "201"
+        weight: 0.7
+      - type: matches_regex
+        target: "205"
+        weight: 0.7
+      - type: matches_regex
+        target: "212"
+        weight: 0.7
+
+  - id: slash_single_pr
+    prompt: "/pr-swarm #77"
+    fixtures: []
+    rubric:
+      - "a single PR number is valid input"
+      - "still runs the full isolated-worktree-and-own-session path, not a collapsed inline shortcut"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "77"
+        weight: 0.8
+      - type: matches_regex
+        target: "worktree"
+        weight: 0.6
+
+  - id: slash_no_numbers_error_handling
+    prompt: "/pr-swarm"
+    fixtures: []
+    rubric:
+      - "activates the pr-swarm command even with no arguments"
+      - "reports the required syntax and stops rather than guessing which PRs to act on"
+      - "does not resolve or act on any PR"
+    trigger_expected: true
+
+  - id: negative_stack_pr_syntax
+    prompt: "/stack-pr publish --base main feat/parser-core feat/parser-cache"
+    fixtures: []
+    rubric:
+      - "this is the stack-pr command's syntax, not pr-swarm's"
+      - "does not activate pr-swarm"
+    trigger_expected: false
+
+  - id: negative_natural_language_no_slash
+    prompt: "Can you check if any of my open PRs have merge conflicts?"
+    fixtures: []
+    rubric:
+      - "a general PR status question without an explicit multi-PR parallelization request is not this command's argument surface"
+      - "does not activate the pr-swarm command"
+    trigger_expected: false

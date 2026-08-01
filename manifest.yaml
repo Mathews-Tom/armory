@@ -915,6 +915,26 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
+  - name: pr-swarm
+    version: 1.0.0
+    description: 'Parallelizes two or more independent "own PR to green" loops for a single repository using isolated git
+      worktrees and separate headless Claude Code sessions per PR — resolving merge conflicts, clearing review feedback, and
+      watching CI to completion without one PR''s diff or feedback leaking into another''s context. Triggers on: "parallelize
+      these PRs", "drive PR #123 and #456 to green in parallel", "own-PR-to-green fleet", "run these PRs concurrently", "isolated
+      worktree loops for my PRs", "pr-swarm". Use this skill when a user has two or more already-open, file-disjoint pull
+      requests in the same repository that each need conflict resolution, review-feedback triage, and CI monitoring, and wants
+      them driven to merge-ready at the same time instead of one after another.'
+    path: skills/pr-swarm
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/pr-swarm/SKILL.md
+    tags:
+    - git-worktree
+    - parallel-execution
+    - pull-requests
+    - headless-cli
+    - ci-monitoring
+    category: operations
+    difficulty: advanced
+    phase: ship
   - name: pre-landing-review
     version: 1.0.1
     description: 'Gate-oriented safety audit for code changes before landing, using a checklist with two-pass severity triage.
@@ -1959,6 +1979,25 @@ packages:
     - runbook
     category: development
     difficulty: intermediate
+    phase: ship
+  - name: pr-swarm
+    version: 1.0.0
+    description: 'Slash-command wrapper for the pr-swarm skill. `/pr-swarm #123 #456` (or bare numbers, space- or comma-separated)
+      drives that many already-open pull requests to merge-ready at the same time, each in its own isolated git worktree and
+      its own headless Claude Code session. Triggers on: "/pr-swarm", "pr-swarm #123 #456", "parallelize these PRs", "drive
+      PR #123 and #456 to green in parallel", "own-PR-to-green fleet", "isolated worktree loops for my PRs". Use this command
+      when a user wants a concise argument surface for parallelizing two or more of their own open pull requests while delegating
+      independence checks, worktree naming, launch mechanics, and verification gates to skills/pr-swarm.'
+    path: commands/pr-swarm
+    source: https://github.com/Mathews-Tom/armory/blob/main/commands/pr-swarm/COMMAND.md
+    tags:
+    - git
+    - pull-requests
+    - worktree
+    - slash-command
+    - parallel-execution
+    category: development
+    difficulty: advanced
     phase: ship
   - name: refactor
     version: 1.0.0
