@@ -34,6 +34,17 @@ ORIENTATION:
   gh auth status
   gh pr view {PR_NUMBER} --repo {REPO} \
     --json state,mergeable,mergeStateStatus,headRefOid,headRefName,baseRefName
+  gh pr checks {PR_NUMBER} --repo {REPO} | grep -v skipping
+
+A freshly-launched lane commonly inherits a PR with CI already red or
+feedback already unresolved from before this run started — that is normal
+starting state, not a reason to wait. Read the checks output and the PR's
+existing reviews/threads now. If anything above is already actionable (a
+check already reporting FAILURE, an unresolved review thread, or a
+body-only review finding), fix it as your first action. Being unable to
+force a fresh CI rerun (`gh run rerun` requires repo admin rights you do
+not have) is never a reason to stall — pushing your fix triggers a
+genuinely fresh run on its own.
 
 MERGE CONFLICTS: GitHub's mergeStateStatus can be stale. Verify with
 `git merge-tree --write-tree <base> <head>` before assuming a real conflict
@@ -41,9 +52,17 @@ exists. If clean, `git merge <base> -m "..."` and push rather than replaying
 commits with rebase (fixup commits tailored to an older base can conflict
 individually even when the net merge doesn't).
 
-WATCH LOOP: after each push, wait ~10 minutes, re-check every condition above.
-Reset the quiet-window timer on any new feedback. Run one extra quiet window
-before declaring done, as insurance against reviewer lag.
+WATCH LOOP: after each push, CI starts a new run. Poll per-job status via
+`gh pr checks {PR_NUMBER}`, not just the run-level aggregate — the moment
+any single non-skipped check reports FAILURE, or new review feedback lands,
+stop waiting on the rest of that run's still-pending checks and act on it
+immediately. You never need every check in a run to finish, or the full
+~10-minute quiet window to elapse, before reacting to something already
+actionable. Only treat the ~10-minute wait as genuine idle time once every
+currently-visible check is passing or still pending with zero failures and
+there is no unaddressed feedback. Reset the quiet-window timer on any new
+feedback or push. Run one extra quiet window before declaring done, as
+insurance against reviewer lag.
 
 Report your final status against every termination condition explicitly —
 don't just say "done." If you cannot reach all seven conditions, report
