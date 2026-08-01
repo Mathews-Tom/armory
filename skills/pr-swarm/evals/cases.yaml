@@ -1,0 +1,61 @@
+cases:
+  - id: parallelize_two_prs
+    prompt: "I've got PR #482 and PR #491 open in this repo, both mine, touching completely different files. Can you drive both to merge-ready at the same time instead of one after another?"
+    fixtures: []
+    rubric:
+      - "activates the pr-swarm skill rather than driving the PRs sequentially"
+      - "runs the independence check (Phase 2) before creating any worktree"
+      - "creates one isolated git worktree per PR with an inferred branch/worktree name"
+      - "launches one independent headless Claude Code session per PR, not task subagents"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "worktree"
+        weight: 0.9
+      - type: matches_regex
+        target: "independen"
+        weight: 0.8
+      - type: matches_regex
+        target: "claude -p"
+        weight: 0.7
+
+  - id: three_pr_fleet
+    prompt: "Own-PR-to-green fleet: I need #201, #205, and #212 all driven to CI-green concurrently, each with its own session so their context doesn't mix."
+    fixtures: []
+    rubric:
+      - "activates the pr-swarm skill for three PRs"
+      - "infers each worktree/branch name from the PR's headRefName rather than asking the user to supply names"
+      - "enforces no cross-lane reference between the three PRs"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "headRefName|branch"
+        weight: 0.7
+      - type: matches_regex
+        target: "isolat|no cross-lane|does not reference"
+        weight: 0.7
+
+  - id: negative_single_sequential_pr
+    prompt: "Resolve the merge conflicts on PR #77 and get it through CI."
+    fixtures: []
+    rubric:
+      - "a single, already-serial PR-to-green task does not need worktree parallelization"
+      - "does not activate pr-swarm for one PR being handled inline in the current session"
+    trigger_expected: false
+
+  - id: negative_stacked_pr_topology
+    prompt: "Split this branch into three stacked PRs and publish them in dependency order."
+    fixtures: []
+    rubric:
+      - "stacked/dependent PR topology belongs to skills/stacked-prs, not pr-swarm"
+      - "pr-swarm is for independent PRs with no parent/child relationship"
+      - "does not activate pr-swarm"
+    trigger_expected: false
+
+  - id: negative_new_pr_from_issue
+    prompt: "Take issue #340 and open a new PR that fixes it."
+    fixtures: []
+    rubric:
+      - "creating a new PR from an issue is out of scope — pr-swarm only drives already-open PRs"
+      - "does not activate pr-swarm"
+    trigger_expected: false
