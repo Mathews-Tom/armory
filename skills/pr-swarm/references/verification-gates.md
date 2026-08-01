@@ -1,6 +1,6 @@
 # Verification Gates
 
-Contents: [Termination conditions](#termination-conditions) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Quiet window](#quiet-window)
+Contents: [Termination conditions](#termination-conditions) · [First-failure reaction](#react-to-the-first-failing-check-not-the-full-matrix) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Quiet window](#quiet-window)
 
 These are GitHub API/`gh` CLI behaviors, not agent-specific — they apply regardless of which lane process produced the work.
 
@@ -15,6 +15,12 @@ A PR/lane is genuinely done only when **all** of the following hold simultaneous
 5. No new feedback landed in the last ~10-minute quiet window
 6. Worktree clean; local HEAD matches the pushed remote head
 7. The repo's own test/lint/typecheck gate ran green on the merged tree, not just on the pre-merge branch
+
+## React to the first failing check, not the full matrix
+
+`gh pr checks <N>` reports per-job status, not just a run-level aggregate. A run with ten jobs where one has already failed and nine are still queued or in progress is not "still running" from a triage standpoint — the failed job is actionable now. Start fixing it immediately; the still-pending jobs continue in the background and get re-checked on the next poll regardless. Waiting for every job in a run to reach a terminal state before looking at any of them wastes wall-clock time on jobs that were never going to change the fact that one of them already failed.
+
+This also means a lane rarely needs to force a fresh CI run at all: pushing the fix for an already-failed job triggers a brand-new run on its own. `gh run rerun` requires repo admin rights a contributor-driven lane typically doesn't have (`Must have admin rights to Repository`) — that's a non-issue here, not a blocker, because the normal fix-and-push cycle never depends on it. Reserve the close/reopen technique (`force-fresh-ci-without-admin-rerun` skill) for the narrow case of re-testing a suspected-flaky failure with no code change to push — not as a routine response to red CI.
 
 ## Merge-state staleness
 

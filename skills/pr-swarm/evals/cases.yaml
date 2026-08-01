@@ -35,6 +35,22 @@ cases:
         target: "isolat|no cross-lane|does not reference"
         weight: 0.7
 
+  - id: pr_with_existing_ci_failures
+    prompt: "Swarm PR #310 and PR #322 to green — heads up, #310 already has a couple of CI checks failing from before you even start, and there's open review feedback on it too."
+    fixtures: []
+    rubric:
+      - "activates pr-swarm despite one PR already having failing CI and open feedback at launch"
+      - "treats the existing failure/feedback as normal starting state to fix immediately, not a swarm-level stop condition"
+      - "does not block on being unable to force a fresh CI rerun without admin rights"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "already"
+        weight: 0.6
+      - type: matches_regex
+        target: "worktree"
+        weight: 0.6
+
   - id: negative_single_sequential_pr
     prompt: "Resolve the merge conflicts on PR #77 and get it through CI."
     fixtures: []
