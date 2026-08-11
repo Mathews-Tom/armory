@@ -6,6 +6,12 @@ on:
       - main
     tags:
       - 'v*'
+  # Packaging used to be main-only, so a break in it was invisible until after merge.
+  # PRs run every build and validation step; the release steps below stay gated on
+  # main and tags.
+  pull_request:
+    branches:
+      - main
 
 jobs:
   package:
@@ -62,29 +68,45 @@ jobs:
             fi
           done
 
+      - name: Write release notes
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cat > dist-notes.md <<'NOTES'
+          Rolling release — automatically updated on every push to `main`.
+
+          Contains the latest packaged archives from the repository.
+          For stable releases, use a versioned tag (e.g., `v1.0.0`).
+          NOTES
+          echo "" >> dist-notes.md
+          echo "**Last updated:** ${{ github.sha }}" >> dist-notes.md
+
+      # Both release steps sync through scripts/sync_release_assets.py rather than
+      # re-uploading dist/* wholesale. Uploading every artifact on every push cost two
+      # API calls per package in a burst and eventually failed the job with GitHub's
+      # secondary rate limit. The script compares each artifact against a checksums.txt
+      # manifest stored on the release and uploads only what changed, with throttled
+      # batches and retry-with-backoff for the cold-start case.
       - name: Create versioned release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          files: dist/*
+        run: |
+          python scripts/sync_release_assets.py \
+            --tag "${GITHUB_REF_NAME}" \
+            --dist dist \
+            --target "${GITHUB_SHA}" \
+            --prune
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update latest release
         if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          tag_name: latest
-          name: Latest Packages (rolling)
-          body: |
-            Rolling release — automatically updated on every push to `main`.
-
-            Contains the latest packaged archives from the repository.
-            For stable releases, use a versioned tag (e.g., `v1.0.0`).
-
-            **Last updated:** ${{ github.sha }}
-          prerelease: true
-          make_latest: false
-          files: dist/*
+        run: |
+          python scripts/sync_release_assets.py \
+            --tag latest \
+            --dist dist \
+            --target "${GITHUB_SHA}" \
+            --title "Latest Packages (rolling)" \
+            --notes-file dist-notes.md \
+            --prerelease \
+            --no-make-latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
