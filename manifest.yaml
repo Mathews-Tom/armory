@@ -580,6 +580,23 @@ packages:
     - adaptive
     category: review
     difficulty: intermediate
+  - name: kg-builder
+    version: 1.0.0
+    description: Designs and builds knowledge graphs from documents — ontology modeling with domain/range constraints, entity/relation/event
+      extraction, entity resolution, provenance and supersession, and GraphRAG serving. Use when asked to "build a knowledge
+      graph", "design an ontology", "extract entities and relations", "deduplicate entities", "entity resolution", "add GraphRAG",
+      or "graph memory for an agent". NOT for multi-agent task graphs or agent orchestration, use task-decomposer.
+    path: skills/kg-builder
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/kg-builder/SKILL.md
+    tags:
+    - knowledge-graph
+    - ontology
+    - entity-resolution
+    - graphrag
+    - provenance
+    category: data
+    difficulty: advanced
+    phase: build
   - name: lightpanda-browser
     version: 1.0.1
     description: 'Lightweight headless browser automation via Lightpanda and agent-browser CLI: 9x lower memory, 11x faster
