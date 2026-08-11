@@ -21,6 +21,16 @@ from scripts.package_types import (
 )
 
 
+# Archives must be byte-identical for identical content. zipfile.write() stamps each
+# entry with the source file's mtime, so a fresh checkout produced a different archive
+# from unchanged sources — which defeated checksum-based release syncing and made
+# published archives unverifiable. Entries are written with a fixed timestamp and a
+# normalized mode instead. 1980-01-01 is the earliest instant the ZIP format encodes.
+ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+MODE_EXECUTABLE = 0o755
+MODE_REGULAR = 0o644
+
+
 def validate_frontmatter(pkg_dir: Path, pkg_type: PackageType) -> dict[str, Any]:
     """Validate frontmatter in the type-specific definition file."""
     definition = pkg_dir / pkg_type.definition_file
@@ -87,7 +97,13 @@ def package(pkg_dir: Path, output_dir: Path, pkg_type: PackageType) -> Path:
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for file_path in included:
             arcname = file_path.relative_to(pkg_dir.parent)
-            zf.write(file_path, arcname)
+            # Git tracks only the executable bit, so collapsing to 755/644 keeps the
+            # archive identical across checkouts with different umasks.
+            executable = file_path.stat().st_mode & 0o111
+            info = zipfile.ZipInfo(arcname.as_posix(), date_time=ZIP_EPOCH)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (MODE_EXECUTABLE if executable else MODE_REGULAR) << 16
+            zf.writestr(info, file_path.read_bytes())
             print(f"  added: {arcname}")
 
     for file_path in excluded:
