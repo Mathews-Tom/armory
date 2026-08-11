@@ -1,0 +1,227 @@
+cases:
+  - id: build_graph_from_documents
+    prompt: "I have 400 supplier contracts as PDFs. I want to build a knowledge graph so I can ask which suppliers depend on which sub-suppliers. Where do I start?"
+    fixtures: []
+    rubric:
+      - "runs the value test and confirms multi-hop queries justify a graph"
+      - "insists on competency questions and an ontology before extraction"
+      - "does not jump straight to entity extraction"
+      - "specifies domain and range on relation types"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(competency question|ontology)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(domain|range)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(multi-hop|multi hop)"
+        weight: 0.7
+      - type: not_contains
+        target: "TODO"
+        weight: 0.3
+
+  - id: design_ontology
+    prompt: "Help me design an ontology for an internal engineering knowledge base covering people, services, and incidents."
+    fixtures: []
+    rubric:
+      - "asks for or writes competency questions first"
+      - "proposes a small type set rather than an exhaustive taxonomy"
+      - "gives each relation an explicit domain and range"
+      - "rejects vague relation names like RELATED_TO"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(domain|range)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(CONTRIBUTED_TO|AFFECTED|[A-Z]+_[A-Z]+)"
+        weight: 0.8
+      - type: not_contains
+        target: "RELATED_TO:"
+        weight: 0.6
+      - type: matches_regex
+        target: "(canonical|provenance)"
+        weight: 0.5
+
+  - id: extract_entities_and_relations
+    prompt: "What prompt should I use to extract entities and relations from unstructured incident reports into my graph?"
+    fixtures: []
+    rubric:
+      - "separate passes for entities and relations, not one mega-prompt"
+      - "embeds the ontology in the prompt"
+      - "requires a verbatim evidence quote per extraction"
+      - "validates domain and range in code rather than in the prompt"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(evidence|verbatim|quote)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(ontology)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(separate pass|one pass|two pass|per stage)"
+        weight: 0.7
+      - type: matches_regex
+        target: "(domain/range|domain and range)"
+        weight: 0.7
+
+  - id: deduplicate_entities
+    prompt: "My graph has 40k company records with tons of duplicates — Acme Corp, Acme Corporation, ACME. How do I deduplicate entities without wrecking the graph?"
+    fixtures: []
+    rubric:
+      - "prescribes blocking before matching to avoid quadratic comparison"
+      - "layers string, attribute, and structural evidence"
+      - "treats a false merge as worse than a missed merge"
+      - "requires a reversible merge policy with merged_from"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(blocking|block)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(neighborhood|structural|structure layer)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(reversib|undo|merged_from)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(threshold|band)"
+        weight: 0.6
+
+  - id: entity_resolution_recall_ceiling
+    prompt: "How do I know if my blocking strategy for entity resolution is good enough before I run it on the full dataset?"
+    fixtures: []
+    rubric:
+      - "identifies pair recall as the ceiling on fusion recall"
+      - "requires a labeled match set to measure against"
+      - "distinguishes reduction ratio from pair recall"
+      - "recommends a union of several blocking keys"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(pair recall|recall)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(reduction ratio|reduction)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(label|ground truth)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(blocking_report|union)"
+        weight: 0.5
+
+  - id: add_graphrag
+    prompt: "I want to add GraphRAG to my agent so it answers from our knowledge graph instead of hallucinating. How should retrieval work?"
+    fixtures: []
+    rubric:
+      - "routes by question type and says which questions the graph should not serve"
+      - "retrieves paths between entities for multi-hop questions, not neighborhoods"
+      - "serializes as triples carrying provenance and time"
+      - "requires a vector-only baseline over the same source text"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(path|paths)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(baseline|vector)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(provenance|source)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(hop)"
+        weight: 0.6
+
+  - id: graph_memory_for_agent
+    prompt: "I want graph memory for an agent that accumulates facts across sessions. How do I handle a new fact that contradicts something already stored?"
+    fixtures: []
+    rubric:
+      - "supersedes rather than overwrites, keeping the prior claim addressable"
+      - "keeps both claims with time and provenance"
+      - "separates validity time from record time"
+      - "distinguishes temporal change from genuine contradiction"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(supersede|supersedes)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(provenance|source)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(keep both|both claims|retain both)"
+        weight: 0.8
+      - type: not_contains
+        target: "overwrite the"
+        weight: 0.5
+
+  - id: measure_llm_adjudicator
+    prompt: "I'm using an LLM to decide whether two extracted entities are the same. Is that a good idea?"
+    fixtures: []
+    rubric:
+      - "restricts model adjudication to the ambiguous middle band"
+      - "requires measurement against a prompt-only baseline on labeled pairs"
+      - "notes engineered loops have measurably lost to prompt-only baselines"
+      - "keeps the merge policy itself in deterministic code"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(baseline)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(middle band|ambiguous)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(deterministic|code)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(label|held-out|measure)"
+        weight: 0.7
+
+  - id: reject_graph_when_table_suffices
+    prompt: "We have a flat list of 5000 products and we look each one up by SKU. Should we build a knowledge graph for it?"
+    fixtures: []
+    rubric:
+      - "applies the value test and answers no"
+      - "identifies single-hop lookup as the disqualifying pattern"
+      - "recommends a table or plain search instead"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(single-hop|single hop|lookup)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(table|database|no)"
+        weight: 0.9
+      - type: not_contains
+        target: "ontology.yaml"
+        weight: 0.4
+
+  - id: negative_agent_orchestration
+    prompt: "Design a graph for my multi-agent system — which agents are nodes, what handoffs are allowed between them, and where the human approval gate goes."
+    fixtures: []
+    rubric:
+      - "agent orchestration topology is task-decomposer territory, not knowledge graphs"
+      - "does not propose an ontology, entity extraction, or fusion"
+    trigger_expected: false
+
+  - id: negative_rag_quality_audit
+    prompt: "Our vector RAG pipeline hallucinates. Measure its retrieval precision and groundedness and tell me what's broken."
+    fixtures: []
+    rubric:
+      - "auditing an existing vector RAG pipeline is rag-auditor territory"
+      - "no knowledge graph is being built here"
+    trigger_expected: false
+
+  - id: negative_graph_visualization
+    prompt: "Draw me a dependency diagram of the modules in this repository."
+    fixtures: []
+    rubric:
+      - "diagram rendering is a visualization task, not knowledge graph construction"
+      - "does not propose ontology design or entity resolution"
+    trigger_expected: false
