@@ -128,6 +128,32 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 
 **Re-sync policy:** Compare upstream against the pinned commit before merging updates. Preserve armory's `codebase-advisor` naming and routing boundary unless `codebase-auditor` is formally deprecated.
 
+### Knowledge-graph curriculum and governance patterns — used by `kg-builder`
+
+`kg-builder` vendors **no** upstream text, code, or assets. It is written independently. Two bodies of prior work informed its content and are recorded here for provenance.
+
+**Field grounding — Southeast University graduate Knowledge Graph course**
+
+**Course:** 东南大学《知识图谱》研究生课程, Prof. 汪鹏 (Peng Wang)
+**Repo:** [npubird/KnowledgeGraphCourse](https://github.com/npubird/KnowledgeGraphCourse)
+**License:** **No license file.** The GitHub API reports `license: null` and the repository root contains no `LICENSE` or `COPYING`. No derivative-work permission is established.
+
+Because no license grants derivative rights, nothing from that repository is reproduced here. `kg-builder` uses only the field's standard, non-copyrightable pipeline decomposition — ontology modeling, entity/relation/event extraction, knowledge fusion, KG×LLM serving — which is common to the published knowledge-graph literature and predates that course. No lecture text, slide content, translated outline, or PDF is included, and the skill deliberately carries no per-lecture curriculum map.
+
+A third-party redistribution of an English distillation of that course exists at [codejunkie99/graph-engineering](https://github.com/codejunkie99/graph-engineering) (MIT). It was evaluated and **not** ingested: its scope conflates knowledge graphs with agent task graphs, its task-graph half duplicates `task-decomposer`, `milestone-runner`, `pr-swarm`, `team-lead`, and `project-planner`, and it relicenses a derivative of an unlicensed upstream. No content was taken from it.
+
+**Governance patterns — Kosha**
+
+**Repo:** [Mathews-Tom/Kosha](https://github.com/Mathews-Tom/Kosha) (`kosha-okf`)
+**License:** Apache-2.0
+**Referenced at:** v0.1.0
+
+`references/provenance-and-supersession.md` describes a claim-ledger design — append-only supersession, `supersedes`/`contradicts` lineage, bitemporal validity, a checkable no-silent-overwrite invariant, and a human gate on irreversible steps — for which Kosha is a reference implementation (`src/kosha/model.py`, `assert_no_silent_overwrite` in `src/kosha/contradiction/escalate.py`). The pattern is described, not copied; no Kosha code or documentation text is included, and `kg-builder` takes no dependency on `kosha-okf`.
+
+Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured finding rather than a claim: an LLM-adjudicated dedup-and-contradiction loop trailed a prompt-only baseline by 0.28–0.33 on detection and safety across every provider cell tested (108 held-out contradictions, 2 embedding × 2 generation models). `kg-builder` uses this to require that any model adjudicator be measured against a prompt-only baseline before it is trusted. Kosha's governance guarantee held under the same evaluation; its decision-quality claim did not, and the skill states the distinction.
+
+**Re-sync policy:** Neither upstream is vendored, so there is nothing to diff. Revisit the Kosha citation if a later pre-registered Gate-0 run records a GO verdict, and revisit the OKF question separately — OKF bundles are linked Markdown documents with untyped links, not typed property graphs, so they are out of scope for this skill.
+
 ## Conceptual Inspiration
 
 | Concept                                        | Source                                                                                                                  | Used by                                  |
