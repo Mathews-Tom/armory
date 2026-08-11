@@ -42,9 +42,21 @@ jobs:
       - name: Package adapter artifacts
         run: |
           mkdir -p dist
-          cd adapters/cursor && tar -czf ../../dist/armory-cursor.tar.gz .cursor && cd ../..
-          cd adapters/codex && tar -czf ../../dist/armory-codex.tar.gz AGENTS.md standards agents workflows skills && cd ../..
-          cd adapters/gemini && tar -czf ../../dist/armory-gemini.tar.gz .gemini && cd ../..
+          # tar records mtimes and gzip records its own timestamp, so an unchanged
+          # tree still produced a different tarball on every run. Pinning both keeps
+          # the artifacts byte-identical, which is what checksum-based release syncing
+          # and download verification depend on.
+          pack() {
+            dir="$1"; out="$2"; shift 2
+            tar --sort=name \
+                --mtime='UTC 1980-01-01' \
+                --owner=0 --group=0 --numeric-owner \
+                --format=gnu \
+                -cf - -C "${dir}" "$@" | gzip -n > "dist/${out}"
+          }
+          pack adapters/cursor armory-cursor.tar.gz .cursor
+          pack adapters/codex  armory-codex.tar.gz AGENTS.md standards agents workflows skills
+          pack adapters/gemini armory-gemini.tar.gz .gemini
           echo "Adapter artifacts:"
           ls -lh dist/armory-*.tar.gz
 
