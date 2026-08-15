@@ -1,0 +1,231 @@
+# GCP service -> icon cache slug mapping for architecture-diagram.
+#
+# Every `slug` value below was verified present in the real icon cache built
+# from `jgraph/drawio@a1f615b` (draw.io's `mxgraph.gcp2` stencil set, 297
+# icons total) — see scripts/fetch_icons.py.
+#
+# GCP's stencil coverage is narrower than AWS's (297 vs 1037 icons). Several
+# services common in modern GCP architectures — GKE as a distinct icon from
+# the generic Kubernetes logo, Vertex AI, Artifact Registry, Cloud Build,
+# Secret Manager, Cloud KMS, Anthos, Eventarc, Workflows — have no dedicated
+# icon in this stencil set. Where no real icon exists, the entry is omitted
+# rather than mapped to a misleading substitute; render.py falls back to a
+# labeled placeholder for any node whose service isn't listed here.
+#
+# `color` is GCP's own architecture-icon palette
+# (https://cloud.google.com/icons), used as the node's fill.
+
+services:
+  compute-engine:
+    label: Compute Engine
+    aliases: [compute engine, virtual machine, vm, gce]
+    color: "#4285F4"
+    category: compute
+  cloud-run:
+    label: Cloud Run
+    aliases: [cloud run, serverless containers]
+    color: "#4285F4"
+    category: compute
+  cloud-functions:
+    label: Cloud Functions
+    aliases: [cloud functions, faas, serverless function]
+    color: "#4285F4"
+    category: compute
+  app-engine:
+    label: App Engine
+    aliases: [app engine]
+    color: "#4285F4"
+    category: compute
+  gke-on-prem:
+    label: GKE (on-prem)
+    aliases: [gke on-prem]
+    color: "#4285F4"
+    category: compute
+
+  cloud-storage:
+    label: Cloud Storage
+    aliases: [cloud storage, bucket, object storage, gcs]
+    color: "#34A853"
+    category: storage
+  persistent-disk:
+    label: Persistent Disk
+    aliases: [persistent disk, block storage]
+    color: "#34A853"
+    category: storage
+  cloud-filestore:
+    label: Filestore
+    aliases: [filestore, nfs]
+    color: "#34A853"
+    category: storage
+
+  cloud-sql:
+    label: Cloud SQL
+    aliases: [cloud sql, postgres, mysql, relational database]
+    color: "#4285F4"
+    category: database
+  cloud-spanner:
+    label: Spanner
+    aliases: [spanner, globally distributed database]
+    color: "#4285F4"
+    category: database
+  cloud-bigtable:
+    label: Bigtable
+    aliases: [bigtable, wide-column database]
+    color: "#4285F4"
+    category: database
+  cloud-firestore:
+    label: Firestore
+    aliases: [firestore, document database]
+    color: "#4285F4"
+    category: database
+  cloud-memorystore:
+    label: Memorystore
+    aliases: [memorystore, redis, in-memory cache]
+    color: "#4285F4"
+    category: database
+
+  bigquery:
+    label: BigQuery
+    aliases: [bigquery, data warehouse]
+    color: "#4285F4"
+    category: analytics
+  cloud-dataflow:
+    label: Dataflow
+    aliases: [dataflow, stream/batch processing]
+    color: "#4285F4"
+    category: analytics
+  cloud-dataproc:
+    label: Dataproc
+    aliases: [dataproc, spark, hadoop]
+    color: "#4285F4"
+    category: analytics
+  cloud-pubsub:
+    label: Pub/Sub
+    aliases: [pubsub, pub/sub, message queue, event bus]
+    color: "#4285F4"
+    category: analytics
+  cloud-composer:
+    label: Composer
+    aliases: [composer, airflow, workflow orchestration]
+    color: "#4285F4"
+    category: analytics
+  cloud-data-fusion:
+    label: Data Fusion
+    aliases: [data fusion, etl]
+    color: "#4285F4"
+    category: analytics
+
+  cloud-load-balancing:
+    label: Cloud Load Balancing
+    aliases: [load balancer, cloud load balancing]
+    color: "#4285F4"
+    category: networking
+  cloud-cdn:
+    label: Cloud CDN
+    aliases: [cdn, cloud cdn]
+    color: "#4285F4"
+    category: networking
+  cloud-dns:
+    label: Cloud DNS
+    aliases: [dns, cloud dns]
+    color: "#4285F4"
+    category: networking
+  cloud-armor:
+    label: Cloud Armor
+    aliases: [cloud armor, waf, ddos protection]
+    color: "#4285F4"
+    category: networking
+  cloud-nat:
+    label: Cloud NAT
+    aliases: [cloud nat, nat gateway]
+    color: "#4285F4"
+    category: networking
+  cloud-vpn:
+    label: Cloud VPN
+    aliases: [cloud vpn, vpn gateway]
+    color: "#4285F4"
+    category: networking
+  cloud-endpoints:
+    label: Cloud Endpoints
+    aliases: [cloud endpoints, api gateway]
+    color: "#4285F4"
+    category: networking
+
+  cloud-iam:
+    label: Cloud IAM
+    aliases: [iam, identity and access management, role, policy]
+    color: "#EA4335"
+    category: security
+  key-management-service:
+    label: Key Management Service
+    aliases: [kms, cloud kms, encryption key]
+    color: "#EA4335"
+    category: security
+  cloud-security-command-center:
+    label: Security Command Center
+    aliases: [security command center, threat detection]
+    color: "#EA4335"
+    category: security
+
+  cloud-vision-api:
+    label: Vision API
+    aliases: [vision api, image recognition]
+    color: "#0F9D58"
+    category: ai-ml
+  cloud-natural-language-api:
+    label: Natural Language API
+    aliases: [natural language api, nlp]
+    color: "#0F9D58"
+    category: ai-ml
+  cloud-translation-api:
+    label: Translation API
+    aliases: [translation api]
+    color: "#0F9D58"
+    category: ai-ml
+  cloud-speech-api:
+    label: Speech-to-Text
+    aliases: [speech-to-text, speech api]
+    color: "#0F9D58"
+    category: ai-ml
+  cloud-text-to-speech:
+    label: Text-to-Speech
+    aliases: [text-to-speech]
+    color: "#0F9D58"
+    category: ai-ml
+  cloud-automl:
+    label: AutoML
+    aliases: [automl, cloud automl]
+    color: "#0F9D58"
+    category: ai-ml
+
+  cloud-scheduler:
+    label: Cloud Scheduler
+    aliases: [cloud scheduler, cron]
+    color: "#4285F4"
+    category: management
+  cloud-tasks:
+    label: Cloud Tasks
+    aliases: [cloud tasks, task queue]
+    color: "#4285F4"
+    category: management
+  error-reporting:
+    label: Error Reporting
+    aliases: [error reporting]
+    color: "#4285F4"
+    category: management
+  cloud-monitoring:
+    label: Cloud Monitoring
+    aliases: [cloud monitoring, metrics]
+    color: "#4285F4"
+    category: management
+
+  apigee-api-platform:
+    label: Apigee
+    aliases: [apigee, api management]
+    color: "#4285F4"
+    category: networking
+  firebase:
+    label: Firebase
+    aliases: [firebase]
+    color: "#FFCA28"
+    category: mobile

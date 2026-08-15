@@ -1,0 +1,282 @@
+# Azure service -> icon cache slug mapping for architecture-diagram.
+#
+# Every `slug` value below was verified present in the real icon cache built
+# from `jgraph/drawio@a1f615b` (draw.io's `azure2` real-SVG icon library, 704
+# icons total) — see scripts/fetch_icons.py. Unlike AWS/GCP these are inlined
+# directly (svg_inline.py), not converted from a stencil DSL.
+#
+# A handful of services common in Azure DevOps-heavy architectures — Azure
+# Pipelines, Boards, Artifacts, Queue Storage, File Storage, VPN Gateway as a
+# distinct icon — have no dedicated icon in this set. Entries are omitted
+# rather than mapped to a misleading substitute.
+#
+# `color` is Azure's own architecture-icon service-category color
+# (https://learn.microsoft.com/en-us/azure/architecture/icons/), used as the
+# node's fill.
+
+services:
+  virtual-machine:
+    label: Virtual Machine
+    aliases: [virtual machine, vm, instance]
+    color: "#0078D4"
+    category: compute
+  app-services:
+    label: App Service
+    aliases: [app service, web app]
+    color: "#0078D4"
+    category: compute
+  function-apps:
+    label: Function Apps
+    aliases: [function apps, azure functions, faas, serverless function]
+    color: "#0078D4"
+    category: compute
+  kubernetes-services:
+    label: Kubernetes Services
+    aliases: [aks, azure kubernetes service, kubernetes]
+    color: "#0078D4"
+    category: compute
+  container-instances:
+    label: Container Instances
+    aliases: [container instances, aci]
+    color: "#0078D4"
+    category: compute
+  container-app-environments:
+    label: Container Apps
+    aliases: [container apps]
+    color: "#0078D4"
+    category: compute
+  batch-accounts:
+    label: Batch Accounts
+    aliases: [batch accounts, azure batch]
+    color: "#0078D4"
+    category: compute
+  vm-scale-sets:
+    label: VM Scale Sets
+    aliases: [vmss, vm scale set]
+    color: "#0078D4"
+    category: compute
+
+  storage-accounts:
+    label: Storage Accounts
+    aliases: [storage account, blob storage, object storage]
+    color: "#0078D4"
+    category: storage
+  blob-block:
+    label: Blob Storage
+    aliases: [blob, blob storage block]
+    color: "#0078D4"
+    category: storage
+  data-lake-storage-gen1:
+    label: Data Lake Storage
+    aliases: [data lake storage, data lake]
+    color: "#0078D4"
+    category: storage
+  managed-file-shares:
+    label: File Shares
+    aliases: [file share, azure files]
+    color: "#0078D4"
+    category: storage
+
+  sql-database:
+    label: SQL Database
+    aliases: [sql database, relational database]
+    color: "#0078D4"
+    category: database
+  azure-cosmos-db:
+    label: Cosmos DB
+    aliases: [cosmos db, cosmosdb, nosql database]
+    color: "#0078D4"
+    category: database
+  azure-database-postgresql-server:
+    label: Database for PostgreSQL
+    aliases: [postgres, postgresql]
+    color: "#0078D4"
+    category: database
+  azure-database-mysql-server:
+    label: Database for MySQL
+    aliases: [mysql]
+    color: "#0078D4"
+    category: database
+
+  key-vaults:
+    label: Key Vault
+    aliases: [key vault, secrets, certificates, encryption key]
+    color: "#0078D4"
+    category: security
+  azure-sentinel:
+    label: Microsoft Sentinel
+    aliases: [sentinel, siem, threat detection]
+    color: "#0078D4"
+    category: security
+  security-center:
+    label: Security Center
+    aliases: [security center, defender for cloud]
+    color: "#0078D4"
+    category: security
+  azure-active-directory:
+    label: Azure Active Directory
+    aliases: [active directory, entra id, identity provider]
+    color: "#0078D4"
+    category: identity
+  managed-identities:
+    label: Managed Identities
+    aliases: [managed identity]
+    color: "#0078D4"
+    category: identity
+
+  service-bus:
+    label: Service Bus
+    aliases: [service bus, message queue]
+    color: "#0078D4"
+    category: integration
+  event-grid-topics:
+    label: Event Grid Topics
+    aliases: [event grid, event bus]
+    color: "#0078D4"
+    category: integration
+  logic-apps:
+    label: Logic Apps
+    aliases: [logic apps, workflow orchestration]
+    color: "#0078D4"
+    category: integration
+  api-management-services:
+    label: API Management
+    aliases: [api management, apim, api gateway]
+    color: "#0078D4"
+    category: integration
+  event-hubs:
+    label: Event Hubs
+    aliases: [event hubs, streaming]
+    color: "#0078D4"
+    category: integration
+  data-factory:
+    label: Data Factory
+    aliases: [data factory, etl]
+    color: "#0078D4"
+    category: integration
+
+  application-insights:
+    label: Application Insights
+    aliases: [application insights, apm]
+    color: "#0078D4"
+    category: monitoring
+  log-analytics-workspaces:
+    label: Log Analytics Workspaces
+    aliases: [log analytics, logs]
+    color: "#0078D4"
+    category: monitoring
+  monitor:
+    label: Azure Monitor
+    aliases: [azure monitor, metrics, monitoring]
+    color: "#0078D4"
+    category: monitoring
+
+  virtual-networks:
+    label: Virtual Network
+    aliases: [virtual network, vnet]
+    color: "#0078D4"
+    category: networking
+  load-balancers:
+    label: Load Balancer
+    aliases: [load balancer]
+    color: "#0078D4"
+    category: networking
+  application-gateways:
+    label: Application Gateway
+    aliases: [application gateway]
+    color: "#0078D4"
+    category: networking
+  firewalls:
+    label: Firewall
+    aliases: [firewall]
+    color: "#0078D4"
+    category: networking
+  front-doors:
+    label: Front Door
+    aliases: [front door, cdn]
+    color: "#0078D4"
+    category: networking
+  cdn-profiles:
+    label: CDN Profile
+    aliases: [cdn profile]
+    color: "#0078D4"
+    category: networking
+  dns-zones:
+    label: DNS Zone
+    aliases: [dns zone, dns]
+    color: "#0078D4"
+    category: networking
+  expressroute-circuits:
+    label: ExpressRoute Circuit
+    aliases: [expressroute]
+    color: "#0078D4"
+    category: networking
+  traffic-manager-profiles:
+    label: Traffic Manager
+    aliases: [traffic manager]
+    color: "#0078D4"
+    category: networking
+  subnet:
+    label: Subnet
+    aliases: [subnet]
+    color: "#0078D4"
+    category: networking
+  private-endpoint:
+    label: Private Endpoint
+    aliases: [private endpoint]
+    color: "#0078D4"
+    category: networking
+  public-ip-addresses:
+    label: Public IP Address
+    aliases: [public ip]
+    color: "#0078D4"
+    category: networking
+
+  cognitive-services:
+    label: Cognitive Services
+    aliases: [cognitive services]
+    color: "#0078D4"
+    category: ai-ml
+  azure-machine-learning:
+    label: Azure Machine Learning
+    aliases: [machine learning, ml training]
+    color: "#0078D4"
+    category: ai-ml
+  azure-openai:
+    label: Azure OpenAI
+    aliases: [azure openai, genai, foundation model]
+    color: "#0078D4"
+    category: ai-ml
+  bot-services:
+    label: Bot Services
+    aliases: [bot service, chatbot]
+    color: "#0078D4"
+    category: ai-ml
+
+  azure-synapse-analytics:
+    label: Azure Synapse Analytics
+    aliases: [synapse, data warehouse]
+    color: "#0078D4"
+    category: analytics
+  azure-databricks:
+    label: Azure Databricks
+    aliases: [databricks, spark]
+    color: "#0078D4"
+    category: analytics
+
+  azure-devops:
+    label: Azure DevOps
+    aliases: [azure devops]
+    color: "#0078D4"
+    category: devops
+
+  iot-hub:
+    label: IoT Hub
+    aliases: [iot hub]
+    color: "#0078D4"
+    category: iot
+  digital-twins:
+    label: Digital Twins
+    aliases: [digital twins]
+    color: "#0078D4"
+    category: iot
