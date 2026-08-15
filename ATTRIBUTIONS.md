@@ -30,7 +30,8 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 | **arXiv API**                            | [lukasschwab/arxiv.py](https://github.com/lukasschwab/arxiv.py)                                               | MIT                       | `arxiv-search`                       |
 | **pytest**                               | [pytest-dev/pytest](https://github.com/pytest-dev/pytest)                                                     | MIT                       | `test-harness`                       |
 | **KaTeX**                                | [KaTeX/KaTeX](https://github.com/KaTeX/KaTeX)                                                                 | MIT                       | `md-to-pdf`                          |
-| **Mermaid**                              | [mermaid-js/mermaid](https://github.com/mermaid-js/mermaid)                                                   | MIT                       | `md-to-pdf`, `architecture-diagram`  |
+| **Mermaid**                              | [mermaid-js/mermaid](https://github.com/mermaid-js/mermaid)                                                   | MIT                       | `md-to-pdf`                          |
+| **draw.io** (jgraph)                     | [jgraph/drawio](https://github.com/jgraph/drawio)                                                             | Apache-2.0                | `architecture-diagram` (icon geometry, fetched at runtime — see Vendoring Records) |
 | **Playwright** (Microsoft)               | [microsoft/playwright](https://github.com/microsoft/playwright)                                               | Apache-2.0                | `qa-systematic`                      |
 | **Marp** (marp-team)                     | [marp-team/marpit](https://github.com/marp-team/marpit) · [marp-team/marp-core](https://github.com/marp-team/marp-core) · [marp-team/marp-cli](https://github.com/marp-team/marp-cli) | MIT                       | `marp-slides`                        |
 
@@ -153,6 +154,22 @@ A third-party redistribution of an English distillation of that course exists at
 Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured finding rather than a claim: an LLM-adjudicated dedup-and-contradiction loop trailed a prompt-only baseline by 0.28–0.33 on detection and safety across every provider cell tested (108 held-out contradictions, 2 embedding × 2 generation models). `kg-builder` uses this to require that any model adjudicator be measured against a prompt-only baseline before it is trusted. Kosha's governance guarantee held under the same evaluation; its decision-quality claim did not, and the skill states the distinction.
 
 **Re-sync policy:** Neither upstream is vendored, so there is nothing to diff. Revisit the Kosha citation if a later pre-registered Gate-0 run records a GO verdict, and revisit the OKF question separately — OKF bundles are linked Markdown documents with untyped links, not typed property graphs, so they are out of scope for this skill.
+
+### draw.io icon geometry — used by `architecture-diagram`
+
+**Upstream repo:** [jgraph/drawio](https://github.com/jgraph/drawio)
+**License:** Apache-2.0
+**Pinned commit:** `a1f615b7f5a5237da71de2ce2f057b5fa70b0aeb` (`dev` branch, verified 2026-08-15)
+
+**Not traditional vendoring — no files are copied into this repository.** AWS, Azure, and GCP's own terms permit using their icons to build architecture diagrams, but none grant redistribution rights for the raw files, so `architecture-diagram` ships zero icon assets. Instead:
+
+- `scripts/stencil2svg.py` converts draw.io's `mxgraph.aws4`/`mxgraph.gcp2` stencil XML (vector `move`/`line`/`curve`/`arc` primitives, no embedded rasters) into inline SVG, at render time, on the end user's own machine.
+- `scripts/svg_inline.py` inlines and namespaces draw.io's `azure2` real-SVG icon library the same way.
+- `scripts/fetch_icons.py` builds a local per-user cache pinned to the commit above, so output stays reproducible without this repository ever holding the icon files.
+
+The pinned commit governs which stencil/icon geometry is used; bumping it is a deliberate, reviewable change to `scripts/fetch_icons.py`, not an implicit `dev`-branch tracking dependency.
+
+**Re-sync policy:** Nothing is vendored, so there is nothing to diff against upstream `dev` churn. Bump `DRAWIO_SHA` in `scripts/fetch_icons.py` only after re-running the full corpus conversion and confirming no new conversion warnings, per `references/editability.md`.
 
 ## Conceptual Inspiration
 

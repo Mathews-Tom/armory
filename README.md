@@ -116,7 +116,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 
 | Skill                                                                | Description                                                                                                          |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [architecture-diagram](skills/architecture-diagram/)                 | Layered architecture diagrams as self-contained HTML with inline SVG icons and CSS Grid layout                       |
+| [architecture-diagram](skills/architecture-diagram/)                 | Editable SVG architecture diagrams with native AWS/Azure/GCP icons, deterministic zone-aware layout                 |
 | [concept-to-image](skills/concept-to-image/)                         | Turn concepts into polished HTML visuals, export as PNG or SVG                                                       |
 | [concept-to-video](skills/concept-to-video/)                         | Turn concepts into animated explainer videos using Manim — MP4/GIF output with audio overlay, templates, multi-scene |
 | [remotion-video](skills/remotion-video/)                             | Production motion graphics using Remotion (React) — branded content, data-driven video, audio sync, TailwindCSS      |

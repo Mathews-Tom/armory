@@ -216,7 +216,7 @@ Produce the structured proposal document using the Output Format below. Sections
 
 <Solution in business language>
 
-![Solution Architecture](architecture-diagram.png)
+![Solution Architecture](architecture-diagram.svg)
 
 <Technical detail as needed>
 

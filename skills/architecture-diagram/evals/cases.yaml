@@ -3,46 +3,102 @@ cases:
     prompt: "Create an architecture diagram for our microservices: API Gateway, User Service, Order Service, PostgreSQL, Redis"
     fixtures: []
     rubric:
-      - "Output produces a self-contained HTML file"
-      - "Output uses SVG or CSS Grid for layout"
+      - "Output produces a self-contained, valid SVG file"
+      - "Output includes real <text> labels for every component, not outlined paths"
       - "Output includes connection lines or arrows between components"
+      - "Output does not use raster images or <use> clones for icons"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(<html|<HTML|\\.html)"
+        target: "<svg[^>]*xmlns=\"http://www\\.w3\\.org/2000/svg\""
         weight: 1.0
-      - type: matches_regex
-        target: "(<svg|SVG|svg)"
+      - type: contains
+        target: "<text"
         weight: 0.8
       - type: contains
         target: "API Gateway"
         weight: 0.8
       - type: matches_regex
-        target: "(connection|arrow|line|path)"
+        target: "(<path|<line|<polyline)"
         weight: 0.8
       - type: not_contains
-        target: "external dependency"
-        weight: 0.6
+        target: "<image"
+        weight: 1.0
+      - type: not_contains
+        target: "base64,"
+        weight: 1.0
 
   - id: aws_deployment_diagram
-    prompt: "Draw a deployment diagram showing our AWS infrastructure"
+    prompt: "Draw a deployment diagram showing our AWS infrastructure: API Gateway, Lambda, DynamoDB inside a VPC"
     fixtures: []
     rubric:
-      - "Output shows containment hierarchy (e.g., VPC > Subnet > Instance)"
-      - "Output uses color-coded legends to distinguish component types"
+      - "Output shows containment hierarchy (e.g., VPC zone containing service nodes)"
+      - "Output uses AWS-native icon geometry, not generic placeholder icons"
+      - "Output is valid, self-contained SVG"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(<html|<HTML|\\.html)"
+        target: "<svg[^>]*xmlns=\"http://www\\.w3\\.org/2000/svg\""
         weight: 1.0
       - type: matches_regex
-        target: "(VPC|Subnet|EC2|AWS|Region)"
+        target: "(VPC|Lambda|DynamoDB|API Gateway)"
         weight: 0.8
       - type: matches_regex
-        target: "(legend|Legend|color)"
+        target: "(zone-|stroke-dasharray)"
         weight: 0.6
+      - type: not_contains
+        target: "<use "
+        weight: 1.0
+
+  - id: azure_web_app_diagram
+    prompt: "Draw an Azure architecture diagram for our web app: App Gateway, App Service, SQL Database"
+    fixtures: []
+    rubric:
+      - "Output uses Azure-native icon geometry"
+      - "Output is valid, self-contained SVG with no external references"
+    trigger_expected: true
+    assertions:
       - type: matches_regex
-        target: "(container|zone|hierarchy|nested)"
+        target: "<svg[^>]*xmlns=\"http://www\\.w3\\.org/2000/svg\""
+        weight: 1.0
+      - type: matches_regex
+        target: "(App Gateway|App Service|SQL Database|Azure)"
+        weight: 0.8
+      - type: not_contains
+        target: "href=\"http"
+        weight: 1.0
+
+  - id: gcp_data_pipeline_diagram
+    prompt: "Create a GCP architecture diagram: Pub/Sub feeding Dataflow into BigQuery"
+    fixtures: []
+    rubric:
+      - "Output uses GCP-native icon geometry"
+      - "Output shows the pipeline's data flow direction"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "<svg[^>]*xmlns=\"http://www\\.w3\\.org/2000/svg\""
+        weight: 1.0
+      - type: matches_regex
+        target: "(Pub/Sub|PubSub|Dataflow|BigQuery)"
+        weight: 0.8
+
+  - id: multi_cloud_and_vpc_topology_diagram
+    prompt: "Draw our deployment topology: on-prem Nginx and PostgreSQL behind a VPC boundary, syncing nightly to an AWS S3 backup"
+    fixtures: []
+    rubric:
+      - "Output mixes a cloud provider's native icons with generic on-prem icons in one diagram"
+      - "Output shows containment hierarchy (VPC zone) and a labeled connection for the sync"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "<svg[^>]*xmlns=\"http://www\\.w3\\.org/2000/svg\""
+        weight: 1.0
+      - type: matches_regex
+        target: "(Nginx|PostgreSQL|S3)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(VPC|zone-)"
         weight: 0.6
 
   - id: negative_architecture_review
@@ -57,4 +113,11 @@ cases:
     fixtures: []
     rubric:
       - "Skill should not trigger for process flow diagrams"
+    trigger_expected: false
+
+  - id: negative_interactive_dashboard
+    prompt: "Build an interactive dashboard with toggleable tabs showing our service metrics"
+    fixtures: []
+    rubric:
+      - "Skill should not trigger for interactive/click-through HTML artifacts — that's static-web-artifacts-builder's job"
     trigger_expected: false
