@@ -1,0 +1,429 @@
+# AWS service -> icon cache slug mapping for architecture-diagram.
+#
+# Every `slug` value below was verified present in the real icon cache built
+# from `jgraph/drawio@a1f615b` (draw.io's `mxgraph.aws4` stencil set, 1037
+# icons total) — see scripts/fetch_icons.py. `slug` is exactly the filename
+# (minus `.json`) render.py looks up under `<cache>/<sha>/aws/<slug>.json`.
+#
+# `aliases` are phrasings a user is likely to say ("bucket", "S3") that
+# should resolve to this entry when authoring a spec's `service:` field —
+# use the top-level key (the canonical slug) as the spec value.
+#
+# `color` is AWS's own architecture-icon category color
+# (https://aws.amazon.com/architecture/icons/), used as the node's fill.
+
+services:
+  lambda:
+    label: Lambda
+    aliases: [lambda, serverless function, faas]
+    color: "#ED7100"
+    category: compute
+  ec2:
+    label: EC2
+    aliases: [ec2, virtual machine, vm, instance]
+    color: "#ED7100"
+    category: compute
+  ecs:
+    label: ECS
+    aliases: [ecs, elastic container service]
+    color: "#ED7100"
+    category: compute
+  eks:
+    label: EKS
+    aliases: [eks, elastic kubernetes service, kubernetes]
+    color: "#ED7100"
+    category: compute
+  fargate:
+    label: Fargate
+    aliases: [fargate, serverless containers]
+    color: "#ED7100"
+    category: compute
+  elastic-beanstalk:
+    label: Elastic Beanstalk
+    aliases: [elastic beanstalk, beanstalk]
+    color: "#ED7100"
+    category: compute
+  app-runner:
+    label: App Runner
+    aliases: [app runner]
+    color: "#ED7100"
+    category: compute
+  lightsail:
+    label: Lightsail
+    aliases: [lightsail]
+    color: "#ED7100"
+    category: compute
+  batch:
+    label: Batch
+    aliases: [batch, aws batch]
+    color: "#ED7100"
+    category: compute
+  outposts:
+    label: Outposts
+    aliases: [outposts]
+    color: "#ED7100"
+    category: compute
+
+  s3:
+    label: S3
+    aliases: [s3, bucket, object storage, simple storage service]
+    color: "#7AA116"
+    category: storage
+  efs-standard:
+    label: EFS
+    aliases: [efs, elastic file system, nfs]
+    color: "#7AA116"
+    category: storage
+  elastic-block-store:
+    label: EBS
+    aliases: [ebs, elastic block store, block storage]
+    color: "#7AA116"
+    category: storage
+  s3-express-one-zone:
+    label: S3 Express One Zone
+    aliases: [s3 express]
+    color: "#7AA116"
+    category: storage
+  data-pipeline:
+    label: Data Pipeline
+    aliases: [data pipeline]
+    color: "#7AA116"
+    category: storage
+
+  dynamodb:
+    label: DynamoDB
+    aliases: [dynamodb, nosql database]
+    color: "#C925D1"
+    category: database
+  rds:
+    label: RDS
+    aliases: [rds, relational database, postgres, mysql, mariadb]
+    color: "#C925D1"
+    category: database
+  aurora:
+    label: Aurora
+    aliases: [aurora]
+    color: "#C925D1"
+    category: database
+  elasticache:
+    label: ElastiCache
+    aliases: [elasticache, redis, memcached, in-memory cache]
+    color: "#C925D1"
+    category: database
+  redshift:
+    label: Redshift
+    aliases: [redshift, data warehouse]
+    color: "#C925D1"
+    category: database
+  documentdb-with-mongodb-compatibility:
+    label: DocumentDB
+    aliases: [documentdb, mongodb-compatible database]
+    color: "#C925D1"
+    category: database
+  neptune:
+    label: Neptune
+    aliases: [neptune, graph database]
+    color: "#C925D1"
+    category: database
+  timestream:
+    label: Timestream
+    aliases: [timestream, time series database]
+    color: "#C925D1"
+    category: database
+  memorydb-for-redis:
+    label: MemoryDB for Redis
+    aliases: [memorydb]
+    color: "#C925D1"
+    category: database
+
+  cloudfront:
+    label: CloudFront
+    aliases: [cloudfront, cdn]
+    color: "#8C4FFF"
+    category: networking
+  route-53:
+    label: Route 53
+    aliases: [route 53, dns]
+    color: "#8C4FFF"
+    category: networking
+  vpc:
+    label: VPC
+    aliases: [vpc, virtual private cloud]
+    color: "#8C4FFF"
+    category: networking
+  application-load-balancer:
+    label: Application Load Balancer
+    aliases: [alb, application load balancer]
+    color: "#8C4FFF"
+    category: networking
+  elastic-load-balancing:
+    label: Elastic Load Balancing
+    aliases: [load balancer, elb]
+    color: "#8C4FFF"
+    category: networking
+  nat-gateway:
+    label: NAT Gateway
+    aliases: [nat gateway]
+    color: "#8C4FFF"
+    category: networking
+  internet-gateway:
+    label: Internet Gateway
+    aliases: [internet gateway]
+    color: "#8C4FFF"
+    category: networking
+  transit-gateway:
+    label: Transit Gateway
+    aliases: [transit gateway]
+    color: "#8C4FFF"
+    category: networking
+  direct-connect:
+    label: Direct Connect
+    aliases: [direct connect]
+    color: "#8C4FFF"
+    category: networking
+  api-gateway:
+    label: API Gateway
+    aliases: [api gateway, rest api, http api]
+    color: "#E7157B"
+    category: networking
+
+  sqs:
+    label: SQS
+    aliases: [sqs, queue, message queue]
+    color: "#E7157B"
+    category: integration
+  sns:
+    label: SNS
+    aliases: [sns, pub/sub, notification, topic]
+    color: "#E7157B"
+    category: integration
+  eventbridge:
+    label: EventBridge
+    aliases: [eventbridge, event bus]
+    color: "#E7157B"
+    category: integration
+  step-functions:
+    label: Step Functions
+    aliases: [step functions, state machine, workflow orchestration]
+    color: "#E7157B"
+    category: integration
+  appsync:
+    label: AppSync
+    aliases: [appsync, graphql]
+    color: "#E7157B"
+    category: integration
+  kinesis:
+    label: Kinesis
+    aliases: [kinesis, streaming]
+    color: "#8C4FFF"
+    category: analytics
+  kinesis-data-streams:
+    label: Kinesis Data Streams
+    aliases: [kinesis data streams]
+    color: "#8C4FFF"
+    category: analytics
+  kinesis-data-firehose:
+    label: Kinesis Data Firehose
+    aliases: [kinesis firehose]
+    color: "#8C4FFF"
+    category: analytics
+  managed-streaming-for-kafka:
+    label: Managed Streaming for Apache Kafka
+    aliases: [msk, kafka]
+    color: "#8C4FFF"
+    category: analytics
+
+  cognito:
+    label: Cognito
+    aliases: [cognito, user pool, authentication]
+    color: "#DD344C"
+    category: security
+  identity-and-access-management:
+    label: IAM
+    aliases: [iam, identity and access management, role, policy]
+    color: "#DD344C"
+    category: security
+  key-management-service:
+    label: KMS
+    aliases: [kms, key management service, encryption key]
+    color: "#DD344C"
+    category: security
+  secrets-manager:
+    label: Secrets Manager
+    aliases: [secrets manager]
+    color: "#DD344C"
+    category: security
+  certificate-manager:
+    label: Certificate Manager
+    aliases: [acm, certificate manager, tls certificate]
+    color: "#DD344C"
+    category: security
+  waf:
+    label: WAF
+    aliases: [waf, web application firewall]
+    color: "#DD344C"
+    category: security
+  shield:
+    label: Shield
+    aliases: [shield, ddos protection]
+    color: "#DD344C"
+    category: security
+  guardduty:
+    label: GuardDuty
+    aliases: [guardduty, threat detection]
+    color: "#DD344C"
+    category: security
+  macie:
+    label: Macie
+    aliases: [macie]
+    color: "#DD344C"
+    category: security
+  inspector:
+    label: Inspector
+    aliases: [inspector, vulnerability scanning]
+    color: "#DD344C"
+    category: security
+  network-firewall:
+    label: Network Firewall
+    aliases: [network firewall]
+    color: "#DD344C"
+    category: security
+  firewall-manager:
+    label: Firewall Manager
+    aliases: [firewall manager]
+    color: "#DD344C"
+    category: security
+  organizations:
+    label: Organizations
+    aliases: [organizations]
+    color: "#DD344C"
+    category: security
+  control-tower:
+    label: Control Tower
+    aliases: [control tower]
+    color: "#DD344C"
+    category: security
+
+  cloudwatch:
+    label: CloudWatch
+    aliases: [cloudwatch, monitoring, metrics, logs]
+    color: "#E7157B"
+    category: management
+  cloudtrail:
+    label: CloudTrail
+    aliases: [cloudtrail, audit log]
+    color: "#E7157B"
+    category: management
+  config:
+    label: Config
+    aliases: [aws config, compliance]
+    color: "#E7157B"
+    category: management
+  systems-manager:
+    label: Systems Manager
+    aliases: [systems manager, ssm]
+    color: "#E7157B"
+    category: management
+  codepipeline:
+    label: CodePipeline
+    aliases: [codepipeline, ci/cd pipeline]
+    color: "#E7157B"
+    category: devtools
+  codebuild:
+    label: CodeBuild
+    aliases: [codebuild]
+    color: "#E7157B"
+    category: devtools
+  codedeploy:
+    label: CodeDeploy
+    aliases: [codedeploy]
+    color: "#E7157B"
+    category: devtools
+
+  athena:
+    label: Athena
+    aliases: [athena, sql query engine]
+    color: "#8C4FFF"
+    category: analytics
+  glue:
+    label: Glue
+    aliases: [glue, etl]
+    color: "#8C4FFF"
+    category: analytics
+  lake-formation:
+    label: Lake Formation
+    aliases: [lake formation, data lake]
+    color: "#8C4FFF"
+    category: analytics
+  quicksight:
+    label: QuickSight
+    aliases: [quicksight, bi dashboard]
+    color: "#8C4FFF"
+    category: analytics
+  opensearch-service-index:
+    label: OpenSearch Service
+    aliases: [opensearch, elasticsearch]
+    color: "#8C4FFF"
+    category: analytics
+
+  sagemaker:
+    label: SageMaker
+    aliases: [sagemaker, ml training]
+    color: "#01A88D"
+    category: ai-ml
+  bedrock:
+    label: Bedrock
+    aliases: [bedrock, foundation model, genai]
+    color: "#01A88D"
+    category: ai-ml
+  rekognition:
+    label: Rekognition
+    aliases: [rekognition, image recognition]
+    color: "#01A88D"
+    category: ai-ml
+  comprehend:
+    label: Comprehend
+    aliases: [comprehend, nlp]
+    color: "#01A88D"
+    category: ai-ml
+  textract:
+    label: Textract
+    aliases: [textract, ocr]
+    color: "#01A88D"
+    category: ai-ml
+  transcribe:
+    label: Transcribe
+    aliases: [transcribe, speech-to-text]
+    color: "#01A88D"
+    category: ai-ml
+  polly:
+    label: Polly
+    aliases: [polly, text-to-speech]
+    color: "#01A88D"
+    category: ai-ml
+  personalize:
+    label: Personalize
+    aliases: [personalize, recommendation engine]
+    color: "#01A88D"
+    category: ai-ml
+  forecast:
+    label: Forecast
+    aliases: [forecast, time series forecasting]
+    color: "#01A88D"
+    category: ai-ml
+
+  client:
+    label: Client
+    aliases: [client, browser, end user, user]
+    color: "#232F3E"
+    category: generic
+  traditional-server:
+    label: External Server
+    aliases: [external system, on-prem server, legacy system]
+    color: "#232F3E"
+    category: generic
+  generic-firewall:
+    label: Firewall
+    aliases: [generic firewall]
+    color: "#232F3E"
+    category: generic
