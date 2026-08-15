@@ -60,6 +60,8 @@ packages:
     - svg
     category: review
     difficulty: intermediate
+    complements:
+    - tldraw
   - name: architecture-reviewer
     version: 1.1.1
     description: 'Architecture reviews across 7 dimensions (structural, scalability, enterprise readiness, performance, security,
@@ -1266,6 +1268,28 @@ packages:
     category: development
     difficulty: intermediate
     phase: build
+  - name: tldraw
+    version: 1.0.0
+    description: 'Generate hand-drawn whiteboard-style diagrams (.tldr) from natural language and export to PNG/SVG via tldraw-cli,
+      with vision-based self-check and an iterative review loop. Covers flowcharts, sequence diagrams, ERDs, UML sketches,
+      and ML model diagrams. Triggers on: "whiteboard diagram", "sketch this out", "tldraw diagram", "hand-drawn diagram",
+      "flowchart", "sequence diagram", "ERD diagram", "UML sketch", "ML model diagram", "draw a diagram". NOT for polished
+      business/infra diagrams, use architecture-diagram.'
+    path: skills/tldraw
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/tldraw/SKILL.md
+    complements:
+    - architecture-diagram
+    tags:
+    - diagram
+    - whiteboard
+    - tldraw
+    - flowchart
+    - sequence-diagram
+    - erd
+    - uml
+    - visualization
+    category: visualization
+    difficulty: intermediate
   - name: to-markdown
     version: 1.0.1
     description: 'Convert any file or URL to clean Markdown: PDF, DOCX, XLSX, PPTX, HTML, images (OCR), audio, CSV, YouTube.
