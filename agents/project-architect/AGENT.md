@@ -195,7 +195,7 @@ Address any findings from the review. If critical issues are found, revise the a
 | Artifact              | Format      | Description                                           |
 | --------------------- | ----------- | ----------------------------------------------------- |
 | Architecture Document | Markdown    | Complete system design with all sections from Phase 4 |
-| Architecture Diagram  | Mermaid/SVG | Visual system topology via architecture-diagram skill |
+| Architecture Diagram  | SVG         | Visual system topology via architecture-diagram skill |
 | ADRs                  | Markdown    | One per major decision via adr-writer skill           |
 | Requirements Summary  | Markdown    | Organized discovery findings from Phases 1-2          |
 

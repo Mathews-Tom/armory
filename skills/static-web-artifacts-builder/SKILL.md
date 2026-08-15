@@ -87,10 +87,9 @@ Share the validated HTML file in conversation with the user so they can view it 
 | --------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------- |
 | Rich infographic with multiple sections, high data density      | Yes                                 | —                                                   |
 | Self-contained dashboard with interactive tabs or toggles       | Yes                                 | —                                                   |
-| Architecture diagram with bidirectional flows and layered tiers | Yes                                 | `architecture-diagram` for auto-generated from code |
+| Static architecture/topology diagram, editable afterward in Figma/Illustrator | No | `architecture-diagram` — produces real vector SVG, not this skill's interactive HTML |
 | Simple concept illustration or icon-style image                 | No                                  | `concept-to-image`                                  |
 | Slide deck or multi-page presentation                           | No                                  | `html-presentation`                                 |
-| Architecture diagram generated from existing codebase           | No                                  | `architecture-diagram`                              |
 | Single-page visual where CSS Grid layout control is critical    | Yes                                 | —                                                   |
 | Artifact must be screenshot-ready via Playwright                | Yes (with caveat — see Limitations) | —                                                   |
 

@@ -108,7 +108,7 @@ Route to the appropriate skill based on concept type and output needs:
 
 | Concept Type                                         | Default Route                | Rationale                                               |
 | ---------------------------------------------------- | ---------------------------- | ------------------------------------------------------- |
-| System topology, infrastructure                      | architecture-diagram         | Purpose-built for component relationships and data flow |
+| System topology, infrastructure                      | architecture-diagram         | Purpose-built for component relationships; produces editable SVG with native AWS/Azure/GCP icons |
 | Static concept, comparison, illustration             | concept-to-image             | Single-frame visual with no temporal dimension          |
 | Algorithm, mathematical process, technical education | concept-to-video (Manim)     | Step-by-step animation reveals complexity incrementally |
 | Branded product demo, marketing video                | remotion-video (React)       | Polished motion graphics with brand consistency         |
