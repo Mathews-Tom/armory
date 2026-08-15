@@ -273,6 +273,26 @@ class Box:
         )
 
 
+def icon_box(box: Box) -> Box:
+    """The node's *visible icon square* — 64x64, horizontally centered
+    within the wider label-reserving node box, flush against its top edge
+    (icon on top, label lines below).
+
+    `Box` (NODE_W x NODE_H) exists to reserve room for label text that's
+    almost always wider than the 64px icon; it is correct for layout
+    spacing (compute_zone_boxes, node-overlap checks) but was previously
+    also used directly for label centering and edge-routing anchor points.
+    Since the icon isn't centered within that wider box by default, those
+    anchors landed off the icon's true center — edges rode along the
+    icon's bottom edge in LR diagrams and its right side in TB diagrams
+    instead of passing through its middle, and labels centered ~28px to
+    the right of their own icon. Every caller that needs "where does this
+    node visually connect" — routing, label centering, the no-icon
+    placeholder glyph — must go through this helper instead of `Box`
+    directly."""
+    return Box(box.x + (NODE_W - ICON) / 2, box.y, ICON, ICON)
+
+
 def compute_positions(
     spec: Spec, rank: dict[str, int], order: dict[str, int]
 ) -> dict[str, Box]:
@@ -353,7 +373,7 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
     available gap regardless of how many edges share it."""
     corridor_of: dict[int, tuple[float, str]] = {}
     for i, e in enumerate(spec.edges):
-        a, b = node_boxes[e.src], node_boxes[e.dst]
+        a, b = icon_box(node_boxes[e.src]), icon_box(node_boxes[e.dst])
         if spec.direction == "TB":
             ax, bx = a.x + a.w / 2, b.x + b.w / 2
             if abs(ax - bx) >= 1:
@@ -370,7 +390,7 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
     lane_index: dict[tuple[float, str], int] = {}
     routed = []
     for i, e in enumerate(spec.edges):
-        a, b = node_boxes[e.src], node_boxes[e.dst]
+        a, b = icon_box(node_boxes[e.src]), icon_box(node_boxes[e.dst])
         if spec.direction == "TB":
             ax, ay = a.x + a.w / 2, a.y2
             bx, by = b.x + b.w / 2, b.y
@@ -513,13 +533,14 @@ class CompositeIconLookup:
 
 def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -> str:
     parts = [f'<g id="node-{_escape(node.id)}">']
+    icon_pos = icon_box(box)
     parts.append(
-        f'<rect x="{box.x:g}" y="{box.y:g}" width="{ICON:g}" height="{ICON:g}" rx="10" fill="{node.color}"/>'
+        f'<rect x="{icon_pos.x:g}" y="{icon_pos.y:g}" width="{ICON:g}" height="{ICON:g}" rx="10" fill="{node.color}"/>'
     )
     if icon is not None:
         inset = 9
         parts.append(
-            f'<svg x="{box.x + inset:g}" y="{box.y + inset:g}" width="{ICON - inset * 2:g}" '
+            f'<svg x="{icon_pos.x + inset:g}" y="{icon_pos.y + inset:g}" width="{ICON - inset * 2:g}" '
             f'height="{ICON - inset * 2:g}" viewBox="{icon.view_box}" color="#FFFFFF">{icon.body}</svg>'
         )
     else:
@@ -527,7 +548,7 @@ def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -
             warnings.append(
                 f"no icon for node {node.id!r} (service={node.service!r}, provider={node.provider!r})"
             )
-        cx, cy = box.x + ICON / 2, box.y + ICON / 2
+        cx, cy = icon_pos.x + ICON / 2, icon_pos.y + ICON / 2
         initial = _escape(node.label[:1].upper() or "?")
         parts.append(
             f'<text x="{cx:g}" y="{cy + 6:g}" font-size="22" font-weight="700" text-anchor="middle" fill="#FFFFFF">{initial}</text>'

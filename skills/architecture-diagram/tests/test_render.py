@@ -10,6 +10,7 @@ import pytest
 import render
 from render import (
     COL_GAP,
+    ICON,
     ROW_GAP,
     Box,
     Edge,
@@ -22,6 +23,7 @@ from render import (
     check_layout,
     compute_positions,
     compute_zone_boxes,
+    icon_box,
     load_spec,
     order_within_ranks,
     route_edges,
@@ -390,6 +392,63 @@ class TestRouting:
                 f"target column (left={target_col_left}): {r.path_d}"
             )
 
+    def test_lr_edge_anchors_at_icon_vertical_center_not_full_box_center(
+        self,
+    ) -> None:
+        """Regression test for a real bug found while building showcase
+        diagrams: the icon is drawn 64x64 flush against the top of its
+        wider 120x118 node box (icon + two label lines below it), but
+        route_edges anchored on the *full* box's vertical center
+        (box.y + box.h/2), which sits 27px below the icon's true center —
+        on the icon's bottom edge, not through its middle. Edges must
+        anchor on the icon's own center, derived via `icon_box`."""
+        boxes = {"a": Box(0, 0, 120, 118), "b": Box(200, 0, 120, 118)}
+        spec2 = Spec(
+            title="",
+            direction="LR",
+            provider="generic",
+            nodes=[Node("a", "A"), Node("b", "B")],
+            zones=[],
+            edges=[Edge("a", "b")],
+        )
+        routed = route_edges(spec2, boxes)
+        expected_y = icon_box(boxes["a"]).y + ICON / 2
+        assert expected_y == icon_box(boxes["b"]).y + ICON / 2
+        for tok in routed[0].path_d.replace("M", "L").split("L"):
+            if not tok.strip():
+                continue
+            y = float(tok.split(",")[1])
+            assert y == pytest.approx(expected_y), (
+                f"edge should ride through the icon's vertical center "
+                f"({expected_y}), not the full box's ({boxes['a'].y + boxes['a'].h / 2}): {routed[0].path_d}"
+            )
+
+    def test_tb_edge_anchors_at_icon_horizontal_center_not_full_box_center(
+        self,
+    ) -> None:
+        """TB counterpart: the icon is horizontally centered within the
+        wider node box (to match its centered label), so edges must anchor
+        on that centered x, which happens to coincide with the full box's
+        center too — assert route_edges uses `icon_box`'s x, confirming
+        the LR/TB anchor logic is symmetric on the axis each direction
+        actually needs to get right."""
+        boxes = {"a": Box(0, 0, 120, 118), "b": Box(0, 200, 120, 118)}
+        spec2 = Spec(
+            title="",
+            direction="TB",
+            provider="generic",
+            nodes=[Node("a", "A"), Node("b", "B")],
+            zones=[],
+            edges=[Edge("a", "b")],
+        )
+        routed = route_edges(spec2, boxes)
+        expected_x = icon_box(boxes["a"]).x + ICON / 2
+        for tok in routed[0].path_d.replace("M", "L").split("L"):
+            if not tok.strip():
+                continue
+            x = float(tok.split(",")[0])
+            assert x == pytest.approx(expected_x)
+
 
 class TestEditabilityCheck:
     def test_clean_svg_has_no_violations(self) -> None:
@@ -489,6 +548,28 @@ class TestEndToEndRender:
         vb_m = re.search(r'viewBox="0 0 ([\d.]+) ', result.svg)
         assert width_m and vb_m
         assert float(width_m.group(1)) == pytest.approx(float(vb_m.group(1)))
+
+    def test_node_icon_and_label_share_the_same_horizontal_center(self) -> None:
+        """Regression test for a real bug found while showcasing the
+        tool: the icon rect was drawn flush at the node box's left edge
+        while the label text centered on the full (wider) box, so every
+        label rendered ~28px right of its own icon. Extract the icon
+        rect's true center and the label's x from real SVG output — not
+        just internal layout structs — to catch this even if a future
+        change reintroduces the mismatch through a different code path."""
+        spec = load_spec("nodes:\n  - id: a\n    label: A\n")
+        result = do_render(spec, _icon_lookup)
+        rect_m = re.search(
+            r'<rect x="([\d.]+)" y="([\d.]+)" width="64" height="64" rx="10"',
+            result.svg,
+        )
+        label_m = re.search(
+            r'<text x="([\d.]+)"[^>]*font-weight="600"[^>]*>A<', result.svg
+        )
+        assert rect_m and label_m
+        icon_center_x = float(rect_m.group(1)) + 32
+        label_x = float(label_m.group(1))
+        assert label_x == pytest.approx(icon_center_x)
 
 
 class TestZoneOverlapAssertion:
