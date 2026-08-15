@@ -1,0 +1,52 @@
+title: Serverless API — us-east-1
+provider: aws
+direction: LR
+zones:
+  - id: vpc
+    label: VPC 10.0.0.0/16
+nodes:
+  - id: cf
+    label: CloudFront
+    sublabel: CDN
+    service: cloudfront
+    color: "#8C4FFF"
+  - id: apigw
+    label: API Gateway
+    sublabel: REST
+    service: api-gateway
+    zone: vpc
+    color: "#E7157B"
+  - id: fn
+    label: Lambda
+    sublabel: handler
+    service: lambda
+    zone: vpc
+    color: "#ED7100"
+  - id: ddb
+    label: DynamoDB
+    sublabel: orders
+    service: dynamodb
+    zone: vpc
+    color: "#C925D1"
+  - id: s3
+    label: S3
+    sublabel: assets
+    service: s3
+    color: "#7AA116"
+edges:
+  - from: cf
+    to: apigw
+    label: HTTPS
+    type: realtime
+  - from: apigw
+    to: fn
+    label: invoke
+    type: realtime
+  - from: fn
+    to: ddb
+    label: query
+    type: realtime
+  - from: cf
+    to: s3
+    label: origin
+    type: batch

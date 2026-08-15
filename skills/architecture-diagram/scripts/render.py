@@ -427,6 +427,8 @@ class IconLookup(Protocol):
 
 @dataclass
 class CacheIconLookup:
+    """Network-fetched cloud provider icons — see fetch_icons.py."""
+
     cache_dir: Path
     sha: str
 
@@ -436,6 +438,46 @@ class CacheIconLookup:
             return None
         data = json.loads(path.read_text())
         return IconRef(view_box=data["viewBox"], body=data["body"])
+
+
+@dataclass
+class BundledGenericIconLookup:
+    """Hand-drawn, non-cloud icon catalog shipped inside this skill package
+    (assets/generic-icons.json, generated from references/icons-generic.md).
+    No network, no cache directory — always available. Only answers for
+    provider == "generic"; every cloud provider is CacheIconLookup's job."""
+
+    path: Path = field(
+        default_factory=lambda: (
+            Path(__file__).resolve().parent.parent / "assets" / "generic-icons.json"
+        )
+    )
+
+    def __call__(self, provider: str, service_slug: str) -> IconRef | None:
+        if provider != "generic" or not self.path.exists():
+            return None
+        data = json.loads(self.path.read_text())
+        entry = data.get(service_slug)
+        if entry is None:
+            return None
+        return IconRef(view_box=entry["viewBox"], body=entry["body"])
+
+
+@dataclass
+class CompositeIconLookup:
+    """Tries each lookup in order, returning the first hit. The default
+    render.py CLI wiring is [CacheIconLookup, BundledGenericIconLookup] so a
+    single spec can freely mix cloud-provider nodes and provider: generic
+    nodes without the caller needing to know which backend serves which."""
+
+    lookups: list[IconLookup]
+
+    def __call__(self, provider: str, service_slug: str) -> IconRef | None:
+        for lookup in self.lookups:
+            ref = lookup(provider, service_slug)
+            if ref is not None:
+                return ref
+        return None
 
 
 # --- emit ----------------------------------------------------------------------
@@ -643,7 +685,9 @@ def main(argv: list[str] | None = None) -> int:
 
     cache_dir = args.cache_dir or fetch_icons.default_cache_dir()
     sha = args.sha or fetch_icons.DRAWIO_SHA
-    lookup = CacheIconLookup(cache_dir=cache_dir, sha=sha)
+    lookup = CompositeIconLookup(
+        [CacheIconLookup(cache_dir=cache_dir, sha=sha), BundledGenericIconLookup()]
+    )
 
     try:
         spec = load_spec(args.spec.read_text())
