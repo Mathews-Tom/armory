@@ -35,8 +35,8 @@ import yaml
 ICON = 64
 NODE_W = 120
 NODE_H = 118  # icon + two label lines + padding
-COL_GAP = 64
-ROW_GAP = 32
+COL_GAP = 90
+ROW_GAP = 44
 MARGIN = 32
 TITLE_H = 44
 ZONE_PAD = 22
@@ -343,9 +343,33 @@ class RoutedEdge:
 
 
 def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
+    """Corridor membership must be known before assigning lane offsets, or a
+    parallel-edge stack can grow past the row/column gap and cross through
+    the very node row it was routing around. Verified failure mode: 4
+    same-rank targets fanning out from one TB source pushed the 3rd/4th lane
+    offset past ROW_GAP, drawing those segments through the target row's
+    node bodies instead of the gap above them. Fix: pre-count each
+    corridor's membership, then size lane spacing to fit inside the actual
+    available gap regardless of how many edges share it."""
+    corridor_of: dict[int, tuple[float, str]] = {}
+    for i, e in enumerate(spec.edges):
+        a, b = node_boxes[e.src], node_boxes[e.dst]
+        if spec.direction == "TB":
+            ax, bx = a.x + a.w / 2, b.x + b.w / 2
+            if abs(ax - bx) >= 1:
+                corridor_of[i] = (a.y2, "h")
+        else:
+            ay, by = a.y + a.h / 2, b.y + b.h / 2
+            if abs(ay - by) >= 1:
+                corridor_of[i] = (a.x2, "v")
+
+    corridor_size: dict[tuple[float, str], int] = {}
+    for key in corridor_of.values():
+        corridor_size[key] = corridor_size.get(key, 0) + 1
+
+    lane_index: dict[tuple[float, str], int] = {}
     routed = []
-    lane_use: dict[tuple[float, str], int] = {}
-    for e in spec.edges:
+    for i, e in enumerate(spec.edges):
         a, b = node_boxes[e.src], node_boxes[e.dst]
         if spec.direction == "TB":
             ax, ay = a.x + a.w / 2, a.y2
@@ -354,10 +378,12 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
                 d = f"M{ax:g},{ay:g} L{bx:g},{by - 6:g}"
                 mx, my = ax + 8, (ay + by) / 2
             else:
-                mid = ay + 24
-                key = (mid, "h")
-                lane_use[key] = lane_use.get(key, 0) + 1
-                mid += (lane_use[key] - 1) * 10
+                key = corridor_of[i]
+                n = corridor_size[key]
+                spacing = min(8.0, 16.0 / max(n - 1, 1))
+                idx = lane_index.get(key, 0)
+                lane_index[key] = idx + 1
+                mid = ay + 10 + idx * spacing
                 d = f"M{ax:g},{ay:g} L{ax:g},{mid:g} L{bx:g},{mid:g} L{bx:g},{by - 6:g}"
                 mx, my = (ax + bx) / 2, mid - 6
         else:
@@ -367,10 +393,12 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
                 d = f"M{ax:g},{ay:g} L{bx - 6:g},{by:g}"
                 mx, my = (ax + bx) / 2, ay - 8
             else:
-                mid = ax + 28
-                key = (mid, "v")
-                lane_use[key] = lane_use.get(key, 0) + 1
-                mid += (lane_use[key] - 1) * 10
+                key = corridor_of[i]
+                n = corridor_size[key]
+                spacing = min(10.0, 40.0 / max(n - 1, 1))
+                idx = lane_index.get(key, 0)
+                lane_index[key] = idx + 1
+                mid = ax + 16 + idx * spacing
                 d = f"M{ax:g},{ay:g} L{mid:g},{ay:g} L{mid:g},{by:g} L{bx - 6:g},{by:g}"
                 mx, my = mid + 6, (ay + by) / 2
         routed.append(RoutedEdge(edge=e, path_d=d, label_pos=(mx, my)))

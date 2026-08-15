@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import render
 from render import (
+    COL_GAP,
+    ROW_GAP,
     Box,
     Edge,
     IconRef,
@@ -316,6 +318,77 @@ class TestRouting:
         )
         routed = route_edges(spec2, boxes)
         assert routed[0].path_d != routed[1].path_d
+
+    def test_dense_fan_out_corridor_stays_within_the_gap_tb(self) -> None:
+        """Regression test for a real bug found while showcasing the tool:
+        one TB source fanning out to 4 same-rank targets pushed the 3rd/4th
+        parallel lane offset past ROW_GAP, drawing those horizontal jog
+        segments through the target row's node bodies instead of the gap
+        above them (verified visually — the 'query'/'fetch secrets' labels
+        rendered on top of unrelated icons). Every corridor's horizontal
+        segment must sit strictly above the target row's top edge."""
+        source = Box(1000, 0, 120, 118)  # deliberately x-misaligned with every target
+        targets = {
+            "b": Box(0, ROW_GAP + 118, 120, 118),
+            "c": Box(140, ROW_GAP + 118, 120, 118),
+            "d": Box(280, ROW_GAP + 118, 120, 118),
+            "e": Box(420, ROW_GAP + 118, 120, 118),
+        }
+        boxes = {"a": source, **targets}
+        spec2 = Spec(
+            title="",
+            direction="TB",
+            provider="generic",
+            nodes=[Node("a", "A"), *(Node(k, k.upper()) for k in targets)],
+            zones=[],
+            edges=[Edge("a", k) for k in targets],
+        )
+        routed = route_edges(spec2, boxes)
+        target_row_top = min(b.y for b in targets.values())
+        for r in routed:
+            points = [
+                tuple(float(v) for v in tok.split(","))
+                for tok in r.path_d.replace("M", "L").split("L")
+                if tok.strip()
+            ]
+            assert len(points) == 4, f"expected a bent 4-point path, got {r.path_d}"
+            corridor_y = points[1][1]  # the horizontal jog's height
+            assert corridor_y < target_row_top, (
+                f"edge {r.edge.src}->{r.edge.dst} corridor (y={corridor_y}) reaches into the "
+                f"target row (top={target_row_top}): {r.path_d}"
+            )
+
+    def test_dense_fan_out_corridor_stays_within_the_gap_lr(self) -> None:
+        """Same regression, LR direction: corridor x-offsets must sit
+        strictly left of the target column."""
+        source = Box(0, 1000, 120, 118)  # deliberately y-misaligned with every target
+        targets = {
+            k: Box(COL_GAP + 120, i * 140, 120, 118)
+            for i, k in enumerate("bcdefghi")  # 8 targets: guarantees overflow
+        }  # against COL_GAP even under the old unclamped-lane-offset formula
+        boxes = {"a": source, **targets}
+        spec2 = Spec(
+            title="",
+            direction="LR",
+            provider="generic",
+            nodes=[Node("a", "A"), *(Node(k, k.upper()) for k in targets)],
+            zones=[],
+            edges=[Edge("a", k) for k in targets],
+        )
+        routed = route_edges(spec2, boxes)
+        target_col_left = min(b.x for b in targets.values())
+        for r in routed:
+            points = [
+                tuple(float(v) for v in tok.split(","))
+                for tok in r.path_d.replace("M", "L").split("L")
+                if tok.strip()
+            ]
+            assert len(points) == 4, f"expected a bent 4-point path, got {r.path_d}"
+            corridor_x = points[1][0]  # the vertical jog's position
+            assert corridor_x < target_col_left, (
+                f"edge {r.edge.src}->{r.edge.dst} corridor (x={corridor_x}) reaches into the "
+                f"target column (left={target_col_left}): {r.path_d}"
+            )
 
 
 class TestEditabilityCheck:
