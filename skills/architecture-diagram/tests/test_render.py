@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 import pytest
 import render
@@ -445,8 +447,6 @@ class TestRealIconCacheIntegration:
     def test_cache_icon_lookup_reads_real_fixture_style_entry(
         self, tmp_path: object
     ) -> None:
-        import json
-        from pathlib import Path
 
         cache_dir = Path(str(tmp_path))
         sha = "deadbeef"
@@ -470,7 +470,68 @@ class TestRealIconCacheIntegration:
         assert icon.view_box == "0 0 54 56"
 
     def test_cache_miss_returns_none(self, tmp_path: object) -> None:
-        from pathlib import Path
 
         lookup = render.CacheIconLookup(cache_dir=Path(str(tmp_path)), sha="deadbeef")
         assert lookup("aws", "does-not-exist") is None
+
+
+class TestBundledGenericIconLookup:
+    def test_resolves_a_real_catalog_entry(self) -> None:
+        lookup = render.BundledGenericIconLookup()
+        icon = lookup("generic", "database")
+        assert icon is not None
+        assert icon.view_box == "0 0 64 64"
+        assert "<" in icon.body
+
+    def test_ignores_non_generic_provider(self) -> None:
+        lookup = render.BundledGenericIconLookup()
+        assert lookup("aws", "database") is None
+
+    def test_unknown_slug_returns_none(self) -> None:
+        lookup = render.BundledGenericIconLookup()
+        assert lookup("generic", "not-a-real-icon") is None
+
+    def test_every_documented_slug_in_icons_generic_md_resolves(self) -> None:
+        """references/icons-generic.md documents a `service: <slug>` line per
+        icon for the agent to copy. If that slug doesn't actually resolve,
+        the documentation is lying — this is the same class of drift
+        test_service_maps.py guards against for the cloud provider tables."""
+
+        doc = (
+            Path(__file__).parent.parent / "references" / "icons-generic.md"
+        ).read_text()
+        slugs = re.findall(r"`service: ([a-z0-9-]+)`", doc)
+        assert len(slugs) >= 20
+        lookup = render.BundledGenericIconLookup()
+        missing = [s for s in slugs if lookup("generic", s) is None]
+        assert not missing, (
+            f"icons-generic.md documents slugs with no catalog entry: {missing}"
+        )
+
+
+class TestCompositeIconLookup:
+    def test_falls_through_to_second_lookup_on_miss(self) -> None:
+        first = render.CacheIconLookup(cache_dir=Path("/nonexistent"), sha="x")
+        second = render.BundledGenericIconLookup()
+        composite = render.CompositeIconLookup([first, second])
+        icon = composite("generic", "database")
+        assert icon is not None
+
+    def test_first_hit_wins(self) -> None:
+        def always_a(provider: str, slug: str) -> IconRef | None:
+            return IconRef(view_box="A", body="a")
+
+        def always_b(provider: str, slug: str) -> IconRef | None:
+            return IconRef(view_box="B", body="b")
+
+        composite = render.CompositeIconLookup([always_a, always_b])
+        icon = composite("generic", "anything")
+        assert icon is not None
+        assert icon.view_box == "A"
+
+    def test_none_when_every_lookup_misses(self) -> None:
+        def always_none(provider: str, slug: str) -> IconRef | None:
+            return None
+
+        composite = render.CompositeIconLookup([always_none, always_none])
+        assert composite("aws", "anything") is None
