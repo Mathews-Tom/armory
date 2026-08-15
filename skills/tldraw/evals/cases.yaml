@@ -1,0 +1,104 @@
+cases:
+  - id: flowchart_from_description
+    prompt: >
+      Sketch a whiteboard flowchart for a login flow: enter credentials, a
+      decision on whether they're valid, then either load the dashboard or
+      show an error and loop back to re-entering credentials.
+    fixtures: []
+    rubric:
+      - "generates a .tldr JSON file rather than a text description"
+      - "uses a diamond shape for the Yes/No decision"
+      - "labels the decision's outgoing arrows Yes and No"
+      - "routes the No branch back to the credentials step"
+      - "exports to PNG via tldraw-cli after generating the JSON"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(\\.tldr|tldraw export|tldraw-cli)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(diamond|decision)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(yes|no)"
+        weight: 0.6
+
+  - id: sequence_diagram_api_flow
+    prompt: >
+      Draw a hand-drawn sequence diagram of a login API call flow between
+      Client, API, Auth service, and DB, including the dashed return
+      messages.
+    fixtures: []
+    rubric:
+      - "approximates lifelines with vertical rectangle shapes per actor"
+      - "uses solid arrows for synchronous calls"
+      - "uses dashed arrows for return messages"
+      - "lays out actors left-to-right with time flowing top-to-bottom"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(lifeline|actor|sequence)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(dash(ed)?.*(return|async)|dashed arrow)"
+        weight: 0.8
+
+  - id: erd_sketch_ecommerce
+    prompt: >
+      Sketch an ERD for User, Order, Product, and OrderItem entities with
+      primary/foreign keys marked and 1:N relationship arrows.
+    fixtures: []
+    rubric:
+      - "represents each entity as a multi-line labeled rectangle"
+      - "marks primary keys and foreign keys in the label text"
+      - "labels relationship arrows with cardinality"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(entity|ERD|primary key|foreign key|\\bPK\\b|\\bFK\\b)"
+        weight: 1.0
+
+  - id: ml_transformer_diagram
+    prompt: >
+      Whiteboard-sketch a Transformer encoder block: input embedding
+      [B,512,768], positional encoding, multi-head attention, add & norm,
+      feed forward, add & norm, with residual skip-connections annotated
+      with tensor shapes.
+    fixtures: []
+    rubric:
+      - "uses distinct colors per layer type (attention vs feed-forward vs norm)"
+      - "annotates node labels with tensor shapes"
+      - "draws skip-connections as curved dashed arrows bypassing the main stack"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(tensor|shape|\\[B,|residual|skip.connection)"
+        weight: 0.8
+
+  - id: negative_polished_infra_diagram
+    prompt: >
+      Create a professional deployment architecture diagram for a
+      stakeholder deck: VPC, subnets, load balancer, and RDS, with a clean
+      business-presentation look.
+    fixtures: []
+    rubric:
+      - "should not trigger tldraw because the user explicitly wants a polished business-presentation diagram, not a hand-drawn sketch — route to architecture-diagram instead"
+    trigger_expected: false
+
+  - id: negative_data_chart_request
+    prompt: >
+      Plot monthly revenue against target as a line chart with direct
+      labels and accessible colors.
+    fixtures: []
+    rubric:
+      - "should not trigger because this is a data chart/plot request handled by chart-clarity, not a node-and-arrow diagram"
+    trigger_expected: false
+
+  - id: negative_logo_design
+    prompt: >
+      Design a logo for our product: a white wordmark on a solid dark-navy
+      background.
+    fixtures: []
+    rubric:
+      - "should not trigger because tldraw has no opaque fill and cannot reproduce white-on-dark artwork; this is not a diagram task"
+    trigger_expected: false
