@@ -2029,6 +2029,25 @@ packages:
     category: development
     difficulty: beginner
   commands:
+  - name: decision-map
+    version: 1.0.0
+    description: 'Slash-command wrapper for the decision-map skill. `/decision-map chart` plus a loose idea opens a decision
+      map for an effort too big for one session; `/decision-map work` plus an optional map reference claims and resolves exactly
+      one frontier ticket, then stops. Triggers on: "/decision-map", "decision-map chart", "decision-map work", "chart this
+      effort as a map", "work the next decision ticket", "what is on the frontier", "wayfinder". Use this command when a user
+      wants a two-mode argument surface over a tracker-backed decision map, delegating map format, ticket typing, claim arbitration,
+      and tracker operations to skills/decision-map.'
+    path: commands/decision-map
+    source: https://github.com/Mathews-Tom/armory/blob/main/commands/decision-map/COMMAND.md
+    tags:
+    - planning
+    - issue-tracker
+    - decisions
+    - slash-command
+    - discovery
+    category: development
+    difficulty: advanced
+    phase: define
   - name: evolve
     version: 1.0.0
     description: 'Co-evolutionary skill generation command. Given a task domain or research paper, generates a complete skill

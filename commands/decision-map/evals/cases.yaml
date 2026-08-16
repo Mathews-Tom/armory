@@ -1,0 +1,27 @@
+cases:
+  - id: chart_billing_migration
+    prompt: "/decision-map chart the billing migration"
+    fixtures: []
+    rubric:
+      - "Parses chart mode and hands the loose idea to decision-map Mode A"
+      - "Charts topology without resolving a ticket"
+    trigger_expected: true
+  - id: work_explicit_map
+    prompt: "/decision-map work #482"
+    fixtures: []
+    rubric:
+      - "Resolves #482 and requires the decision-map:map label before handoff"
+      - "Delegates to Mode B and returns one work report unchanged"
+    trigger_expected: true
+  - id: pr_swarm_command
+    prompt: "/pr-swarm #482 #491"
+    fixtures: []
+    rubric:
+      - "Does not activate; parallel PR ownership belongs to pr-swarm"
+    trigger_expected: false
+  - id: generate_milestone_prompts
+    prompt: "Generate execution prompts for M5."
+    fixtures: []
+    rubric:
+      - "Does not activate; known milestone planning belongs to plan-prompts"
+    trigger_expected: false
