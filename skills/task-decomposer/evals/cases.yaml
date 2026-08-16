@@ -66,3 +66,9 @@ cases:
     rubric:
       - "code review is outside task decomposition scope"
     trigger_expected: false
+  - id: negative_unresolved_decisions
+    prompt: "We do not know what architecture we want yet. Map the decisions first."
+    fixtures: []
+    rubric:
+      - "Does not activate; unresolved architecture decisions belong to decision-map"
+    trigger_expected: false

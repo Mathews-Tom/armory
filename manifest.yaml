@@ -917,10 +917,11 @@ packages:
     difficulty: advanced
     phase: build
   - name: plan-prompts
-    version: 1.3.0
+    version: 1.3.1
     description: Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update
       DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository
-      design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.
+      design. Not for discovering an uncertain destination or unresolved decisions; use decision-map. Not for auditing an
+      existing plan; use plan-review. Not for executing a stack; use stacked-prs.
     path: skills/plan-prompts
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/plan-prompts/SKILL.md
     complements:
@@ -1261,12 +1262,16 @@ packages:
     difficulty: advanced
     phase: verify
   - name: task-decomposer
-    version: 1.1.1
+    version: 1.1.2
     description: 'Produces phased task boards from feature requests: dependency-mapped work items, parallelization flags,
       risk flags, edge cases, test matrices. Triggers on: "decompose this feature", "task breakdown with dependencies", "phased
-      implementation plan", "work breakdown structure". NOT for effort estimates, use estimate-calibrator.'
+      implementation plan", "work breakdown structure". NOT for discovering which decisions are still open, use decision-map.
+      NOT for effort estimates, use estimate-calibrator.'
     path: skills/task-decomposer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/task-decomposer/SKILL.md
+    complements:
+    - decision-map
+    - plan-prompts
     tags:
     - task-breakdown
     - dependencies
@@ -1275,9 +1280,6 @@ packages:
     category: development
     difficulty: intermediate
     phase: plan
-    complements:
-    - decision-map
-    - plan-prompts
   - name: tavily
     version: 1.1.1
     description: 'AI-optimized web search via Tavily API when no URL is provided. Returns clean AI-ready snippets for current

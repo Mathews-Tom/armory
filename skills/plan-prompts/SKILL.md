@@ -1,8 +1,8 @@
 ---
 name: plan-prompts
-description: 'Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository design. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.'
+description: 'Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository design. Not for discovering an uncertain destination or unresolved decisions; use decision-map. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.'
 metadata:
-  version: 1.3.0
+  version: 1.3.1
   category: development
   tags: [planning, execution-prompts, milestones, adaptive-planning, stacked-prs, release-management, docs]
   difficulty: advanced
@@ -12,6 +12,7 @@ metadata:
     - stacked-prs
     - plan-review
     - task-decomposer
+    - decision-map
 ---
 
 # Development Plan and Execution Prompts
@@ -23,6 +24,13 @@ Convert source documents into a plan that remains valid as milestones merge:
 - `.docs/DEVELOPMENT_PLAN_HISTORY.md` — the single local, append-only design-evidence ledger. It must be gitignored.
 
 This skill plans from documents only. Do not implement product code, create branches, open PRs, or execute the generated prompts.
+
+## Scope Boundary
+
+| Situation | Package |
+|---|---|
+| Destination or the decisions needed to define it remain uncertain | `decision-map` |
+
 
 ## Inputs
 

@@ -1,12 +1,14 @@
 ---
 name: task-decomposer
-description: 'Produces phased task boards from feature requests: dependency-mapped work items, parallelization flags, risk flags, edge cases, test matrices. Triggers on: "decompose this feature", "task breakdown with dependencies", "phased implementation plan", "work breakdown structure". NOT for effort estimates, use estimate-calibrator.'
+description: 'Produces phased task boards from feature requests: dependency-mapped work items, parallelization flags, risk flags, edge cases, test matrices. Triggers on: "decompose this feature", "task breakdown with dependencies", "phased implementation plan", "work breakdown structure". NOT for discovering which decisions are still open, use decision-map. NOT for effort estimates, use estimate-calibrator.'
 metadata:
-  version: 1.1.1
+  version: 1.1.2
   category: development
   tags: [task-breakdown, dependencies, planning, phased]
   difficulty: intermediate
   phase: plan
+  complements:
+    - decision-map
 ---
 
 # Task Decomposer
@@ -223,3 +225,4 @@ Push back if:
 - The task is already atomic (single function, single file change) — just do it
 - The user wants time estimates, not task breakdown — use estimate-calibrator instead
 - The feature is exploratory (research, prototype) — decomposition assumes known scope
+- The destination or the decisions needed to define it are still unknown — use decision-map
