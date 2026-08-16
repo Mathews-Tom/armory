@@ -35,4 +35,4 @@ Use a generated task list in the map for children and `Blocked by: #N` body line
 
 ## Local path
 
-Store `.scratch/<effort>/map.md`, one numbered child file with `Type:`, `Interaction:`, `Status:`, and `Blocked by:` headers, and a `claims/` directory. Write resolution pointers back to the map. Backend selection is: obey `docs/agents/issue-tracker.md`; otherwise GitHub remote plus working `gh auth`; otherwise local markdown. Report the choice and suggest `project-context-setup` when it should become repo policy.
+Store `.docs/decision-maps/<effort>/map.md`, one numbered child file with `Type:`, `Interaction:`, `Status:`, and `Blocked by:` headers, and a `claims/` directory. Write resolution pointers back to the map. Backend selection is: obey `.docs/agents/issue-tracker.md`; otherwise use local markdown. Use GitHub only when the user explicitly selects it and `gh auth status` succeeds; do not infer that choice from a remote or authentication. Report the choice and suggest `project-context-setup` when it should become repo policy.

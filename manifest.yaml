@@ -320,7 +320,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: decision-map
-    version: 1.0.0
+    version: 1.0.1
     description: 'Maps the unresolved architecture, policy, and scope decisions that must be answered before planning can
       start: one durable decision ticket per question on the issue tracker, typed and blocker-linked under a parent map, with
       fog-of-war, out-of-scope, a computed frontier, and one decision resolved per invocation. Triggers on: "map the decisions",
@@ -2032,7 +2032,7 @@ packages:
     difficulty: beginner
   commands:
   - name: decision-map
-    version: 1.0.0
+    version: 1.0.1
     description: 'Slash-command wrapper for the decision-map skill. `/decision-map chart` plus a loose idea opens a decision
       map for an effort too big for one session; `/decision-map work` plus an optional map reference claims and resolves exactly
       one frontier ticket, then stops. Triggers on: "/decision-map", "decision-map chart", "decision-map work", "chart this

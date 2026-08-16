@@ -20,4 +20,4 @@ This is advisory ownership plus optimistic arbitration, not a lock. A claim olde
 
 ## Local exclusion
 
-Write the complete session identifier and timestamp to a private temporary file, then atomically link it to `.scratch/<effort>/claims/<ticket>.lock`. The link is exclusive: a second creator fails rather than arbitrating, and the visible lock is always complete. Apply the same TTL before a documented stale-lock preemption and remove the lock when resolution is recorded.
+Write the complete session identifier and timestamp to a private temporary file, then atomically link it to `.docs/decision-maps/<effort>/claims/<ticket>.lock`. The link is exclusive: a second creator fails rather than arbitrating, and the visible lock is always complete. Apply the same TTL before a documented stale-lock preemption and remove the lock when resolution is recorded.
