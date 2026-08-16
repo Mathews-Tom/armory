@@ -16,6 +16,8 @@ packages:
     category: operations
     difficulty: intermediate
     phase: plan
+    complements:
+    - decision-map
   - name: agent-builder
     version: 1.1.1
     description: 'Build AI agents and automate Claude Code programmatically via the Claude Agent SDK and headless CLI mode.
@@ -317,6 +319,32 @@ packages:
     category: development
     difficulty: intermediate
     phase: build
+  - name: decision-map
+    version: 1.0.0
+    description: 'Maps the unresolved architecture, policy, and scope decisions that must be answered before planning can
+      start: one durable decision ticket per question on the issue tracker, typed and blocker-linked under a parent map, with
+      fog-of-war, out-of-scope, a computed frontier, and one decision resolved per invocation. Triggers on: "map the decisions",
+      "what do we need to decide", "identify the unknowns", "not ready to plan yet", "decision map", "chart this effort",
+      "work the next decision ticket", "wayfinder". Use when the destination is still uncertain. NOT for implementation slices
+      of a known feature, use task-decomposer. NOT for milestone plans, use plan-prompts.'
+    path: skills/decision-map
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/decision-map/SKILL.md
+    complements:
+    - plan-prompts
+    - task-decomposer
+    - project-context-setup
+    - adr-writer
+    - plan-review
+    tags:
+    - planning
+    - issue-tracker
+    - decisions
+    - discovery
+    - frontier
+    - pre-planning
+    category: development
+    difficulty: advanced
+    phase: define
   - name: dependency-audit
     version: 1.1.1
     description: 'Audits direct and transitive dependencies for license compliance, maintenance health, CVEs, abandoned packages,
@@ -900,6 +928,7 @@ packages:
     - stacked-prs
     - plan-review
     - task-decomposer
+    - decision-map
     tags:
     - planning
     - execution-prompts
@@ -926,6 +955,7 @@ packages:
     category: review
     difficulty: intermediate
     complements:
+    - decision-map
     - plan-prompts
   - name: pr-review
     version: 1.1.1
@@ -994,6 +1024,8 @@ packages:
     category: development
     difficulty: intermediate
     phase: define
+    complements:
+    - decision-map
   - name: prompt-lab
     version: 1.1.1
     description: 'LLM prompt engineering: analyzes failure modes, generates variants (direct, few-shot, CoT), designs rubrics,
@@ -1244,6 +1276,7 @@ packages:
     difficulty: intermediate
     phase: plan
     complements:
+    - decision-map
     - plan-prompts
   - name: tavily
     version: 1.1.1

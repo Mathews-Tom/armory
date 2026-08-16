@@ -1,0 +1,64 @@
+cases:
+  - id: map_unresolved_sso_decisions
+    prompt: "We want organization SSO but still have major design choices — map what we need to decide."
+    fixtures: []
+    rubric:
+      - "Creates a decision map rather than implementation tasks"
+      - "Identifies unresolved questions, fog, ticket types, interaction labels, and blocker edges"
+      - "Stops after charting topology without resolving a ticket"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "decision-map"
+        weight: 1.0
+  - id: map_before_architecture_plan
+    prompt: "Before creating a plan, identify all unresolved architecture questions."
+    fixtures: []
+    rubric:
+      - "Routes pre-planning uncertainty to a decision map"
+      - "Preserves fog instead of inventing milestones"
+    trigger_expected: true
+  - id: work_next_unblocked_ticket
+    prompt: "Work through the map, take the next unblocked ticket."
+    fixtures: []
+    rubric:
+      - "Claims and verifies one frontier ticket before substantive work"
+      - "Resolves at most one ticket and reports the resulting state"
+    trigger_expected: true
+  - id: inspect_auth_map_frontier
+    prompt: "What's on the frontier of the auth map?"
+    fixtures: []
+    rubric:
+      - "Computes actionable unclaimed tickets and map state"
+      - "Does not advance or resolve a ticket"
+    trigger_expected: true
+  - id: known_design_to_milestones
+    prompt: "The architecture doc is signed off — turn it into DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md."
+    fixtures: []
+    rubric:
+      - "Does not activate; a known design needing milestones belongs to plan-prompts"
+    trigger_expected: false
+  - id: specified_feature_to_tasks
+    prompt: "The architecture is final. Break this checkout feature into PR-sized tasks with a test matrix."
+    fixtures: []
+    rubric:
+      - "Does not activate; specified feature work belongs to task-decomposer"
+    trigger_expected: false
+  - id: execute_existing_milestones
+    prompt: "Run milestone M4 and merge the stack."
+    fixtures: []
+    rubric:
+      - "Does not activate; executing approved milestones belongs to milestone-runner"
+    trigger_expected: false
+  - id: review_existing_plan
+    prompt: "Review this development plan for flaws."
+    fixtures: []
+    rubric:
+      - "Does not activate; existing plans belong to plan-review"
+    trigger_expected: false
+  - id: audit_to_plan_issues
+    prompt: "Audit the repo and publish each remediation plan as a GitHub issue."
+    fixtures: []
+    rubric:
+      - "Does not activate; audit remediation planning belongs to codebase-advisor --issues"
+    trigger_expected: false
