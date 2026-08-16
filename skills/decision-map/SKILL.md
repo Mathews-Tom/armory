@@ -2,7 +2,7 @@
 name: decision-map
 description: 'Maps the unresolved architecture, policy, and scope decisions that must be answered before planning can start: one durable decision ticket per question on the issue tracker, typed and blocker-linked under a parent map, with fog-of-war, out-of-scope, a computed frontier, and one decision resolved per invocation. Triggers on: "map the decisions", "what do we need to decide", "identify the unknowns", "not ready to plan yet", "decision map", "chart this effort", "work the next decision ticket", "wayfinder". Use when the destination is still uncertain. NOT for implementation slices of a known feature, use task-decomposer. NOT for milestone plans, use plan-prompts.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [planning, issue-tracker, decisions, discovery, frontier, pre-planning]
   difficulty: advanced
@@ -42,8 +42,7 @@ A ticket holds one question, exactly one type label, exactly one interaction lab
 
 ## Prerequisites
 
-Use `gh --version` and require `gh` 2.96.0 or newer for native GitHub relationships. Verify authentication with `gh auth status`. `frontier.py` requires Python 3.12 and only the standard library. `docs/agents/issue-tracker.md`, when present, is the authoritative backend choice. Otherwise choose GitHub only when a GitHub remote exists and `gh auth status` succeeds; choose local markdown in every other case. Report the selected backend once and mention `project-context-setup` when the choice should be persisted.
-
+Use `gh --version` and require `gh` 2.96.0 or newer only when the user explicitly selects GitHub as the tracker. Verify authentication with `gh auth status` before that path. `frontier.py` requires Python 3.12 and only the standard library. `.docs/agents/issue-tracker.md`, when present, is the authoritative backend choice. Otherwise store maps locally in `.docs/decision-maps/<effort>/`; select GitHub only when the user expressly asks for it. Do not infer GitHub selection from a remote or authentication. Report the selected backend once and mention `project-context-setup` when the choice should be persisted.
 Probe GitHub capability before using native relationships. When older GitHub Enterprise or an older CLI rejects `blockedBy`, take the degraded path: generated child links in the map and `Blocked by: #N` lines in ticket bodies. The degraded index exists only to emulate absent tracker relationships.
 
 ## Workflow
@@ -95,7 +94,7 @@ An empty frontier does not mean completion. Evaluate the ordered ladder: actiona
 
 | Failure | Diagnose | Corrective action |
 |---|---|---|
-| Tracker document absent | inspect `docs/agents/issue-tracker.md` | use the backend ladder and report it |
+| Tracker document absent | inspect `.docs/agents/issue-tracker.md` | use the local `.docs/decision-maps/` backend unless the user selected GitHub |
 | Native relationship unsupported | `gh issue view <map> --json blockedBy` | use degraded generated links and body blockers |
 | Label schema absent | `gh label list` | bootstrap labels idempotently before ticket creation |
 | Two sessions claim one ticket | re-read comments and database comment identifiers | lowest fresh identifier wins; loser withdraws |
@@ -127,7 +126,7 @@ Confirm all five map sections exist; every open ticket is a child of the map and
 ```bash
 uv run python skills/decision-map/scripts/frontier.py --map 42
 uv run python skills/decision-map/scripts/frontier.py --map 42 --degraded
-uv run python skills/decision-map/scripts/frontier.py --local .scratch/billing
+uv run python skills/decision-map/scripts/frontier.py --local .docs/decision-maps/billing
 ```
 
 ## References

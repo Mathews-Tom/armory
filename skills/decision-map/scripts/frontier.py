@@ -474,7 +474,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--map", type=int, help="GitHub decision-map issue number")
-    source.add_argument("--local", type=Path, help="Local .scratch effort directory")
+    source.add_argument("--local", type=Path, help="Local .docs/decision-maps effort directory")
     parser.add_argument("--degraded", action="store_true", help="Parse generated child and blocker links")
     parser.add_argument("--afk", action="store_true", help="Show only AFK frontier tickets")
     return parser

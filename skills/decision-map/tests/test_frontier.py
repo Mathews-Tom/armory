@@ -6,10 +6,12 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 
 from frontier import (  # noqa: E402
+    _build_parser,
     Claim,
     Ticket,
     compute_frontier,
@@ -24,7 +26,7 @@ NOW = datetime(2026, 8, 16, 10, tzinfo=UTC)
 
 
 def _fixture(name: str) -> list[dict[str, object]]:
-    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+    return cast(list[dict[str, object]], json.loads((FIXTURES / name).read_text(encoding="utf-8")))
 
 
 def _ticket(
@@ -117,3 +119,7 @@ def test_local_normalization_reads_headers_and_fog() -> None:
     assert [ticket.number for ticket in tickets] == [1, 2]
     assert tickets[1].blocker_numbers == (1,)
     assert "Regional retention rules" in fog
+
+
+def test_local_argument_documents_docs_storage() -> None:
+    assert ".docs/decision-maps" in _build_parser().format_help()

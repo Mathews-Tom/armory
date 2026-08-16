@@ -3,7 +3,7 @@ name: decision-map
 type: command
 description: 'Slash-command wrapper for the decision-map skill. `/decision-map chart` plus a loose idea opens a decision map for an effort too big for one session; `/decision-map work` plus an optional map reference claims and resolves exactly one frontier ticket, then stops. Triggers on: "/decision-map", "decision-map chart", "decision-map work", "chart this effort as a map", "work the next decision ticket", "what is on the frontier", "wayfinder". Use this command when a user wants a two-mode argument surface over a tracker-backed decision map, delegating map format, ticket typing, claim arbitration, and tracker operations to skills/decision-map.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [planning, issue-tracker, decisions, slash-command, discovery]
   difficulty: advanced
@@ -23,8 +23,8 @@ Thin slash-command entry point for the `decision-map` skill. This command owns a
 
 1. Parse the first token as the mode. `chart` sends the remaining text as a loose idea to Mode A. `work` selects Mode B.
 2. For a bare invocation, treat a map URL or `#N` as `work`; treat free text as `chart`; when neither exists, ask which mode the user intends.
-3. In work mode, resolve the reference with `gh issue view N --json number,title,url,labels,state`. Require the `decision-map:map` label before handing off.
-4. When work mode has no reference, locate open maps. If exactly one open `decision-map:map` issue exists, use it. If several exist, list their linked titles and stop; never select one silently.
+3. In work mode with an explicit GitHub reference, resolve it with `gh issue view N --json number,title,url,labels,state`. Require the `decision-map:map` label before handing off.
+4. When work mode has no reference, defer map discovery to the skill's selected backend. If several maps are eligible, list their linked titles and stop; never select one silently.
 5. Load `skills/decision-map`, hand it the resolved mode and map identity, then begin that mode at step 1.
 6. Return the skill's report unchanged. Do not add a second selection, a plan, tracker calls, or claim logic after handoff.
 
@@ -40,7 +40,7 @@ Thin slash-command entry point for the `decision-map` skill. This command owns a
 | `/decision-map MAP-URL` | Work | Resolve the referenced map URL |
 | `/decision-map IDEA` | Chart | Treat non-reference text as the loose idea |
 
-A `MAP` is a GitHub issue number, `#N`, or issue URL. Tracker selection after handoff follows the skill's documented backend ladder. The command does not provide a separate local-file argument: local map selection is part of the skill's tracker-backed workflow, not a rival command contract.
+A `MAP` is a GitHub issue number, `#N`, or issue URL; supplying one explicitly selects GitHub. `chart` uses the local `.docs/decision-maps/<effort>/` backend unless the user expressly selects GitHub or `.docs/agents/issue-tracker.md` specifies another backend. The command does not provide a separate local-file argument: local map selection is part of the skill's tracker-backed workflow, not a rival command contract.
 
 ## Argument Rules
 
@@ -52,7 +52,7 @@ A `MAP` is a GitHub issue number, `#N`, or issue URL. Tracker selection after ha
 | `work` with several open maps | List all linked titles | Stop for selection |
 | Bare command with no argument | Ask for `chart` or `work` | Do not infer intent |
 
-Use `gh issue view` to resolve explicit GitHub references. When the skill's configured backend is local, the handoff resolves the local map using its documented selection process. This command never duplicates the tracker capability probe or degraded-path parsing.
+Use `gh issue view` to resolve explicit GitHub references. Otherwise, hand off map selection to the skill's documented backend process; it uses `.docs/decision-maps/` unless `.docs/agents/issue-tracker.md` specifies another backend. This command never duplicates the tracker capability probe or degraded-path parsing.
 
 ## Output
 
