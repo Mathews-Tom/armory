@@ -1,0 +1,65 @@
+[
+  {
+    "number": 42,
+    "title": "Billing migration decisions",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:map"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Destination\nChoose the migration.\n\n## Notes\nClaim TTL: 24h\n\n## Decisions so far\n\n## Not yet specified\n- Regional retention rules.\n\n## Generated child index\n- [ ] #7\n- [ ] #8\n- [ ] #9\n- [ ] #10\n- [ ] #11\n- [ ] #12\n\n## Out of scope\n"
+  },
+  {
+    "number": 7,
+    "title": "Choose immutable record shape",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:discussion"}, {"name": "decision-map:hitl"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Question\nWhich record shape preserves history?\n"
+  },
+  {
+    "number": 8,
+    "title": "Research retention rules",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:research"}, {"name": "decision-map:afk"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Question\nWhat retention rules apply?\n\nBlocked by: #7\n"
+  },
+  {
+    "number": 9,
+    "title": "Measure ledger cardinality",
+    "state": "CLOSED",
+    "labels": [{"name": "decision-map:unblock"}, {"name": "decision-map:afk"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Question\nHow large is the ledger?\n"
+  },
+  {
+    "number": 10,
+    "title": "Sketch cutover experience",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:prototype"}, {"name": "decision-map:hitl"}],
+    "assignees": [{"login": "shared-agent"}],
+    "comments": [],
+    "body": "## Question\nHow should cutover be presented?\n"
+  },
+  {
+    "number": 11,
+    "title": "Claimed policy decision",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:discussion"}, {"name": "decision-map:hitl"}],
+    "assignees": [{"login": "shared-agent"}],
+    "comments": [{"id": "IC_kwDO120", "url": "https://github.com/owner/repo/issues/42#issuecomment-120", "body": "decision-map claim\nsession: first\nclaimed-at: 2026-08-16T09:00:00+00:00"}],
+    "body": "## Question\nWho approves the policy?\n"
+  },
+  {
+    "number": 12,
+    "title": "Publish measurement evidence",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:unblock"}, {"name": "decision-map:afk"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Question\nWhere should measurements be published?\n\nBlocked by: #9\n"
+  }
+]
