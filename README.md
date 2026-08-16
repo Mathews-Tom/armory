@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 135](https://img.shields.io/badge/packages-135-informational)](manifest.yaml)
+[![packages: 137](https://img.shields.io/badge/packages-137-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -18,7 +18,27 @@ Curated, production-grade skills, agents, hooks, rules, commands, utilities, and
 
 Intended for developers who treat AI coding agents as a serious part of their workflow.
 
+## Planning Lifecycle
+
+Use the planning packages in sequence, not as interchangeable formats:
+
+```text
+unknown destination → decision-map → known design → plan-prompts → task-decomposer / plan-review → milestone-runner → stacked-prs
+```
+
+| Situation | Package | Output |
+|---|---|---|
+| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, and recorded decisions |
+| Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` |
+| Feature is specified and needs implementation slices | [task-decomposer](skills/task-decomposer/) | Phased task board with dependencies and test matrix |
+| Existing plan needs a pre-implementation challenge | [plan-review](skills/plan-review/) | Severity-ranked plan review |
+| Approved plan needs execution across sessions | [milestone-runner](skills/milestone-runner/) | Reviewed, merged milestone PR stack |
+
+`decision-map` stops at resolved decisions. It recommends `plan-prompts` after a complete map and never creates implementation milestones or tasks.
+
 ---
+
+
 
 ## Package Catalog
 
@@ -68,6 +88,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, merge, and clean up stack topology                      |
 | [plan-prompts](skills/plan-prompts/)             | Generate adaptive development plans, execution prompts, and an ignored local design-evidence ledger from source docs |
+| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions before implementation planning begins |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones through serialized design reconciliation, reviewed PR gates, CI, cleanup, and release preparation |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
@@ -213,6 +234,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [handoff](commands/handoff/)             | Refresh or scaffold `.docs/handoff.md` |
 | [route](commands/route/)                 | Package discovery and task-to-package routing |
 | [stack-pr](commands/stack-pr/)           | Stacked PR workflow command surface |
+| [decision-map](commands/decision-map/)           | Slash-command surface for charting and working decision maps |
 
 ## Hooks
 
