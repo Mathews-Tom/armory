@@ -229,3 +229,9 @@ cases:
       - type: matches_regex
         target: "(do not tag|do not publish|without source evidence)"
         weight: 0.8
+  - id: negative_unresolved_destination
+    prompt: "The destination itself is still unclear. Identify the questions we must resolve."
+    fixtures: []
+    rubric:
+      - "Does not activate; unresolved pre-planning decisions belong to decision-map"
+    trigger_expected: false
