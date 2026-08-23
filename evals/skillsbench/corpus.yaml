@@ -127,8 +127,8 @@ tasks:
     description: Define strict JSON output for a classification response.
     category: development
     difficulty: easy
-    prompt: Specify a JSON response schema for classifying a support ticket. It must include category, confidence from 0 to 1, and a boolean needs_human_review.
-    success_criterion: {type: assertion, assertions: [{type: contains, target: "category", weight: 0.34}, {type: contains, target: "confidence", weight: 0.33}, {type: contains, target: "needs_human_review", weight: 0.33}], pass_threshold: 0.67}
+    prompt: In the working directory, create ticket_schema.json containing a JSON response schema for classifying a support ticket. It must include category, confidence from 0 to 1, and boolean needs_human_review.
+    success_criterion: {type: artifact, artifact: {path: ticket_schema.json, assertions: [{type: contains, target: "category", weight: 0.34}, {type: contains, target: "confidence", weight: 0.33}, {type: contains, target: "needs_human_review", weight: 0.33}]}, pass_threshold: 0.67}
     limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
     tags: [api, schema]
   - id: task_019_concurrency_limit
@@ -191,16 +191,16 @@ tasks:
     description: Define meaningful CLI exit-code behavior.
     category: development
     difficulty: easy
-    prompt: Define exit-code behavior for a CLI validation command. Distinguish success, invalid user input, and internal execution failure.
-    success_criterion: {type: assertion, assertions: [{type: contains, target: "0", weight: 0.34}, {type: matches_regex, target: "(?i)(invalid|usage)", weight: 0.33}, {type: matches_regex, target: "(?i)(internal|error)", weight: 0.33}], pass_threshold: 0.67}
+    prompt: In the working directory, create exit_codes.md defining exit-code behavior for a CLI validation command. Distinguish success, invalid user input, and internal execution failure.
+    success_criterion: {type: artifact, artifact: {path: exit_codes.md, assertions: [{type: contains, target: "0", weight: 0.34}, {type: matches_regex, target: "(?i)(invalid|usage)", weight: 0.33}, {type: matches_regex, target: "(?i)(internal|error)", weight: 0.33}]}, pass_threshold: 0.67}
     limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
     tags: [cli, error-handling]
   - id: task_027_repository_handoff
     description: Produce a concise implementation handoff structure.
     category: content
     difficulty: easy
-    prompt: Outline a repository handoff document containing current state, verification performed, unresolved risks, and exact resume steps.
-    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)current state", weight: 0.25}, {type: matches_regex, target: "(?i)verification", weight: 0.25}, {type: matches_regex, target: "(?i)risk", weight: 0.25}, {type: matches_regex, target: "(?i)(resume|next step)", weight: 0.25}], pass_threshold: 0.75}
+    prompt: In the working directory, create handoff.md containing current state, verification performed, unresolved risks, and exact resume steps.
+    success_criterion: {type: artifact, artifact: {path: handoff.md, assertions: [{type: matches_regex, target: "(?i)current state", weight: 0.25}, {type: matches_regex, target: "(?i)verification", weight: 0.25}, {type: matches_regex, target: "(?i)risk", weight: 0.25}, {type: matches_regex, target: "(?i)(resume|next step)", weight: 0.25}]}, pass_threshold: 0.75}
     limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
     tags: [documentation, handoff]
   - id: task_028_test_boundary

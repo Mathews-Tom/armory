@@ -112,6 +112,7 @@ class TestCorpusManifest:
         assert len(corpus.tasks) == 50
         assert corpus.repetitions == 3
         assert len(cells) == 450
+        assert sum(task.criterion_type == "artifact" for task in corpus.tasks) == 3
         validate_observed_cells(corpus, cells)
 
     def test_rejects_undeclared_cell(self) -> None:
@@ -140,6 +141,25 @@ class TestCorpusManifest:
 
         with pytest.raises(ValueError, match="cells are missing"):
             validate_observed_cells(corpus, cells[1:])
+
+    def test_rejects_prose_only_artifact_claim(self, tmp_path: Path) -> None:
+        path = tmp_path / "artifact_claim.yaml"
+        path.write_text(
+            "id: artifact_claim\n"
+            "description: x\n"
+            "category: development\n"
+            "prompt: create a file\n"
+            "success_criterion:\n"
+            "  type: artifact\n"
+            "  assertions:\n"
+            "    - {type: contains, target: x, weight: 1.0}\n"
+            "  artifact: {path: result.txt}\n"
+            "limits: {max_turns: 1, max_tokens: 100, timeout_seconds: 10}\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError, match="must not use prose assertions"):
+            load_task(path)
 
 
 class TestCheckAssertions:

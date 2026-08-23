@@ -1,0 +1,429 @@
+schema_version: 1
+
+# M3 sample registration. Every discovered package is classified exactly once.
+included:
+  - package_type: agent
+    name: security-reviewer
+    rationale: Reviews security-sensitive code and findings; samples the safety-critical agent surface.
+  - package_type: command
+    name: stack-pr
+    rationale: Exercises a command that mutates dependent Git and pull-request topology.
+  - package_type: hook
+    name: git-protection
+    rationale: Exercises a preventive hook guarding destructive Git operations.
+  - package_type: preset
+    name: sec-strict
+    rationale: Exercises a composed security preset with cross-package instruction interactions.
+  - package_type: rule
+    name: security-standards
+    rationale: Exercises a high-risk rule governing credentials, paths, and external input.
+  - package_type: skill
+    name: pr-review
+    rationale: Exercises a review skill whose findings can gate code changes.
+  - package_type: utility
+    name: dependency-tree
+    rationale: Exercises a utility package with a constrained command-facing surface.
+
+excluded:
+  - package_type: agent
+    name: code-reviewer
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: codebase-auditor
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: content-strategist
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: full-stack-builder
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: idea-scout
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: media-producer
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: project-architect
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: project-planner
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: proposal-writer
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: release-captain
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: research-analyst
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: secret-scanner
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: skill-librarian
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: skill-router
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: team-lead
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: agent
+    name: test-engineer
+    rationale: Excluded from the fixed one-package agent stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: decision-map
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: evolve
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: handoff
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: pr-swarm
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: refactor
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: route
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: security-scan
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
+    name: tdd
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: anatomy-index
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: cost-tracker
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: handoff-on-stop
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: pre-edit-backup
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: prompt-context
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: read-dedup
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: simplify-ignore
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: hook
+    name: stack-guard
+    rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: ai-builder
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: biz-validation
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: preset
+    name: content-ops
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: preset
+    name: core
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: eng-ops
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: preset
+    name: media-craft
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: preset
+    name: python-strict
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: research
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: preset
+    name: session-continuity
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: skill-evolution
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: stack-workflow
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: preset
+    name: terse-mode
+    rationale: Excluded from the fixed one-package preset stratum; its type is represented by the registered sample.
+  - package_type: rule
+    name: adaptive-thinking-control
+    rationale: Excluded from the fixed one-package rule stratum; its type is represented by the registered sample.
+  - package_type: rule
+    name: commit-standards
+    rationale: Excluded from the fixed one-package rule stratum; its type is represented by the registered sample.
+  - package_type: rule
+    name: intent-discipline
+    rationale: Excluded from the fixed one-package rule stratum; its type is represented by the registered sample.
+  - package_type: rule
+    name: test-standards
+    rationale: Excluded from the fixed one-package rule stratum; its type is represented by the registered sample.
+  - package_type: rule
+    name: token-efficiency
+    rationale: Excluded from the fixed one-package rule stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: adr-writer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: agent-builder
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: api-docs-generator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: architecture-diagram
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: architecture-reviewer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: arxiv-figures
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: arxiv-package
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: arxiv-preflight
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: benchmark-runner
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: changelog-composer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: chart-clarity
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: citation-audit
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: code-refiner
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: codebase-advisor
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: competitive-analyzer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: concept-to-image
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: concept-to-video
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: debug-investigator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: decision-map
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: dependency-audit
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: devils-advocate
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: doc-condenser
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: skill
+    name: engineering-retro
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: env-validator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: estimate-calibrator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: feasibility-assessor
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: figure-rhetoric
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: figure-table-quality
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: filesystem
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: github
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: gpu-optimizer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: handoff
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: html-presentation
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: humanize
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: idea-validator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: immune
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: kg-builder
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: lightpanda-browser
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: linkedin-post-style
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: literature-review
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: manuscript-provenance
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: manuscript-review
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: manuscript-typography
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: market-analyzer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: marp-slides
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: mcp-to-skill
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: md-to-pdf
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: migration-risk-analyzer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: milestone-runner
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: notebooklm
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: opus-4-7-migration
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: package-evaluator
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: paper-to-skill
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: plan-prompts
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: plan-review
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: pr-swarm
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: pre-landing-review
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: project-context-setup
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: prompt-lab
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: qa-systematic
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: rag-auditor
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: regex-builder
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: skill
+    name: remotion-video
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: repo-sentinel
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: research-critique
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: sequential-thinking
+    rationale: Deprecated packages are excluded from effectiveness sampling.
+  - package_type: skill
+    name: ship-workflow
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: skill-distiller
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: skill-library
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: sql-optimizer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: stacked-prs
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: static-web-artifacts-builder
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: surrogate-verifier
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: task-decomposer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: tavily
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: test-harness
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: tldraw
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: to-markdown
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: usage-audit
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: ux-expert
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: web-fetch
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: youtube-analysis
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: youtube-search
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: utility
+    name: arxiv-search
+    rationale: Excluded from the fixed one-package utility stratum; its type is represented by the registered sample.
+  - package_type: utility
+    name: test-coverage-report
+    rationale: Excluded from the fixed one-package utility stratum; its type is represented by the registered sample.

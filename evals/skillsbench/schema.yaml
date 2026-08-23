@@ -10,16 +10,22 @@ category: string             # development | research | review | content | ops
 difficulty: string           # easy | medium | hard
 prompt: string               # The task prompt delivered to the assistant (block).
 
-# Success criterion. Only `assertion` is supported in the seed harness.
-# Additional types (artifact_check, llm_judge) may be added later.
+# Success criterion. `assertion` checks final assistant output. `artifact`
+# checks a safe relative file path in the task workspace and never accepts
+# final-answer prose as a substitute.
 success_criterion:
-  type: assertion
-  assertions:
-    # Each assertion mirrors the schema from scripts/eval_assertions.py:
-    - type: contains | not_contains | matches_regex | json_path
-      target: string         # Literal, regex, or JSONPath expression
-      weight: 0.0-1.0        # Contribution to the task's weighted score
-  pass_threshold: 0.0-1.0    # Weighted score required to mark the task "pass"
+  type: assertion | artifact
+  assertions: # Required only for `assertion`.
+    - type: contains | not_contains | matches_regex
+      target: string
+      weight: 0.0-1.0
+  artifact: # Required only for `artifact`.
+    path: safe-relative-path
+    assertions:
+      - type: contains | not_contains | matches_regex
+        target: string
+        weight: 0.0-1.0
+  pass_threshold: 0.0-1.0
 
 # Execution bounds. The runner enforces these caps per attempt.
 limits:
