@@ -40,7 +40,12 @@ function decodeEntities(str) {
 
 // Replace inline math: <span class="math inline">LATEX</span>
 html = html.replace(
-  /<span class="math inline">([\s\S]*?)<\/span>/g,
+  // Whitespace-tolerant, matching the display-math regex below. Pandoc wraps its
+  // HTML output at ~72 columns and will split a long tag as `<span\nclass="math
+  // inline">`, so a regex demanding a literal single space silently skips any inline
+  // math that lands near a line boundary -- and the caller then reports "0 errors"
+  // while the LaTeX falls through to the PDF as raw source.
+  /<span[^>]*class="math inline"[^>]*>([\s\S]*?)<\/span>/g,
   (match, latex) => {
     try {
       const decoded = decodeEntities(latex.trim());
