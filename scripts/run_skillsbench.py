@@ -43,7 +43,7 @@ import yaml  # type: ignore[import-untyped]
 
 from scripts.model_fit import ModelFitConfigError, load_model_fit_config, select_target
 
-_SUPPORTED_CRITERION_TYPES = {"assertion"}
+_SUPPORTED_CRITERION_TYPES = {"assertion", "artifact"}
 _SUPPORTED_ASSERTION_TYPES = {"contains", "not_contains", "matches_regex"}
 _CORPUS_SCHEMA_VERSION = 1
 _REQUIRED_CONDITIONS = frozenset(
@@ -77,6 +77,8 @@ class TaskDefinition:
     difficulty: str
     prompt: str
     assertions: list[Assertion]
+    criterion_type: str
+    artifact_path: str | None
     pass_threshold: float
     max_turns: int
     max_tokens: int
@@ -215,7 +217,30 @@ def _load_task_raw(
             f"(supported: {sorted(_SUPPORTED_CRITERION_TYPES)})"
         )
 
-    assertions_raw = criterion.get("assertions")
+    assertion_source = criterion
+    artifact_path: str | None = None
+    if criterion_type == "artifact":
+        if "assertions" in criterion:
+            raise ValueError(
+                f"{source_path}: artifact criterion must not use prose assertions"
+            )
+        artifact = _require_mapping(
+            criterion.get("artifact"), f"{source_path}.success_criterion.artifact"
+        )
+        artifact_relative = Path(
+            _require_string(
+                artifact.get("path"),
+                f"{source_path}.success_criterion.artifact.path",
+            )
+        )
+        if artifact_relative.is_absolute() or ".." in artifact_relative.parts:
+            raise ValueError(
+                f"{source_path}: artifact path must be a safe relative path"
+            )
+        artifact_path = str(artifact_relative)
+        assertion_source = artifact
+
+    assertions_raw = assertion_source.get("assertions")
     if not isinstance(assertions_raw, list) or not assertions_raw:
         raise ValueError(f"{source_path}: criterion has no assertions")
     assertions: list[Assertion] = []
@@ -243,7 +268,6 @@ def _load_task_raw(
                 ),
             )
         )
-
     limits = _require_mapping(task["limits"], f"{source_path}.limits")
     return TaskDefinition(
         id=task_id,
@@ -254,6 +278,8 @@ def _load_task_raw(
         ),
         prompt=_require_string(task["prompt"], f"{source_path}.prompt"),
         assertions=assertions,
+        criterion_type=criterion_type,
+        artifact_path=artifact_path,
         pass_threshold=_require_probability(
             criterion.get("pass_threshold", 0.7),
             f"{source_path}.success_criterion.pass_threshold",
@@ -644,7 +670,27 @@ def run_task_live(
             error=error,
         )
 
-    score, details = check_assertions(output, task.assertions)
+    if task.artifact_path is None:
+        score, details = check_assertions(output, task.assertions)
+    else:
+        artifact = (Path(tmpdir) / task.artifact_path).resolve()
+        if (
+            not artifact.is_relative_to(Path(tmpdir).resolve())
+            or not artifact.is_file()
+        ):
+            score = 0.0
+            details = [
+                {
+                    "type": "artifact_exists",
+                    "target": task.artifact_path,
+                    "weight": 1.0,
+                    "passed": False,
+                }
+            ]
+        else:
+            score, details = check_assertions(
+                artifact.read_text(encoding="utf-8"), task.assertions
+            )
     return TaskRunResult(
         task_id=task.id,
         config=config,

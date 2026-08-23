@@ -75,13 +75,17 @@ Their assertion criteria remain useful for prose deliverables. Tasks whose
 intended deliverable is an artifact use artifact-aware validation rather than
 final-answer prose checks.
 
+`package_strata.yaml` records one active, high-risk-relevant sample for each
+of the seven package types and an explicit rationale for every other package's
+exclusion. `uv run python scripts/validate_skillsbench.py` rejects duplicate,
+missing, undeclared, deprecated-included, and incomplete-type classifications.
+
 ## What This Does Not Measure
 
 - **Cost efficiency** — token and time totals are logged but are not part of
   the pass/fail criterion.
-- **Code quality of generated artifacts** — only the final assistant response
-  is scored against assertions. Tasks requiring artifact quality checks need
-  a richer success criterion type.
+- **Semantic artifact quality** — artifact criteria verify existence and
+  declared content checks, not correctness beyond those deterministic checks.
 - **Librarian drafting quality** — the librarian's drafted skills during
   Config B runs are captured but their correctness is not benchmarked here.
   That belongs to `package-evaluator`, not SkillsBench.
