@@ -10,9 +10,12 @@ package was injected into a turn.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import subprocess
+import signal
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, TypeAlias, cast
@@ -327,6 +330,195 @@ def dry_run(target: ModelFitTarget, profiles: tuple[str, ...]) -> dict[str, Json
     }
 
 
+class ModelFitCaptureError(RuntimeError):
+    """Raised when a live client response cannot supply declared evidence."""
+
+
+def _probe_command(target: ModelFitTarget) -> list[str]:
+    return [
+        "claude",
+        "-p",
+        "Reply with exactly READY.",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--model",
+        target.model,
+        "--effort",
+        target.effort,
+        "--strict-mcp-config",
+        "--no-session-persistence",
+        "--tools",
+        ",".join(target.tool_surface),
+    ]
+
+
+def _require_event_mapping(value: JsonValue, location: str) -> RawMapping:
+    if not isinstance(value, dict):
+        raise ModelFitCaptureError(
+            f"malformed client disclosure: {location} must be a mapping",
+        )
+    return value
+
+
+def _parse_stream_events(stdout: str) -> tuple[RawMapping, ...]:
+    events: list[RawMapping] = []
+    for line_number, line in enumerate(stdout.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            value = cast(JsonValue, json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise ModelFitCaptureError(
+                f"malformed stream-json at line {line_number}: {exc.msg}",
+            ) from exc
+        events.append(
+            _require_event_mapping(value, f"stream event at line {line_number}")
+        )
+    if not events:
+        raise ModelFitCaptureError("client emitted no stream-json events")
+    return tuple(events)
+
+
+def _required_int(value: JsonValue, field: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ModelFitCaptureError(f"required telemetry missing: {field}")
+    return value
+
+
+def _capture_from_events(
+    events: tuple[RawMapping, ...],
+    target: ModelFitTarget,
+) -> tuple[dict[str, JsonValue], dict[str, JsonValue]]:
+    models: set[str] = set()
+    terminal_events: list[RawMapping] = []
+    for event in events:
+        event_type = event.get("type")
+        if event_type == "assistant":
+            message = _require_event_mapping(event.get("message"), "assistant.message")
+            model = message.get("model")
+            if isinstance(model, str) and model:
+                models.add(model)
+        elif event_type == "result":
+            terminal_events.append(event)
+
+    if not models:
+        raise ModelFitCaptureError(
+            "required telemetry missing: model (assistant.message.model)",
+        )
+    if len(models) != 1:
+        raise ModelFitCaptureError(
+            "model disclosure changed: assistant messages reported multiple model values",
+        )
+    observed_model = next(iter(models))
+    if not observed_model.startswith(target.expected_model_prefix):
+        raise ModelFitCaptureError(
+            f"observed model {observed_model!r} does not match expected prefix "
+            f"{target.expected_model_prefix!r}",
+        )
+    if len(terminal_events) != 1:
+        raise ModelFitCaptureError(
+            f"expected exactly one terminal result event, found {len(terminal_events)}",
+        )
+
+    terminal = terminal_events[0]
+    if terminal.get("is_error") is not False:
+        raise ModelFitCaptureError("terminal result does not declare is_error: false")
+    usage = _require_event_mapping(terminal.get("usage"), "result.usage")
+    observed_usage: dict[str, JsonValue] = {}
+    for field in target.required_telemetry:
+        if field == "usage.input_tokens":
+            observed_usage["input_tokens"] = _required_int(
+                usage.get("input_tokens"),
+                "usage.input_tokens (result.usage.input_tokens)",
+            )
+        elif field == "usage.output_tokens":
+            observed_usage["output_tokens"] = _required_int(
+                usage.get("output_tokens"),
+                "usage.output_tokens (result.usage.output_tokens)",
+            )
+
+    terminal_metadata: dict[str, JsonValue] = {}
+    for field in ("subtype", "stop_reason"):
+        value = terminal.get(field)
+        if isinstance(value, str) and value:
+            terminal_metadata[field] = value
+    return (
+        {
+            "model": observed_model,
+            "usage": observed_usage,
+        },
+        terminal_metadata,
+    )
+
+
+def live_probe(
+    target: ModelFitTarget,
+    profiles: tuple[str, ...],
+    timeout_seconds: int,
+) -> dict[str, JsonValue]:
+    """Invoke an explicitly requested live probe and retain derived fields only."""
+    if timeout_seconds <= 0:
+        raise ModelFitConfigError("timeout_seconds must be greater than zero")
+    declaration = dry_run(target, profiles)
+    started = time.monotonic_ns()
+    try:
+        process = subprocess.Popen(
+            _probe_command(target),
+            cwd=_REPO_ROOT,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            start_new_session=True,
+            text=True,
+        )
+        stdout, _stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.communicate()
+        raise ModelFitCaptureError(
+            f"live probe timed out after {timeout_seconds} seconds",
+        ) from exc
+    except OSError as exc:
+        raise ModelFitCaptureError(f"cannot execute Claude Code probe: {exc}") from exc
+    wall_time_ms = (time.monotonic_ns() - started) // 1_000_000
+    if process.returncode != 0:
+        raise ModelFitCaptureError(
+            f"Claude Code probe exited with status {process.returncode}; no receipt was written",
+        )
+    events = _parse_stream_events(stdout)
+    observed, terminal_metadata = _capture_from_events(events, target)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "mode": "live",
+        "model_request_made": True,
+        "raw_receipt_retention": "derived-only",
+        "target": declaration["target"],
+        "client_version": declaration["client_version"],
+        "profile_manifests": declaration["profile_manifests"],
+        "package_content_observation": "not-observed",
+        "tool_surface": {
+            "declared": list(target.tool_surface),
+            "observed": "not-disclosed",
+        },
+        "observed": observed,
+        "terminal_metadata": terminal_metadata,
+        "wall_time_ms": wall_time_ms,
+        "stream_event_count": len(events),
+    }
+
+
+def write_receipt(path: Path, receipt: dict[str, JsonValue]) -> None:
+    """Persist a derived receipt; raw prompts, text, and stream events are excluded."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -336,29 +528,48 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         help="Declared target profile to validate; repeat to select multiple",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate declarations without invoking a model",
+    )
+    mode.add_argument(
+        "--live",
+        action="store_true",
+        help="Invoke the declared model and write a derived receipt",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Required receipt path for --live; raw events are never written",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="External wall-clock deadline for --live (default: 120)",
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run dry-run validation for one declared target."""
-    args = _parser().parse_args(argv)
-    if not args.dry_run:
-        print(
-            "live probe execution is not available in this command version",
-            file=sys.stderr,
-        )
-        return 2
+    parser = _parser()
+    args = parser.parse_args(argv)
     try:
         config = load_model_fit_config(args.config)
         target = select_target(config, args.target)
-        profiles = tuple(args.profile) if args.profile else target.profiles
-        result = dry_run(target, profiles)
-    except ModelFitConfigError as exc:
+        profiles = (
+            tuple(dict.fromkeys(args.profile)) if args.profile else target.profiles
+        )
+        if args.dry_run:
+            result = dry_run(target, profiles)
+        else:
+            if args.output is None:
+                parser.error("--output is required with --live")
+            result = live_probe(target, profiles, args.timeout_seconds)
+            write_receipt(args.output, result)
+    except (ModelFitCaptureError, ModelFitConfigError) as exc:
         print(f"model-fit validation failed: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))

@@ -86,6 +86,8 @@ uv run python scripts/model_fit.py --target claude-code-opus-xhigh --profile ful
 
 Dry runs read `claude --version` and resolve repository package definitions only. They report discovery metadata and explicitly state that package content was not loaded. They do not install a profile or make a paid call.
 
+Use `--live --output /path/to/receipt.json` only when a model request is authorized. The probe disables built-in tools, suppresses ambient MCP configuration, and does not persist sessions. Its receipt stores derived fields only: declared target/profile/tool surface, client version, an observed model that must match the target's declared prefix, required token fields, wall time, and terminal metadata. Raw prompts, assistant text, and stream events are never retained. A missing or changed required field exits non-zero; the probe never estimates a token value.
+
 ### Skills — Development & Tooling
 
 | Skill                                            | Description                                                                                                                                                 |
