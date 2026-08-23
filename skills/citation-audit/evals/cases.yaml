@@ -1,0 +1,16 @@
+cases:
+  - id: audit_manuscript_citations
+    prompt: "Verify that every citation in this manuscript is real and accurately described."
+    fixtures: []
+    rubric: ["checks reference existence, attribution, and claim accuracy"]
+    trigger_expected: true
+  - id: negative_copyedit_prose
+    prompt: "Improve the prose style of this introduction."
+    fixtures: []
+    rubric: ["prose editing is outside citation auditing"]
+    trigger_expected: false
+  - id: negative_format_figures
+    prompt: "Optimize figures for arXiv upload."
+    fixtures: []
+    rubric: ["figure optimization is outside citation auditing"]
+    trigger_expected: false

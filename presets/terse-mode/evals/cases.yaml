@@ -1,0 +1,16 @@
+cases:
+  - id: apply_terse_mode_preset
+    prompt: "Enable the terse-mode preset for concise technical responses."
+    fixtures: []
+    rubric: ["activates concise-response preset configuration"]
+    trigger_expected: true
+  - id: negative_business_preset
+    prompt: "Configure the business-validation preset for a startup idea."
+    fixtures: []
+    rubric: ["business validation is outside terse mode"]
+    trigger_expected: false
+  - id: negative_media_preset
+    prompt: "Configure a media-generation preset."
+    fixtures: []
+    rubric: ["media configuration is outside terse mode"]
+    trigger_expected: false

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate eval cases.yaml files across all package types."""
+
 from __future__ import annotations
 
 import sys
@@ -9,14 +10,20 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import yaml
+import yaml  # noqa: E402
 
-from scripts.frontmatter import parse_frontmatter
-from scripts.package_types import REPO_ROOT, TYPES, PackageType
+from scripts.frontmatter import parse_frontmatter  # noqa: E402
+from scripts.package_types import TYPES, PackageType  # noqa: E402
 
 REQUIRED_CASE_FIELDS = {"id", "prompt", "rubric", "trigger_expected"}
 OPTIONAL_CASE_FIELDS = {"fixtures", "assertions", "oracle_verdict", "diagnostics"}
-VALID_ASSERTION_TYPES = {"contains", "not_contains", "matches_regex", "output_format", "calls_tool"}
+VALID_ASSERTION_TYPES = {
+    "contains",
+    "not_contains",
+    "matches_regex",
+    "output_format",
+    "calls_tool",
+}
 VALID_ORACLE_VERDICTS = {None, "pass", "fail"}
 
 
@@ -83,7 +90,9 @@ def validate_case(case: dict, pkg_name: str, idx: int) -> list[str]:
                 if "weight" in assertion:
                     weight = assertion["weight"]
                     if not isinstance(weight, (int, float)) or weight < 0 or weight > 1:
-                        errors.append(f"{a_prefix}: 'weight' must be a number between 0 and 1")
+                        errors.append(
+                            f"{a_prefix}: 'weight' must be a number between 0 and 1"
+                        )
 
     # Validate optional oracle_verdict field
     if "oracle_verdict" in case:
@@ -107,7 +116,9 @@ def validate_pkg_evals(pkg_dir: Path, pkg_type: PackageType) -> list[str]:
     """Validate evals/cases.yaml for a single package."""
     cases_file = pkg_dir / "evals" / "cases.yaml"
     if not cases_file.exists():
-        return []
+        if is_deprecated(pkg_dir, pkg_type):
+            return []
+        return [f"{pkg_dir.name}: missing required evals/cases.yaml"]
 
     pkg_name = pkg_dir.name
     deprecated = is_deprecated(pkg_dir, pkg_type)
@@ -144,13 +155,19 @@ def validate_pkg_evals(pkg_dir: Path, pkg_type: PackageType) -> list[str]:
 
     if deprecated:
         if positive_count > 0:
-            errors.append(f"{pkg_name}: deprecated {pkg_type.key} must have 0 positive cases, found {positive_count}")
+            errors.append(
+                f"{pkg_name}: deprecated {pkg_type.key} must have 0 positive cases, found {positive_count}"
+            )
     else:
         if positive_count == 0:
-            errors.append(f"{pkg_name}: must have at least 1 positive case (trigger_expected: true)")
+            errors.append(
+                f"{pkg_name}: must have at least 1 positive case (trigger_expected: true)"
+            )
 
     if negative_count < 2:
-        errors.append(f"{pkg_name}: must have at least 2 negative cases (trigger_expected: false), found {negative_count}")
+        errors.append(
+            f"{pkg_name}: must have at least 2 negative cases (trigger_expected: false), found {negative_count}"
+        )
 
     return errors
 
@@ -169,8 +186,7 @@ def main() -> int:
         for pkg_dir in sorted(type_dir.iterdir()):
             if not pkg_dir.is_dir():
                 continue
-            cases_file = pkg_dir / "evals" / "cases.yaml"
-            if not cases_file.exists():
+            if is_deprecated(pkg_dir, pkg_type):
                 continue
 
             errors = validate_pkg_evals(pkg_dir, pkg_type)
@@ -183,7 +199,10 @@ def main() -> int:
     total = sum(counts.values())
 
     if all_errors:
-        print(f"FAILED: {len(all_errors)} error(s) in {total} eval file(s):", file=sys.stderr)
+        print(
+            f"FAILED: {len(all_errors)} error(s) in {total} eval file(s):",
+            file=sys.stderr,
+        )
         for error in all_errors:
             print(f"  {error}", file=sys.stderr)
         return 1

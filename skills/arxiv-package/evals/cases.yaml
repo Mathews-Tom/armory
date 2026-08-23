@@ -1,0 +1,16 @@
+cases:
+  - id: package_arxiv_submission
+    prompt: "Create an arXiv-ready source tarball for my LaTeX paper."
+    fixtures: []
+    rubric: ["validates submission contents and produces a source package"]
+    trigger_expected: true
+  - id: negative_figure_optimization
+    prompt: "Reduce the size of oversized PNG figures."
+    fixtures: []
+    rubric: ["figure optimization is outside packaging"]
+    trigger_expected: false
+  - id: negative_manuscript_review
+    prompt: "Review this paper for methodological flaws."
+    fixtures: []
+    rubric: ["manuscript review is outside packaging"]
+    trigger_expected: false
