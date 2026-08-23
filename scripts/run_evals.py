@@ -10,11 +10,13 @@ Usage:
     uv run python scripts/run_evals.py --all --timeout-per-case 120
     uv run python scripts/run_evals.py --package skills/immune --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -27,11 +29,32 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import yaml
 
-from scripts.eval_assertions import run_all_assertions
-from scripts.package_types import TYPES
-from scripts.task_signature import task_signature
+import yaml  # noqa: E402
+
+from scripts.eval_assertions import AssertionResult, run_all_assertions  # noqa: E402
+from scripts.package_types import TYPES  # noqa: E402
+from scripts.task_signature import task_signature  # noqa: E402
+
+
+_ROUTE_PATTERN = re.compile(r"(?m)^ARMORY_EVAL_ROUTE:\s*(engaged|inactive)\s*$")
+
+
+def _evaluation_prompt(prompt: str) -> str:
+    """Append the declared-routing receipt required by the eval harness."""
+    return (
+        f"{prompt}\n\n"
+        "Evaluation receipt: append exactly one final line in this form after answering:\n"
+        "ARMORY_EVAL_ROUTE: engaged|inactive\n"
+        "Use engaged only when the package supplied for this evaluation materially guided "
+        "your response. Use inactive when it did not."
+    )
+
+
+def _declared_route(output: str) -> str | None:
+    """Return the unambiguous routing declaration emitted by an eval run."""
+    routes = _ROUTE_PATTERN.findall(output)
+    return routes[0] if len(routes) == 1 else None
 
 
 @dataclass
@@ -81,12 +104,28 @@ def load_cases(pkg_dir: Path) -> list[dict] | None:
     return data["cases"]
 
 
+def _assertion_details(results: list[AssertionResult]) -> list[dict[str, object]]:
+    """Serialize assertion results for the stable eval receipt."""
+    return [
+        {
+            "type": result.assertion_type,
+            "target": result.target,
+            "passed": result.passed,
+            "weight": result.weight,
+            "detail": result.detail,
+        }
+        for result in results
+    ]
+
+
 def _git_untracked_files(repo_root: Path) -> set[str]:
     """List untracked files in a git repo via git status --porcelain."""
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
-            capture_output=True, text=True, cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            cwd=str(repo_root),
         )
         files: set[str] = set()
         for line in result.stdout.strip().splitlines():
@@ -146,10 +185,21 @@ def execute_case(
         result = subprocess.run(
             [
                 "claude",
-                "-p", prompt,
-                "--add-dir", str(pkg_dir),
-                "--output-format", "text",
-                "--allowedTools", "Read", "Glob", "Grep", "Write", "Edit", "Bash",
+                "-p",
+                _evaluation_prompt(prompt),
+                "--add-dir",
+                str(pkg_dir),
+                "--output-format",
+                "text",
+                "--strict-mcp-config",
+                "--no-session-persistence",
+                "--allowedTools",
+                "Read",
+                "Glob",
+                "Grep",
+                "Write",
+                "Edit",
+                "Bash",
             ],
             capture_output=True,
             text=True,
@@ -212,21 +262,35 @@ def execute_case(
     shutil.rmtree(tmpdir, ignore_errors=True)
     elapsed_ms = (time.monotonic_ns() // 1_000_000) - start_ms
 
-    # For negative cases (trigger_expected: false), pass if no substantial output
-    # or the agent did not engage with the package's domain
     if not trigger_expected:
-        verdict = "pass"  # Negative cases are validated by the schema, not execution
+        route = _declared_route(output)
+        assertions_passed = True
+        assertion_details: list[dict[str, object]] = []
+        weighted_score = 1.0
+        if assertions:
+            assertions_passed, weighted_score, results = run_all_assertions(
+                output, assertions
+            )
+            assertion_details = _assertion_details(results)
+        passed = exit_code == 0 and route == "inactive" and assertions_passed
+        if passed:
+            error = None
+        elif route == "engaged":
+            error = "negative route reported package engagement"
+        else:
+            error = "missing or ambiguous routing declaration"
         return CaseResult(
             case_id=case_id,
             prompt=prompt,
             trigger_expected=trigger_expected,
-            oracle_verdict=verdict,
-            weighted_score=1.0,
-            assertion_details=[],
+            oracle_verdict="pass" if passed else "fail",
+            weighted_score=weighted_score if passed else 0.0,
+            assertion_details=assertion_details,
             execution_time_ms=elapsed_ms,
+            error=error,
         )
 
-    # For positive cases: check assertions if present, otherwise pass on non-zero output
+    # Positive cases without assertions retain the existing non-empty-output oracle.
     if not assertions:
         verdict = "pass" if (exit_code == 0 and len(output.strip()) > 0) else "fail"
         return CaseResult(
@@ -240,16 +304,7 @@ def execute_case(
         )
 
     all_passed, weighted_score, results = run_all_assertions(output, assertions)
-    assertion_details = [
-        {
-            "type": r.assertion_type,
-            "target": r.target,
-            "passed": r.passed,
-            "weight": r.weight,
-            "detail": r.detail,
-        }
-        for r in results
-    ]
+    assertion_details = _assertion_details(results)
 
     return CaseResult(
         case_id=case_id,
@@ -287,7 +342,9 @@ def run_package_evals(
     failed = sum(1 for r in results if r.oracle_verdict == "fail")
     skipped = sum(1 for r in results if r.oracle_verdict == "skipped")
     total = len(results)
-    aggregate_score = sum(r.weighted_score for r in results) / total if total > 0 else 0.0
+    aggregate_score = (
+        sum(r.weighted_score for r in results) / total if total > 0 else 0.0
+    )
 
     return PackageResult(
         package_name=pkg_dir.name,
@@ -392,15 +449,31 @@ def write_history(results: list[PackageResult], history_path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Execute eval cases against live Claude sessions")
+    parser = argparse.ArgumentParser(
+        description="Execute eval cases against live Claude sessions"
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--package", help="Path to a single package (relative to repo root)")
+    group.add_argument(
+        "--package", help="Path to a single package (relative to repo root)"
+    )
     group.add_argument("--all", action="store_true", help="Run evals for all packages")
-    parser.add_argument("--timeout-per-case", type=int, default=120, help="Timeout per case in seconds")
-    parser.add_argument("--output", default="evals/results.json", help="Output file path")
-    parser.add_argument("--history", default="evals/history.jsonl", help="Append-only history log path")
-    parser.add_argument("--no-history", action="store_true", help="Skip appending to the history log")
-    parser.add_argument("--dry-run", action="store_true", help="Skip actual execution, validate structure only")
+    parser.add_argument(
+        "--timeout-per-case", type=int, default=120, help="Timeout per case in seconds"
+    )
+    parser.add_argument(
+        "--output", default="evals/results.json", help="Output file path"
+    )
+    parser.add_argument(
+        "--history", default="evals/history.jsonl", help="Append-only history log path"
+    )
+    parser.add_argument(
+        "--no-history", action="store_true", help="Skip appending to the history log"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Skip actual execution, validate structure only",
+    )
     args = parser.parse_args()
 
     packages = collect_all_packages() if args.all else [args.package]
@@ -412,7 +485,9 @@ def main() -> int:
         if result is not None:
             results.append(result)
             status = "PASS" if result.failed == 0 else "FAIL"
-            print(f"  {status}: {result.passed}/{result.total_cases} passed (score: {result.aggregate_score:.2f})")
+            print(
+                f"  {status}: {result.passed}/{result.total_cases} passed (score: {result.aggregate_score:.2f})"
+            )
 
     output_path = _REPO_ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
