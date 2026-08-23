@@ -1,4 +1,5 @@
 """Tests for scripts.run_skillsbench pure logic (no live claude execution)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,17 +8,22 @@ import pytest
 
 from scripts.run_skillsbench import (
     BenchmarkReport,
+    ComparisonCell,
     TaskRunResult,
     aggregate_report,
     check_assertions,
     compare_reports,
+    declared_cells,
+    load_corpus_manifest,
     load_task,
     load_task_set,
+    validate_observed_cells,
     verdict_from_score,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SEED_TASKS_DIR = _REPO_ROOT / "evals" / "skillsbench" / "tasks"
+_CORPUS_PATH = _REPO_ROOT / "evals" / "skillsbench" / "corpus.yaml"
 
 
 class TestLoadTask:
@@ -97,6 +103,45 @@ class TestLoadTaskSet:
         assert load_task_set(tmp_path / "nope") == []
 
 
+class TestCorpusManifest:
+    def test_loads_frozen_corpus_and_declared_cells(self) -> None:
+        corpus = load_corpus_manifest(_CORPUS_PATH)
+        cells = declared_cells(corpus)
+
+        assert corpus.target_id == "claude-code-opus-xhigh"
+        assert len(corpus.tasks) == 50
+        assert corpus.repetitions == 3
+        assert len(cells) == 450
+        validate_observed_cells(corpus, cells)
+
+    def test_rejects_undeclared_cell(self) -> None:
+        corpus = load_corpus_manifest(_CORPUS_PATH)
+        cells = declared_cells(corpus)
+        undeclared = ComparisonCell(
+            task_id="task_999_not_registered",
+            condition="current",
+            target_id=corpus.target_id,
+            repetition=1,
+        )
+
+        with pytest.raises(ValueError, match="undeclared comparison cells"):
+            validate_observed_cells(corpus, (*cells[1:], undeclared))
+
+    def test_rejects_duplicate_cells(self) -> None:
+        corpus = load_corpus_manifest(_CORPUS_PATH)
+        cells = declared_cells(corpus)
+
+        with pytest.raises(ValueError, match="contain duplicates"):
+            validate_observed_cells(corpus, (*cells[1:], cells[1], cells[1]))
+
+    def test_rejects_missing_cells(self) -> None:
+        corpus = load_corpus_manifest(_CORPUS_PATH)
+        cells = declared_cells(corpus)
+
+        with pytest.raises(ValueError, match="cells are missing"):
+            validate_observed_cells(corpus, cells[1:])
+
+
 class TestCheckAssertions:
     def test_all_pass(self) -> None:
         assertions = [
@@ -136,9 +181,7 @@ class TestCheckAssertions:
         assert score == 1.0
 
     def test_regex_case_insensitive(self) -> None:
-        assertions = [
-            {"type": "matches_regex", "target": "(?i)HELLO", "weight": 1.0}
-        ]
+        assertions = [{"type": "matches_regex", "target": "(?i)HELLO", "weight": 1.0}]
         score, _ = check_assertions("hello there", assertions)
         assert score == 1.0
 
@@ -210,7 +253,9 @@ class TestAggregateReport:
 
 
 class TestCompareReports:
-    def _report(self, config: str, pass_rate: float, total: int = 10) -> BenchmarkReport:
+    def _report(
+        self, config: str, pass_rate: float, total: int = 10
+    ) -> BenchmarkReport:
         return BenchmarkReport(
             config=config,
             timestamp="",
