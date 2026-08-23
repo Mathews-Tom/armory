@@ -1,0 +1,389 @@
+schema_version: 1
+
+# M3 freezes this declaration before any comparison result exists. The target is
+# resolved through M2's no-cost model-fit contract; it does not authorize a live
+# model invocation.
+model_fit:
+  config: ../../model_fit.yaml
+  target: claude-code-opus-xhigh
+
+comparison:
+  baseline: current
+  treatments: [reduced-or-rewritten, strengthened-contract]
+  repetitions: 3
+  exclusions:
+    - id: unapproved-live-run
+      rationale: Live execution remains excluded until M4 records spend, privacy, and receipt-retention approval.
+    - id: external-state-dependency
+      rationale: Tasks requiring credentials, network mutation, or inaccessible private state cannot provide reproducible evidence.
+    - id: subjective-prose-only-artifact
+      rationale: Tasks whose intended deliverable is an artifact require artifact validation, not an assistant-prose assertion.
+
+# The five seed tasks remain file-backed. The remaining tasks are registered
+# inline so the matrix is frozen in one reviewable artifact.
+tasks:
+  - file: tasks/task_001_code_review_simple.yaml
+  - file: tasks/task_002_sql_injection_audit.yaml
+  - file: tasks/task_003_pytest_generation.yaml
+  - file: tasks/task_004_architecture_tradeoff.yaml
+  - file: tasks/task_005_migration_risk.yaml
+  - id: task_006_api_error_contract
+    description: Define a stable HTTP error contract for an invalid request.
+    category: development
+    difficulty: easy
+    prompt: Propose a JSON error response for an invalid request. Include a stable machine-readable code, a human-readable message, and the HTTP status. Do not expose internal implementation details.
+    success_criterion: {type: assertion, assertions: [{type: contains, target: code, weight: 0.34}, {type: contains, target: message, weight: 0.33}, {type: matches_regex, target: "4[0-9]{2}", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [api, error-handling]
+  - id: task_007_cache_invalidation
+    description: Identify a cache invalidation invariant for mutable user profiles.
+    category: development
+    difficulty: medium
+    prompt: A service caches user profiles by user ID. Describe the invariant that prevents stale reads after an update and provide concise pseudocode for the update path.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(invalidate|evict|delete).*(cache|cached)", weight: 0.5}, {type: matches_regex, target: "(?i)(after|upon).*(update|write)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [cache, consistency]
+  - id: task_008_schema_migration_lock
+    description: Review a schema migration for lock and rollback risks.
+    category: review
+    difficulty: medium
+    prompt: Review a migration that adds a non-null column with a default to a large table. State the lock risk and give a safer phased rollout with rollback handling.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(lock|rewrite|blocking)", weight: 0.34}, {type: matches_regex, target: "(?i)(backfill|batch)", weight: 0.33}, {type: matches_regex, target: "(?i)(rollback|revert)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [database, migration]
+  - id: task_009_token_redaction
+    description: Define log redaction rules for bearer credentials.
+    category: ops
+    difficulty: easy
+    prompt: Write a concise logging policy for HTTP Authorization headers. State what must be redacted and give one safe example log field.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(redact|mask|never log)", weight: 0.5}, {type: matches_regex, target: "(?i)authorization|bearer", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 3000, timeout_seconds: 120}
+    tags: [security, logging]
+  - id: task_010_retry_budget
+    description: Specify bounded retry behavior for an unavailable dependency.
+    category: development
+    difficulty: easy
+    prompt: Specify retry behavior for a transient upstream HTTP 503. Include a finite attempt budget, exponential backoff with jitter, and the condition that stops retries.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(max|finite).*(attempt|retry)", weight: 0.34}, {type: matches_regex, target: "(?i)(exponential|backoff)", weight: 0.33}, {type: matches_regex, target: "(?i)jitter", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [reliability, retry]
+  - id: task_011_path_traversal
+    description: Audit a file-serving endpoint for path traversal.
+    category: review
+    difficulty: medium
+    prompt: A download endpoint joins a user-provided filename to /srv/files. Explain the path traversal risk and provide a safe validation rule using resolved paths.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)path traversal", weight: 0.34}, {type: matches_regex, target: "(?i)resolve", weight: 0.33}, {type: matches_regex, target: "(?i)(relative_to|within|base)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, filesystem]
+  - id: task_012_sql_parameterization
+    description: Correct unsafe SQL string interpolation.
+    category: development
+    difficulty: easy
+    prompt: Replace SQL built with string interpolation from a user email with a parameterized query. Explain why the replacement prevents injection.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(parameter|placeholder|bind)", weight: 0.5}, {type: matches_regex, target: "(?i)injection", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, sql]
+  - id: task_013_idempotency_key
+    description: Define idempotency behavior for a create-payment request.
+    category: development
+    difficulty: medium
+    prompt: Define server behavior for a create-payment endpoint accepting an Idempotency-Key. Cover duplicate requests, payload conflicts, and response reuse.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)duplicate", weight: 0.34}, {type: matches_regex, target: "(?i)(same|reuse).*(response|result)", weight: 0.33}, {type: matches_regex, target: "(?i)(conflict|different payload)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [api, payments]
+  - id: task_014_rate_limit_policy
+    description: Propose an observable rate-limit response contract.
+    category: ops
+    difficulty: easy
+    prompt: Define a rate-limit response for an API. Include the status, a retry hint, and guidance that allows clients to distinguish a rate limit from authentication failure.
+    success_criterion: {type: assertion, assertions: [{type: contains, target: "429", weight: 0.34}, {type: matches_regex, target: "(?i)(retry-after|retry)", weight: 0.33}, {type: matches_regex, target: "(?i)(authentication|401)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [api, operations]
+  - id: task_015_feature_flag_cleanup
+    description: Plan safe removal of an expired feature flag.
+    category: ops
+    difficulty: easy
+    prompt: Give a safe checklist for removing an expired feature flag. Include usage discovery, rollout verification, and removal of stale configuration and tests.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(search|discover|usage)", weight: 0.34}, {type: matches_regex, target: "(?i)(verify|monitor)", weight: 0.33}, {type: matches_regex, target: "(?i)(test|config)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [operations, cleanup]
+  - id: task_016_incident_timeline
+    description: Structure an incident timeline from three events.
+    category: content
+    difficulty: easy
+    prompt: "Turn these events into a concise incident timeline: 10:00 alert fired, 10:07 rollback started, 10:18 error rate returned to normal. Include timestamps and state that customer impact ended at 10:18."
+    success_criterion: {type: assertion, assertions: [{type: contains, target: "10:00", weight: 0.25}, {type: contains, target: "10:07", weight: 0.25}, {type: contains, target: "10:18", weight: 0.25}, {type: matches_regex, target: "(?i)(impact ended|resolved)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 3, max_tokens: 3000, timeout_seconds: 120}
+    tags: [incident, communication]
+  - id: task_017_dependency_pin
+    description: Explain why a dependency pin needs a review trigger.
+    category: review
+    difficulty: easy
+    prompt: A project pins a dependency due to a regression. Specify the pin rationale, the evidence to retain, and the condition that triggers an unpin review.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)rationale|reason", weight: 0.34}, {type: matches_regex, target: "(?i)(evidence|issue|regression)", weight: 0.33}, {type: matches_regex, target: "(?i)(review|unpin)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [dependencies, maintenance]
+  - id: task_018_output_schema
+    description: Define strict JSON output for a classification response.
+    category: development
+    difficulty: easy
+    prompt: Specify a JSON response schema for classifying a support ticket. It must include category, confidence from 0 to 1, and a boolean needs_human_review.
+    success_criterion: {type: assertion, assertions: [{type: contains, target: "category", weight: 0.34}, {type: contains, target: "confidence", weight: 0.33}, {type: contains, target: "needs_human_review", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [api, schema]
+  - id: task_019_concurrency_limit
+    description: Select a bounded concurrency design for batch work.
+    category: development
+    difficulty: medium
+    prompt: A worker must process 10,000 jobs without opening unbounded concurrent connections. Describe a bounded concurrency design and how it reports failed jobs.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(semaphore|pool|bounded)", weight: 0.5}, {type: matches_regex, target: "(?i)(fail|error)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [concurrency, reliability]
+  - id: task_020_backup_restore_test
+    description: Define acceptance for a backup restore drill.
+    category: ops
+    difficulty: medium
+    prompt: Define a backup restore drill. Include an isolated restore target, integrity verification, recovery-time measurement, and a documented failure outcome.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(isolated|separate)", weight: 0.25}, {type: matches_regex, target: "(?i)(integrity|verify)", weight: 0.25}, {type: matches_regex, target: "(?i)(recovery time|RTO|duration)", weight: 0.25}, {type: matches_regex, target: "(?i)(failure|fail)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [backup, operations]
+  - id: task_021_authz_boundary
+    description: Identify authorization checks for a tenant resource.
+    category: review
+    difficulty: medium
+    prompt: Review a get-document endpoint that receives document_id and authenticated_user. State the authorization check required to prevent cross-tenant access and the response for a denied request.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(tenant|owner|membership)", weight: 0.5}, {type: matches_regex, target: "(?i)(403|forbidden)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, authorization]
+  - id: task_022_config_precedence
+    description: Specify deterministic configuration precedence.
+    category: development
+    difficulty: easy
+    prompt: State a deterministic precedence order for command-line flags, environment variables, config files, and built-in defaults. Include how conflicting values are surfaced.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(command.line|flag)", weight: 0.34}, {type: matches_regex, target: "(?i)environment", weight: 0.33}, {type: matches_regex, target: "(?i)(config file|default)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [configuration, cli]
+  - id: task_023_file_format_version
+    description: Plan a backward-compatible file-format change.
+    category: development
+    difficulty: medium
+    prompt: Add a required field to a persisted JSON document while preserving old readers and writers. Describe versioning, migration, and rejection of unsupported future versions.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)version", weight: 0.34}, {type: matches_regex, target: "(?i)(migrate|compatib)", weight: 0.33}, {type: matches_regex, target: "(?i)(unsupported|reject)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [data, compatibility]
+  - id: task_024_observability_slo
+    description: Define an SLO with an actionable error budget.
+    category: ops
+    difficulty: medium
+    prompt: Define an API availability SLO that includes a measurement window, target, error budget, and action when the budget is exhausted.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(window|30 day)", weight: 0.25}, {type: matches_regex, target: "(?i)(target|availability)", weight: 0.25}, {type: matches_regex, target: "(?i)error budget", weight: 0.25}, {type: matches_regex, target: "(?i)(action|freeze|stop)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [observability, slo]
+  - id: task_025_webhook_signature
+    description: Define verification for signed webhooks.
+    category: development
+    difficulty: medium
+    prompt: Specify verification for a signed webhook. Include raw-body preservation, constant-time signature comparison, replay protection, and failure behavior.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(raw body|raw payload)", weight: 0.25}, {type: matches_regex, target: "(?i)(constant.time|timing.safe)", weight: 0.25}, {type: matches_regex, target: "(?i)(replay|timestamp)", weight: 0.25}, {type: matches_regex, target: "(?i)(reject|fail)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [security, webhooks]
+  - id: task_026_cli_exit_codes
+    description: Define meaningful CLI exit-code behavior.
+    category: development
+    difficulty: easy
+    prompt: Define exit-code behavior for a CLI validation command. Distinguish success, invalid user input, and internal execution failure.
+    success_criterion: {type: assertion, assertions: [{type: contains, target: "0", weight: 0.34}, {type: matches_regex, target: "(?i)(invalid|usage)", weight: 0.33}, {type: matches_regex, target: "(?i)(internal|error)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [cli, error-handling]
+  - id: task_027_repository_handoff
+    description: Produce a concise implementation handoff structure.
+    category: content
+    difficulty: easy
+    prompt: Outline a repository handoff document containing current state, verification performed, unresolved risks, and exact resume steps.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)current state", weight: 0.25}, {type: matches_regex, target: "(?i)verification", weight: 0.25}, {type: matches_regex, target: "(?i)risk", weight: 0.25}, {type: matches_regex, target: "(?i)(resume|next step)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [documentation, handoff]
+  - id: task_028_test_boundary
+    description: Choose boundary tests for an input parser.
+    category: review
+    difficulty: easy
+    prompt: A parser accepts integers from 1 through 100. List boundary tests that detect off-by-one errors and invalid input handling.
+    success_criterion: {type: assertion, assertions: [{type: contains, target: "1", weight: 0.25}, {type: contains, target: "100", weight: 0.25}, {type: matches_regex, target: "(?i)(0|below)", weight: 0.25}, {type: matches_regex, target: "(?i)(101|above)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 3, max_tokens: 3000, timeout_seconds: 120}
+    tags: [testing, boundaries]
+  - id: task_029_release_rollback
+    description: Define a release rollback trigger.
+    category: ops
+    difficulty: medium
+    prompt: Define a deployment rollback trigger using an error-rate threshold and observation window. State how the rollback decision is recorded.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)error rate", weight: 0.34}, {type: matches_regex, target: "(?i)(window|minute)", weight: 0.33}, {type: matches_regex, target: "(?i)(record|document)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [release, rollback]
+  - id: task_030_prompt_injection_boundary
+    description: Distinguish untrusted retrieved text from instructions.
+    category: review
+    difficulty: medium
+    prompt: Explain how an assistant workflow should treat retrieved web text that says to reveal a secret. State the trust boundary and the safe handling rule.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(untrusted|data)", weight: 0.5}, {type: matches_regex, target: "(?i)(ignore|not follow|do not follow)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, agents]
+  - id: task_031_resource_cleanup
+    description: Identify cleanup requirements for a file handle.
+    category: development
+    difficulty: easy
+    prompt: Explain how to ensure a file handle is closed when processing raises an exception. Include the language construct that owns cleanup.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(with|context manager|finally)", weight: 0.5}, {type: matches_regex, target: "(?i)close", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 3000, timeout_seconds: 120}
+    tags: [resources, python]
+  - id: task_032_queue_poison_message
+    description: Define handling for repeatedly failing queue messages.
+    category: ops
+    difficulty: medium
+    prompt: Define handling for a queue message that fails processing repeatedly. Include bounded retries, a dead-letter destination, and an alert.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(bounded|max).*(retry|attempt)", weight: 0.34}, {type: matches_regex, target: "(?i)(dead.letter|DLQ)", weight: 0.33}, {type: matches_regex, target: "(?i)(alert|notify)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [queues, reliability]
+  - id: task_033_accessibility_form
+    description: Review a form error for accessible behavior.
+    category: review
+    difficulty: easy
+    prompt: Review a web form validation error. State how the error is associated with the input and announced to assistive technology.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(label|describedby|aria-describedby)", weight: 0.5}, {type: matches_regex, target: "(?i)(screen reader|announce|aria-live)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 3000, timeout_seconds: 120}
+    tags: [accessibility, frontend]
+  - id: task_034_timezone_schedule
+    description: Define a daylight-saving-safe schedule rule.
+    category: development
+    difficulty: medium
+    prompt: A job must run at 09:00 in a user's local timezone across daylight-saving changes. State how timezones are stored and how ambiguous local times are handled.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(IANA|timezone)", weight: 0.5}, {type: matches_regex, target: "(?i)(ambiguous|daylight|DST)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [time, scheduling]
+  - id: task_035_data_deletion
+    description: Define a verifiable personal-data deletion workflow.
+    category: ops
+    difficulty: medium
+    prompt: Define a personal-data deletion workflow. Include identity authorization, deletion across derived stores, an audit record without retaining the deleted content, and failure escalation.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(authorize|identity)", weight: 0.25}, {type: matches_regex, target: "(?i)(derived|backup|replica)", weight: 0.25}, {type: matches_regex, target: "(?i)(audit|record)", weight: 0.25}, {type: matches_regex, target: "(?i)(fail|escalat)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [privacy, data]
+  - id: task_036_contract_test
+    description: Define a consumer-driven contract test.
+    category: development
+    difficulty: medium
+    prompt: Define a consumer-driven contract test for an API response. Include the expected fields, versioning behavior, and how a breaking change fails CI.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(field|schema)", weight: 0.34}, {type: matches_regex, target: "(?i)version", weight: 0.33}, {type: matches_regex, target: "(?i)(CI|fail)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [testing, contracts]
+  - id: task_037_git_conflict_resolution
+    description: Describe safe resolution of a merge conflict.
+    category: development
+    difficulty: easy
+    prompt: Describe a safe workflow for resolving a merge conflict. Include inspecting both changes, testing the resolution, and avoiding force push without a lease.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(inspect|review)", weight: 0.34}, {type: matches_regex, target: "(?i)test", weight: 0.33}, {type: matches_regex, target: "(?i)force-with-lease", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [git, workflow]
+  - id: task_038_metric_cardinality
+    description: Identify a high-cardinality metrics risk.
+    category: review
+    difficulty: medium
+    prompt: A metrics label includes raw user IDs. Explain the cardinality risk and propose a safer aggregation or tracing alternative.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)cardinality", weight: 0.5}, {type: matches_regex, target: "(?i)(aggregate|trace|sample)", weight: 0.5}], pass_threshold: 0.7}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [observability, metrics]
+  - id: task_039_batch_partial_failure
+    description: Specify reporting for partial batch failure.
+    category: development
+    difficulty: medium
+    prompt: Define how a batch API reports partial failures. Include per-item outcomes, an aggregate summary, and retry eligibility without treating failures as success.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(per.item|each item)", weight: 0.34}, {type: matches_regex, target: "(?i)(summary|aggregate)", weight: 0.33}, {type: matches_regex, target: "(?i)(retry|failure)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [batch, error-handling]
+  - id: task_040_csrf_boundary
+    description: Define CSRF protection for a browser session.
+    category: review
+    difficulty: medium
+    prompt: Explain CSRF protection for a cookie-authenticated browser session. Include SameSite settings, an anti-CSRF token, and server-side validation.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)samesite", weight: 0.34}, {type: matches_regex, target: "(?i)(csrf token|anti-csrf)", weight: 0.33}, {type: matches_regex, target: "(?i)(validate|verify)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, web]
+  - id: task_041_api_deprecation
+    description: Plan a backward-compatible API deprecation.
+    category: development
+    difficulty: medium
+    prompt: Plan deprecation of an API field. Include published timeline, compatibility behavior, usage measurement, and removal criteria.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(timeline|date)", weight: 0.25}, {type: matches_regex, target: "(?i)(compatib|fallback)", weight: 0.25}, {type: matches_regex, target: "(?i)(measure|usage)", weight: 0.25}, {type: matches_regex, target: "(?i)(remove|criteria)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [api, deprecation]
+  - id: task_042_secret_rotation
+    description: Define an operational secret-rotation sequence.
+    category: ops
+    difficulty: medium
+    prompt: Define a secret rotation sequence that avoids downtime. Include creating the replacement, deploying consumers, verifying use, and revoking the old secret.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(create|generate).*(new|replacement)", weight: 0.25}, {type: matches_regex, target: "(?i)deploy", weight: 0.25}, {type: matches_regex, target: "(?i)(verify|monitor)", weight: 0.25}, {type: matches_regex, target: "(?i)(revoke|retire)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [security, secrets]
+  - id: task_043_benchmark_reproducibility
+    description: Define reproducibility metadata for a benchmark run.
+    category: research
+    difficulty: medium
+    prompt: List the metadata required to reproduce a benchmark run. Include corpus revision, task matrix, model and client configuration, randomization or repetition policy, and raw-result references.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(corpus|revision)", weight: 0.2}, {type: matches_regex, target: "(?i)(matrix|task)", weight: 0.2}, {type: matches_regex, target: "(?i)(model|client)", weight: 0.2}, {type: matches_regex, target: "(?i)(repeat|random)", weight: 0.2}, {type: matches_regex, target: "(?i)(raw|receipt|result)", weight: 0.2}], pass_threshold: 0.8}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [benchmark, reproducibility]
+  - id: task_044_incident_severity
+    description: Classify incident severity from stated impact.
+    category: ops
+    difficulty: easy
+    prompt: Define an incident severity decision for an outage affecting all paid users but no data loss. Include impact, urgency, and escalation expectation.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(high|sev|critical)", weight: 0.34}, {type: matches_regex, target: "(?i)(paid users|all users|impact)", weight: 0.33}, {type: matches_regex, target: "(?i)(escalat|urgent)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [incident, operations]
+  - id: task_045_pull_request_scope
+    description: Review a pull request for scope drift.
+    category: review
+    difficulty: easy
+    prompt: Give a review checklist that detects unrelated formatting churn, mixed concerns, missing tests for changed behavior, and undocumented compatibility impact.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(format|churn)", weight: 0.25}, {type: matches_regex, target: "(?i)(scope|concern)", weight: 0.25}, {type: matches_regex, target: "(?i)test", weight: 0.25}, {type: matches_regex, target: "(?i)(compatib|document)", weight: 0.25}], pass_threshold: 0.75}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [review, git]
+  - id: task_046_input_normalization
+    description: Define normalization boundaries for an email input.
+    category: development
+    difficulty: easy
+    prompt: Define how an API validates an email address. Distinguish presentation normalization from canonical storage and state how invalid input is returned.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(valid|validate)", weight: 0.34}, {type: matches_regex, target: "(?i)(normaliz|canonical)", weight: 0.33}, {type: matches_regex, target: "(?i)(invalid|error)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [input, validation]
+  - id: task_047_disaster_recovery
+    description: Define a disaster-recovery exercise acceptance gate.
+    category: ops
+    difficulty: hard
+    prompt: Define an acceptance gate for a disaster-recovery exercise. Include recovery point objective, recovery time objective, isolated validation, stakeholder communication, and a remediated failure log.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)(RPO|recovery point)", weight: 0.2}, {type: matches_regex, target: "(?i)(RTO|recovery time)", weight: 0.2}, {type: matches_regex, target: "(?i)isolated", weight: 0.2}, {type: matches_regex, target: "(?i)(stakeholder|communication)", weight: 0.2}, {type: matches_regex, target: "(?i)(failure|remediat)", weight: 0.2}], pass_threshold: 0.8}
+    limits: {max_turns: 5, max_tokens: 6000, timeout_seconds: 180}
+    tags: [disaster-recovery, operations]
+  - id: task_048_data_quality_gate
+    description: Define a data-quality gate before analytics publication.
+    category: research
+    difficulty: medium
+    prompt: Define a data-quality gate before publishing analytics. Include completeness, duplicate detection, schema validation, a threshold, and failure escalation.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)complet", weight: 0.2}, {type: matches_regex, target: "(?i)duplicate", weight: 0.2}, {type: matches_regex, target: "(?i)(schema|valid)", weight: 0.2}, {type: matches_regex, target: "(?i)(threshold|minimum)", weight: 0.2}, {type: matches_regex, target: "(?i)(escalat|fail)", weight: 0.2}], pass_threshold: 0.8}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [data, quality]
+  - id: task_049_permission_review
+    description: Review least-privilege requirements for a service account.
+    category: review
+    difficulty: medium
+    prompt: Review a service account requesting administrator access. Define the least-privilege review, evidence required, and a time-bound exception process.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)least privilege", weight: 0.34}, {type: matches_regex, target: "(?i)(evidence|justif)", weight: 0.33}, {type: matches_regex, target: "(?i)(time.bound|expire|review)", weight: 0.33}], pass_threshold: 0.67}
+    limits: {max_turns: 3, max_tokens: 4000, timeout_seconds: 120}
+    tags: [security, authorization]
+  - id: task_050_change_approval
+    description: Define a high-risk change approval record.
+    category: ops
+    difficulty: medium
+    prompt: Define a record for approving a high-risk production change. Include scope, owner, verification plan, rollback plan, and decision timestamp.
+    success_criterion: {type: assertion, assertions: [{type: matches_regex, target: "(?i)scope", weight: 0.2}, {type: matches_regex, target: "(?i)owner", weight: 0.2}, {type: matches_regex, target: "(?i)verification", weight: 0.2}, {type: matches_regex, target: "(?i)rollback", weight: 0.2}, {type: matches_regex, target: "(?i)(timestamp|time)", weight: 0.2}], pass_threshold: 0.8}
+    limits: {max_turns: 4, max_tokens: 5000, timeout_seconds: 150}
+    tags: [change-management, operations]

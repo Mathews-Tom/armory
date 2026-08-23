@@ -36,39 +36,44 @@ evals/skillsbench/
 
 ## Running the Benchmark
 
-**Status:** harness ready, seed task set partial. **Full execution is deferred
-to the operator** — a meaningful run requires hours of live `claude -p`
-execution and should be scheduled with budget awareness.
+**Status:** frozen corpus registered; live execution remains deferred to the
+operator. A meaningful run requires hours of live `claude -p` execution and
+requires M4's recorded approval, budget, privacy posture, and receipt policy.
 
 ```bash
-# Single task, dry-run (validates harness without live execution)
-uv run python scripts/run_skillsbench.py --task evals/skillsbench/tasks/task_001_*.yaml --dry-run
+# Validate the frozen task × condition × target × repetition declaration.
+uv run python scripts/run_skillsbench.py --validate-manifest
 
-# Full sweep, Config A only
-uv run python scripts/run_skillsbench.py --config A --all
+# Full declared corpus, dry-run (validates M2 target linkage and all task data
+# without a model request).
+uv run python scripts/run_skillsbench.py --dry-run
 
-# Full sweep, both configs, 3 runs each, median verdict
-uv run python scripts/run_skillsbench.py --all --runs 3
+# One registered task, dry-run.
+uv run python scripts/run_skillsbench.py --task task_001_code_review_simple --dry-run
 
-# Operator workflow for comparison
-uv run python scripts/run_skillsbench.py --all --config A --output results/run-A.json
-uv run python scripts/run_skillsbench.py --all --config B --output results/run-B.json
+# Full sweep, Config A only. Requires M4 approval before `--live`.
+uv run python scripts/run_skillsbench.py --all --config A --live
+
+# Operator workflow for comparison. Requires M4 approval before `--live`.
+uv run python scripts/run_skillsbench.py --all --config A --live --output results/run-A.json
+uv run python scripts/run_skillsbench.py --all --config B --live --output results/run-B.json
 uv run python scripts/run_skillsbench.py --compare results/run-A.json results/run-B.json
 ```
 
 ## Task Set Scope
 
-The current seed set is **5 synthetic integration tasks** chosen to exercise
-different armory capabilities without requiring external APIs or human
-judgment for scoring. Before running a verdict-bearing benchmark, expand to
-at least 50 tasks — the plan calls for GAIA-public samples plus additional
-synthetic tasks, but GAIA sampling is deferred until the harness has been
-validated on the seed set.
+`corpus.yaml` freezes **50 registered tasks** before any comparison result
+exists: the five retained seed tasks plus 45 inline tasks spanning development,
+review, operations, research, and content work. It resolves the M2 declared
+target (`claude-code-opus-xhigh`) and declares the `current`,
+`reduced-or-rewritten`, and `strengthened-contract` conditions, three
+repetitions, and explicit exclusions. The matrix therefore contains 450
+declared cells.
 
-Tasks in the seed set all use the `assertion` success criterion, which
-checks the model's final output against a list of regex/contains rules with
-weights. More complex tasks (multi-file edits, artifact checks) should add
-new criterion types rather than shoehorning into this schema.
+The legacy seed task files remain directly loadable for focused harness tests.
+Their assertion criteria remain useful for prose deliverables. Tasks whose
+intended deliverable is an artifact use artifact-aware validation rather than
+final-answer prose checks.
 
 ## What This Does Not Measure
 
