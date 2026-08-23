@@ -1,0 +1,17 @@
+# Declared, reproducible inputs for runtime-disclosure probes.
+# This file contains no credentials and never asserts that package bodies were loaded.
+schema_version: 1
+raw_receipt_retention: derived-only
+
+targets:
+  - id: claude-code-opus-xhigh
+    client: claude-code
+    model: opus
+    expected_model_prefix: claude-opus-
+    effort: xhigh
+    profiles: [core, full]
+    tool_surface: []
+    required_telemetry:
+      - model
+      - usage.input_tokens
+      - usage.output_tokens
