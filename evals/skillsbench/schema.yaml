@@ -29,3 +29,22 @@ limits:
 
 # Tags for later analysis. Keep short and consistent.
 tags: [string]
+
+# M3 frozen corpus declaration. `corpus.yaml` references retained task files
+# or supplies equivalent inline task mappings and declares the complete matrix
+# before any result exists.
+schema_version: 1
+model_fit:
+  config: relative-path-to-model_fit.yaml
+  target: declared-model-fit-target-id
+comparison:
+  baseline: current
+  treatments: [reduced-or-rewritten, strengthened-contract]
+  repetitions: 3 # Minimum; all task × condition × target × repetition cells exist.
+  exclusions:
+    - id: stable-exclusion-id
+      rationale: Explicit reason the task class cannot enter this corpus.
+tasks:
+  - file: relative-path-to-retained-task.yaml
+  - id: task_006_example
+    # Inline task mapping with the task fields above.

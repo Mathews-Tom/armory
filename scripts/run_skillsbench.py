@@ -20,6 +20,8 @@ See ``evals/skillsbench/README.md`` for the experiment design. Full
 execution is deferred to the operator — a meaningful benchmark requires
 hours of live execution and should be scheduled deliberately.
 """
+
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -31,15 +33,23 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import yaml
+import yaml  # type: ignore[import-untyped]
+
+from scripts.model_fit import ModelFitConfigError, load_model_fit_config, select_target
 
 _SUPPORTED_CRITERION_TYPES = {"assertion"}
 _SUPPORTED_ASSERTION_TYPES = {"contains", "not_contains", "matches_regex"}
+_CORPUS_SCHEMA_VERSION = 1
+_REQUIRED_CONDITIONS = frozenset(
+    {"current", "reduced-or-rewritten", "strengthened-contract"}
+)
+_DEFAULT_CORPUS_PATH = _REPO_ROOT / "evals" / "skillsbench" / "corpus.yaml"
 
 # Tolerance for floating-point comparisons in compare_reports. Pass-rate
 # subtractions like 0.70 - 0.60 produce values slightly below 0.10 in
@@ -47,6 +57,14 @@ _SUPPORTED_ASSERTION_TYPES = {"contains", "not_contains", "matches_regex"}
 # One microunit (1e-6 percentage points) is small enough to be
 # semantically irrelevant and large enough to absorb FP error.
 _COMPARE_TOLERANCE_PP = 1e-6
+
+
+class Assertion(TypedDict):
+    """A validated final-answer assertion."""
+
+    type: str
+    target: str
+    weight: float
 
 
 @dataclass
@@ -58,13 +76,35 @@ class TaskDefinition:
     category: str
     difficulty: str
     prompt: str
-    assertions: list[dict]
+    assertions: list[Assertion]
     pass_threshold: float
     max_turns: int
     max_tokens: int
     timeout_seconds: int
     tags: list[str]
     source_path: str
+
+
+@dataclass(frozen=True)
+class ComparisonCell:
+    """One predeclared task × condition × target × repetition cell."""
+
+    task_id: str
+    condition: str
+    target_id: str
+    repetition: int
+
+
+@dataclass(frozen=True)
+class CorpusManifest:
+    """A validated, pre-result SkillsBench comparison declaration."""
+
+    target_id: str
+    baseline: str
+    treatments: tuple[str, ...]
+    repetitions: int
+    exclusions: tuple[tuple[str, str], ...]
+    tasks: tuple[TaskDefinition, ...]
 
 
 @dataclass
@@ -77,7 +117,7 @@ class TaskRunResult:
     verdict: str  # "pass" | "fail" | "error" | "skipped"
     weighted_score: float
     output_excerpt: str
-    assertion_results: list[dict]
+    assertion_results: list[dict[str, object]]
     execution_time_ms: int
     error: str | None = None
 
@@ -98,84 +138,311 @@ class BenchmarkReport:
     per_task: list[TaskRunResult] = field(default_factory=list)
 
 
-def load_task(path: Path) -> TaskDefinition:
-    """Load and validate a task YAML file.
+def _require_mapping(value: object, location: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{location}: expected a mapping")
+    return value
 
-    Args:
-        path: Path to a task YAML under evals/skillsbench/tasks/.
 
-    Returns:
-        Parsed TaskDefinition.
+def _require_string(value: object, location: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{location}: expected a non-empty string")
+    return value
 
-    Raises:
-        ValueError: If the file is missing required fields or uses an
-            unsupported criterion or assertion type.
-    """
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{path}: expected a mapping at the top level")
 
-    required = {"id", "description", "category", "prompt", "success_criterion", "limits"}
-    missing = required - raw.keys()
+def _require_string_list(value: object, location: str) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ValueError(f"{location}: expected a list of strings")
+    values = tuple(
+        _require_string(item, f"{location}[{index}]")
+        for index, item in enumerate(value)
+    )
+    if len(values) != len(set(values)):
+        raise ValueError(f"{location}: must not contain duplicates")
+    return values
+
+
+def _require_positive_int(value: object, location: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{location}: expected a positive integer")
+    return value
+
+
+def _require_probability(value: object, location: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{location}: expected a number from 0 to 1")
+    probability = float(value)
+    if not 0 < probability <= 1:
+        raise ValueError(f"{location}: expected a number from 0 to 1")
+    return probability
+
+
+def _load_task_raw(
+    raw: object,
+    source_path: str,
+    expected_id: str | None = None,
+) -> TaskDefinition:
+    """Validate one file-backed or inline task mapping."""
+    task = _require_mapping(raw, source_path)
+    required = {
+        "id",
+        "description",
+        "category",
+        "prompt",
+        "success_criterion",
+        "limits",
+    }
+    missing = required - task.keys()
     if missing:
-        raise ValueError(f"{path}: missing required fields: {sorted(missing)}")
+        raise ValueError(f"{source_path}: missing required fields: {sorted(missing)}")
 
-    if raw["id"] != path.stem:
+    task_id = _require_string(task["id"], f"{source_path}.id")
+    if expected_id is not None and task_id != expected_id:
         raise ValueError(
-            f"{path}: task id {raw['id']!r} must match filename stem {path.stem!r}"
+            f"{source_path}: task id {task_id!r} must match filename stem "
+            f"{expected_id!r}"
         )
 
-    criterion = raw["success_criterion"]
-    if criterion.get("type") not in _SUPPORTED_CRITERION_TYPES:
+    criterion = _require_mapping(
+        task["success_criterion"], f"{source_path}.success_criterion"
+    )
+    criterion_type = _require_string(
+        criterion.get("type"), f"{source_path}.success_criterion.type"
+    )
+    if criterion_type not in _SUPPORTED_CRITERION_TYPES:
         raise ValueError(
-            f"{path}: unsupported criterion type {criterion.get('type')!r} "
+            f"{source_path}: unsupported criterion type {criterion_type!r} "
             f"(supported: {sorted(_SUPPORTED_CRITERION_TYPES)})"
         )
 
-    assertions = criterion.get("assertions") or []
-    if not assertions:
-        raise ValueError(f"{path}: criterion has no assertions")
-    for idx, assertion in enumerate(assertions):
-        if assertion.get("type") not in _SUPPORTED_ASSERTION_TYPES:
+    assertions_raw = criterion.get("assertions")
+    if not isinstance(assertions_raw, list) or not assertions_raw:
+        raise ValueError(f"{source_path}: criterion has no assertions")
+    assertions: list[Assertion] = []
+    for index, assertion_raw in enumerate(assertions_raw):
+        assertion = _require_mapping(assertion_raw, f"{source_path}.assertion {index}")
+        assertion_type = _require_string(
+            assertion.get("type"), f"{source_path}.assertion {index}.type"
+        )
+        if assertion_type not in _SUPPORTED_ASSERTION_TYPES:
             raise ValueError(
-                f"{path}: assertion {idx} has unsupported type {assertion.get('type')!r}"
-            )
-        if "target" not in assertion or "weight" not in assertion:
-            raise ValueError(
-                f"{path}: assertion {idx} missing 'target' or 'weight'"
+                f"{source_path}: assertion {index} has unsupported type "
+                f"{assertion_type!r}"
             )
 
-    limits = raw["limits"]
+        assertions.append(
+            Assertion(
+                type=assertion_type,
+                target=_require_string(
+                    assertion.get("target"),
+                    f"{source_path}.assertion {index}.target",
+                ),
+                weight=_require_probability(
+                    assertion.get("weight"),
+                    f"{source_path}.assertion {index}.weight",
+                ),
+            )
+        )
+
+    limits = _require_mapping(task["limits"], f"{source_path}.limits")
     return TaskDefinition(
-        id=raw["id"],
-        description=raw["description"],
-        category=raw["category"],
-        difficulty=raw.get("difficulty", "medium"),
-        prompt=raw["prompt"],
+        id=task_id,
+        description=_require_string(task["description"], f"{source_path}.description"),
+        category=_require_string(task["category"], f"{source_path}.category"),
+        difficulty=_require_string(
+            task.get("difficulty", "medium"), f"{source_path}.difficulty"
+        ),
+        prompt=_require_string(task["prompt"], f"{source_path}.prompt"),
         assertions=assertions,
-        pass_threshold=float(criterion.get("pass_threshold", 0.7)),
-        max_turns=int(limits.get("max_turns", 5)),
-        max_tokens=int(limits.get("max_tokens", 10000)),
-        timeout_seconds=int(limits.get("timeout_seconds", 180)),
-        tags=list(raw.get("tags") or []),
-        source_path=str(path),
+        pass_threshold=_require_probability(
+            criterion.get("pass_threshold", 0.7),
+            f"{source_path}.success_criterion.pass_threshold",
+        ),
+        max_turns=_require_positive_int(
+            limits.get("max_turns", 5), f"{source_path}.limits.max_turns"
+        ),
+        max_tokens=_require_positive_int(
+            limits.get("max_tokens", 10000), f"{source_path}.limits.max_tokens"
+        ),
+        timeout_seconds=_require_positive_int(
+            limits.get("timeout_seconds", 180), f"{source_path}.limits.timeout_seconds"
+        ),
+        tags=list(_require_string_list(task.get("tags", []), f"{source_path}.tags")),
+        source_path=source_path,
     )
 
 
+def load_task(path: Path) -> TaskDefinition:
+    """Load and validate one legacy file-backed SkillsBench task."""
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"{path}: cannot read task: {exc}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path}: cannot parse task YAML: {exc}") from exc
+    return _load_task_raw(raw, str(path), expected_id=path.stem)
+
+
 def load_task_set(tasks_dir: Path) -> list[TaskDefinition]:
-    """Load every YAML task under a directory, sorted by id."""
+    """Load every legacy task YAML under a directory, sorted by id."""
     if not tasks_dir.is_dir():
         return []
+    return [load_task(path) for path in sorted(tasks_dir.glob("*.yaml"))]
+
+
+def _resolve_manifest_path(base: Path, value: object, location: str) -> Path:
+    relative_path = Path(_require_string(value, location))
+    if relative_path.is_absolute():
+        raise ValueError(f"{location}: absolute paths are not allowed")
+    resolved = (base / relative_path).resolve()
+    if not resolved.is_relative_to(_REPO_ROOT.resolve()):
+        raise ValueError(f"{location}: path must remain under the repository root")
+    return resolved
+
+
+def load_corpus_manifest(path: Path = _DEFAULT_CORPUS_PATH) -> CorpusManifest:
+    """Load a frozen M3 corpus and verify its M2 target and comparison matrix."""
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"{path}: cannot read corpus manifest: {exc}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path}: cannot parse corpus YAML: {exc}") from exc
+    manifest = _require_mapping(raw, str(path))
+
+    schema_version = manifest.get("schema_version")
+    if isinstance(schema_version, bool) or schema_version != _CORPUS_SCHEMA_VERSION:
+        raise ValueError(
+            f"{path}: schema_version must be {_CORPUS_SCHEMA_VERSION}, "
+            f"got {schema_version!r}"
+        )
+
+    model_fit = _require_mapping(manifest.get("model_fit"), f"{path}.model_fit")
+    config_path = _resolve_manifest_path(
+        path.parent, model_fit.get("config"), f"{path}.model_fit.config"
+    )
+    target_id = _require_string(model_fit.get("target"), f"{path}.model_fit.target")
+    try:
+        select_target(load_model_fit_config(config_path), target_id)
+    except ModelFitConfigError as exc:
+        raise ValueError(f"{path}.model_fit: {exc}") from exc
+
+    comparison = _require_mapping(manifest.get("comparison"), f"{path}.comparison")
+    baseline = _require_string(
+        comparison.get("baseline"), f"{path}.comparison.baseline"
+    )
+    treatments = _require_string_list(
+        comparison.get("treatments"), f"{path}.comparison.treatments"
+    )
+    conditions = {baseline, *treatments}
+    if baseline != "current" or conditions != _REQUIRED_CONDITIONS:
+        raise ValueError(
+            f"{path}.comparison: must declare current, reduced-or-rewritten, "
+            "and strengthened-contract conditions"
+        )
+    repetitions = _require_positive_int(
+        comparison.get("repetitions"), f"{path}.comparison.repetitions"
+    )
+    if repetitions < 3:
+        raise ValueError(f"{path}.comparison.repetitions: must be at least 3")
+
+    exclusions_raw = comparison.get("exclusions")
+    if not isinstance(exclusions_raw, list) or not exclusions_raw:
+        raise ValueError(f"{path}.comparison.exclusions: must be a non-empty list")
+    exclusions = tuple(
+        (
+            _require_string(
+                _require_mapping(
+                    exclusion_raw, f"{path}.comparison.exclusions[{index}]"
+                ).get("id"),
+                f"{path}.comparison.exclusions[{index}].id",
+            ),
+            _require_string(
+                _require_mapping(
+                    exclusion_raw, f"{path}.comparison.exclusions[{index}]"
+                ).get("rationale"),
+                f"{path}.comparison.exclusions[{index}].rationale",
+            ),
+        )
+        for index, exclusion_raw in enumerate(exclusions_raw)
+    )
+    if len({exclusion[0] for exclusion in exclusions}) != len(exclusions):
+        raise ValueError(f"{path}.comparison.exclusions: ids must be unique")
+
+    tasks_raw = manifest.get("tasks")
+    if not isinstance(tasks_raw, list):
+        raise ValueError(f"{path}.tasks: expected a list")
+    if len(tasks_raw) < 50:
+        raise ValueError(f"{path}.tasks: requires at least 50 registered tasks")
     tasks: list[TaskDefinition] = []
-    for path in sorted(tasks_dir.glob("*.yaml")):
-        tasks.append(load_task(path))
-    return tasks
+    for index, task_raw in enumerate(tasks_raw):
+        task_mapping = _require_mapping(task_raw, f"{path}.tasks[{index}]")
+        if "file" in task_mapping:
+            if len(task_mapping) != 1:
+                raise ValueError(
+                    f"{path}.tasks[{index}]: file references cannot add fields"
+                )
+            task_path = _resolve_manifest_path(
+                path.parent, task_mapping["file"], f"{path}.tasks[{index}].file"
+            )
+            tasks.append(load_task(task_path))
+        else:
+            tasks.append(_load_task_raw(task_mapping, f"{path}#tasks[{index}]"))
+    task_ids = tuple(task.id for task in tasks)
+    if len(task_ids) != len(set(task_ids)):
+        raise ValueError(f"{path}.tasks: task ids must be unique")
+
+    return CorpusManifest(
+        target_id=target_id,
+        baseline=baseline,
+        treatments=treatments,
+        repetitions=repetitions,
+        exclusions=exclusions,
+        tasks=tuple(tasks),
+    )
+
+
+def declared_cells(corpus: CorpusManifest) -> tuple[ComparisonCell, ...]:
+    """Expand a frozen manifest into its exact comparison cells."""
+    return tuple(
+        ComparisonCell(
+            task_id=task.id,
+            condition=condition,
+            target_id=corpus.target_id,
+            repetition=repetition,
+        )
+        for task in corpus.tasks
+        for condition in (corpus.baseline, *corpus.treatments)
+        for repetition in range(1, corpus.repetitions + 1)
+    )
+
+
+def validate_observed_cells(
+    corpus: CorpusManifest, observed_cells: tuple[ComparisonCell, ...]
+) -> None:
+    """Reject result-cell sets that differ from the frozen comparison matrix."""
+    expected = set(declared_cells(corpus))
+    observed = set(observed_cells)
+    if len(observed) != len(observed_cells):
+        raise ValueError("observed comparison cells contain duplicates")
+    undeclared = observed - expected
+    if undeclared:
+        raise ValueError(
+            "observed undeclared comparison cells: "
+            f"{sorted(undeclared, key=lambda cell: (cell.task_id, cell.condition, cell.target_id, cell.repetition))!r}"
+        )
+    missing = expected - observed
+    if missing:
+        raise ValueError(
+            "observed comparison cells are missing: "
+            f"{sorted(missing, key=lambda cell: (cell.task_id, cell.condition, cell.target_id, cell.repetition))!r}"
+        )
 
 
 def check_assertions(
     output: str,
-    assertions: list[dict],
-) -> tuple[float, list[dict]]:
+    assertions: list[Assertion],
+) -> tuple[float, list[dict[str, object]]]:
     """Score output against a task's assertions.
 
     Args:
@@ -193,7 +460,7 @@ def check_assertions(
         return 0.0, []
 
     passed_weight = 0.0
-    details: list[dict] = []
+    details: list[dict[str, object]] = []
     for assertion in assertions:
         a_type = assertion["type"]
         target = str(assertion["target"])
@@ -284,7 +551,7 @@ def compare_reports(
     report_a: BenchmarkReport,
     report_b: BenchmarkReport,
     min_delta_pp: float = 15.0,
-) -> dict:
+) -> dict[str, object]:
     """Compare two configuration reports against the S3 exit criterion.
 
     Args:
@@ -339,9 +606,12 @@ def run_task_live(
         result = subprocess.run(
             [
                 "claude",
-                "-p", task.prompt,
-                "--output-format", "text",
-                "--allowedTools", *tools,
+                "-p",
+                task.prompt,
+                "--output-format",
+                "text",
+                "--allowedTools",
+                *tools,
             ],
             capture_output=True,
             text=True,
@@ -392,18 +662,19 @@ def main() -> int:
         description="Run the SkillsBench bootstrap benchmark",
     )
     parser.add_argument(
-        "--tasks-dir",
-        default="evals/skillsbench/tasks",
-        help="Directory of task YAML files",
+        "--manifest",
+        type=Path,
+        default=_DEFAULT_CORPUS_PATH,
+        help="Frozen corpus manifest to validate and load",
     )
     parser.add_argument(
         "--task",
-        help="Run a single task by path (mutually exclusive with --all)",
+        help="Run one registered task by id (default: all registered tasks)",
     )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Run every task under --tasks-dir",
+        help="Explicitly select every registered task",
     )
     parser.add_argument(
         "--config",
@@ -422,6 +693,11 @@ def main() -> int:
         help="Load tasks and validate schema without running claude",
     )
     parser.add_argument(
+        "--validate-manifest",
+        action="store_true",
+        help="Validate the frozen corpus and print its declared cell count",
+    )
+    parser.add_argument(
         "--live",
         action="store_true",
         help="Actually invoke claude -p (otherwise dry-run is implied)",
@@ -437,23 +713,39 @@ def main() -> int:
     if args.compare:
         return _compare_command(args.compare[0], args.compare[1])
 
-    if not args.task and not args.all:
-        parser.error("one of --task or --all is required")
+    corpus = load_corpus_manifest(args.manifest)
+    cells = declared_cells(corpus)
+    if len(cells) != len(set(cells)):
+        raise ValueError(f"{args.manifest}: generated duplicate comparison cells")
+    if args.validate_manifest:
+        print(
+            f"Validated {len(corpus.tasks)} task(s), {len(cells)} declared cell(s), "
+            f"and {len(corpus.exclusions)} exclusion rule(s)."
+        )
+        return 0
 
     if args.task:
-        tasks = [load_task(_REPO_ROOT / args.task)]
+        tasks = [task for task in corpus.tasks if task.id == args.task]
+        if not tasks:
+            parser.error(f"undeclared task: {args.task}")
     else:
-        tasks = load_task_set(_REPO_ROOT / args.tasks_dir)
-
-    if not tasks:
-        print(f"No tasks found in {args.tasks_dir}", file=sys.stderr)
-        return 1
+        tasks = list(corpus.tasks)
 
     if args.dry_run or not args.live:
-        print(f"Loaded {len(tasks)} task(s) for config {args.config}")
+        print(
+            f"Loaded {len(tasks)} registered task(s) for config {args.config} "
+            f"from {args.manifest}"
+        )
+        print(
+            f"Frozen comparison: target={corpus.target_id}, "
+            f"conditions={','.join((corpus.baseline, *corpus.treatments))}, "
+            f"repetitions={corpus.repetitions}, declared_cells={len(cells)}"
+        )
         print("Dry run — no tasks executed. Pass --live to actually run claude -p.")
-        for t in tasks:
-            print(f"  - {t.id} ({t.category}/{t.difficulty}): {t.description}")
+        for task in tasks:
+            print(
+                f"  - {task.id} ({task.category}/{task.difficulty}): {task.description}"
+            )
         return 0
 
     allowed_tools: list[str] | None
@@ -472,9 +764,7 @@ def main() -> int:
     report = aggregate_report(args.config, results)
     output_path = _REPO_ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(asdict(report), indent=2), encoding="utf-8"
-    )
+    output_path.write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
     print(
         f"Report written to {args.output} "
         f"(pass_rate={report.pass_rate:.2%}, mean_score={report.mean_score:.2f})"
