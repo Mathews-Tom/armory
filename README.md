@@ -71,7 +71,20 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [skill-router](agents/skill-router/)           | haiku  | Outcome-weighted package routing using historical eval results |
 | [test-engineer](agents/test-engineer/)         | sonnet | Co-evolutionary skill evolution with generate-verify-refine loops |
 
-> **Model routing:** Agents marked `opus` run on Claude Opus 4.7 with `xhigh` effort by default in Claude Code. Use `max` effort only for genuinely hard novel problems (diminishing returns, overthinking risk); `high` when running concurrent sessions or for cost-sensitive work. Opus 4.7 uses adaptive thinking — there is no fixed thinking budget to tune.
+> **Model routing:** Agents marked `opus` request Claude Code's `opus` alias with `xhigh` effort by default. The declared target matrix records the alias and an expected fully disclosed model-id prefix; a dated snapshot is an observed receipt field, never inferred from this declaration. Use `max` effort only for genuinely hard novel problems (diminishing returns, overthinking risk); use `high` for concurrent sessions or cost-sensitive work.
+
+### Runtime model-fit target matrix
+
+`model_fit.yaml` declares the client/model/effort/profile/telemetry matrix. Its current target requests the Claude Code `opus` alias, requires a disclosed model ID beginning `claude-opus-`, and requires observed input-token and output-token fields.
+
+Validate a profile without creating a model request:
+
+```bash
+uv run python scripts/model_fit.py --target claude-code-opus-xhigh --profile core --dry-run
+uv run python scripts/model_fit.py --target claude-code-opus-xhigh --profile full --dry-run
+```
+
+Dry runs read `claude --version` and resolve repository package definitions only. They report discovery metadata and explicitly state that package content was not loaded. They do not install a profile or make a paid call.
 
 ### Skills — Development & Tooling
 
