@@ -1,0 +1,16 @@
+cases:
+  - id: preflight_arxiv_submission
+    prompt: "Run a preflight check on my arXiv submission before upload."
+    fixtures: []
+    rubric: ["checks source, metadata, and compilation readiness"]
+    trigger_expected: true
+  - id: negative_tarball_creation
+    prompt: "Build a compressed source tarball."
+    fixtures: []
+    rubric: ["packaging is outside preflight review"]
+    trigger_expected: false
+  - id: negative_figure_conversion
+    prompt: "Convert EPS figures to PDF."
+    fixtures: []
+    rubric: ["figure conversion is outside preflight review"]
+    trigger_expected: false

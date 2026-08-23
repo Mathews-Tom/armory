@@ -1,0 +1,16 @@
+cases:
+  - id: apply_business_validation_preset
+    prompt: "Set up the business-validation preset for evaluating a startup idea."
+    fixtures: []
+    rubric: ["activates the preset configuration for business validation"]
+    trigger_expected: true
+  - id: negative_media_preset
+    prompt: "Configure a preset for generating a product video."
+    fixtures: []
+    rubric: ["media generation is outside business validation"]
+    trigger_expected: false
+  - id: negative_security_preset
+    prompt: "Configure a preset for repository secret scanning."
+    fixtures: []
+    rubric: ["security scanning is outside business validation"]
+    trigger_expected: false

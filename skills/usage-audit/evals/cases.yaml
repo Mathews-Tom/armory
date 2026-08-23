@@ -1,0 +1,16 @@
+cases:
+  - id: audit_claude_code_usage
+    prompt: "Audit my Claude Code setup for token waste and context bloat."
+    fixtures: []
+    rubric: ["inspects MCP servers, instructions, skills, and context cost"]
+    trigger_expected: true
+  - id: negative_security_scan
+    prompt: "Scan this repository for leaked secrets."
+    fixtures: []
+    rubric: ["security auditing is outside usage optimization"]
+    trigger_expected: false
+  - id: negative_refactor_code
+    prompt: "Refactor this Python function for readability."
+    fixtures: []
+    rubric: ["code refactoring is outside usage optimization"]
+    trigger_expected: false

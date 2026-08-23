@@ -1,0 +1,16 @@
+cases:
+  - id: review_manuscript_typography
+    prompt: "Audit the typography and layout consistency of this academic manuscript."
+    fixtures: []
+    rubric: ["identifies typographic hierarchy, spacing, and readability issues"]
+    trigger_expected: true
+  - id: negative_methodology_review
+    prompt: "Critique the research methodology in this study."
+    fixtures: []
+    rubric: ["methodology review is outside typography"]
+    trigger_expected: false
+  - id: negative_bibliography_audit
+    prompt: "Verify all citations and references in this manuscript."
+    fixtures: []
+    rubric: ["citation auditing is outside typography"]
+    trigger_expected: false

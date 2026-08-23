@@ -1,0 +1,16 @@
+cases:
+  - id: optimize_arxiv_figures
+    prompt: "Optimize figures in this PDFLaTeX paper for arXiv submission."
+    fixtures: []
+    rubric: ["inventories formats, sizes, and processor compatibility"]
+    trigger_expected: true
+  - id: negative_citation_check
+    prompt: "Verify every citation in my manuscript."
+    fixtures: []
+    rubric: ["citation verification is outside figure optimization"]
+    trigger_expected: false
+  - id: negative_package_tarball
+    prompt: "Create an arXiv submission tarball."
+    fixtures: []
+    rubric: ["submission packaging is outside figure optimization"]
+    trigger_expected: false

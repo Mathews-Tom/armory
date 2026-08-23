@@ -1,0 +1,16 @@
+cases:
+  - id: assess_figure_table_quality
+    prompt: "Assess the visual quality and accessibility of figures and tables in this paper."
+    fixtures: []
+    rubric: ["checks legibility, labeling, accessibility, and table presentation"]
+    trigger_expected: true
+  - id: negative_arxiv_tarball
+    prompt: "Package this paper for arXiv submission."
+    fixtures: []
+    rubric: ["submission packaging is outside figure and table quality"]
+    trigger_expected: false
+  - id: negative_citation_truth
+    prompt: "Verify whether these references are real."
+    fixtures: []
+    rubric: ["citation auditing is outside figure and table quality"]
+    trigger_expected: false

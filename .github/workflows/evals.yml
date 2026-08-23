@@ -87,7 +87,7 @@ jobs:
           failed=0
           for pkg_path in $changed_packages; do
             echo "Evaluating ${pkg_path}..."
-            if ! python scripts/evaluate_package.py --path "${pkg_path}" --threshold 70; then
+            if ! python scripts/evaluate_package.py --path "${pkg_path}"; then
               failed=$((failed + 1))
             fi
           done
@@ -120,13 +120,13 @@ jobs:
           missing=0
           for pkg_path in $changed_packages; do
             if [ ! -f "${pkg_path}/evals/cases.yaml" ]; then
-              echo "WARNING: ${pkg_path} definition changed but no evals/cases.yaml found"
+              echo "ERROR: ${pkg_path} definition changed but no evals/cases.yaml found"
               missing=$((missing + 1))
             fi
           done
 
           if [ "$missing" -gt 0 ]; then
             echo ""
-            echo "${missing} changed package(s) have no eval cases."
-            echo "Consider adding evals/cases.yaml for modified packages."
+            echo "FAILED: ${missing} changed package(s) have no eval cases."
+            exit 1
           fi

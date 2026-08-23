@@ -1,0 +1,16 @@
+cases:
+  - id: review_figure_argument
+    prompt: "Review whether the figures in my paper support the argument clearly."
+    fixtures: []
+    rubric: ["analyzes rhetorical role, claims, and reader interpretation"]
+    trigger_expected: true
+  - id: negative_compress_images
+    prompt: "Compress these PNG files for a smaller upload."
+    fixtures: []
+    rubric: ["image compression is outside figure rhetoric"]
+    trigger_expected: false
+  - id: negative_verify_citations
+    prompt: "Check the bibliography for fabricated papers."
+    fixtures: []
+    rubric: ["citation audit is outside figure rhetoric"]
+    trigger_expected: false
