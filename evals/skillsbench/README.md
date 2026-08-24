@@ -36,28 +36,21 @@ evals/skillsbench/
 
 ## Running the Benchmark
 
-**Status:** frozen corpus registered; live execution remains deferred to the
-operator. A meaningful run requires hours of live `claude -p` execution and
-requires M4's recorded approval, budget, privacy posture, and receipt policy.
+**Status:** M4's no-cost OMP preflight is available. It validates the frozen
+two-target matrix against active Claude and Codex subscriptions without sending a
+model request. Live execution remains unavailable until the reviewed preflight
+stack merges and a fresh M4 design gate authorizes the resulting runtime.
 
 ```bash
-# Validate the frozen task × condition × target × repetition declaration.
+# Validate the frozen corpus and package strata.
 uv run python scripts/run_skillsbench.py --validate-manifest
+uv run python scripts/validate_skillsbench.py
 
-# Full declared corpus, dry-run (validates M2 target linkage and all task data
-# without a model request).
+# Validate the 900-cell OMP subscription contract without a model request.
+uv run python scripts/omp_skillsbench.py --preflight
+
+# Legacy harness dry-run: validates M2 target linkage and task data only.
 uv run python scripts/run_skillsbench.py --dry-run
-
-# One registered task, dry-run.
-uv run python scripts/run_skillsbench.py --task task_001_code_review_simple --dry-run
-
-# Full sweep, Config A only. Requires M4 approval before `--live`.
-uv run python scripts/run_skillsbench.py --all --config A --live
-
-# Operator workflow for comparison. Requires M4 approval before `--live`.
-uv run python scripts/run_skillsbench.py --all --config A --live --output results/run-A.json
-uv run python scripts/run_skillsbench.py --all --config B --live --output results/run-B.json
-uv run python scripts/run_skillsbench.py --compare results/run-A.json results/run-B.json
 ```
 
 ## Task Set Scope
@@ -67,8 +60,9 @@ exists: the five retained seed tasks plus 45 inline tasks spanning development,
 review, operations, research, and content work. It resolves the M2 declared
 target (`claude-code-opus-xhigh`) and declares the `current`,
 `reduced-or-rewritten`, and `strengthened-contract` conditions, three
-repetitions, and explicit exclusions. The matrix therefore contains 450
-declared cells.
+repetitions, and explicit exclusions. The M3 declaration contains 450 cells.
+`omp_run.yaml` expands those conditions over pinned Claude and Codex OMP targets
+into the M4 900-cell subscription matrix without running a model.
 
 The legacy seed task files remain directly loadable for focused harness tests.
 Their assertion criteria remain useful for prose deliverables. Tasks whose
