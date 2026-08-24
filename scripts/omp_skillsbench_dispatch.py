@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -39,7 +40,8 @@ from scripts.omp_skillsbench_results import (
 )
 
 _EXPECTED_CELL_COUNT: Final = 900
-_TOOL_SURFACE: Final = "Read,Write,Edit,Bash,Glob,Grep"
+_PROCESS_GRACE_SECONDS: Final = 30
+_TOOL_SURFACE: Final = "read,write,edit,bash,glob,grep"
 
 
 class OmpDispatchError(ValueError):
@@ -158,17 +160,12 @@ def build_omp_command(contract: OmpRunContract, prepared: PreparedCell) -> list[
 
 
 def _classify_nonzero(stderr: str) -> OmpDispatchError:
-    normalized = stderr.casefold()
-    if any(
-        token in normalized
-        for token in (
-            "no api key",
-            "not logged",
-            "auth",
-            "quota",
-            "rate limit",
-            "credit",
-        )
+    if "no api key" in stderr.casefold() or "not logged" in stderr.casefold():
+        return GlobalDispatchError("OMP provider authentication or quota failure")
+    if re.search(
+        r"\b(authentication|authorization|quota|rate limit|insufficient credit)\b",
+        stderr,
+        re.IGNORECASE,
     ):
         return GlobalDispatchError("OMP provider authentication or quota failure")
     return CellDispatchError("OMP process failed for the declared cell")
@@ -191,7 +188,7 @@ def dispatch_cell(
                 check=False,
                 stdin=subprocess.DEVNULL,
                 text=True,
-                timeout=contract.max_time_seconds,
+                timeout=contract.max_time_seconds + _PROCESS_GRACE_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:
             raise CellDispatchError(
@@ -209,8 +206,14 @@ def dispatch_cell(
                 completed.stdout,
             )
         except OmpResultError as exc:
-            raise GlobalDispatchError(
-                f"OMP terminal receipt is invalid: {exc}"
+            if "provider/model differs" in str(exc) or "unapproved provider API" in str(
+                exc
+            ):
+                raise GlobalDispatchError(
+                    f"OMP terminal receipt has global identity drift: {exc}"
+                ) from exc
+            raise CellDispatchError(
+                f"OMP terminal receipt failed for the cell: {exc}"
             ) from exc
         write_derived_receipt(receipt_root, receipt)
         return receipt
@@ -226,9 +229,32 @@ def dispatcher_preflight(contract: OmpRunContract) -> DispatcherPreflightReport:
         for index, cell in enumerate(cells):
             prepared = prepare_cell(contract, cell, root / str(index))
             command = build_omp_command(contract, prepared)
-            if "--model" not in command or "--append-system-prompt" not in command:
+            model_index = command.index("--model") + 1
+            thinking_index = command.index("--thinking") + 1
+            cwd_index = command.index("--cwd") + 1
+            bundle_index = command.index("--append-system-prompt") + 1
+            bundle = Path(command[bundle_index]).resolve()
+            if command[model_index] != prepared.target.model:
                 raise OmpDispatchError(
-                    "dispatcher command omits required target or condition input"
+                    "dispatcher command model differs from its cell target"
+                )
+            if command[thinking_index] != prepared.target.thinking:
+                raise OmpDispatchError(
+                    "dispatcher command thinking differs from its cell target"
+                )
+            if Path(command[cwd_index]).resolve() != prepared.workspace:
+                raise OmpDispatchError(
+                    "dispatcher command cwd differs from its cell workspace"
+                )
+            if not bundle.is_relative_to(prepared.workspace) or not bundle.is_file():
+                raise OmpDispatchError(
+                    "dispatcher condition bundle escapes its cell workspace"
+                )
+            if prepared.materialized.content_hash not in bundle.read_text(
+                encoding="utf-8"
+            ):
+                raise OmpDispatchError(
+                    "dispatcher condition bundle omits its materialized hash"
                 )
             if "--api-key" in command or "--profile" in command:
                 raise OmpDispatchError(
