@@ -36,11 +36,11 @@ evals/skillsbench/
 
 ## Running the Benchmark
 
-**Status:** M4's no-cost OMP input and result preflights are available. They
-validate the frozen two-target matrix, reviewed treatment materialization, and
-derived-receipt schema against active Claude and Codex subscriptions without a
-model request. Live execution remains unavailable until the reviewed result-runner
-stack merges and a fresh M4 design gate authorizes it.
+**Status:** M4's no-cost OMP input, receipt, and dispatcher preflights are
+available. They validate the frozen two-target matrix, reviewed treatment
+materialization, derived-receipt schema, and all 900 isolated command shapes
+without a model request. Live execution remains unavailable until a fresh M4
+design gate authorizes the reviewed dispatcher.
 
 ```bash
 # Validate the frozen corpus and package strata.
@@ -52,6 +52,9 @@ uv run python scripts/omp_skillsbench.py --preflight
 
 # Materialize reviewed treatment inputs and validate immutable receipt handling.
 uv run python scripts/omp_skillsbench_results.py --preflight
+
+# Validate all 900 isolated OMP command shapes without starting OMP.
+uv run python scripts/omp_skillsbench_dispatch.py --preflight
 
 # Legacy harness dry-run: validates M2 target linkage and task data only.
 uv run python scripts/run_skillsbench.py --dry-run
