@@ -62,6 +62,7 @@ def test_prepared_cell_has_explicit_condition_bundle(tmp_path: Path) -> None:
         "--model" in command
         and command[command.index("--model") + 1] == "anthropic/claude-opus-5"
     )
+    assert command[command.index("--profile") + 1] == "m4-benchmark"
     assert "--api-key" not in command
 
 
@@ -103,6 +104,22 @@ def test_dispatch_treats_auth_failures_as_global(tmp_path: Path) -> None:
         dispatch_cell(contract, cell, tmp_path / "receipts", runner)
 
 
+@pytest.mark.parametrize(
+    "stderr", ["401 Unauthorized", "rate_limit_error", "OAuth token expired"]
+)
+def test_dispatch_treats_provider_error_forms_as_global(
+    tmp_path: Path, stderr: str
+) -> None:
+    contract = load_omp_run_contract(_CONTRACT_PATH)
+    cell = declared_omp_cells(contract)[0]
+
+    def runner(command: list[str], **kwargs: object) -> CompletedProcess[str]:
+        return CompletedProcess(command, 1, stdout="", stderr=stderr)
+
+    with pytest.raises(GlobalDispatchError, match="authentication or quota"):
+        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+
+
 def test_dispatch_treats_neutral_cell_failure_as_non_global(tmp_path: Path) -> None:
     contract = load_omp_run_contract(_CONTRACT_PATH)
     cell = declared_omp_cells(contract)[0]
@@ -122,4 +139,17 @@ def test_dispatch_timeout_is_cell_failure(tmp_path: Path) -> None:
         raise TimeoutExpired(command, 630)
 
     with pytest.raises(CellDispatchError, match="wall-time"):
+        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+
+
+def test_dispatch_treats_abnormal_terminal_as_cell_failure(tmp_path: Path) -> None:
+    contract = load_omp_run_contract(_CONTRACT_PATH)
+    cell = declared_omp_cells(contract)[0]
+    event = json.loads(_terminal_events())
+    event["message"]["stopReason"] = "max_tokens"
+
+    def runner(command: list[str], **kwargs: object) -> CompletedProcess[str]:
+        return CompletedProcess(command, 0, stdout=json.dumps(event), stderr="")
+
+    with pytest.raises(CellDispatchError, match="terminal receipt failed"):
         dispatch_cell(contract, cell, tmp_path / "receipts", runner)
