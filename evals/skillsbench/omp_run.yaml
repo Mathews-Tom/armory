@@ -7,6 +7,7 @@ execution:
   attempts_per_cell: 1
   max_time_seconds: 600
   derived_receipts_only: true
+  profile: m4-benchmark
 
 targets:
   - id: omp-anthropic-claude-opus-5

@@ -81,6 +81,7 @@ class OmpRunContract:
     treatments: tuple[TreatmentVariant, ...]
     attempts_per_cell: int
     max_time_seconds: int
+    profile: str
     corpus: CorpusManifest
 
 
@@ -212,6 +213,9 @@ def load_omp_run_contract(path: Path = _DEFAULT_CONTRACT_PATH) -> OmpRunContract
     )
     if attempts != 1:
         raise OmpRunConfigError("execution.attempts_per_cell must be exactly 1")
+    profile = _string(execution.get("profile"), "execution.profile")
+    if profile != "m4-benchmark":
+        raise OmpRunConfigError("execution.profile must be m4-benchmark")
     targets_raw = contract.get("targets")
     if not isinstance(targets_raw, list) or len(targets_raw) != _EXPECTED_TARGET_COUNT:
         raise OmpRunConfigError(
@@ -255,6 +259,7 @@ def load_omp_run_contract(path: Path = _DEFAULT_CONTRACT_PATH) -> OmpRunContract
         targets=targets,
         treatments=treatments,
         attempts_per_cell=attempts,
+        profile=profile,
         max_time_seconds=_positive_int(
             execution.get("max_time_seconds"), "execution.max_time_seconds"
         ),

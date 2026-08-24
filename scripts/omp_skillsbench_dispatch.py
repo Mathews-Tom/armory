@@ -139,6 +139,8 @@ def build_omp_command(contract: OmpRunContract, prepared: PreparedCell) -> list[
         "--mode",
         "json",
         "--no-session",
+        "--profile",
+        contract.profile,
         "--no-title",
         "--no-extensions",
         "--no-skills",
@@ -160,12 +162,12 @@ def build_omp_command(contract: OmpRunContract, prepared: PreparedCell) -> list[
 
 
 def _classify_nonzero(stderr: str) -> OmpDispatchError:
-    if "no api key" in stderr.casefold() or "not logged" in stderr.casefold():
-        return GlobalDispatchError("OMP provider authentication or quota failure")
+    normalized = re.sub(r"[-_]", " ", stderr.casefold())
     if re.search(
-        r"\b(authentication|authorization|quota|rate limit|insufficient credit)\b",
-        stderr,
-        re.IGNORECASE,
+        r"\b(401|403|429)\b|no api key|invalid api key|not logged|oauth token expired|"
+        r"\b(unauthorized|authentication|authorization|quota|rate limit|"
+        r"insufficient quota|insufficient credit|credit balance|billing)\b",
+        normalized,
     ):
         return GlobalDispatchError("OMP provider authentication or quota failure")
     return CellDispatchError("OMP process failed for the declared cell")
@@ -215,7 +217,12 @@ def dispatch_cell(
             raise CellDispatchError(
                 f"OMP terminal receipt failed for the cell: {exc}"
             ) from exc
-        write_derived_receipt(receipt_root, receipt)
+        try:
+            write_derived_receipt(receipt_root, receipt)
+        except OmpResultError as exc:
+            raise CellDispatchError(
+                f"OMP receipt persistence failed for the cell: {exc}"
+            ) from exc
         return receipt
 
 
@@ -256,9 +263,10 @@ def dispatcher_preflight(contract: OmpRunContract) -> DispatcherPreflightReport:
                 raise OmpDispatchError(
                     "dispatcher condition bundle omits its materialized hash"
                 )
-            if "--api-key" in command or "--profile" in command:
+            profile_index = command.index("--profile") + 1
+            if command[profile_index] != contract.profile or "--api-key" in command:
                 raise OmpDispatchError(
-                    "dispatcher command may not override subscription auth"
+                    "dispatcher command does not use the dedicated subscription profile"
                 )
     return DispatcherPreflightReport(
         cell_count=len(cells),
