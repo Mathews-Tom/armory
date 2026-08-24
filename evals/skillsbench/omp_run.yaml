@@ -1,0 +1,60 @@
+schema_version: 1
+execution:
+  runner: omp
+  mode: json
+  subscription_only: true
+  session_persistence: false
+  attempts_per_cell: 1
+  max_time_seconds: 600
+  derived_receipts_only: true
+
+targets:
+  - id: omp-anthropic-claude-opus-5
+    model: anthropic/claude-opus-5
+    subscription_label: Anthropic
+    thinking: xhigh
+  - id: omp-openai-gpt-5-codex
+    model: openai/gpt-5-codex
+    subscription_label: Openai Codex
+    thinking: xhigh
+
+# Each source revision is pinned. The reduced condition keeps only the reviewed
+# load-bearing sections; strengthened-contract appends the stated invariant to
+# the complete pinned source. PR-2 materializes these specifications in isolated
+# worktrees and records the resulting content hashes per cell.
+treatments:
+  - package: agent/security-reviewer
+    source: agents/security-reviewer/AGENT.md
+    source_sha256: e27c6b70f4fb08456e4098f4a06007e598323e71c36c34fd0badbbe9826f3e71
+    reduced_sections: ["Scope and Trigger Conditions", "Severity Classification", "Output Format", "Rules", "Verification"]
+    strengthened_append: "Every reported finding MUST distinguish verified source-to-sink evidence from a hypothesis and MUST state the evidence gap when verification is unavailable."
+  - package: command/stack-pr
+    source: commands/stack-pr/COMMAND.md
+    source_sha256: 5c86024f50fd7d1d68e52d01360b61408d2fbe3b4869d62dbfbd6053874bbcb9
+    reduced_sections: ["Workflow", "Operations", "Argument Rules", "Error Handling", "Output"]
+    strengthened_append: "Before any stack mutation, require an explicit branch order or provider-base evidence; refuse inferred topology when the two disagree."
+  - package: hook/git-protection
+    source: hooks/git-protection/HOOK.md
+    source_sha256: bb392e70d026df14088895c64d7e8775699b97d0234c37feca615b29891da2ce
+    reduced_sections: ["Blocked Operations", "Behavior", "Bypassing"]
+    strengthened_append: "Malformed tool input is a blocked operation: emit an explicit denial and never treat an unreadable command as safe."
+  - package: preset/sec-strict
+    source: presets/sec-strict/PRESET.md
+    source_sha256: 874b4ea9af2fb6bf7778d3be0df45525e97bb731efc9b644565600e67f199e41
+    reduced_sections: ["Included Packages", "Defense Layers", "When to Use", "Relationship to Core"]
+    strengthened_append: "For every exception to this preset, record the omitted package, security rationale, approver, and expiry before execution."
+  - package: rule/security-standards
+    source: rules/security-standards/RULE.md
+    source_sha256: 3657c435d3ed86a0db1eb026e65162c721e9aa89402919542e965b808516764a
+    reduced_sections: ["Secret Management", "Input Validation", "Authentication and Session Handling", "HTTP Security Headers", "File Upload Security"]
+    strengthened_append: "Security exceptions require an explicit owner, compensating control, expiry, and verification command; undocumented exceptions are rejected."
+  - package: skill/pr-review
+    source: skills/pr-review/SKILL.md
+    source_sha256: 776a618c37d1b9c0ae5466f5af06f506056d69b574c3dd93557217b5bef96c54
+    reduced_sections: ["Workflow", "Output Format", "Error Handling", "Calibration Rules", "Verification"]
+    strengthened_append: "Every approval must identify the tested behavioral contract and name unresolved risks; a green test suite alone is not an approval rationale."
+  - package: utility/dependency-tree
+    source: utilities/dependency-tree/UTILITY.md
+    source_sha256: be88aad965885eb00d525a1a8cfd01557cbb0050d7113e6fe48f4497898619af
+    reduced_sections: ["Usage", "Output Format", "Supported Formats", "Limitations"]
+    strengthened_append: "Output MUST state the parsed manifest path and explicitly label unresolved transitive dependencies as unavailable rather than absent."
