@@ -28,7 +28,7 @@ def test_loads_fixed_two_target_contract() -> None:
 
     assert [target.model for target in contract.targets] == [
         "anthropic/claude-opus-5",
-        "openai/gpt-5-codex",
+        "openai-codex/gpt-5.6-terra",
     ]
     assert len(contract.treatments) == 7
     assert len(cells) == 900

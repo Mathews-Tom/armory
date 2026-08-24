@@ -222,7 +222,7 @@ def load_omp_run_contract(path: Path = _DEFAULT_CONTRACT_PATH) -> OmpRunContract
     if len(target_ids) != len(set(target_ids)):
         raise OmpRunConfigError("targets must not contain duplicate ids")
     target_models = {target.model for target in targets}
-    if target_models != {"anthropic/claude-opus-5", "openai/gpt-5-codex"}:
+    if target_models != {"anthropic/claude-opus-5", "openai-codex/gpt-5.6-terra"}:
         raise OmpRunConfigError(
             "targets must declare the approved Claude and Codex models"
         )

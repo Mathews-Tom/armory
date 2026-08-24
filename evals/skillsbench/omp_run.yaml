@@ -13,8 +13,8 @@ targets:
     model: anthropic/claude-opus-5
     subscription_label: Anthropic
     thinking: xhigh
-  - id: omp-openai-gpt-5-codex
-    model: openai/gpt-5-codex
+  - id: omp-openai-codex-gpt-5-6-terra
+    model: openai-codex/gpt-5.6-terra
     subscription_label: Openai Codex
     thinking: xhigh
 
