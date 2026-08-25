@@ -2,7 +2,7 @@
 name: milestone-runner
 description: 'Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design. Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.'
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   category: development
   tags: [milestones, orchestration, adaptive-planning, stacked-prs, ci, release-management, execution-prompts]
   difficulty: advanced
@@ -30,6 +30,7 @@ An ignored history ledger is reconstructible local evidence, not authoritative s
 
 Every terminal milestone result must print the literal heading `NEXT STEPS:` followed by concrete, ordered actions: the current milestone action, release-preparation state, and the next runnable milestone. A `NO-GO` must name remediation and either an independent milestone that can proceed or the reason no milestone can. A prose follow-up or JSON `next_steps` key is insufficient.
 
+
 | Evidence | Use |
 | --- | --- |
 | Authoritative plan and prompts | Build the DAG, release trains, milestone contract, and design-gate scope. |
@@ -37,6 +38,24 @@ Every terminal milestone result must print the literal heading `NEXT STEPS:` fol
 | Current code plus merged predecessor diffs and PR evidence | Validate the plan’s assumptions, interfaces, dependencies, and acceptance. |
 | CI/check state and verification commands | Confirm predecessor outcomes, reconciliation PRs, and implementation stacks. |
 | Provider PR metadata | Confirm bases, reviewed reconciliation, stack topology, and merge state. |
+
+## Capability-first proportionality
+
+The runner exists to ship useful product behavior, not to maximize process.
+
+- When an existing package has an observable defect and an established evaluator
+  can verify a focused correction, prioritize that authorized product-code change
+  over new benchmark, telemetry, dispatcher, or release-control infrastructure.
+- Treat a new measurement or control-plane prerequisite as justified only when
+  its output directly decides a concrete product change already in scope.
+- An unresolved release target blocks release preparation, not an otherwise
+  authorized product-code change, unless the plan explicitly makes release
+  identity a runtime prerequisite.
+- Scope a `DESIGN NO-GO` to the affected dependency closure. Continue an
+  independent milestone lane only when it holds its own current `DESIGN GO` and
+  shares no invalidated assumption.
+- State the smallest observable next action. Do not substitute more gates,
+  dashboards, or experimental machinery for a product improvement.
 
 ## Modes
 
@@ -47,7 +66,7 @@ Every terminal milestone result must print the literal heading `NEXT STEPS:` fol
 | Resume | "continue the milestone sequence" | Reconstruct state from authoritative artifacts and external evidence, then reconcile the next ready milestone or release train. |
 | Merge and clean | "merge the stack", "ensure CI is green" | Verify design and merge gates, use stacked-PR discipline, clean verified merged branches, and evaluate release preparation. |
 
-Default to sequential. Never launch code after `DESIGN NO-GO`, a failed or pending gate, an unresolved release target, or a required human gate.
+Default to sequential. Never launch code after `DESIGN NO-GO`, a failed or pending gate, an unresolved release target for release preparation or where the plan makes release identity a runtime prerequisite, or a required human gate.
 
 ## Workflow
 
@@ -125,7 +144,7 @@ Treat runner output as a hint. Verify externally:
 | PR topology | Root targets the intended base and children target the preceding branch. |
 | Checks and verification | CI is green and every milestone command passes with expected output. Pending is not done. |
 | Review | Per-PR and whole-stack criteria are complete. |
-| Release target | Plan, prompt, and verdict agree; no unresolved or invented target exists. |
+| Release target | Plan, prompt, and verdict agree; never invent a target. An unresolved target blocks release preparation and the merge verdict only when the plan makes release identity a runtime prerequisite. |
 | Cleanliness | No accidental non-ignored worktree files remain. |
 
 Any failed gate stops the affected dependency closure. Report the last safe state and required remediation; independent release trains may continue only in isolated lanes.
