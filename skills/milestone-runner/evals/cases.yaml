@@ -120,6 +120,36 @@ cases:
         target: "(do not tag|do not publish|not.*publish)"
         weight: 0.8
 
+  - id: direct_package_fix_over_control_plane
+    prompt: >
+      The package evaluator found that skills/example has an observable trigger
+      regression and its existing eval can verify a focused description fix.
+      The release target is unresolved. Fix the package rather than starting a
+      new benchmark, telemetry pipeline, or release-control project.
+    fixtures: []
+    rubric:
+      - "prioritizes the focused package correction and its existing evaluator"
+      - "treats the unresolved release target as release-preparation work, not a package-fix blocker"
+      - "does not create benchmark, telemetry, dispatcher, dashboard, or control-plane work"
+      - "reports the smallest observable next action"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "NEXT STEPS"
+        weight: 1.0
+      - type: matches_regex
+        target: "(package|skills/example).*(fix|correct|improve)|(fix|correct|improve).*(package|skills/example)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(existing eval|evaluator|focused).*verif"
+        weight: 0.9
+      - type: matches_regex
+        target: "(before|rather than|instead of|prioriti[sz]e)[^\\n]{0,80}(benchmark|telemetry|dispatcher|dashboard|control.plane|infrastructure)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(release target|release preparation).*(defer|does not block|not a blocker)|(defer|does not block|not a blocker).*(release target|release preparation)"
+        weight: 0.9
+
   - id: negative_generate_plan_prompts
     prompt: >
       Create DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md from the documents in docs/ and save them in .docs.
