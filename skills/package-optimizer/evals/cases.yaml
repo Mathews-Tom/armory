@@ -1,0 +1,90 @@
+cases:
+  - id: structural_evidence_proposal
+    prompt: >
+      Optimize skills/example. Its package evaluator passes static conformance and
+      an evaluator case proves the required trigger still activates. The request is
+      to remove one redundant example section, but no behavioral model result is
+      available. Produce a proposal only.
+    fixtures: []
+    rubric:
+      - "scopes the proposal to skills/example"
+      - "labels the evidence as structural and does not infer model effectiveness"
+      - "requires explicit approval before edits"
+      - "names the existing evaluator case as the preservation check"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(Scope|scope).*skills/example"
+        weight: 1.0
+      - type: matches_regex
+        target: "(structural|static conformance)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(approval required|explicit approval|do not edit)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(preservation check|evaluator|eval case)"
+        weight: 0.9
+
+  - id: stale_profile_refusal
+    prompt: >
+      Simplify skills/example using a model result collected before the package
+      changed. The result has no current model/client/tool-surface profile and the
+      evaluator case did not run. Apply the edit now.
+    fixtures: []
+    rubric:
+      - "refuses to edit without approval"
+      - "classifies the stale or incomparable evidence as inconclusive"
+      - "requests the smallest missing evaluator or profile evidence"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(inconclusive|stale|incomparable|missing evidence)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(do not edit|approval required|explicit approval)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(evaluator|eval case|capability profile|recertification)"
+        weight: 0.9
+      - type: not_contains
+        target: "applied"
+        weight: 1.0
+      - type: not_contains
+        target: "updated the file"
+        weight: 1.0
+
+  - id: negative_benchmark_runner_request
+    prompt: >
+      Run all milestones in the development plan, merge their PR stacks, and
+      prepare the release train.
+    fixtures: []
+    rubric:
+      - "milestone orchestration belongs to milestone-runner"
+    trigger_expected: false
+
+  - id: broad_apply_refusal
+    prompt: >
+      Rewrite every skill to be shorter now. Do not inspect package evidence,
+      ask for approval, or run any evaluator.
+    fixtures: []
+    rubric:
+      - "refuses the over-broad unapproved scope"
+      - "returns inconclusive and identifies the smallest package decision"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(inconclusive|do not edit|approval required)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(scope|package decision|one package|bounded)"
+        weight: 0.9
+
+  - id: negative_static_quality_audit
+    prompt: >
+      Score skills/example across frontmatter quality, trigger coverage, content
+      depth, integrity, and contributing compliance.
+    fixtures: []
+    rubric:
+      - "static rubric scoring belongs to package-evaluator"
+    trigger_expected: false
