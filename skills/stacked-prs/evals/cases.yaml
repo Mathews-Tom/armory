@@ -204,6 +204,101 @@ cases:
         target: "(stop|stops|do not|must not)[\\s\\S]*(mismatch|differs|different)"
         weight: 1.0
 
+  - id: github_native_same_repo_stack
+    prompt: >
+      Link same-repository branches feat/core, feat/api, and feat/ui into a
+      GitHub-native stack on main. Preserve the existing Stack-Id trailers and
+      stop if native topology disagrees with the Armory stack metadata.
+    fixtures: []
+    rubric:
+      - "probes gh stack support and same-repository eligibility"
+      - "links the stack bottom-to-top with gh stack link"
+      - "preserves Armory provenance and fails on topology disagreement"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack --help"
+        weight: 0.8
+      - type: matches_regex
+        target: "gh stack link[\\s\\S]*--base[\\s\\S]*main"
+        weight: 1.0
+      - type: matches_regex
+        target: "(Stack-Id|Stack-Position|\\.stack-prs\\.yaml)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(same.repository|fork|topology|disagree|mismatch)"
+        weight: 0.9
+
+  - id: github_native_prefix_merge
+    prompt: >
+      In a GitHub-native stack, merge only the prefix through PR #42 with a merge
+      commit after every displayed layer is green. Do not infer the merge boundary.
+    fixtures: []
+    rubric:
+      - "requires the explicit highest PR number for a partial merge"
+      - "uses GitHub atomic stack merge with a trailer-preserving explicit method"
+      - "re-fetches and verifies remaining topology after the cascading rebase"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack merge[\\s\\S]*42[\\s\\S]*--yes[\\s\\S]*--merge-method\\s+merge\\b"
+        weight: 1.0
+      - type: matches_regex
+        target: "(atomic|every lower|prefix|partial)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(fetch|re-fetch|topology|cascading)"
+        weight: 0.8
+
+  - id: github_native_fork_fallback
+    prompt: >
+      Use GitHub-native stack mode for a stack whose child branch belongs to a
+      fork. Keep the stack safe.
+    fixtures: []
+    rubric:
+      - "rejects GitHub-native mode for cross-fork stacks"
+      - "falls back to the manual Armory workflow without losing provenance"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(fork|cross.repository|same.repository)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(manual|fallback|root.to.leaf)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(Stack-Id|Stack-Position|provenance)"
+        weight: 0.8
+      - type: not_contains
+        target: "gh stack link"
+        weight: 1.0
+      - type: not_contains
+        target: "gh stack merge"
+        weight: 1.0
+      - type: matches_regex
+        target: "gh pr merge|gh pr edit[\\s\\S]*--base"
+        weight: 0.9
+
+  - id: github_native_unavailable_fallback
+    prompt: >
+      GitHub native stacked pull requests are disabled for this repository.
+      Keep a same-repository stack safe and continue without native mode.
+    fixtures: []
+    rubric:
+      - "detects native mode unavailability and selects manual Armory mode"
+      - "does not run native link or merge operations"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(exit code 9|not enabled|native.*unavailable|manual.*fallback)"
+        weight: 1.0
+      - type: not_contains
+        target: "gh stack link"
+        weight: 1.0
+      - type: not_contains
+        target: "gh stack merge"
+        weight: 1.0
+
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."
     fixtures: []
