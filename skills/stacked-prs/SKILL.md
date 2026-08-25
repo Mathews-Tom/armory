@@ -1,10 +1,10 @@
 ---
 name: stacked-prs
-description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches". Use when local branches or one source branch need to become a dependency-ordered PR stack with correct parent bases, validation, synchronization, merge order, and cleanup.'
+description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization, merge order, cleanup, and optional GitHub-native stack support.'
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   category: development
-  tags: [git, pull-requests, stacked-prs, workflow]
+  tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
   phase: ship
 ---
@@ -25,6 +25,7 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 | `references/merge-discipline.md` | Bottom-up merge and branch cleanup rules | Merging or closing out a stack |
 | `references/metadata-format.md` | Optional metadata schema and validation rules | `.stack-prs.yaml` exists or inference is ambiguous |
 | `references/provenance.md` | Commit-trailer stack identity, stamping, verification, merge-mode coupling | Creating, splitting, syncing, or merging any stack |
+| `references/github-native.md` | Eligibility, `gh stack` operations, preview limits, and manual fallback | A GitHub-native stack is requested or detected |
 
 ## When To Use
 
@@ -48,6 +49,46 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Stamp `Stack-Id` and `Stack-Position` trailers on every commit the skill creates or splits; copy the ID from `.stack-prs.yaml` or mint it once when absent.
 - Verify trailers are present and consistent before merge.
 - Detect the provider merge mode before merging. Under squash-only repos, fold trailers into the squash body or stack identity is lost.
+
+## GitHub-native stack mode
+
+GitHub-native stacks are public preview, same-repository-only, and optional.
+They enhance manual Armory stacks; they do not replace provenance trailers,
+`.stack-prs.yaml`, or the provider-neutral workflow.
+
+Use `github-native` mode only after this eligibility probe passes:
+
+1. GitHub CLI plus `gh stack --help` succeeds; install `github/gh-stack` when absent.
+2. Native stack support is enabled for the repository; native exit code 9 falls
+   back to manual mode.
+3. Every proposed head/base branch and pull request belongs to the same GitHub
+   repository; reject forks and cross-repository stacks.
+4. Existing PR bases, local branch order, and `Stack-Id`/`Stack-Position`
+   provenance agree. Stop on disagreement.
+5. Native merge is eligible only when trailers survive: use merge/rebase mode;
+   use manual Armory mode for squash-only repositories.
+6. The user explicitly requests native mode or accepts its public-preview risk.
+
+When eligible:
+
+- Link existing branches or PRs bottom-to-top with
+  `gh stack link --base <base> <branch-or-pr>...`.
+- Inspect both Armory provenance and the GitHub-native stack position.
+- Sync with `gh stack sync`; re-read `gh stack view` after every non-interactive
+  sync and use `gh stack rebase` plus `gh stack push` for non-linear history.
+- Merge the entire stack only on an explicit user request; invoke
+  `gh stack merge --yes --merge-method <merge|rebase>` with no positional
+  argument. For a partial prefix, require the exact highest PR number and run
+  `gh stack merge <pr-number> --yes --merge-method <merge|rebase>`.
+  Outside a merge queue, GitHub merges every lower layer atomically.
+- For a merge queue, method flags are ignored and stack members may land in
+  separate queue groups; require explicit queue acceptance and verify each group.
+- Re-fetch and verify the remaining stack topology, CI, and provenance after
+  GitHub's cascading rebase/retarget.
+
+Fall back to the manual workflow when the probe fails, the stack spans a fork,
+the GitHub preview surface is unavailable, or provider/trailer topology differs.
+Never silently switch modes mid-stack.
 
 ## Workflow
 
