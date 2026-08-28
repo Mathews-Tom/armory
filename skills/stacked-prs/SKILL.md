@@ -48,13 +48,17 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Do not delete unmerged stack branches without explicit user instruction.
 - Stamp `Stack-Id` and `Stack-Position` trailers on every commit the skill creates or splits; copy the ID from `.stack-prs.yaml` or mint it once when absent.
 - Verify trailers are present and consistent before merge.
-- Detect the provider merge mode before merging. Under squash-only repos, fold trailers into the squash body or stack identity is lost.
+- Probe every open stack PR for native-stack membership during Inspect (`references/stack-model.md` § Native Stack Detection) before merge planning; a detected native stack makes the manual merge path in §5 unavailable, not merely discouraged.
 
 ## GitHub-native stack mode
 
 GitHub-native stacks are public preview, same-repository-only, and optional.
 They enhance manual Armory stacks; they do not replace provenance trailers,
 `.stack-prs.yaml`, or the provider-neutral workflow.
+
+Native-stack membership is a provider-side property of a pull request, not a
+mode this skill chooses. Detect it for every stack PR during Inspect, before
+any merge planning, whether or not `github-native` mode was requested.
 
 Use `github-native` mode only after this eligibility probe passes:
 
@@ -105,12 +109,14 @@ git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
 gh pr list --state open --json number,title,headRefName,baseRefName,state,url
 ```
 
-Produce a table with one row per stack branch:
+Produce a table with one row per stack branch. Run the native-stack probe
+(`references/stack-model.md` § Native Stack Detection) for every PR before
+recording this table:
 
-| Order | Branch | Parent | PR | State | Checks |
-| ---: | --- | --- | --- | --- | --- |
-| 1 | `feat/parser-core` | `main` | `#101` | open | pending |
-| 2 | `feat/parser-cache` | `feat/parser-core` | `#102` | open | pending |
+| Order | Branch | Parent | PR | State | Checks | Native |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `feat/parser-core` | `main` | `#101` | open | pending | no |
+| 2 | `feat/parser-cache` | `feat/parser-core` | `#102` | open | pending | no |
 
 Stop when no provider adapter is available, no local branches match the requested stack, or parent order cannot be inferred from PR bases, explicit order, or metadata.
 

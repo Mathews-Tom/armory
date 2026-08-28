@@ -299,6 +299,26 @@ cases:
         target: "gh stack merge"
         weight: 1.0
 
+  - id: native_stack_detected_during_inspect
+    prompt: >
+      Inspect this two-PR stack before planning anything else.
+    fixtures: []
+    rubric:
+      - "probes native stack membership for every open stack PR during Inspect"
+      - "uses a non-mutating provider check rather than gh stack view"
+      - "records native status in the stack model output"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh api repos/\\{owner\\}/\\{repo\\}/pulls/"
+        weight: 1.0
+      - type: matches_regex
+        target: "\\.stack"
+        weight: 0.8
+      - type: not_contains
+        target: "gh stack view <"
+        weight: 0.8
+
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."
     fixtures: []
