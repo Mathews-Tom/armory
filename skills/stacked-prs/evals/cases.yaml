@@ -368,6 +368,27 @@ cases:
         target: "gh stack view <"
         weight: 0.8
 
+  - id: squash_merged_local_branch_cleanup
+    prompt: >
+      The stack merged with --squash and git branch --merged origin/staging
+      lists nothing for the stack branches. Clean up the local branches.
+    fixtures: []
+    rubric:
+      - "recognizes git branch --merged is unreachable proof after a squash or rebase merge"
+      - "proves content equivalence instead before deleting"
+      - "deletes only after the equivalence proof passes"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(git diff --quiet|git cherry)"
+        weight: 1.0
+      - type: matches_regex
+        target: "git branch -D"
+        weight: 0.8
+      - type: matches_regex
+        target: "(squash|rebase)[\\s\\S]*(ancestry|no ancestry|not list)"
+        weight: 0.8
+
   - id: stack_base_is_not_main
     prompt: >
       Merge this stack. Both PRs target staging, not main.

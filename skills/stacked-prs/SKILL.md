@@ -262,11 +262,30 @@ After the stack lands:
 git switch <base>
 git pull --ff-only origin <base>
 git fetch --prune origin
+```
+
+Delete local branches with merge-mode-appropriate proof. For a `--merge`
+(merge-commit) landing, ancestry survives:
+
+```bash
 git branch --merged <base>
 git branch -d <merged-stack-branch>
 ```
 
-Delete only branches confirmed merged into the current base.
+For a `--squash` or `--rebase` landing, the landed commit has no ancestry link
+to the local branch: `git branch --merged <base>` never lists it and `git
+branch -d` always refuses. Prove content equivalence instead:
+
+```bash
+git diff --quiet origin/<base> <merged-stack-branch>
+git branch -D <merged-stack-branch>
+```
+
+A stale local branch predating a remote rebase can show diffs in files it
+never touched; read `git diff --stat` for additions unique to the branch, not
+merely for nonzero output, before trusting the comparison. When in doubt, use
+`git cherry <base> <merged-stack-branch>` instead: no `+`-prefixed lines means
+every commit already landed, and `-D` is safe.
 
 Delete remote stack branches only after every stack PR has landed or been retargeted away from the branch:
 
@@ -330,6 +349,7 @@ Do not publish if the leaf differs from the source branch.
 | Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
 | PR is a detected native-stack member | Stop the manual merge path; use GitHub-native stack mode merge instead |
 | Squash repo with `PR_BODY`/`BLANK` message policy and trailers not present | Stop; use the squash-body merge path |
+| Local branch fails its merge-mode-appropriate proof (unmerged per `git branch --merged <base>` under a merge-commit landing, or shows `+` commits under `git cherry <base> <branch>` for a squash/rebase landing) | Stop; do not force-delete without explicit user instruction |
 
 ## Recovery: Deleted Parent Branch Closed A Child PR
 
