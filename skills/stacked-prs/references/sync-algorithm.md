@@ -31,14 +31,14 @@ Use the local parent branch after rebasing it. Do not rebase children onto stale
 
 ## Retargeting After Parent Merge
 
-When a parent lands into `main`, the child must be rebased onto `origin/main` and its PR base retargeted to `main`:
+When a parent lands into `<base>`, the child must be rebased onto `origin/<base>` and its PR base retargeted to `<base>`:
 
 ```bash
 git fetch origin --prune
 git switch <child-branch>
-git rebase origin/main
+git rebase origin/<base>
 git push --force-with-lease origin <child-branch>
-gh pr edit <child-pr> --base main
+gh pr edit <child-pr> --base <base>
 ```
 
 Then repeat for the next child.

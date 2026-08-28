@@ -31,9 +31,9 @@ If the child-base guard returns any PRs, keep the parent branch. On GitHub, dele
 
 ```bash
 git switch <child-branch>
-git rebase origin/main
+git rebase origin/<base>
 git push --force-with-lease origin <child-branch>
-gh pr edit <child-pr> --base main
+gh pr edit <child-pr> --base <base>
 ```
 
 Then validate and merge that child.
@@ -41,10 +41,10 @@ Then validate and merge that child.
 ## Cleanup
 
 ```bash
-git switch main
-git pull --ff-only origin main
+git switch <base>
+git pull --ff-only origin <base>
 git fetch --prune origin
-git branch --merged main
+git branch --merged <base>
 git branch -d <merged-stack-branch>
 ```
 
@@ -66,7 +66,7 @@ Use this path only for the specific provider failure where a child PR was closed
 2. Confirm the deleted branch was the closed PR's `baseRefName`.
 3. Confirm the child `headRefName` still exists on `origin`.
 4. Confirm the child head commit is still the intended stack slice.
-5. Recreate the PR against `main` or the current merged parent.
+5. Recreate the PR against `<base>` or the current merged parent.
 6. Wait for required provider checks on the recreated PR.
 7. Continue root-to-leaf merging.
 

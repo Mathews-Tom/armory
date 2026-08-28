@@ -42,6 +42,7 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Run `git status --porcelain` before rebases, pushes, PR creation, PR retargeting, merge, or cleanup.
 - Stop on a dirty worktree unless the user explicitly scopes the operation to inspection only.
 - Prefer existing PR `baseRefName` values over inferred ancestry.
+- Resolve `<base>` from the root PR's `baseRefName` (`gh pr view <root-pr> --json baseRefName --jq .baseRefName`), not from `origin/HEAD`; a stack's trunk need not be the repository's default branch.
 - Use explicit branch order or `.stack-prs.yaml` when parent inference is ambiguous.
 - Never use plain `git push --force`; use `git push --force-with-lease origin <branch>`.
 - Merge from root to leaf. Never merge a child before its parent.
@@ -194,7 +195,7 @@ Stop when a branch has no commits beyond its parent, an existing PR is closed an
 
 ### 3. Sync
 
-Rebase each stack branch onto its parent after `main` or any parent branch moves:
+Rebase each stack branch onto its parent after `<base>` or any parent branch moves:
 
 ```bash
 git status --porcelain
@@ -238,9 +239,9 @@ gh pr list --state open --json number,baseRefName,headRefName \
 gh pr merge <root-pr> --merge
 git fetch origin --prune
 git switch <child-branch>
-git rebase origin/main
+git rebase origin/<base>
 git push --force-with-lease origin <child-branch>
-gh pr edit <child-pr> --base main
+gh pr edit <child-pr> --base <base>
 ```
 
 If merge commits are allowed, use `gh pr merge <pr> --merge`. If the
@@ -258,10 +259,10 @@ On GitHub, do not pass `--delete-branch` while any open PR still has the branch 
 After the stack lands:
 
 ```bash
-git switch main
-git pull --ff-only origin main
+git switch <base>
+git pull --ff-only origin <base>
 git fetch --prune origin
-git branch --merged main
+git branch --merged <base>
 git branch -d <merged-stack-branch>
 ```
 
@@ -320,7 +321,7 @@ Do not publish if the leaf differs from the source branch.
 | Dirty worktree before mutation | Stop and report changed paths |
 | Ambiguous parent order | Request explicit branch order or `.stack-prs.yaml` |
 | Existing closed unmerged PR | Stop before creating replacements |
-| Closed unmerged child after parent branch deletion | Confirm the head branch and intended commit still exist, recreate the PR against `main` or the current merged parent, wait for checks, then continue |
+| Closed unmerged child after parent branch deletion | Confirm the head branch and intended commit still exist, recreate the PR against `<base>` or the current merged parent, wait for checks, then continue |
 | Rebase or cherry-pick conflict | Stop, report branch and conflicted files, do not continue children |
 | Remote branch changed since fetch | Stop; do not retry without a fresh inspect |
 | Failed validation | Record the failed command and stop merge or publish |
@@ -338,7 +339,7 @@ Use this only when a provider closed a child PR because its base branch was dele
 2. Confirm the closed PR's base branch was deleted by the parent merge or cleanup command.
 3. Confirm the child head branch still exists on `origin`.
 4. Confirm the child head commit is the intended stack slice.
-5. Recreate the PR against `main` or the current merged parent.
+5. Recreate the PR against `<base>` or the current merged parent.
 6. Wait for required checks on the recreated PR.
 7. Continue the root-to-leaf merge sequence.
 

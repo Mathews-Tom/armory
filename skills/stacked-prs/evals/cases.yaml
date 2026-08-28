@@ -368,6 +368,29 @@ cases:
         target: "gh stack view <"
         weight: 0.8
 
+  - id: stack_base_is_not_main
+    prompt: >
+      Merge this stack. Both PRs target staging, not main.
+    fixtures: []
+    rubric:
+      - "resolves the base branch from the root PR's baseRefName instead of assuming main"
+      - "uses the resolved base in every rebase, retarget, and cleanup command"
+      - "never hardcodes main when the stack's actual base is staging"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "baseRefName"
+        weight: 0.9
+      - type: matches_regex
+        target: "staging"
+        weight: 0.9
+      - type: not_contains
+        target: "--base main"
+        weight: 1.0
+      - type: not_contains
+        target: "origin/main"
+        weight: 1.0
+
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."
     fixtures: []
