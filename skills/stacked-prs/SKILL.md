@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization, merge order, cleanup, and optional GitHub-native stack support.'
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced

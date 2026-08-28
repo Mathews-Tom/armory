@@ -1227,7 +1227,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: stacked-prs
-    version: 0.2.0
+    version: 0.3.0
     description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create
       stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs",
       "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use
