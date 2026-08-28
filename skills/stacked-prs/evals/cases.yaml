@@ -151,19 +151,22 @@ cases:
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "detects provider merge policy before merge"
-      - "folds stack trailers into the squash commit body"
+      - "detects the repo's squash_merge_commit_message policy before merge, not just whether squash is allowed"
+      - "folds stack trailers into the squash commit body only when the policy is PR_BODY or BLANK"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "gh api repos/\\{owner\\}/\\{repo\\}"
         weight: 0.8
       - type: matches_regex
-        target: "allow_squash_merge"
-        weight: 0.8
-      - type: matches_regex
-        target: "gh pr merge[\\s\\S]*--squash[\\s\\S]*--body[\\s\\S]*Stack-Id"
+        target: "squash_merge_commit_message"
         weight: 1.0
+      - type: matches_regex
+        target: "(COMMIT_MESSAGES|PR_BODY|BLANK)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(PR_BODY|BLANK)[\\s\\S]*(--body|fold)"
+        weight: 0.9
 
   - id: backfill_existing_stack_trailers
     prompt: "Backfill Stack-Id trailers onto this existing unmerged stack and prove the leaf tree still matches the original source branch."
@@ -249,6 +252,31 @@ cases:
       - type: matches_regex
         target: "(fetch|re-fetch|topology|cascading)"
         weight: 0.8
+
+  - id: github_native_prefix_merge_squash
+    prompt: >
+      In a GitHub-native stack whose repo defaults squash_merge_commit_message
+      to COMMIT_MESSAGES, merge only the prefix through PR #42 with a squash
+      after every displayed layer is green.
+    fixtures: []
+    rubric:
+      - "checks squash_merge_commit_message before choosing squash as the merge method"
+      - "expects trailers to survive automatically under COMMIT_MESSAGES with no squash-body workaround"
+      - "does not attempt a --body override on gh stack merge"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack merge[\\s\\S]*42[\\s\\S]*--yes[\\s\\S]*--merge-method\\s+squash\\b"
+        weight: 1.0
+      - type: matches_regex
+        target: "squash_merge_commit_message"
+        weight: 0.9
+      - type: matches_regex
+        target: "(COMMIT_MESSAGES)[\\s\\S]*(automatic|survive)"
+        weight: 0.8
+      - type: not_contains
+        target: "gh stack merge[\\s\\S]*--body"
+        weight: 0.9
 
   - id: github_native_fork_fallback
     prompt: >

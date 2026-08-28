@@ -68,7 +68,7 @@ gh api repos/{owner}/{repo} \
 gh pr merge <number> --merge
 ```
 
-Prefer `--merge` when merge commits are allowed. If the repository is squash-only, use the squash-body merge path in `references/provenance.md` so `Stack-Id` and `Stack-Position` survive in history.
+Prefer `--merge` when merge commits are allowed. If the repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK` (`gh api repos/{owner}/{repo} --jq '.squash_merge_commit_message'`), use the squash-body merge path in `references/provenance.md` so `Stack-Id` and `Stack-Position` survive in history. Under `COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers automatically.
 
 Do not use `--delete-branch` while any open PR still has the branch being merged as `baseRefName`. For GitHub stacks, branch deletion can close descendant PRs unmerged when their base branch disappears.
 

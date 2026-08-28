@@ -80,17 +80,36 @@ git log --grep 'Stack-Id: <stack-id>' \
 
 ## Merge Mode Coupling
 
-Trailer survival depends on merge mode:
+Trailer survival depends on merge mode and, for squash, on the repository's
+squash message policy — not on a blanket "squash discards messages"
+assumption.
 
 | Merge mode | Commit messages | Trailers survive |
 | --- | --- | --- |
 | `gh pr merge --merge` | Original commits preserved | Yes, automatically |
 | `gh pr merge --rebase` | Original commits replayed | Yes, automatically |
-| `gh pr merge --squash` | Messages collapsed and rewritten | No, unless folded into squash body |
+| `gh pr merge --squash`, policy `COMMIT_MESSAGES` (GitHub default) | Every squashed commit's full message concatenated | Yes, automatically, once per squashed commit |
+| `gh pr merge --squash`, policy `PR_BODY` | PR body only | Only if the PR body carries the trailers |
+| `gh pr merge --squash`, policy `BLANK` | Discarded | No; fold trailers in with `--body` |
 
-The documented merge path uses `--merge`, so trailers survive as-is. If a
-target repo enforces squash merges, inject the trailers into the squash commit
-body because GitHub's squash default discards per-commit messages:
+Detect the repo's squash message policy before merging, not merely whether
+squash is allowed:
+
+```bash
+gh api repos/{owner}/{repo} \
+  --jq '{title: .squash_merge_commit_title, message: .squash_merge_commit_message}'
+```
+
+- `COMMIT_MESSAGES` (GitHub's default): trailers survive automatically. No
+  `--body` override needed.
+- `PR_BODY`: trailers survive only if the PR body includes them; use the
+  squash-body path below.
+- `BLANK`: trailers are always discarded; use the squash-body path below or
+  switch to `--merge`/`--rebase`.
+
+The documented merge path uses `--merge`, so trailers survive as-is by
+default. When the target repository squashes and `squash_merge_commit_message`
+is `PR_BODY` or `BLANK`, inject the trailers into the squash commit body:
 
 ```bash
 gh pr merge <pr> --squash \
@@ -101,11 +120,19 @@ gh pr merge <pr> --squash \
     'Stack-Position: <n>/<total>')"
 ```
 
-Detect the repo's merge policy before merging:
+For a GitHub-native stack merged with `gh stack merge`, no `--subject`/`--body`
+override exists (`references/github-native.md` § Merge). Under
+`COMMIT_MESSAGES` this is safe by default; under `PR_BODY` or `BLANK`, fold
+the trailers into each PR body before merging so the squash captures them, or
+use `--merge-method merge`/`rebase` instead of squash.
+
+Detect the repo's overall merge policy (which methods are allowed) separately,
+to choose a method at all:
 
 ```bash
 gh api repos/{owner}/{repo} \
   --jq '{merge: .allow_merge_commit, squash: .allow_squash_merge, rebase: .allow_rebase_merge}'
 ```
 
-If only squash is allowed, take the squash-body path. Otherwise prefer `--merge`.
+If only squash is allowed, take the squash-body path (or confirm
+`COMMIT_MESSAGES`). Otherwise prefer `--merge`.

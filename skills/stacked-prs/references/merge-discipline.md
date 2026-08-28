@@ -23,7 +23,7 @@ gh pr merge <root-pr> --merge
 git fetch origin --prune
 ```
 
-Verify `Stack-Id` and `Stack-Position` trailers before each merge. Prefer `gh pr merge <pr> --merge` when merge commits are allowed. If the repository is squash-only, use the squash-body path from `references/provenance.md`; do not merge until the trailers are folded into the squash commit body.
+Verify `Stack-Id` and `Stack-Position` trailers before each merge. Prefer `gh pr merge <pr> --merge` when merge commits are allowed. If the repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK`, use the squash-body path from `references/provenance.md`; do not merge until the trailers are present. Under `COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers automatically.
 
 If the child-base guard returns any PRs, keep the parent branch. On GitHub, deleting a branch that is still a child PR base can close the child PR unmerged.
 
@@ -75,7 +75,7 @@ Use this path only for the specific provider failure where a child PR was closed
 - Parent PR is not merged.
 - Required checks are failing or pending.
 - A stack commit is missing `Stack-Id` or has a `Stack-Id` that differs from `.stack-prs.yaml`.
-- The repository is squash-only and the squash body does not include stack trailers.
+- Squash message policy is `PR_BODY` or `BLANK` and stack trailers are not present in the squash body or PR body.
 - Provider reports branch protection failure.
 - Rebase conflict occurs after parent merge.
 - Local branch is not listed by `git branch --merged <base>`.

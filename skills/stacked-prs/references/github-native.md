@@ -115,6 +115,26 @@ Never infer a prefix. Require the exact highest pull request number. GitHub
 applies branch protection at merge time. After completion, re-fetch, verify
 stack topology/CI/provenance, and clean only confirmed merged branches.
 
+### Choosing a merge method for trailer survival
+
+Key the method choice on the repository's squash message policy, not on
+whether squash is merely one of the allowed methods:
+
+```bash
+gh api repos/{owner}/{repo} \
+  --jq '{title: .squash_merge_commit_title, message: .squash_merge_commit_message}'
+```
+
+| `squash_merge_commit_message` | Trailers under `--merge-method squash` |
+| --- | --- |
+| `COMMIT_MESSAGES` (GitHub default) | Survive automatically, once per squashed commit |
+| `PR_BODY` | Survive only if every PR body already carries them |
+| `BLANK` | Always lost; `gh stack merge` has no `--subject`/`--body` override |
+
+Under `BLANK`, either change the repository's message policy before merging or
+use `--merge-method merge`/`rebase` for this merge; `--merge-method squash`
+gives up provenance with no recovery path.
+
 ### Merge queues
 
 When the base uses a merge queue, stack members enter the queue together but can

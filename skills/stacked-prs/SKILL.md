@@ -49,6 +49,7 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Stamp `Stack-Id` and `Stack-Position` trailers on every commit the skill creates or splits; copy the ID from `.stack-prs.yaml` or mint it once when absent.
 - Verify trailers are present and consistent before merge.
 - Probe every open stack PR for native-stack membership during Inspect (`references/stack-model.md` § Native Stack Detection) before merge planning; a detected native stack makes the manual merge path in §5 unavailable, not merely discouraged.
+- Detect the provider's squash message policy (`squash_merge_commit_message`) before merging with `--squash`. Fold trailers into the squash body only when the policy is `PR_BODY` or `BLANK`; under `COMMIT_MESSAGES` (GitHub's default) trailers already survive automatically.
 
 ## GitHub-native stack mode
 
@@ -94,10 +95,18 @@ When eligible or already native:
 - Sync with `gh stack sync`; re-read `gh stack view` after every non-interactive
   sync and use `gh stack rebase` plus `gh stack push` for non-linear history.
 - Merge the entire stack only on an explicit user request; invoke
-  `gh stack merge --yes --merge-method <merge|rebase>` with no positional
-  argument. For a partial prefix, require the exact highest PR number and run
-  `gh stack merge <pr-number> --yes --merge-method <merge|rebase>`.
-  Outside a merge queue, GitHub merges every lower layer atomically.
+  `gh stack merge --yes --merge-method <merge|squash|rebase>` with no
+  positional argument. For a partial prefix, require the exact highest PR
+  number and run `gh stack merge <pr-number> --yes --merge-method
+  <merge|squash|rebase>`. Outside a merge queue, GitHub merges every lower
+  layer atomically.
+- Before choosing `--squash`, check `gh api repos/{owner}/{repo} --jq
+  '.squash_merge_commit_message'`. Trailers survive automatically under
+  `COMMIT_MESSAGES` (GitHub's default). Under `PR_BODY` they survive only if
+  every PR body already carries them. Under `BLANK` they are always lost and
+  `gh stack merge` has no `--subject`/`--body` override to fold them back in —
+  change the repository's policy first or merge with `--merge-method
+  merge`/`rebase` instead.
 - For a merge queue, method flags are ignored and stack members may land in
   separate queue groups; require explicit queue acceptance and verify each group.
 - Re-fetch and verify the remaining stack topology, CI, and provenance after
@@ -226,7 +235,13 @@ git push --force-with-lease origin <child-branch>
 gh pr edit <child-pr> --base main
 ```
 
-If merge commits are allowed, use `gh pr merge <pr> --merge`. If the repository is squash-only, use the squash-body path from `references/provenance.md` so the `Stack-Id` and `Stack-Position` trailers land in the squash commit body.
+If merge commits are allowed, use `gh pr merge <pr> --merge`. If the
+repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK`
+(`gh api repos/{owner}/{repo} --jq '.squash_merge_commit_message'`), use the
+squash-body path from `references/provenance.md` so the `Stack-Id` and
+`Stack-Position` trailers land in the squash commit body. Under
+`COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers
+automatically.
 
 On GitHub, do not pass `--delete-branch` while any open PR still has the branch being merged as its `baseRefName`. Deleting a parent branch that is still a child PR base can close the child PR unmerged. Repeat for each child. Require trailer verification, parent checks, and provider merge confirmation before moving to the next branch.
 
@@ -305,7 +320,7 @@ Do not publish if the leaf differs from the source branch.
 | Commit in stack range missing `Stack-Id` trailer | Stop; stamp via provenance backfill before merge |
 | Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
 | PR is a detected native-stack member | Stop the manual merge path; use GitHub-native stack mode merge instead |
-| Squash-only repo without trailers folded into squash body | Stop; use the squash-body merge path |
+| Squash repo with `PR_BODY`/`BLANK` message policy and trailers not present | Stop; use the squash-body merge path |
 
 ## Recovery: Deleted Parent Branch Closed A Child PR
 
