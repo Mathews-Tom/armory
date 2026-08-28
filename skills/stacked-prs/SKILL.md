@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization, merge order, cleanup, and optional GitHub-native stack support.'
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
@@ -42,21 +42,30 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 - Run `git status --porcelain` before rebases, pushes, PR creation, PR retargeting, merge, or cleanup.
 - Stop on a dirty worktree unless the user explicitly scopes the operation to inspection only.
 - Prefer existing PR `baseRefName` values over inferred ancestry.
+- Resolve `<base>` from the root PR's `baseRefName` (`gh pr view <root-pr> --json baseRefName --jq .baseRefName`), not from `origin/HEAD`; a stack's trunk need not be the repository's default branch.
 - Use explicit branch order or `.stack-prs.yaml` when parent inference is ambiguous.
 - Never use plain `git push --force`; use `git push --force-with-lease origin <branch>`.
 - Merge from root to leaf. Never merge a child before its parent.
 - Do not delete unmerged stack branches without explicit user instruction.
 - Stamp `Stack-Id` and `Stack-Position` trailers on every commit the skill creates or splits; copy the ID from `.stack-prs.yaml` or mint it once when absent.
 - Verify trailers are present and consistent before merge.
-- Detect the provider merge mode before merging. Under squash-only repos, fold trailers into the squash body or stack identity is lost.
+- Probe every open stack PR for native-stack membership during Inspect (`references/stack-model.md` § Native Stack Detection) before merge planning; a detected native stack makes the manual merge path in §5 unavailable, not merely discouraged.
+- Detect the provider's squash message policy (`squash_merge_commit_message`) before merging with `--squash`. Fold trailers into the squash body only when the policy is `PR_BODY` or `BLANK`; under `COMMIT_MESSAGES` (GitHub's default) trailers already survive automatically.
 
 ## GitHub-native stack mode
 
-GitHub-native stacks are public preview, same-repository-only, and optional.
-They enhance manual Armory stacks; they do not replace provenance trailers,
+GitHub-native stacks are public preview and same-repository-only. They
+enhance manual Armory stacks; they do not replace provenance trailers,
 `.stack-prs.yaml`, or the provider-neutral workflow.
 
-Use `github-native` mode only after this eligibility probe passes:
+Native-stack membership is a provider-side property of a pull request, not a
+mode this skill chooses. Detect it for every stack PR during Inspect, before
+any merge planning, whether or not `github-native` mode was requested.
+
+### Creating native state (opt-in)
+
+Converting a manual stack to native with `gh stack link` is a mutation with
+public-preview risk. Use it only after this eligibility probe passes:
 
 1. GitHub CLI plus `gh stack --help` succeeds; install `github/gh-stack` when absent.
 2. Native stack support is enabled for the repository; native exit code 9 falls
@@ -65,11 +74,21 @@ Use `github-native` mode only after this eligibility probe passes:
    repository; reject forks and cross-repository stacks.
 4. Existing PR bases, local branch order, and `Stack-Id`/`Stack-Position`
    provenance agree. Stop on disagreement.
-5. Native merge is eligible only when trailers survive: use merge/rebase mode;
-   use manual Armory mode for squash-only repositories.
-6. The user explicitly requests native mode or accepts its public-preview risk.
+5. The user explicitly requests native mode or accepts its public-preview risk.
 
-When eligible:
+### Operating on an already-native stack (mandatory)
+
+Once Inspect finds a PR already native, native mode is not a choice for any
+operation that mutates that PR: the provider refuses a plain synchronous merge
+mutation (`gh pr merge`, and the underlying `mergePullRequest`/`PUT
+.../pulls/{n}/merge`) for a stack member with "must be merged using the
+asynchronous merge REST API." There is no manual Armory merge path for an
+already-native stack; do not present one as an alternative. Conditions 1-4
+above still apply as safety checks; condition 5's user consent does not — a
+stack the provider already registered as native carries no additional
+preview risk beyond what already exists.
+
+When eligible or already native:
 
 - Link existing branches or PRs bottom-to-top with
   `gh stack link --base <base> <branch-or-pr>...`.
@@ -77,18 +96,36 @@ When eligible:
 - Sync with `gh stack sync`; re-read `gh stack view` after every non-interactive
   sync and use `gh stack rebase` plus `gh stack push` for non-linear history.
 - Merge the entire stack only on an explicit user request; invoke
-  `gh stack merge --yes --merge-method <merge|rebase>` with no positional
-  argument. For a partial prefix, require the exact highest PR number and run
-  `gh stack merge <pr-number> --yes --merge-method <merge|rebase>`.
-  Outside a merge queue, GitHub merges every lower layer atomically.
+  `gh stack merge --yes --merge-method <merge|squash|rebase>` with no
+  positional argument. For a partial prefix, require the exact highest PR
+  number and run `gh stack merge <pr-number> --yes --merge-method
+  <merge|squash|rebase>`. Outside a merge queue, GitHub merges every lower
+  layer atomically.
+- Before choosing `--squash`, check `gh api repos/{owner}/{repo} --jq
+  '.squash_merge_commit_message'`. Trailers survive automatically under
+  `COMMIT_MESSAGES` (GitHub's default). Under `PR_BODY` they survive only if
+  every PR body already carries them. Under `BLANK` they are always lost and
+  `gh stack merge` has no `--subject`/`--body` override to fold them back in —
+  change the repository's policy first or merge with `--merge-method
+  merge`/`rebase` instead.
+- `gh stack merge` exposes no `--subject`/`--body`. With
+  `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a PR
+  squashing a single commit takes that commit's headline as the base-branch
+  subject, not the PR title, and this cannot be corrected after merge without
+  rewriting pushed history. When the visible subject matters for a
+  single-commit PR under `--merge-method squash`, align the commit headline
+  with the PR title first (`git commit --amend -m "<pr-title>"`, then
+  force-with-lease push) before running `gh stack merge`.
 - For a merge queue, method flags are ignored and stack members may land in
   separate queue groups; require explicit queue acceptance and verify each group.
 - Re-fetch and verify the remaining stack topology, CI, and provenance after
   GitHub's cascading rebase/retarget.
 
-Fall back to the manual workflow when the probe fails, the stack spans a fork,
-the GitHub preview surface is unavailable, or provider/trailer topology differs.
-Never silently switch modes mid-stack.
+Fall back to the manual workflow only when the stack is not yet native: the
+creation probe fails, the stack spans a fork, the preview surface is
+unavailable, or provider/trailer topology differs. Never silently switch
+modes mid-stack, and never attempt the manual merge path once Inspect has
+found the stack is already native.
 
 ## Workflow
 
@@ -105,12 +142,14 @@ git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
 gh pr list --state open --json number,title,headRefName,baseRefName,state,url
 ```
 
-Produce a table with one row per stack branch:
+Produce a table with one row per stack branch. Run the native-stack probe
+(`references/stack-model.md` § Native Stack Detection) for every PR before
+recording this table:
 
-| Order | Branch | Parent | PR | State | Checks |
-| ---: | --- | --- | --- | --- | --- |
-| 1 | `feat/parser-core` | `main` | `#101` | open | pending |
-| 2 | `feat/parser-cache` | `feat/parser-core` | `#102` | open | pending |
+| Order | Branch | Parent | PR | State | Checks | Native |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `feat/parser-core` | `main` | `#101` | open | pending | no |
+| 2 | `feat/parser-cache` | `feat/parser-core` | `#102` | open | pending | no |
 
 Stop when no provider adapter is available, no local branches match the requested stack, or parent order cannot be inferred from PR bases, explicit order, or metadata.
 
@@ -156,7 +195,7 @@ Stop when a branch has no commits beyond its parent, an existing PR is closed an
 
 ### 3. Sync
 
-Rebase each stack branch onto its parent after `main` or any parent branch moves:
+Rebase each stack branch onto its parent after `<base>` or any parent branch moves:
 
 ```bash
 git status --porcelain
@@ -184,6 +223,11 @@ uv run python scripts/evaluate_package.py --path skills/stacked-prs
 
 ### 5. Merge
 
+Before merging, confirm the Inspect native-stack probe reported `null` for
+this PR. A non-null result means the provider already treats this stack as
+native; `gh pr merge` will be rejected outright — switch to the GitHub-native
+stack mode merge path above instead of continuing here.
+
 Merge root to leaf:
 
 ```bash
@@ -195,12 +239,18 @@ gh pr list --state open --json number,baseRefName,headRefName \
 gh pr merge <root-pr> --merge
 git fetch origin --prune
 git switch <child-branch>
-git rebase origin/main
+git rebase origin/<base>
 git push --force-with-lease origin <child-branch>
-gh pr edit <child-pr> --base main
+gh pr edit <child-pr> --base <base>
 ```
 
-If merge commits are allowed, use `gh pr merge <pr> --merge`. If the repository is squash-only, use the squash-body path from `references/provenance.md` so the `Stack-Id` and `Stack-Position` trailers land in the squash commit body.
+If merge commits are allowed, use `gh pr merge <pr> --merge`. If the
+repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK`
+(`gh api repos/{owner}/{repo} --jq '.squash_merge_commit_message'`), use the
+squash-body path from `references/provenance.md` so the `Stack-Id` and
+`Stack-Position` trailers land in the squash commit body. Under
+`COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers
+automatically.
 
 On GitHub, do not pass `--delete-branch` while any open PR still has the branch being merged as its `baseRefName`. Deleting a parent branch that is still a child PR base can close the child PR unmerged. Repeat for each child. Require trailer verification, parent checks, and provider merge confirmation before moving to the next branch.
 
@@ -209,14 +259,33 @@ On GitHub, do not pass `--delete-branch` while any open PR still has the branch 
 After the stack lands:
 
 ```bash
-git switch main
-git pull --ff-only origin main
+git switch <base>
+git pull --ff-only origin <base>
 git fetch --prune origin
-git branch --merged main
+```
+
+Delete local branches with merge-mode-appropriate proof. For a `--merge`
+(merge-commit) landing, ancestry survives:
+
+```bash
+git branch --merged <base>
 git branch -d <merged-stack-branch>
 ```
 
-Delete only branches confirmed merged into the current base.
+For a `--squash` or `--rebase` landing, the landed commit has no ancestry link
+to the local branch: `git branch --merged <base>` never lists it and `git
+branch -d` always refuses. Prove content equivalence instead:
+
+```bash
+git diff --quiet origin/<base> <merged-stack-branch>
+git branch -D <merged-stack-branch>
+```
+
+A stale local branch predating a remote rebase can show diffs in files it
+never touched; read `git diff --stat` for additions unique to the branch, not
+merely for nonzero output, before trusting the comparison. When in doubt, use
+`git cherry <base> <merged-stack-branch>` instead: no `+`-prefixed lines means
+every commit already landed, and `-D` is safe.
 
 Delete remote stack branches only after every stack PR has landed or been retargeted away from the branch:
 
@@ -271,14 +340,16 @@ Do not publish if the leaf differs from the source branch.
 | Dirty worktree before mutation | Stop and report changed paths |
 | Ambiguous parent order | Request explicit branch order or `.stack-prs.yaml` |
 | Existing closed unmerged PR | Stop before creating replacements |
-| Closed unmerged child after parent branch deletion | Confirm the head branch and intended commit still exist, recreate the PR against `main` or the current merged parent, wait for checks, then continue |
+| Closed unmerged child after parent branch deletion | Confirm the head branch and intended commit still exist, recreate the PR against `<base>` or the current merged parent, wait for checks, then continue |
 | Rebase or cherry-pick conflict | Stop, report branch and conflicted files, do not continue children |
 | Remote branch changed since fetch | Stop; do not retry without a fresh inspect |
 | Failed validation | Record the failed command and stop merge or publish |
 | Top split branch differs from source | Stop before PR creation and report remaining diff |
 | Commit in stack range missing `Stack-Id` trailer | Stop; stamp via provenance backfill before merge |
 | Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
-| Squash-only repo without trailers folded into squash body | Stop; use the squash-body merge path |
+| PR is a detected native-stack member | Stop the manual merge path; use GitHub-native stack mode merge instead |
+| Squash repo with `PR_BODY`/`BLANK` message policy and trailers not present | Stop; use the squash-body merge path |
+| Local branch fails its merge-mode-appropriate proof (unmerged per `git branch --merged <base>` under a merge-commit landing, or shows `+` commits under `git cherry <base> <branch>` for a squash/rebase landing) | Stop; do not force-delete without explicit user instruction |
 
 ## Recovery: Deleted Parent Branch Closed A Child PR
 
@@ -288,7 +359,7 @@ Use this only when a provider closed a child PR because its base branch was dele
 2. Confirm the closed PR's base branch was deleted by the parent merge or cleanup command.
 3. Confirm the child head branch still exists on `origin`.
 4. Confirm the child head commit is the intended stack slice.
-5. Recreate the PR against `main` or the current merged parent.
+5. Recreate the PR against `<base>` or the current merged parent.
 6. Wait for required checks on the recreated PR.
 7. Continue the root-to-leaf merge sequence.
 

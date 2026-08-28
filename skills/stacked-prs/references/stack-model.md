@@ -38,6 +38,32 @@ git merge-base <branch> <candidate-parent>
 git log --oneline <candidate-parent>..<branch>
 ```
 
+## Native Stack Detection
+
+Run for every open stack PR during Inspect, before any merge planning,
+whether or not `github-native` mode was requested. A pull request the
+provider already registers as a GitHub-native stack member rejects a plain
+synchronous merge mutation outright; detection must happen here, not as a
+merge-time failure.
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<number> --jq '.stack'
+```
+
+A plain `GET`; it mutates nothing and is safe to run for every open PR.
+Returns `null` when the PR is not part of a native stack, or an object with
+`number` (stack number), `size`, `position`, and `base.ref` when it is.
+
+Do not use `gh stack view` for detection: it reads only the branch currently
+checked out and takes no PR argument, so it fails with `current branch
+"<branch>" is not part of a stack` when run from any other branch, including
+the stack's own base branch.
+
+If the probe cannot run, treat a later `mergePullRequest`/`merge-async`
+rejection ("must be merged using the asynchronous merge REST API") as
+authoritative detection and switch to `references/github-native.md` § Merge
+rather than reporting failure.
+
 ## Required Model
 
 Represent each stack entry with:
@@ -51,6 +77,7 @@ Represent each stack entry with:
 | `pr_state` | Provider state |
 | `url` | Provider PR URL |
 | `checks` | Latest known validation or provider check state |
+| `native` | `true`/`false`/`unknown` from the Native Stack Detection probe |
 
 ## Stop Conditions
 

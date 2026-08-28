@@ -1,11 +1,28 @@
 # GitHub-native stacked pull requests
 
-GitHub-native stacked pull requests are public preview. Use them only as an
-optional GitHub adapter over Armory's existing provenance and manual workflow.
+GitHub-native stacked pull requests are public preview. Native-stack
+membership is a provider-side property of a pull request; detect it for every
+open stack PR during Inspect (`references/stack-model.md` § Native Stack
+Detection) before any merge planning.
 
-## Eligibility
+## Two distinct operations, two different opt-in rules
 
-Require all of the following before linking or merging natively:
+- **Creating native state** — `gh stack link` converts a manual stack (or
+  links loose PRs) into a native stack on GitHub. This is a mutation with
+  public-preview risk; it requires the eligibility probe below plus explicit
+  user consent.
+- **Operating on a stack Inspect already found to be native** — merging,
+  syncing, or otherwise mutating a PR the provider already registers as a
+  stack member. This is not a choice: the provider's synchronous merge
+  mutation (`gh pr merge`, the legacy `PUT .../pulls/{n}/merge`, and the
+  `mergePullRequest` GraphQL mutation) refuses any pull request that is part
+  of a stack with an explicit "must be merged using the asynchronous merge
+  REST API" error. There is no manual Armory merge path for an already-native
+  stack; do not present one as an alternative.
+
+## Eligibility (creating native state)
+
+Require all of the following before running `gh stack link`:
 
 1. GitHub CLI is version 2.0 or later and `gh stack --help` succeeds. Install
    the extension when absent: `gh extension install github/gh-stack`.
@@ -15,14 +32,34 @@ Require all of the following before linking or merging natively:
    as unavailable and fall back to manual mode.
 4. Armory branch order, PR base order, and `Stack-Id`/`Stack-Position` trailers
    agree with the proposed native order.
-5. The repository permits merge commits or rebase merges. A squash-only
-   repository may link natively but must use Armory's manual squash-body merge
-   path so trailers survive.
-6. The user explicitly selects `github-native` mode or accepts the preview risk.
+5. The user explicitly selects `github-native` mode or accepts the preview risk.
 
-Do not use native mode for cross-fork stacks, unavailable preview tooling,
-disabled repository support, squash-only merge, or topology mismatch. Report the
-reason and use manual Armory mode instead.
+Do not use native linking for cross-fork stacks, unavailable preview tooling,
+disabled repository support, or topology mismatch. Report the reason and use
+manual Armory mode instead.
+
+Condition 5 gates linking only. Once Inspect finds a PR already native (see
+below), skip condition 5 and proceed with native merge; conditions 1-4 remain
+in force as safety checks.
+
+## Detecting an already-native stack
+
+`gh stack view` is current-branch-only and takes no PR argument; it fails with
+`current branch "<branch>" is not part of a stack` from any other branch,
+including the stack's own base branch. Probe per PR instead, non-mutating:
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<number> --jq '.stack'
+```
+
+Returns `null` when the PR is not part of a native stack, or an object with
+`number`, `size`, `position`, and `base.ref` when it is. Run this for every
+open stack PR during Inspect, before merge planning.
+
+If the probe is unavailable for any reason, treat the merge-time
+`mergePullRequest`/`merge-async` "part of a stack" rejection as authoritative
+detection and switch to the native merge path below rather than reporting
+failure.
 
 ## Link and inspect
 
@@ -78,6 +115,42 @@ Never infer a prefix. Require the exact highest pull request number. GitHub
 applies branch protection at merge time. After completion, re-fetch, verify
 stack topology/CI/provenance, and clean only confirmed merged branches.
 
+### Choosing a merge method for trailer survival
+
+Key the method choice on the repository's squash message policy, not on
+whether squash is merely one of the allowed methods:
+
+```bash
+gh api repos/{owner}/{repo} \
+  --jq '{title: .squash_merge_commit_title, message: .squash_merge_commit_message}'
+```
+
+| `squash_merge_commit_message` | Trailers under `--merge-method squash` |
+| --- | --- |
+| `COMMIT_MESSAGES` (GitHub default) | Survive automatically, once per squashed commit |
+| `PR_BODY` | Survive only if every PR body already carries them |
+| `BLANK` | Always lost; `gh stack merge` has no `--subject`/`--body` override |
+
+Under `BLANK`, either change the repository's message policy before merging or
+use `--merge-method merge`/`rebase` for this merge; `--merge-method squash`
+gives up provenance with no recovery path.
+
+### Commit-title control under squash
+
+`gh stack merge` exposes only `--merge`, `--merge-method`, `--rebase`,
+`--squash`, `--yes` — no `--subject` or `--body`. With
+`squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a pull
+request that squashes a single commit takes that commit's headline as the
+base-branch commit subject, not the PR title. This cannot be corrected after
+merge without rewriting pushed base-branch history. Before merging, when the
+visible base-branch subject matters for a single-commit PR under
+`--merge-method squash`, align the commit headline with the PR title first:
+
+```bash
+git commit --amend -m "<pr-title>"
+git push --force-with-lease origin <branch>
+```
+
 ### Merge queues
 
 When the base uses a merge queue, stack members enter the queue together but can
@@ -90,5 +163,9 @@ queue acceptance, then verify topology, CI, and provenance after every group.
 GitHub applies the bottom pull request's base-branch requirements across a
 native stack. Still inspect every displayed stack layer as green before a merge.
 
-Manual Armory mode remains mandatory for every ineligible stack and retains its
-root-to-leaf merge, explicit rebase/retarget, and trailer-preservation rules.
+Manual Armory mode remains mandatory for a stack Inspect has NOT already found
+native: an ineligible creation probe, a cross-fork stack, unavailable preview
+tooling, or topology mismatch. It retains its root-to-leaf merge, explicit
+rebase/retarget, and trailer-preservation rules. Manual mode is not available
+once Inspect finds a stack already native — see "Two distinct operations"
+above.

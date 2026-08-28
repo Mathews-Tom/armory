@@ -151,19 +151,22 @@ cases:
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "detects provider merge policy before merge"
-      - "folds stack trailers into the squash commit body"
+      - "detects the repo's squash_merge_commit_message policy before merge, not just whether squash is allowed"
+      - "folds stack trailers into the squash commit body only when the policy is PR_BODY or BLANK"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "gh api repos/\\{owner\\}/\\{repo\\}"
         weight: 0.8
       - type: matches_regex
-        target: "allow_squash_merge"
-        weight: 0.8
-      - type: matches_regex
-        target: "gh pr merge[\\s\\S]*--squash[\\s\\S]*--body[\\s\\S]*Stack-Id"
+        target: "squash_merge_commit_message"
         weight: 1.0
+      - type: matches_regex
+        target: "(COMMIT_MESSAGES|PR_BODY|BLANK)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(PR_BODY|BLANK)[\\s\\S]*(--body|fold)"
+        weight: 0.9
 
   - id: backfill_existing_stack_trailers
     prompt: "Backfill Stack-Id trailers onto this existing unmerged stack and prove the leaf tree still matches the original source branch."
@@ -250,6 +253,31 @@ cases:
         target: "(fetch|re-fetch|topology|cascading)"
         weight: 0.8
 
+  - id: github_native_prefix_merge_squash
+    prompt: >
+      In a GitHub-native stack whose repo defaults squash_merge_commit_message
+      to COMMIT_MESSAGES, merge only the prefix through PR #42 with a squash
+      after every displayed layer is green.
+    fixtures: []
+    rubric:
+      - "checks squash_merge_commit_message before choosing squash as the merge method"
+      - "expects trailers to survive automatically under COMMIT_MESSAGES with no squash-body workaround"
+      - "does not attempt a --body override on gh stack merge"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack merge[\\s\\S]*42[\\s\\S]*--yes[\\s\\S]*--merge-method\\s+squash\\b"
+        weight: 1.0
+      - type: matches_regex
+        target: "squash_merge_commit_message"
+        weight: 0.9
+      - type: matches_regex
+        target: "(COMMIT_MESSAGES)[\\s\\S]*(automatic|survive)"
+        weight: 0.8
+      - type: not_contains
+        target: "gh stack merge[\\s\\S]*--body"
+        weight: 0.9
+
   - id: github_native_fork_fallback
     prompt: >
       Use GitHub-native stack mode for a stack whose child branch belongs to a
@@ -297,6 +325,91 @@ cases:
         weight: 1.0
       - type: not_contains
         target: "gh stack merge"
+        weight: 1.0
+
+  - id: github_native_detection_forces_native_merge
+    prompt: >
+      Merge this stack. The Inspect probe already found that PR #193 reports a
+      non-null native stack.
+    fixtures: []
+    rubric:
+      - "treats a detected native stack as mandatory, not opt-in"
+      - "uses gh stack merge instead of gh pr merge for the detected stack"
+      - "does not offer the manual gh pr merge path as an alternative"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack merge"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge 193"
+        weight: 0.9
+      - type: matches_regex
+        target: "(mandatory|must|no opt-in|not a choice)"
+        weight: 0.8
+
+  - id: native_stack_detected_during_inspect
+    prompt: >
+      Inspect this two-PR stack before planning anything else.
+    fixtures: []
+    rubric:
+      - "probes native stack membership for every open stack PR during Inspect"
+      - "uses a non-mutating provider check rather than gh stack view"
+      - "records native status in the stack model output"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh api repos/\\{owner\\}/\\{repo\\}/pulls/"
+        weight: 1.0
+      - type: matches_regex
+        target: "\\.stack"
+        weight: 0.8
+      - type: not_contains
+        target: "gh stack view <"
+        weight: 0.8
+
+  - id: squash_merged_local_branch_cleanup
+    prompt: >
+      The stack merged with --squash and git branch --merged origin/staging
+      lists nothing for the stack branches. Clean up the local branches.
+    fixtures: []
+    rubric:
+      - "recognizes git branch --merged is unreachable proof after a squash or rebase merge"
+      - "proves content equivalence instead before deleting"
+      - "deletes only after the equivalence proof passes"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(git diff --quiet|git cherry)"
+        weight: 1.0
+      - type: matches_regex
+        target: "git branch -D"
+        weight: 0.8
+      - type: matches_regex
+        target: "(squash|rebase)[\\s\\S]*(ancestry|no ancestry|not list)"
+        weight: 0.8
+
+  - id: stack_base_is_not_main
+    prompt: >
+      Merge this stack. Both PRs target staging, not main.
+    fixtures: []
+    rubric:
+      - "resolves the base branch from the root PR's baseRefName instead of assuming main"
+      - "uses the resolved base in every rebase, retarget, and cleanup command"
+      - "never hardcodes main when the stack's actual base is staging"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "baseRefName"
+        weight: 0.9
+      - type: matches_regex
+        target: "staging"
+        weight: 0.9
+      - type: not_contains
+        target: "--base main"
+        weight: 1.0
+      - type: not_contains
+        target: "origin/main"
         weight: 1.0
 
   - id: negative_single_pr
