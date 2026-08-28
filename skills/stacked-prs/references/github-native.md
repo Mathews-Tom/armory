@@ -135,6 +135,22 @@ Under `BLANK`, either change the repository's message policy before merging or
 use `--merge-method merge`/`rebase` for this merge; `--merge-method squash`
 gives up provenance with no recovery path.
 
+### Commit-title control under squash
+
+`gh stack merge` exposes only `--merge`, `--merge-method`, `--rebase`,
+`--squash`, `--yes` — no `--subject` or `--body`. With
+`squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a pull
+request that squashes a single commit takes that commit's headline as the
+base-branch commit subject, not the PR title. This cannot be corrected after
+merge without rewriting pushed base-branch history. Before merging, when the
+visible base-branch subject matters for a single-commit PR under
+`--merge-method squash`, align the commit headline with the PR title first:
+
+```bash
+git commit --amend -m "<pr-title>"
+git push --force-with-lease origin <branch>
+```
+
 ### Merge queues
 
 When the base uses a merge queue, stack members enter the queue together but can

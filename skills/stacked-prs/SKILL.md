@@ -107,6 +107,14 @@ When eligible or already native:
   `gh stack merge` has no `--subject`/`--body` override to fold them back in —
   change the repository's policy first or merge with `--merge-method
   merge`/`rebase` instead.
+- `gh stack merge` exposes no `--subject`/`--body`. With
+  `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a PR
+  squashing a single commit takes that commit's headline as the base-branch
+  subject, not the PR title, and this cannot be corrected after merge without
+  rewriting pushed history. When the visible subject matters for a
+  single-commit PR under `--merge-method squash`, align the commit headline
+  with the PR title first (`git commit --amend -m "<pr-title>"`, then
+  force-with-lease push) before running `gh stack merge`.
 - For a merge queue, method flags are ignored and stack members may land in
   separate queue groups; require explicit queue acceptance and verify each group.
 - Re-fetch and verify the remaining stack topology, CI, and provenance after
