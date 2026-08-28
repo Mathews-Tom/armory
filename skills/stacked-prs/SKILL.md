@@ -52,15 +52,18 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 
 ## GitHub-native stack mode
 
-GitHub-native stacks are public preview, same-repository-only, and optional.
-They enhance manual Armory stacks; they do not replace provenance trailers,
+GitHub-native stacks are public preview and same-repository-only. They
+enhance manual Armory stacks; they do not replace provenance trailers,
 `.stack-prs.yaml`, or the provider-neutral workflow.
 
 Native-stack membership is a provider-side property of a pull request, not a
 mode this skill chooses. Detect it for every stack PR during Inspect, before
 any merge planning, whether or not `github-native` mode was requested.
 
-Use `github-native` mode only after this eligibility probe passes:
+### Creating native state (opt-in)
+
+Converting a manual stack to native with `gh stack link` is a mutation with
+public-preview risk. Use it only after this eligibility probe passes:
 
 1. GitHub CLI plus `gh stack --help` succeeds; install `github/gh-stack` when absent.
 2. Native stack support is enabled for the repository; native exit code 9 falls
@@ -69,11 +72,21 @@ Use `github-native` mode only after this eligibility probe passes:
    repository; reject forks and cross-repository stacks.
 4. Existing PR bases, local branch order, and `Stack-Id`/`Stack-Position`
    provenance agree. Stop on disagreement.
-5. Native merge is eligible only when trailers survive: use merge/rebase mode;
-   use manual Armory mode for squash-only repositories.
-6. The user explicitly requests native mode or accepts its public-preview risk.
+5. The user explicitly requests native mode or accepts its public-preview risk.
 
-When eligible:
+### Operating on an already-native stack (mandatory)
+
+Once Inspect finds a PR already native, native mode is not a choice for any
+operation that mutates that PR: the provider refuses a plain synchronous merge
+mutation (`gh pr merge`, and the underlying `mergePullRequest`/`PUT
+.../pulls/{n}/merge`) for a stack member with "must be merged using the
+asynchronous merge REST API." There is no manual Armory merge path for an
+already-native stack; do not present one as an alternative. Conditions 1-4
+above still apply as safety checks; condition 5's user consent does not — a
+stack the provider already registered as native carries no additional
+preview risk beyond what already exists.
+
+When eligible or already native:
 
 - Link existing branches or PRs bottom-to-top with
   `gh stack link --base <base> <branch-or-pr>...`.
@@ -90,9 +103,11 @@ When eligible:
 - Re-fetch and verify the remaining stack topology, CI, and provenance after
   GitHub's cascading rebase/retarget.
 
-Fall back to the manual workflow when the probe fails, the stack spans a fork,
-the GitHub preview surface is unavailable, or provider/trailer topology differs.
-Never silently switch modes mid-stack.
+Fall back to the manual workflow only when the stack is not yet native: the
+creation probe fails, the stack spans a fork, the preview surface is
+unavailable, or provider/trailer topology differs. Never silently switch
+modes mid-stack, and never attempt the manual merge path once Inspect has
+found the stack is already native.
 
 ## Workflow
 
@@ -190,6 +205,11 @@ uv run python scripts/evaluate_package.py --path skills/stacked-prs
 
 ### 5. Merge
 
+Before merging, confirm the Inspect native-stack probe reported `null` for
+this PR. A non-null result means the provider already treats this stack as
+native; `gh pr merge` will be rejected outright — switch to the GitHub-native
+stack mode merge path above instead of continuing here.
+
 Merge root to leaf:
 
 ```bash
@@ -284,6 +304,7 @@ Do not publish if the leaf differs from the source branch.
 | Top split branch differs from source | Stop before PR creation and report remaining diff |
 | Commit in stack range missing `Stack-Id` trailer | Stop; stamp via provenance backfill before merge |
 | Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
+| PR is a detected native-stack member | Stop the manual merge path; use GitHub-native stack mode merge instead |
 | Squash-only repo without trailers folded into squash body | Stop; use the squash-body merge path |
 
 ## Recovery: Deleted Parent Branch Closed A Child PR

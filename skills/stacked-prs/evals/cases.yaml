@@ -299,6 +299,27 @@ cases:
         target: "gh stack merge"
         weight: 1.0
 
+  - id: github_native_detection_forces_native_merge
+    prompt: >
+      Merge this stack. The Inspect probe already found that PR #193 reports a
+      non-null native stack.
+    fixtures: []
+    rubric:
+      - "treats a detected native stack as mandatory, not opt-in"
+      - "uses gh stack merge instead of gh pr merge for the detected stack"
+      - "does not offer the manual gh pr merge path as an alternative"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "gh stack merge"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge 193"
+        weight: 0.9
+      - type: matches_regex
+        target: "(mandatory|must|no opt-in|not a choice)"
+        weight: 0.8
+
   - id: native_stack_detected_during_inspect
     prompt: >
       Inspect this two-PR stack before planning anything else.
