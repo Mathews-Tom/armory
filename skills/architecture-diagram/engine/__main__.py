@@ -1,5 +1,5 @@
 from __future__ import annotations
 
-from .render import main
+from .commands import main
 
 raise SystemExit(main())

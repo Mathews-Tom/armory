@@ -1,7 +1,8 @@
-"""Tests for render.py — spec parsing, layout, routing, and SVG emission."""
+"""Tests for architecture-diagram engine modules."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
@@ -10,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from engine import diagnostics, fetch_icons, render
+from engine import commands, fetch_icons
+from engine.diagnostics import (
+    Diagnostic,
+    apply_quality_profile,
+    count_by_severity,
+    suppress_derived,
+)
 from engine.geometry_checks import (
     check_ambiguous_corridors,
     check_edge_through_node,
@@ -18,6 +25,7 @@ from engine.geometry_checks import (
     check_layout,
     check_proper_crossings,
     check_route_rhythm,
+    edge_label_box,
 )
 from engine.layout import (
     COL_GAP,
@@ -26,16 +34,29 @@ from engine.layout import (
     ROW_GAP,
     Box,
     assign_ranks,
+    box_evidence,
     compute_positions,
     compute_zone_boxes,
     icon_box,
     order_within_ranks,
     text_width,
 )
+from engine.icons import (
+    BundledGenericIconLookup,
+    CacheIconLookup,
+    CompositeIconLookup,
+    IconRef,
+)
 from engine.model import Edge, Node, Spec
-from engine.render import IconRef, check_editability, render as do_render
 from engine.routing import RoutedEdge, route_edges
 from engine.spec import SpecError, load_spec
+from engine.svg import check_editability
+from engine.pipeline import render as do_render
+
+
+def test_legacy_render_module_is_not_importable() -> None:
+    """The decomposition has no renderer compatibility façade."""
+    assert importlib.util.find_spec("engine.render") is None
 
 
 def _icon_lookup(provider: str, service: str) -> IconRef | None:
@@ -572,8 +593,8 @@ class TestEdgeThroughNode:
         }
         findings = check_edge_through_node(node_boxes, [self._route()])
 
-        standard = diagnostics.apply_quality_profile(findings, "standard")
-        showcase = diagnostics.apply_quality_profile(findings, "showcase")
+        standard = apply_quality_profile(findings, "standard")
+        showcase = apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -611,8 +632,8 @@ class TestProperCrossing:
     def test_quality_profiles_change_crossing_severity(self) -> None:
         findings = check_proper_crossings(self._crossing_routes())
 
-        standard = diagnostics.apply_quality_profile(findings, "standard")
-        showcase = diagnostics.apply_quality_profile(findings, "showcase")
+        standard = apply_quality_profile(findings, "standard")
+        showcase = apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -643,8 +664,8 @@ class TestAmbiguousCorridor:
     def test_quality_profiles_change_corridor_severity(self) -> None:
         findings = check_ambiguous_corridors(self._routes(12))
 
-        standard = diagnostics.apply_quality_profile(findings, "standard")
-        showcase = diagnostics.apply_quality_profile(findings, "showcase")
+        standard = apply_quality_profile(findings, "standard")
+        showcase = apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -675,8 +696,8 @@ class TestLabelRouteClearance:
     def test_quality_profiles_change_label_clearance_severity(self) -> None:
         findings = check_label_route_clearance(self._routes(13.99))
 
-        standard = diagnostics.apply_quality_profile(findings, "standard")
-        showcase = diagnostics.apply_quality_profile(findings, "showcase")
+        standard = apply_quality_profile(findings, "standard")
+        showcase = apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -873,30 +894,30 @@ class TestRealIconCacheIntegration:
         )
         stats = fetch_icons.write_cache(cache_dir, sha, "aws", [entry])
         fetch_icons.update_manifest(cache_dir, sha, "aws", stats)
-        lookup = render.CacheIconLookup(cache_dir=cache_dir, sha=sha)
+        lookup = CacheIconLookup(cache_dir=cache_dir, sha=sha)
         icon = lookup("aws", "lambda")
         assert icon is not None
         assert icon.view_box == "0 0 54 56"
 
     def test_cache_miss_returns_none(self, tmp_path: object) -> None:
-        lookup = render.CacheIconLookup(cache_dir=Path(str(tmp_path)), sha="deadbeef")
+        lookup = CacheIconLookup(cache_dir=Path(str(tmp_path)), sha="deadbeef")
         assert lookup("aws", "does-not-exist") is None
 
 
 class TestBundledGenericIconLookup:
     def test_resolves_a_real_catalog_entry(self) -> None:
-        lookup = render.BundledGenericIconLookup()
+        lookup = BundledGenericIconLookup()
         icon = lookup("generic", "database")
         assert icon is not None
         assert icon.view_box == "0 0 64 64"
         assert "<" in icon.body
 
     def test_ignores_non_generic_provider(self) -> None:
-        lookup = render.BundledGenericIconLookup()
+        lookup = BundledGenericIconLookup()
         assert lookup("aws", "database") is None
 
     def test_unknown_slug_returns_none(self) -> None:
-        lookup = render.BundledGenericIconLookup()
+        lookup = BundledGenericIconLookup()
         assert lookup("generic", "not-a-real-icon") is None
 
     def test_every_documented_slug_in_icons_generic_md_resolves(self) -> None:
@@ -910,7 +931,7 @@ class TestBundledGenericIconLookup:
         ).read_text()
         slugs = re.findall(r"`service: ([a-z0-9-]+)`", doc)
         assert len(slugs) >= 20
-        lookup = render.BundledGenericIconLookup()
+        lookup = BundledGenericIconLookup()
         missing = [s for s in slugs if lookup("generic", s) is None]
         assert not missing, (
             f"icons-generic.md documents slugs with no catalog entry: {missing}"
@@ -919,9 +940,9 @@ class TestBundledGenericIconLookup:
 
 class TestCompositeIconLookup:
     def test_falls_through_to_second_lookup_on_miss(self) -> None:
-        first = render.CacheIconLookup(cache_dir=Path("/nonexistent"), sha="x")
-        second = render.BundledGenericIconLookup()
-        composite = render.CompositeIconLookup([first, second])
+        first = CacheIconLookup(cache_dir=Path("/nonexistent"), sha="x")
+        second = BundledGenericIconLookup()
+        composite = CompositeIconLookup([first, second])
         icon = composite("generic", "database")
         assert icon is not None
 
@@ -932,7 +953,7 @@ class TestCompositeIconLookup:
         def always_b(provider: str, slug: str) -> IconRef | None:
             return IconRef(view_box="B", body="b")
 
-        composite = render.CompositeIconLookup([always_a, always_b])
+        composite = CompositeIconLookup([always_a, always_b])
         icon = composite("generic", "anything")
         assert icon is not None
         assert icon.view_box == "A"
@@ -941,24 +962,24 @@ class TestCompositeIconLookup:
         def always_none(provider: str, slug: str) -> IconRef | None:
             return None
 
-        composite = render.CompositeIconLookup([always_none, always_none])
+        composite = CompositeIconLookup([always_none, always_none])
         assert composite("aws", "anything") is None
 
 
 class TestDiagnosticEnvelope:
     def test_unknown_severity_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="unknown severity"):
-            diagnostics.Diagnostic(code="spec/x", severity="fatal", message="m")
+            Diagnostic(code="spec/x", severity="fatal", message="m")
 
     def test_empty_suppresses_is_omitted_from_the_payload(self) -> None:
-        payload = diagnostics.Diagnostic(
+        payload = Diagnostic(
             code="layout/node-overlap", severity="error", message="m"
         ).to_dict()
         assert "suppresses" not in payload
         assert payload["supported_fixes"] == []
 
     def test_suppresses_is_carried_when_set(self) -> None:
-        payload = diagnostics.Diagnostic(
+        payload = Diagnostic(
             code="composition/a",
             severity="warning",
             message="m",
@@ -968,11 +989,11 @@ class TestDiagnosticEnvelope:
 
     def test_counts_split_by_severity(self) -> None:
         diags = [
-            diagnostics.Diagnostic(code="a/x", severity="error", message="m"),
-            diagnostics.Diagnostic(code="b/y", severity="warning", message="m"),
-            diagnostics.Diagnostic(code="c/z", severity="warning", message="m"),
+            Diagnostic(code="a/x", severity="error", message="m"),
+            Diagnostic(code="b/y", severity="warning", message="m"),
+            Diagnostic(code="c/z", severity="warning", message="m"),
         ]
-        assert diagnostics.count_by_severity(diags) == {"errors": 1, "warnings": 2}
+        assert count_by_severity(diags) == {"errors": 1, "warnings": 2}
 
 
 class TestRouteRhythm:
@@ -1001,84 +1022,76 @@ class TestRouteRhythm:
         route = self._route(((0, 0), (7.99, 0)))
         findings = check_route_rhythm([route])
 
-        standard = diagnostics.apply_quality_profile(findings, "standard")
-        showcase = diagnostics.apply_quality_profile(findings, "showcase")
+        standard = apply_quality_profile(findings, "standard")
+        showcase = apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
 
 
 class TestQualityProfiles:
-    def _composition_warning(self) -> diagnostics.Diagnostic:
-        return diagnostics.Diagnostic(
+    def _composition_warning(self) -> Diagnostic:
+        return Diagnostic(
             code="composition/micro-segment", severity="warning", message="m"
         )
 
     def test_standard_leaves_composition_findings_as_warnings(self) -> None:
-        out = diagnostics.apply_quality_profile(
-            [self._composition_warning()], "standard"
-        )
+        out = apply_quality_profile([self._composition_warning()], "standard")
         assert [d.severity for d in out] == ["warning"]
 
     def test_showcase_raises_composition_findings_to_errors(self) -> None:
-        out = diagnostics.apply_quality_profile(
-            [self._composition_warning()], "showcase"
-        )
+        out = apply_quality_profile([self._composition_warning()], "showcase")
         assert [d.severity for d in out] == ["error"]
         assert out[0].code == "composition/micro-segment"
 
     def test_showcase_leaves_other_namespaces_alone(self) -> None:
-        warning = diagnostics.Diagnostic(
+        warning = Diagnostic(
             code="layout/label-overflow", severity="warning", message="m"
         )
-        out = diagnostics.apply_quality_profile([warning], "showcase")
+        out = apply_quality_profile([warning], "showcase")
         assert [d.severity for d in out] == ["warning"]
 
     def test_unknown_profile_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="unknown quality profile"):
-            diagnostics.apply_quality_profile([], "pretty")
+            apply_quality_profile([], "pretty")
 
 
 class TestDerivedSuppression:
     def test_a_cause_removes_its_derivative(self) -> None:
-        cause = diagnostics.Diagnostic(
+        cause = Diagnostic(
             code="composition/cause",
             severity="error",
             message="m",
             suppresses=("composition/derived",),
         )
-        derived = diagnostics.Diagnostic(
+        derived = Diagnostic(
             code="composition/derived", severity="warning", message="m"
         )
-        assert diagnostics.suppress_derived([cause, derived]) == [cause]
+        assert suppress_derived([cause, derived]) == [cause]
 
     def test_unrelated_findings_survive(self) -> None:
-        a = diagnostics.Diagnostic(
-            code="layout/node-overlap", severity="error", message="m"
-        )
-        b = diagnostics.Diagnostic(code="icon/not-found", severity="error", message="m")
-        assert diagnostics.suppress_derived([a, b]) == [a, b]
+        a = Diagnostic(code="layout/node-overlap", severity="error", message="m")
+        b = Diagnostic(code="icon/not-found", severity="error", message="m")
+        assert suppress_derived([a, b]) == [a, b]
 
     def test_suppression_is_one_level_and_does_not_resolve_chains(self) -> None:
         # Documented semantics: a dropped record still suppresses, so a
         # chain removes everything below the top. Emitters must therefore
         # declare `suppresses` only for a code they directly explain.
-        top = diagnostics.Diagnostic(
+        top = Diagnostic(
             code="composition/top",
             severity="error",
             message="m",
             suppresses=("composition/middle",),
         )
-        middle = diagnostics.Diagnostic(
+        middle = Diagnostic(
             code="composition/middle",
             severity="warning",
             message="m",
             suppresses=("composition/leaf",),
         )
-        leaf = diagnostics.Diagnostic(
-            code="composition/leaf", severity="warning", message="m"
-        )
-        assert diagnostics.suppress_derived([top, middle, leaf]) == [top]
+        leaf = Diagnostic(code="composition/leaf", severity="warning", message="m")
+        assert suppress_derived([top, middle, leaf]) == [top]
 
 
 class TestSpecErrorCodes:
@@ -1132,7 +1145,7 @@ class TestCliContract:
     def _run(
         self, capsys: pytest.CaptureFixture[str], *argv: str
     ) -> tuple[int, dict[str, object], str]:
-        code = render.main(list(argv))
+        code = commands.main(list(argv))
         captured = capsys.readouterr()
         payload = (
             json.loads(captured.out)
@@ -1150,7 +1163,7 @@ class TestCliContract:
             capsys, "validate", str(spec), "--cache-dir", str(tmp_path), "--json"
         )
 
-        assert code == render.EXIT_OK
+        assert code == commands.EXIT_OK
         assert payload["ok"] is True
         assert payload["command"] == "validate"
         assert payload["input"]["path"] == str(spec)
@@ -1166,7 +1179,7 @@ class TestCliContract:
             "warnings": 0,
         }
         assert payload["diagnostics"] == []
-        assert payload["schema_version"] == render.RECEIPT_SCHEMA_VERSION
+        assert payload["schema_version"] == commands.RECEIPT_SCHEMA_VERSION
 
     def test_deliver_commits_the_validated_candidate(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -1185,12 +1198,12 @@ class TestCliContract:
             "--json",
         )
 
-        assert code == render.EXIT_OK
+        assert code == commands.EXIT_OK
         assert payload["ok"] is True
         assert payload["command"] == "deliver"
         assert payload["output"] == {"path": str(out), "written": True}
         assert payload["artifact"]["bytes"] == len(out.read_bytes())
-        assert payload["artifact"]["sha256"] == render._sha256(out.read_bytes())
+        assert payload["artifact"]["sha256"] == commands._sha256(out.read_bytes())
 
     def test_json_mode_puts_nothing_but_json_on_stdout(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -1207,7 +1220,7 @@ class TestCliContract:
         )
         # A finding is present, so this also proves diagnostics do not leak to
         # stdout as prose alongside the receipt.
-        assert code == render.EXIT_FAILURE
+        assert code == commands.EXIT_FAILURE
         assert [d["code"] for d in payload["diagnostics"]] == ["icon/not-found"]
 
     def test_tampered_icon_cache_fails_closed_with_digest_mismatch(
@@ -1246,7 +1259,7 @@ class TestCliContract:
             "--json",
         )
 
-        assert code == render.EXIT_FAILURE
+        assert code == commands.EXIT_FAILURE
         assert [d["code"] for d in payload["diagnostics"]] == ["icon/digest-mismatch"]
 
     def test_missing_icon_is_an_operational_failure(
@@ -1265,7 +1278,7 @@ class TestCliContract:
             str(tmp_path),
             "--json",
         )
-        assert code == render.EXIT_FAILURE
+        assert code == commands.EXIT_FAILURE
         assert payload["delivery_stage"] == "check"
         assert payload["output"]["written"] is False
         assert not out.exists()
@@ -1308,8 +1321,8 @@ class TestCliContract:
             "--json",
         )
 
-        assert good_code == render.EXIT_OK
-        assert bad_code == render.EXIT_FAILURE
+        assert good_code == commands.EXIT_OK
+        assert bad_code == commands.EXIT_FAILURE
         assert payload["delivery_stage"] == "check"
         assert [d["code"] for d in payload["diagnostics"]] == ["layout/label-overflow"]
         assert out.read_bytes() == last_good
@@ -1330,7 +1343,7 @@ class TestCliContract:
             str(tmp_path),
             "--json",
         )
-        assert code == render.EXIT_FAILURE
+        assert code == commands.EXIT_FAILURE
         assert payload["output"]["written"] is False
         assert payload["delivery_stage"] == "render"
         assert [d["code"] for d in payload["diagnostics"]] == ["spec/no-nodes"]
@@ -1347,7 +1360,7 @@ class TestCliContract:
             str(tmp_path / "d.svg"),
             "--json",
         )
-        assert code == render.EXIT_USAGE
+        assert code == commands.EXIT_USAGE
         assert payload["delivery_stage"] == "input"
         assert [d["code"] for d in payload["diagnostics"]] == ["usage/spec-unreadable"]
 
@@ -1383,9 +1396,9 @@ class TestCliContract:
             "--layout-json",
         )
 
-        first_code = render.main(list(argv))
+        first_code = commands.main(list(argv))
         first_capture = capsys.readouterr()
-        second_code = render.main(list(argv))
+        second_code = commands.main(list(argv))
         second_capture = capsys.readouterr()
         first_payload = json.loads(first_capture.out)
         expected_layout = json.loads(
@@ -1395,7 +1408,7 @@ class TestCliContract:
         )
         result = do_render(load_spec(spec_path.read_text()), _icon_lookup, "showcase")
 
-        assert first_code == second_code == render.EXIT_OK
+        assert first_code == second_code == commands.EXIT_OK
         assert first_capture.out == second_capture.out
         assert first_capture.err == second_capture.err == ""
         assert first_payload["layout"] == expected_layout
@@ -1409,7 +1422,7 @@ class TestCliContract:
             {
                 "edge": {"from": routed.edge.src, "to": routed.edge.dst},
                 "text": routed.edge.label,
-                "box": render.box_evidence(render.edge_label_box(routed)),
+                "box": box_evidence(edge_label_box(routed)),
             }
             for routed in result.routed_edges
             if routed.edge.label
@@ -1431,20 +1444,20 @@ class TestCliContract:
             ],
             check=False,
             capture_output=True,
-            cwd=Path(render.__file__).resolve().parents[1],
+            cwd=Path(commands.__file__).resolve().parents[1],
             text=True,
         )
 
-        assert completed.returncode == render.EXIT_OK
+        assert completed.returncode == commands.EXIT_OK
         assert json.loads(completed.stdout)["command"] == "validate"
         assert completed.stderr == ""
 
     def test_legacy_cli_is_rejected(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
-            render.main([str(tmp_path / "s.yaml"), "-o", str(tmp_path / "d.svg")])
-        assert exc.value.code == render.EXIT_USAGE
+            commands.main([str(tmp_path / "s.yaml"), "-o", str(tmp_path / "d.svg")])
+        assert exc.value.code == commands.EXIT_USAGE
 
     def test_unknown_quality_profile_is_a_usage_error(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
-            render.main(["validate", str(tmp_path / "s.yaml"), "--quality", "pretty"])
-        assert exc.value.code == render.EXIT_USAGE
+            commands.main(["validate", str(tmp_path / "s.yaml"), "--quality", "pretty"])
+        assert exc.value.code == commands.EXIT_USAGE

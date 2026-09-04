@@ -3,7 +3,7 @@
 # Every `slug` value below was verified present in the real icon cache built
 # from `jgraph/drawio@a1f615b` (draw.io's `mxgraph.aws4` stencil set, 1037
 # icons total) — see engine/fetch_icons.py. `slug` is exactly the filename
-# (minus `.json`) engine/render.py looks up under `<cache>/<sha>/aws/<slug>.json`.
+# (minus `.json`) `icons.py` looks up under `<cache>/<sha>/aws/<slug>.json`.
 #
 # `aliases` are phrasings a user is likely to say ("bucket", "S3") that
 # should resolve to this entry when authoring a spec's `service:` field —

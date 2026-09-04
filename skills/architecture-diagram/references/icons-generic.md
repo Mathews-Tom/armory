@@ -4,7 +4,7 @@ For `provider: generic` nodes, or any component with no cloud-provider equivalen
 
 All icons: `viewBox="0 0 64 64"`, render at 44×44px default. Stroke `currentColor`, `stroke-width="2.5"` primary shapes. Fill `currentColor` with `fill-opacity` 0.08–0.2 for enclosed shapes.
 
-Use the slug below each heading as the node's `service` value with `provider: generic` (or set `provider: generic` at the top level and omit it per node). `engine/render.py` resolves it through `assets/generic-icons.json` — no network fetch, no cache directory, always available. A generic-provider node with no `service` set (or an unrecognized slug) still renders cleanly as a labeled colored placeholder; reach for a specific glyph here when it adds real clarity over that placeholder.
+Use the slug below each heading as the node's `service` value with `provider: generic` (or set `provider: generic` at the top level and omit it per node). `engine/icons.py` resolves it through `assets/generic-icons.json` — no network fetch, no cache directory, always available. A generic-provider node with no `service` set (or an unrecognized slug) still renders cleanly as a labeled colored placeholder; reach for a specific glyph here when it adds real clarity over that placeholder.
 
 ## Catalog
 
@@ -290,9 +290,9 @@ Use the slug below each heading as the node's `service` value with `provider: ge
 
 ## When a required icon is absent from the catalog
 
-`render.py`'s icon resolution only reads `assets/generic-icons.json` — there is no mechanism for a spec to supply inline SVG for a single node. Leave `service` unset (or use a slug that isn't in the catalog) and the node renders as a labeled colored placeholder instead, which is correct default behavior, not a degraded fallback.
+`icons.py`'s generic lookup only reads `assets/generic-icons.json` — there is no mechanism for a spec to supply inline SVG for a single node. Leave `service` unset (or use a slug that isn't in the catalog) and the node renders as a labeled colored placeholder instead, which is correct default behavior, not a degraded fallback.
 
-Adding a genuinely new icon to the catalog means editing `assets/generic-icons.json` and this file together (the JSON is the data `render.py` reads; this file is the same content in agent-readable form). New icons should match the existing visual language:
+Adding a genuinely new icon to the catalog means editing `assets/generic-icons.json` and this file together (the JSON is the data `icons.py` reads; this file is the same content in agent-readable form). New icons should match the existing visual language:
 
 - `viewBox="0 0 64 64"`, `fill="none"`
 - Primary strokes: `stroke="currentColor" stroke-width="2.5"`

@@ -262,7 +262,8 @@ Report the output path, any warning-severity findings left unresolved and why, a
 | File | Purpose |
 |---|---|
 | `engine/__main__.py` | `python3 -m engine` entry point for validate, deliver, and compare. |
-| `engine/render.py` | Spec → SVG implementation. |
+| `engine/pipeline.py` | Deterministic spec → SVG composition and render result. |
+| `engine/commands.py` | Validation, delivery, comparison receipts, staging, and CLI dispatch. |
 | `engine/fetch_icons.py` | Local icon-cache builder; invoke with `python3 -m engine.fetch_icons`. |
 | `engine/stencil2svg.py` | AWS/GCP stencil-to-SVG converter — internal. |
 | `engine/svg_inline.py` | Azure real-SVG inliner/namespacer — internal. |

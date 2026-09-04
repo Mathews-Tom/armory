@@ -1,23 +1,5 @@
 #!/usr/bin/env python3
-"""Render a declarative architecture-diagram spec into an editable SVG.
-
-Design principle: the agent authors *what the architecture is* (nodes, zones,
-edges, provider) as a small YAML spec; this module decides *where the pixels
-go*. Coordinate arithmetic is the part LLMs are bad at and prior art in this
-space (see `references/editability.md` for the comparison) papers over with
-prose rules like "don't eyeball it" and a render-and-review loop. Making
-layout deterministic code instead means it's testable, reproducible, and
-self-checking: every self-check rule that prior art asks the model to reason
-about by hand is a hard assertion here (`check_layout` / `check_editability`).
-
-Pipeline: `load_spec` -> `assign_ranks` -> `order_within_ranks` ->
-`compute_positions` -> `compute_zone_boxes` -> `route_edges` -> `emit_svg`.
-
-Output contract (enforced by `check_editability`, see module docstring on
-that function): no raster `<image>`, no external `href`, no `<use>` clones —
-icon geometry is inlined per node so every copy stays independently editable
-in Figma/Illustrator/Inkscape, and labels stay real `<text>`, never outlined.
-"""
+"""Architecture-diagram validation, delivery, and comparison CLI."""
 
 from __future__ import annotations
 
@@ -27,7 +9,6 @@ import json
 import os
 import sys
 import tempfile
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import fetch_icons
@@ -37,97 +18,19 @@ from .diagnostics import (
     QUALITY_STANDARD,
     SEVERITY_ERROR,
     Diagnostic,
-    apply_quality_profile,
     count_by_severity,
-    suppress_derived,
 )
-from .geometry_checks import (
-    check_ambiguous_corridors,
-    check_edge_through_node,
-    check_label_route_clearance,
-    check_layout,
-    check_proper_crossings,
-    check_route_rhythm,
-    edge_label_box,
-)
+from .geometry_checks import edge_label_box
 from .icons import (
     BundledGenericIconLookup,
     CacheIconLookup,
     CompositeIconLookup,
-    IconCacheError,
     IconLookup,
-    IconRef,
 )
-from .layout import (
-    Box,
-    assign_ranks,
-    box_evidence,
-    compute_positions,
-    compute_zone_boxes,
-    order_within_ranks,
-)
+from .layout import box_evidence
 from .model import Spec
-from .profile import check_deployment_profile
-from .routing import RoutedEdge, route_edges
+from .pipeline import RenderResult, render
 from .spec import SpecError, load_spec
-from .svg import check_editability, emit_svg
-
-
-@dataclass
-class RenderResult:
-    svg: str
-    diagnostics: list[Diagnostic] = field(default_factory=list)
-    node_boxes: dict[str, Box] = field(default_factory=dict)
-    zone_boxes: dict[str, Box] = field(default_factory=dict)
-    routed_edges: list[RoutedEdge] = field(default_factory=list)
-
-    @property
-    def errors(self) -> list[Diagnostic]:
-        return [d for d in self.diagnostics if d.severity == SEVERITY_ERROR]
-
-    @property
-    def ok(self) -> bool:
-        return not self.errors
-
-
-def render(
-    spec: Spec, icon_lookup: IconLookup, quality: str = QUALITY_STANDARD
-) -> RenderResult:
-    diagnostics: list[Diagnostic] = []
-    diagnostics += check_deployment_profile(spec)
-    rank = assign_ranks(spec)
-    order = order_within_ranks(spec, rank)
-    node_boxes = compute_positions(spec, rank, order)
-    zone_boxes = compute_zone_boxes(spec, node_boxes) if spec.zones else {}
-    diagnostics += check_layout(spec, node_boxes, zone_boxes)
-    routed_edges = route_edges(spec, node_boxes)
-    diagnostics += check_route_rhythm(routed_edges)
-    diagnostics += check_edge_through_node(node_boxes, routed_edges)
-    diagnostics += check_proper_crossings(routed_edges)
-    diagnostics += check_ambiguous_corridors(routed_edges)
-    diagnostics += check_label_route_clearance(routed_edges)
-
-    icons: dict[str, IconRef | None] = {}
-    for node in spec.nodes:
-        if not node.service:
-            icons[node.id] = None
-            continue
-        try:
-            icons[node.id] = icon_lookup(node.provider, node.service)
-        except IconCacheError as exc:
-            diagnostics.append(exc.diagnostic)
-            icons[node.id] = None
-
-    svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, diagnostics)
-    diagnostics += check_editability(svg)
-    diagnostics = apply_quality_profile(suppress_derived(diagnostics), quality)
-    return RenderResult(
-        svg=svg,
-        diagnostics=diagnostics,
-        node_boxes=node_boxes,
-        zone_boxes=zone_boxes,
-        routed_edges=routed_edges,
-    )
 
 
 EXIT_OK = 0

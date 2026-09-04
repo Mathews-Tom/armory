@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from engine import render
-from engine.render import compare_specs, load_spec
+from engine import commands
+from engine.compare import compare_specs
+from engine.spec import load_spec
 
 
 _FIXTURES = Path(__file__).parent / "fixtures"
@@ -78,7 +79,7 @@ def test_compare_specs_canonicalizes_entity_order() -> None:
 def test_compare_cli_always_includes_the_limitations_text(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = render.main(
+    code = commands.main(
         [
             "compare",
             str(_FIXTURES / "spec-compare-base.yaml"),
@@ -87,9 +88,9 @@ def test_compare_cli_always_includes_the_limitations_text(
     )
     captured = capsys.readouterr()
 
-    assert code == render.EXIT_OK
+    assert code == commands.EXIT_OK
     assert captured.err == ""
-    assert json.loads(captured.out)["limitations"] == render.COMPARISON_LIMITATIONS
+    assert json.loads(captured.out)["limitations"] == commands.COMPARISON_LIMITATIONS
 
 
 def test_compare_cli_rejects_an_edge_without_an_authored_id(
@@ -98,11 +99,11 @@ def test_compare_cli_rejects_an_edge_without_an_authored_id(
     spec = tmp_path / "missing-id.yaml"
     spec.write_text("nodes:\n  - id: a\n  - id: b\nedges:\n  - from: a\n    to: b\n")
 
-    code = render.main(["compare", str(spec), str(spec)])
+    code = commands.main(["compare", str(spec), str(spec)])
     payload = json.loads(capsys.readouterr().out)
 
-    assert code == render.EXIT_FAILURE
+    assert code == commands.EXIT_FAILURE
     assert [finding["code"] for finding in payload["diagnostics"]] == [
         "compare/missing-edge-id"
     ]
-    assert payload["limitations"] == render.COMPARISON_LIMITATIONS
+    assert payload["limitations"] == commands.COMPARISON_LIMITATIONS
