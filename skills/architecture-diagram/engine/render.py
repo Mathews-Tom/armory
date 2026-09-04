@@ -28,7 +28,6 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from math import hypot
 from pathlib import Path
 from typing import Protocol
 
@@ -41,63 +40,67 @@ from .diagnostics import (
     QUALITY_PROFILES,
     QUALITY_STANDARD,
     SEVERITY_ERROR,
-    SEVERITY_WARNING,
     Diagnostic,
     apply_quality_profile,
     count_by_severity,
     suppress_derived,
 )
-from .model import Edge, Node, Spec, Zone
-from .spec import SpecError, _spec_error, load_spec
+from .model import Node, Spec, Zone
+from .spec import SpecError, load_spec
+from .geometry_checks import (
+    check_ambiguous_corridors,
+    check_edge_through_node,
+    check_label_route_clearance,
+    check_layout,
+    check_proper_crossings,
+    check_route_rhythm,
+    edge_label_box,
+)
+from .layout import (
+    EDGE_LABEL_FONT_SIZE,
+    ICON,
+    MARGIN,
+    MIN_NODE_TEXT_FONT_SIZE,
+    NODE_H,
+    NODE_LABEL_FONT_SIZE,
+    NODE_SUBLABEL_FONT_SIZE,
+    NODE_TEXT_PADDING,
+    NODE_W,
+    Box,
+    assign_ranks,
+    box_evidence,
+    compute_positions,
+    compute_zone_boxes,
+    icon_box,
+    order_within_ranks,
+    text_width,
+    zone_ancestors,
+)
+from .profile import check_deployment_profile
+from .routing import RoutedEdge, route_edges
 
 # --- layout constants -------------------------------------------------------
 
-ICON = 64
-NODE_W = 120
-NODE_H = 118  # icon + two label lines + padding
-COL_GAP = 90
-ROW_GAP = 44
-MARGIN = 32
-TITLE_H = 44
-ZONE_PAD = 22
-ZONE_LABEL_H = 26
 # Shared-side ports must stay away from the icon corners and remain legible as
 # fan-out grows. A 64px icon leaves a 32px usable span after 16px gutters:
 # five ports therefore land 8px apart without one endpoint covering another.
-PORT_GUTTER = 16.0
-PORT_MAX_SPACING = 14.0
 # Rejoin a lone source/destination pair when their spread ports are nearly
 # aligned. This keeps short hops straight without collapsing a shared side.
-FACING_PORT_ALIGNMENT_DELTA = 16.0
 # Orthogonal detours leave a real 24px endpoint stub. Centered channel offsets
 # span at most +/-16px, so even their nearest first segment is at least 8px.
-ROUTE_ENDPOINT_STUB = 24.0
-ROUTE_CHANNEL_HALF_SPREAD = 16.0
-ARROW_HEAD_LENGTH = 6.0
 # Route rhythm failures are composition findings: every segment needs 8px and
 # a segment between two turns needs 16px to remain visually distinguishable.
-MIN_ROUTE_SEGMENT = 8.0
-MIN_INTERIOR_ROUTE_SEGMENT = 16.0
 # A route passing within two pixels of an unrelated node visually reads as
 # entering it. Expand every unrelated node by this clearance before testing.
-NODE_ROUTE_CLEARANCE = 2.0
 # Cross-product signs closer than this are endpoint touches or collinear runs,
 # not an interior X that makes two unrelated relationships ambiguous.
-PROPER_CROSSING_EPSILON = 1e-4
 # Unrelated collinear paths sharing eight pixels or more read as one ambiguous
 # corridor rather than distinct connections.
-MIN_AMBIGUOUS_CORRIDOR = 8.0
 # Edge labels use the same glyph estimator as nodes. A route closer than four
 # pixels to the label mask makes the connection annotation unreadable.
-EDGE_LABEL_FONT_SIZE = 10.0
-LABEL_ROUTE_CLEARANCE = 4.0
 # Node labels stay readable at no smaller than 6px. Their estimated width at
 # that floor must remain within the node plus 8px tolerance, while normal
 # fitted text remains inside the 8px-padded node box.
-NODE_LABEL_FONT_SIZE = 12.0
-NODE_SUBLABEL_FONT_SIZE = 10.5
-NODE_TEXT_PADDING = 8.0
-MIN_NODE_TEXT_FONT_SIZE = 6.0
 
 
 EDGE_COLORS = {
@@ -111,20 +114,6 @@ EDGE_COLORS = {
 # Average glyph-width factor (fraction of font-size) for a system-ui-style
 # sans stack, bucketed by character class. Good enough for label-fit and
 # zone-label-width decisions; not a substitute for real font metrics.
-_NARROW = set("iIl.,:;'|!")
-_WIDE = set("MWm@%")
-
-
-def _text_width(text: str, font_size: float) -> float:
-    total = 0.0
-    for ch in text:
-        if ch in _NARROW:
-            total += 0.32
-        elif ch in _WIDE:
-            total += 0.82
-        else:
-            total += 0.56
-    return total * font_size
 
 
 def _escape(text: str) -> str:
@@ -146,1007 +135,10 @@ def _escape(text: str) -> str:
 # --- ranking + ordering ------------------------------------------------------
 
 
-def assign_ranks(spec: Spec) -> dict[str, int]:
-    """Longest-path layering via bounded relaxation. Bounded iteration count
-    means a cycle (a back-edge) simply stops updating once ranks stabilize
-    rather than looping forever — cyclic graphs are common in architecture
-    diagrams (request/response pairs) and must not hang the renderer."""
-    rank = {n.id: 0 for n in spec.nodes}
-    for _ in range(len(spec.nodes) + 1):
-        changed = False
-        for e in spec.edges:
-            if rank[e.dst] < rank[e.src] + 1:
-                rank[e.dst] = rank[e.src] + 1
-                changed = True
-        if not changed:
-            break
-    return rank
-
-
-def order_within_ranks(spec: Spec, rank: dict[str, int]) -> dict[str, int]:
-    """Two-pass barycenter sweep to reduce edge crossings within each rank."""
-    by_rank: dict[int, list[str]] = {}
-    for n in spec.nodes:
-        by_rank.setdefault(rank[n.id], []).append(n.id)
-    for ids in by_rank.values():
-        ids.sort()  # stable, deterministic starting order
-
-    order: dict[str, int] = {}
-    for r in sorted(by_rank):
-        for i, node_id in enumerate(by_rank[r]):
-            order[node_id] = i
-
-    preds: dict[str, list[str]] = {}
-    succs: dict[str, list[str]] = {}
-    for e in spec.edges:
-        preds.setdefault(e.dst, []).append(e.src)
-        succs.setdefault(e.src, []).append(e.dst)
-
-    def sweep(ranks_in_order: list[int], neighbor_map: dict[str, list[str]]) -> None:
-        for r in ranks_in_order:
-            ids = by_rank[r]
-
-            def barycenter(node_id: str) -> float:
-                nbrs = neighbor_map.get(node_id, [])
-                if not nbrs:
-                    return order[node_id]
-                return sum(order[n] for n in nbrs) / len(nbrs)
-
-            ids.sort(key=barycenter)
-            for i, node_id in enumerate(ids):
-                order[node_id] = i
-
-    ranks_sorted = sorted(by_rank)
-    sweep(ranks_sorted[1:], preds)
-    sweep(list(reversed(ranks_sorted[:-1])), succs)
-    return order
-
-
 # --- geometry ----------------------------------------------------------------
 
 
-@dataclass
-class Box:
-    x: float
-    y: float
-    w: float
-    h: float
-
-    @property
-    def x2(self) -> float:
-        return self.x + self.w
-
-    @property
-    def y2(self) -> float:
-        return self.y + self.h
-
-    def overlaps(self, other: Box) -> bool:
-        return (
-            self.x < other.x2
-            and self.x2 > other.x
-            and self.y < other.y2
-            and self.y2 > other.y
-        )
-
-
-def icon_box(box: Box) -> Box:
-    """The node's *visible icon square* — 64x64, horizontally centered
-    within the wider label-reserving node box, flush against its top edge
-    (icon on top, label lines below).
-
-    `Box` (NODE_W x NODE_H) exists to reserve room for label text that's
-    almost always wider than the 64px icon; it is correct for layout
-    spacing (compute_zone_boxes, node-overlap checks) but was previously
-    also used directly for label centering and edge-routing anchor points.
-    Since the icon isn't centered within that wider box by default, those
-    anchors landed off the icon's true center — edges rode along the
-    icon's bottom edge in LR diagrams and its right side in TB diagrams
-    instead of passing through its middle, and labels centered ~28px to
-    the right of their own icon. Every caller that needs "where does this
-    node visually connect" — routing, label centering, the no-icon
-    placeholder glyph — must go through this helper instead of `Box`
-    directly."""
-    return Box(box.x + (NODE_W - ICON) / 2, box.y, ICON, ICON)
-
-
-def compute_positions(
-    spec: Spec, rank: dict[str, int], order: dict[str, int]
-) -> dict[str, Box]:
-    # Zone boxes are computed AFTER node positions (compute_zone_boxes derives
-    # its bbox from member node positions), but a zone's label header sits
-    # above its topmost member and must not collide with the diagram title
-    # above it. Reserve that room here rather than shifting everything down
-    # after the fact once the collision is already baked into every other
-    # coordinate.
-    top_offset = MARGIN + TITLE_H
-    if spec.zones:
-        top_offset += ZONE_PAD + ZONE_LABEL_H
-    boxes: dict[str, Box] = {}
-    for n in spec.nodes:
-        r, o = rank[n.id], order[n.id]
-        if spec.direction == "TB":
-            x = MARGIN + o * (NODE_W + COL_GAP)
-            y = top_offset + r * (NODE_H + ROW_GAP)
-        else:
-            x = MARGIN + r * (NODE_W + COL_GAP)
-            y = top_offset + o * (NODE_H + ROW_GAP)
-        boxes[n.id] = Box(x, y, NODE_W, NODE_H)
-    return boxes
-
-
-def compute_zone_boxes(spec: Spec, node_boxes: dict[str, Box]) -> dict[str, Box]:
-    members: dict[str, list[str]] = {z.id: [] for z in spec.zones}
-    for n in spec.nodes:
-        if n.zone is not None:
-            members[n.zone].append(n.id)
-    children: dict[str, list[str]] = {z.id: [] for z in spec.zones}
-    for z in spec.zones:
-        if z.parent is not None:
-            children[z.parent].append(z.id)
-
-    boxes: dict[str, Box] = {}
-
-    def resolve(zone_id: str, stack: frozenset[str] = frozenset()) -> Box:
-        if zone_id in boxes:
-            return boxes[zone_id]
-        if zone_id in stack:
-            raise _spec_error(
-                "spec/zone-cycle",
-                f"zone cycle detected at {zone_id!r}",
-                subject={"zone": zone_id},
-                evidence={"chain": sorted(stack)},
-                supported_fixes=(
-                    "break the cycle so every zone's `parent` chain ends at a top-level zone",
-                ),
-            )
-        parts = [node_boxes[nid] for nid in members[zone_id]]
-        parts += [resolve(cid, stack | {zone_id}) for cid in children[zone_id]]
-        if not parts:
-            raise _spec_error(
-                "spec/empty-zone",
-                f"zone {zone_id!r} has no member nodes or child zones",
-                subject={"zone": zone_id},
-                supported_fixes=(
-                    "assign at least one node to the zone via that node's `zone` field",
-                    "nest a child zone under it",
-                    "delete the zone",
-                ),
-            )
-        x0 = min(p.x for p in parts) - ZONE_PAD
-        y0 = min(p.y for p in parts) - ZONE_PAD - ZONE_LABEL_H
-        x1 = max(p.x2 for p in parts) + ZONE_PAD
-        y1 = max(p.y2 for p in parts) + ZONE_PAD
-        box = Box(x0, y0, x1 - x0, y1 - y0)
-        boxes[zone_id] = box
-        return box
-
-    for z in spec.zones:
-        resolve(z.id)
-    return boxes
-
-
 # --- routing -----------------------------------------------------------------
-
-
-@dataclass
-class RoutedEdge:
-    edge: Edge
-    points: tuple[tuple[float, float], ...]
-    label_pos: tuple[float, float]
-
-    @property
-    def path_d(self) -> str:
-        start, *rest = self.points
-        return " ".join(
-            [f"M{start[0]:g},{start[1]:g}"] + [f"L{x:g},{y:g}" for x, y in rest]
-        )
-
-
-def _centered_offsets(count: int, maximum: float) -> list[float]:
-    if count == 1:
-        return [0.0]
-    spacing = min(maximum, 2 * maximum / (count - 1))
-    return [spacing * (index - (count - 1) / 2) for index in range(count)]
-
-
-def _dedupe_route_points(
-    points: list[tuple[float, float]],
-) -> tuple[tuple[float, float], ...]:
-    """Remove zero-length or straight-through turns before measuring rhythm."""
-    deduped: list[tuple[float, float]] = []
-    for point in points:
-        if not deduped or point != deduped[-1]:
-            deduped.append(point)
-
-    changed = True
-    while changed:
-        changed = False
-        kept = [deduped[0]]
-        for index, point in enumerate(deduped[1:-1], start=1):
-            previous = kept[-1]
-            following = deduped[index + 1]
-            if (previous[0] == point[0] == following[0]) or (
-                previous[1] == point[1] == following[1]
-            ):
-                changed = True
-                continue
-            kept.append(point)
-        kept.append(deduped[-1])
-        deduped = kept
-    return tuple(deduped)
-
-
-def _edge_sort_key(
-    spec: Spec,
-    node_boxes: dict[str, Box],
-    edge_index: int,
-    source_endpoint: bool,
-) -> tuple[float, str, str, str, str]:
-    edge = spec.edges[edge_index]
-    counterpart_id = edge.dst if source_endpoint else edge.src
-    counterpart = icon_box(node_boxes[counterpart_id])
-    counterpart_center = (
-        counterpart.x + counterpart.w / 2
-        if spec.direction == "TB"
-        else counterpart.y + counterpart.h / 2
-    )
-    return (counterpart_center, counterpart_id, edge.src, edge.dst, edge.label)
-
-
-def _port_axes(
-    spec: Spec, node_boxes: dict[str, Box]
-) -> tuple[
-    dict[tuple[int, bool], float], dict[tuple[str, str], list[tuple[int, bool]]]
-]:
-    """Allocate distinct attachment points on each used icon side."""
-    groups: dict[tuple[str, str], list[tuple[int, bool]]] = {}
-    source_side, destination_side = (
-        ("bottom", "top") if spec.direction == "TB" else ("right", "left")
-    )
-    for index, edge in enumerate(spec.edges):
-        groups.setdefault((edge.src, source_side), []).append((index, True))
-        groups.setdefault((edge.dst, destination_side), []).append((index, False))
-
-    axes: dict[tuple[int, bool], float] = {}
-    for (node_id, side), endpoints in groups.items():
-        icon = icon_box(node_boxes[node_id])
-        extent = icon.w if side in ("top", "bottom") else icon.h
-        usable = max(0.0, extent - 2 * PORT_GUTTER)
-        ordered = sorted(
-            endpoints,
-            key=lambda endpoint: _edge_sort_key(
-                spec, node_boxes, endpoint[0], endpoint[1]
-            ),
-        )
-        if len(ordered) == 1:
-            offsets = [0.0]
-        else:
-            spacing = min(PORT_MAX_SPACING, usable / (len(ordered) - 1))
-            offsets = [
-                spacing * (index - (len(ordered) - 1) / 2)
-                for index in range(len(ordered))
-            ]
-        center = (
-            icon.x + icon.w / 2 if side in ("top", "bottom") else icon.y + icon.h / 2
-        )
-        for endpoint, offset in zip(ordered, offsets, strict=True):
-            axes[endpoint] = center + offset
-    return axes, groups
-
-
-def _route_points(
-    source: tuple[float, float],
-    destination: tuple[float, float],
-    direction: str,
-    channel_offset: float,
-) -> tuple[tuple[float, float], ...]:
-    sx, sy = source
-    dx, dy = destination
-    if direction == "TB":
-        if sx == dx:
-            return ((sx, sy), (dx, dy - ARROW_HEAD_LENGTH))
-        channel = sy + ROUTE_ENDPOINT_STUB + channel_offset
-        if abs(sx - dx) < MIN_INTERIOR_ROUTE_SEGMENT:
-            bridge_x = (
-                sx - MIN_INTERIOR_ROUTE_SEGMENT
-                if dx >= sx
-                else sx + MIN_INTERIOR_ROUTE_SEGMENT
-            )
-            return _dedupe_route_points(
-                [
-                    (sx, sy),
-                    (sx, channel),
-                    (bridge_x, channel),
-                    (bridge_x, channel + ROUTE_CHANNEL_HALF_SPREAD),
-                    (dx, channel + ROUTE_CHANNEL_HALF_SPREAD),
-                    (dx, dy - ARROW_HEAD_LENGTH),
-                ]
-            )
-        return _dedupe_route_points(
-            [(sx, sy), (sx, channel), (dx, channel), (dx, dy - ARROW_HEAD_LENGTH)]
-        )
-    if sy == dy:
-        return ((sx, sy), (dx - ARROW_HEAD_LENGTH, dy))
-    channel = sx + ROUTE_ENDPOINT_STUB + channel_offset
-    if abs(sy - dy) < MIN_INTERIOR_ROUTE_SEGMENT:
-        bridge_y = (
-            sy - MIN_INTERIOR_ROUTE_SEGMENT
-            if dy >= sy
-            else sy + MIN_INTERIOR_ROUTE_SEGMENT
-        )
-        return _dedupe_route_points(
-            [
-                (sx, sy),
-                (channel, sy),
-                (channel, bridge_y),
-                (channel + ROUTE_CHANNEL_HALF_SPREAD, bridge_y),
-                (channel + ROUTE_CHANNEL_HALF_SPREAD, dy),
-                (dx - ARROW_HEAD_LENGTH, dy),
-            ]
-        )
-    return _dedupe_route_points(
-        [(sx, sy), (channel, sy), (channel, dy), (dx - ARROW_HEAD_LENGTH, dy)]
-    )
-
-
-def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
-    """Spread shared ports and use bounded channels in the layout gaps."""
-    axes, groups = _port_axes(spec, node_boxes)
-    source_side, destination_side = (
-        ("bottom", "top") if spec.direction == "TB" else ("right", "left")
-    )
-    source_axes = {index: axes[index, True] for index in range(len(spec.edges))}
-    destination_axes = {index: axes[index, False] for index in range(len(spec.edges))}
-
-    for index, edge in enumerate(spec.edges):
-        source_shared = len(groups[edge.src, source_side]) > 1
-        destination_shared = len(groups[edge.dst, destination_side]) > 1
-        if (
-            not source_shared
-            and not destination_shared
-            and abs(source_axes[index] - destination_axes[index])
-            <= FACING_PORT_ALIGNMENT_DELTA
-        ):
-            merged_axis = (source_axes[index] + destination_axes[index]) / 2
-            source_axes[index] = merged_axis
-            destination_axes[index] = merged_axis
-
-    corridors: dict[tuple[float, str], list[int]] = {}
-    for index, edge in enumerate(spec.edges):
-        source = icon_box(node_boxes[edge.src])
-        source_axis, destination_axis = source_axes[index], destination_axes[index]
-        if abs(source_axis - destination_axis) < 1:
-            continue
-        key = (source.y2, "h") if spec.direction == "TB" else (source.x2, "v")
-        corridors.setdefault(key, []).append(index)
-
-    channel_offsets: dict[int, float] = {}
-    for indices in corridors.values():
-        ordered = sorted(
-            indices, key=lambda index: _edge_sort_key(spec, node_boxes, index, True)
-        )
-        for index, offset in zip(
-            ordered,
-            _centered_offsets(len(ordered), ROUTE_CHANNEL_HALF_SPREAD),
-            strict=True,
-        ):
-            channel_offsets[index] = offset
-
-    routed: list[RoutedEdge] = []
-    for index, edge in enumerate(spec.edges):
-        source = icon_box(node_boxes[edge.src])
-        destination = icon_box(node_boxes[edge.dst])
-        if spec.direction == "TB":
-            start = (source_axes[index], source.y2)
-            end = (destination_axes[index], destination.y)
-        else:
-            start = (source.x2, source_axes[index])
-            end = (destination.x, destination_axes[index])
-        points = _route_points(
-            start, end, spec.direction, channel_offsets.get(index, 0.0)
-        )
-        if spec.direction == "TB":
-            mx, my = (
-                (points[0][0] + points[-1][0]) / 2,
-                points[min(1, len(points) - 1)][1] - 6,
-            )
-        else:
-            mx, my = (
-                points[min(1, len(points) - 1)][0] + 6,
-                (points[0][1] + points[-1][1]) / 2,
-            )
-        routed.append(RoutedEdge(edge=edge, points=points, label_pos=(mx, my)))
-    return routed
-
-
-def _segment_length(start: tuple[float, float], end: tuple[float, float]) -> float:
-    return abs(end[0] - start[0]) + abs(end[1] - start[1])
-
-
-def check_route_rhythm(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
-    """Report paths whose short orthogonal runs cannot read as separate lines."""
-    out: list[Diagnostic] = []
-    for routed in routed_edges:
-        edge = routed.edge
-        segments = list(zip(routed.points, routed.points[1:]))
-        for index, (start, end) in enumerate(segments):
-            length = _segment_length(start, end)
-            evidence = {
-                "segment_index": index,
-                "start": list(start),
-                "end": list(end),
-                "length": length,
-            }
-            subject: dict[str, object] = {
-                "from": edge.src,
-                "to": edge.dst,
-                "label": edge.label,
-            }
-            if length < MIN_ROUTE_SEGMENT:
-                out.append(
-                    Diagnostic(
-                        code="composition/micro-segment",
-                        severity=SEVERITY_WARNING,
-                        message=(
-                            f"edge {edge.src!r}->{edge.dst!r} segment {index} is "
-                            f"{length:g}px; routes need at least {MIN_ROUTE_SEGMENT:g}px"
-                        ),
-                        subject=subject,
-                        evidence={**evidence, "minimum": MIN_ROUTE_SEGMENT},
-                        supported_fixes=(
-                            "remove the redundant connection",
-                            "split the nodes into separate ranks with an intermediate node",
-                        ),
-                    )
-                )
-            if 0 < index < len(segments) - 1 and length < MIN_INTERIOR_ROUTE_SEGMENT:
-                out.append(
-                    Diagnostic(
-                        code="composition/short-interior-segment",
-                        severity=SEVERITY_WARNING,
-                        message=(
-                            f"edge {edge.src!r}->{edge.dst!r} interior segment {index} "
-                            f"is {length:g}px; turns need at least "
-                            f"{MIN_INTERIOR_ROUTE_SEGMENT:g}px"
-                        ),
-                        subject=subject,
-                        evidence={
-                            **evidence,
-                            "minimum": MIN_INTERIOR_ROUTE_SEGMENT,
-                        },
-                        supported_fixes=(
-                            "remove the redundant connection",
-                            "split the nodes into separate ranks with an intermediate node",
-                        ),
-                    )
-                )
-    return out
-
-
-def _expanded_box(box: Box, clearance: float) -> Box:
-    return Box(
-        box.x - clearance,
-        box.y - clearance,
-        box.w + 2 * clearance,
-        box.h + 2 * clearance,
-    )
-
-
-def _segment_intersects_box(
-    start: tuple[float, float], end: tuple[float, float], box: Box
-) -> bool:
-    x0, y0 = start
-    x1, y1 = end
-    if x0 == x1:
-        return box.x <= x0 <= box.x2 and max(min(y0, y1), box.y) <= min(
-            max(y0, y1), box.y2
-        )
-    if y0 == y1:
-        return box.y <= y0 <= box.y2 and max(min(x0, x1), box.x) <= min(
-            max(x0, x1), box.x2
-        )
-    raise ValueError("route segments must be orthogonal")
-
-
-def check_edge_through_node(
-    node_boxes: dict[str, Box], routed_edges: list[RoutedEdge]
-) -> list[Diagnostic]:
-    """Detect an unrelated node that touches a route or its 2px clearance."""
-    out: list[Diagnostic] = []
-    for routed in routed_edges:
-        edge = routed.edge
-        for node_id, node_box in node_boxes.items():
-            if node_id in (edge.src, edge.dst):
-                continue
-            expanded = _expanded_box(node_box, NODE_ROUTE_CLEARANCE)
-            for segment_index, (start, end) in enumerate(
-                zip(routed.points, routed.points[1:])
-            ):
-                if not _segment_intersects_box(start, end, expanded):
-                    continue
-                out.append(
-                    Diagnostic(
-                        code="composition/edge-through-node",
-                        severity=SEVERITY_WARNING,
-                        message=(
-                            f"edge {edge.src!r}->{edge.dst!r} crosses the "
-                            f"clearance around unrelated node {node_id!r}"
-                        ),
-                        subject={
-                            "from": edge.src,
-                            "to": edge.dst,
-                            "node": node_id,
-                        },
-                        evidence={
-                            "segment_index": segment_index,
-                            "start": list(start),
-                            "end": list(end),
-                            "clearance": NODE_ROUTE_CLEARANCE,
-                            "node_box": _box_evidence(node_box),
-                        },
-                        supported_fixes=(
-                            "split the flow into separate ranks with an intermediate node",
-                            "remove the unrelated connection",
-                        ),
-                    )
-                )
-    return out
-
-
-def _cross_product(
-    start: tuple[float, float],
-    end: tuple[float, float],
-    point: tuple[float, float],
-) -> float:
-    return (end[0] - start[0]) * (point[1] - start[1]) - (end[1] - start[1]) * (
-        point[0] - start[0]
-    )
-
-
-def _properly_crosses(
-    first_start: tuple[float, float],
-    first_end: tuple[float, float],
-    second_start: tuple[float, float],
-    second_end: tuple[float, float],
-) -> bool:
-    first_a = _cross_product(first_start, first_end, second_start)
-    first_b = _cross_product(first_start, first_end, second_end)
-    second_a = _cross_product(second_start, second_end, first_start)
-    second_b = _cross_product(second_start, second_end, first_end)
-    epsilon = PROPER_CROSSING_EPSILON
-    return (
-        (first_a > epsilon and first_b < -epsilon)
-        or (first_a < -epsilon and first_b > epsilon)
-    ) and (
-        (second_a > epsilon and second_b < -epsilon)
-        or (second_a < -epsilon and second_b > epsilon)
-    )
-
-
-def _related_edges(first: Edge, second: Edge) -> bool:
-    return bool({first.src, first.dst} & {second.src, second.dst})
-
-
-def check_proper_crossings(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
-    """Find interior X crossings between relationships with no shared node."""
-    out: list[Diagnostic] = []
-    for first_index, first in enumerate(routed_edges):
-        for second in routed_edges[first_index + 1 :]:
-            if _related_edges(first.edge, second.edge):
-                continue
-            for first_segment, (first_start, first_end) in enumerate(
-                zip(first.points, first.points[1:])
-            ):
-                for second_segment, (second_start, second_end) in enumerate(
-                    zip(second.points, second.points[1:])
-                ):
-                    if not _properly_crosses(
-                        first_start, first_end, second_start, second_end
-                    ):
-                        continue
-                    out.append(
-                        Diagnostic(
-                            code="composition/proper-crossing",
-                            severity=SEVERITY_WARNING,
-                            message=(
-                                f"unrelated edges {first.edge.src!r}->{first.edge.dst!r} "
-                                f"and {second.edge.src!r}->{second.edge.dst!r} cross"
-                            ),
-                            subject={
-                                "edges": [
-                                    {"from": first.edge.src, "to": first.edge.dst},
-                                    {"from": second.edge.src, "to": second.edge.dst},
-                                ]
-                            },
-                            evidence={
-                                "first_segment": first_segment,
-                                "second_segment": second_segment,
-                                "epsilon": PROPER_CROSSING_EPSILON,
-                            },
-                            supported_fixes=(
-                                "reorder the affected nodes within their ranks",
-                                "split one relationship through an intermediate node",
-                            ),
-                        )
-                    )
-    return out
-
-
-def _collinear_overlap(
-    first_start: tuple[float, float],
-    first_end: tuple[float, float],
-    second_start: tuple[float, float],
-    second_end: tuple[float, float],
-) -> float:
-    if first_start[1] == first_end[1] == second_start[1] == second_end[1]:
-        return max(
-            0.0,
-            min(max(first_start[0], first_end[0]), max(second_start[0], second_end[0]))
-            - max(
-                min(first_start[0], first_end[0]), min(second_start[0], second_end[0])
-            ),
-        )
-    if first_start[0] == first_end[0] == second_start[0] == second_end[0]:
-        return max(
-            0.0,
-            min(max(first_start[1], first_end[1]), max(second_start[1], second_end[1]))
-            - max(
-                min(first_start[1], first_end[1]), min(second_start[1], second_end[1])
-            ),
-        )
-    return 0.0
-
-
-def check_ambiguous_corridors(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
-    """Find long collinear overlaps between relationships with no shared node."""
-    out: list[Diagnostic] = []
-    for first_index, first in enumerate(routed_edges):
-        for second in routed_edges[first_index + 1 :]:
-            if _related_edges(first.edge, second.edge):
-                continue
-            for first_segment, (first_start, first_end) in enumerate(
-                zip(first.points, first.points[1:])
-            ):
-                for second_segment, (second_start, second_end) in enumerate(
-                    zip(second.points, second.points[1:])
-                ):
-                    overlap = _collinear_overlap(
-                        first_start, first_end, second_start, second_end
-                    )
-                    if overlap < MIN_AMBIGUOUS_CORRIDOR:
-                        continue
-                    out.append(
-                        Diagnostic(
-                            code="composition/ambiguous-corridor",
-                            severity=SEVERITY_WARNING,
-                            message=(
-                                f"unrelated edges {first.edge.src!r}->{first.edge.dst!r} "
-                                f"and {second.edge.src!r}->{second.edge.dst!r} share "
-                                f"{overlap:g}px of route"
-                            ),
-                            subject={
-                                "edges": [
-                                    {"from": first.edge.src, "to": first.edge.dst},
-                                    {"from": second.edge.src, "to": second.edge.dst},
-                                ]
-                            },
-                            evidence={
-                                "first_segment": first_segment,
-                                "second_segment": second_segment,
-                                "overlap": overlap,
-                                "minimum": MIN_AMBIGUOUS_CORRIDOR,
-                            },
-                            supported_fixes=(
-                                "reorder the affected nodes within their ranks",
-                                "split one relationship through an intermediate node",
-                            ),
-                        )
-                    )
-    return out
-
-
-def _edge_label_box(routed: RoutedEdge) -> Box:
-    x, baseline = routed.label_pos
-    return Box(
-        x,
-        baseline - EDGE_LABEL_FONT_SIZE,
-        _text_width(routed.edge.label, EDGE_LABEL_FONT_SIZE),
-        EDGE_LABEL_FONT_SIZE,
-    )
-
-
-def _segment_box(start: tuple[float, float], end: tuple[float, float]) -> Box:
-    return Box(
-        min(start[0], end[0]),
-        min(start[1], end[1]),
-        abs(end[0] - start[0]),
-        abs(end[1] - start[1]),
-    )
-
-
-def _box_clearance(first: Box, second: Box) -> float:
-    horizontal = max(first.x - second.x2, second.x - first.x2, 0.0)
-    vertical = max(first.y - second.y2, second.y - first.y2, 0.0)
-    return hypot(horizontal, vertical)
-
-
-def check_label_route_clearance(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
-    """Detect a label mask that sits too close to a different relationship."""
-    out: list[Diagnostic] = []
-    for label_index, labeled in enumerate(routed_edges):
-        if not labeled.edge.label:
-            continue
-        label_box = _edge_label_box(labeled)
-        for route_index, routed in enumerate(routed_edges):
-            if route_index == label_index:
-                continue
-            for segment_index, (start, end) in enumerate(
-                zip(routed.points, routed.points[1:])
-            ):
-                clearance = _box_clearance(label_box, _segment_box(start, end))
-                if clearance >= LABEL_ROUTE_CLEARANCE:
-                    continue
-                out.append(
-                    Diagnostic(
-                        code="composition/label-route-clearance",
-                        severity=SEVERITY_WARNING,
-                        message=(
-                            f"label on edge {labeled.edge.src!r}->{labeled.edge.dst!r} "
-                            f"is {clearance:g}px from route "
-                            f"{routed.edge.src!r}->{routed.edge.dst!r}"
-                        ),
-                        subject={
-                            "label_edge": {
-                                "from": labeled.edge.src,
-                                "to": labeled.edge.dst,
-                            },
-                            "route_edge": {
-                                "from": routed.edge.src,
-                                "to": routed.edge.dst,
-                            },
-                        },
-                        evidence={
-                            "label_box": _box_evidence(label_box),
-                            "route_segment": segment_index,
-                            "clearance": clearance,
-                            "minimum": LABEL_ROUTE_CLEARANCE,
-                        },
-                        supported_fixes=(
-                            "reorder the affected nodes within their ranks",
-                            "shorten the edge label",
-                        ),
-                    )
-                )
-    return out
-
-
-def check_layout(
-    spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
-) -> list[Diagnostic]:
-    """Hard assertions replacing the prose self-check rules prior art in this
-    space asks the model to apply by eye ("no edge crosses an unrelated
-    icon", "no two edges overlap")."""
-    out: list[Diagnostic] = []
-    ids = list(node_boxes)
-    for i, a_id in enumerate(ids):
-        for b_id in ids[i + 1 :]:
-            if node_boxes[a_id].overlaps(node_boxes[b_id]):
-                out.append(
-                    Diagnostic(
-                        code="layout/node-overlap",
-                        severity=SEVERITY_ERROR,
-                        message=f"node overlap: {a_id!r} and {b_id!r}",
-                        subject={"nodes": [a_id, b_id]},
-                        evidence={
-                            a_id: _box_evidence(node_boxes[a_id]),
-                            b_id: _box_evidence(node_boxes[b_id]),
-                        },
-                        supported_fixes=(
-                            "split the two nodes across different ranks by adding an edge between them",
-                            "remove one of the duplicated nodes",
-                        ),
-                    )
-                )
-    zids = list(zone_boxes)
-    for i, a_id in enumerate(zids):
-        for b_id in zids[i + 1 :]:
-            a_parent_chain = _zone_ancestors(spec, a_id)
-            if b_id in a_parent_chain or a_id in _zone_ancestors(spec, b_id):
-                continue  # nested zones are expected to overlap their ancestor
-            if zone_boxes[a_id].overlaps(zone_boxes[b_id]):
-                out.append(
-                    Diagnostic(
-                        code="layout/zone-overlap",
-                        severity=SEVERITY_ERROR,
-                        message=f"zone overlap: {a_id!r} and {b_id!r}",
-                        subject={"zones": [a_id, b_id]},
-                        evidence={
-                            a_id: _box_evidence(zone_boxes[a_id]),
-                            b_id: _box_evidence(zone_boxes[b_id]),
-                        },
-                        supported_fixes=(
-                            "list each zone's member nodes contiguously in `nodes`",
-                            "correct the `zone` field on the interleaved nodes",
-                            "nest one zone inside the other via `parent` if containment was intended",
-                        ),
-                    )
-                )
-    return out
-
-
-def _box_evidence(box: Box) -> dict[str, float]:
-    return {"x": box.x, "y": box.y, "width": box.w, "height": box.h}
-
-
-def _zone_ancestors(spec: Spec, zone_id: str) -> set[str]:
-    by_id = {z.id: z for z in spec.zones}
-    out = set()
-    cur = by_id[zone_id].parent
-    while cur is not None:
-        if cur in out:
-            break
-        out.add(cur)
-        cur = by_id[cur].parent
-    return out
-
-
-def _zone_membership(spec: Spec, node: Node) -> set[str]:
-    if node.zone is None:
-        return set()
-    return {node.zone, *_zone_ancestors(spec, node.zone)}
-
-
-def _profile_diagnostic(
-    code: str,
-    message: str,
-    subject: dict[str, object],
-    evidence: dict[str, object],
-    supported_fixes: tuple[str, ...],
-) -> Diagnostic:
-    return Diagnostic(
-        code=code,
-        severity=SEVERITY_ERROR,
-        message=message,
-        subject=subject,
-        evidence=evidence,
-        supported_fixes=supported_fixes,
-    )
-
-
-def check_deployment_profile(spec: Spec) -> list[Diagnostic]:
-    """Validate authored deployment facts without assigning missing facts."""
-    if spec.profile != "deployment-ownership":
-        return []
-
-    memberships = {node.id: _zone_membership(spec, node) for node in spec.nodes}
-    region_ids = {zone.id for zone in spec.zones if zone.kind == "region"}
-    security_ids = {zone.id for zone in spec.zones if zone.kind == "security"}
-    out: list[Diagnostic] = []
-
-    missing_kinds = [
-        kind
-        for kind, present in (
-            ("region", region_ids),
-            ("security", security_ids),
-        )
-        if not present
-    ]
-    if missing_kinds:
-        out.append(
-            _profile_diagnostic(
-                "profile/missing-required-zone-kinds",
-                f"deployment profile requires zone kinds: {', '.join(missing_kinds)}",
-                {"profile": spec.profile},
-                {
-                    "missing_kinds": missing_kinds,
-                    "declared_zones": [
-                        {"id": zone.id, "kind": zone.kind} for zone in spec.zones
-                    ],
-                },
-                (
-                    "add at least one `kind: region` zone",
-                    "add at least one `kind: security` zone",
-                ),
-            )
-        )
-
-    for node in spec.nodes:
-        if not node.external and (
-            not isinstance(node.owner, str) or not node.owner.strip()
-        ):
-            out.append(
-                _profile_diagnostic(
-                    "profile/missing-owner",
-                    f"node {node.id!r} has no non-blank owner",
-                    {"node": node.id},
-                    {"external": node.external, "owner": node.owner},
-                    (
-                        "set the node's `owner` to the accountable team or service",
-                        "set `external: true` only for an externally owned node",
-                    ),
-                )
-            )
-
-        node_regions = sorted(memberships[node.id] & region_ids)
-        if not node_regions:
-            out.append(
-                _profile_diagnostic(
-                    "profile/missing-region-scope",
-                    f"node {node.id!r} is not contained by a region zone",
-                    {"node": node.id},
-                    {
-                        "zone": node.zone,
-                        "zone_membership": sorted(memberships[node.id]),
-                    },
-                    ("assign the node to a zone nested under one `kind: region` zone",),
-                )
-            )
-        elif len(node_regions) > 1:
-            out.append(
-                _profile_diagnostic(
-                    "profile/ambiguous-region",
-                    f"node {node.id!r} is contained by multiple region zones",
-                    {"node": node.id},
-                    {"regions": node_regions},
-                    ("nest the node under exactly one `kind: region` zone",),
-                )
-            )
-
-        if node.storage and not (memberships[node.id] & security_ids):
-            out.append(
-                _profile_diagnostic(
-                    "profile/storage-outside-security-zone",
-                    f"storage node {node.id!r} is outside a security zone",
-                    {"node": node.id},
-                    {
-                        "zone": node.zone,
-                        "zone_membership": sorted(memberships[node.id]),
-                    },
-                    (
-                        "assign the storage node to a zone nested under `kind: security`",
-                    ),
-                )
-            )
-
-    for security_id in sorted(security_ids):
-        security_regions = sorted(_zone_ancestors(spec, security_id) & region_ids)
-        if len(security_regions) != 1:
-            out.append(
-                _profile_diagnostic(
-                    "profile/inconsistent-security-zone-region",
-                    f"security zone {security_id!r} does not resolve to one region",
-                    {"zone": security_id},
-                    {
-                        "regions": security_regions,
-                        "parent": next(
-                            zone.parent for zone in spec.zones if zone.id == security_id
-                        ),
-                    },
-                    ("nest the security zone under exactly one `kind: region` zone",),
-                )
-            )
-
-    for edge in spec.edges:
-        src_security = memberships[edge.src] & security_ids
-        dst_security = memberships[edge.dst] & security_ids
-        if src_security != dst_security and not edge.label.strip():
-            out.append(
-                _profile_diagnostic(
-                    "profile/missing-boundary-crossing-mechanism",
-                    f"edge {edge.src!r}->{edge.dst!r} crosses a security boundary without a mechanism",
-                    {"edge": {"from": edge.src, "to": edge.dst}},
-                    {
-                        "from_security_zones": sorted(src_security),
-                        "to_security_zones": sorted(dst_security),
-                        "from_node": edge.src,
-                        "to_node": edge.dst,
-                    },
-                    (
-                        "set a non-blank edge `label` naming the boundary-crossing mechanism",
-                    ),
-                )
-            )
-    return out
 
 
 # --- icon resolution ----------------------------------------------------------
@@ -1319,10 +311,10 @@ class CompositeIconLookup:
 def _fitted_node_font_size(text: str, preferred_size: float, box: Box) -> float | None:
     """Return a readable fitted size, or None when the label cannot fit safely."""
     available = box.w - NODE_TEXT_PADDING
-    projected_minimum_width = _text_width(text, MIN_NODE_TEXT_FONT_SIZE)
+    projected_minimum_width = text_width(text, MIN_NODE_TEXT_FONT_SIZE)
     if projected_minimum_width > box.w + NODE_TEXT_PADDING:
         return None
-    unit_width = _text_width(text, 1.0)
+    unit_width = text_width(text, 1.0)
     if unit_width == 0:
         return preferred_size
     fitted_size = min(preferred_size, available / unit_width)
@@ -1339,10 +331,10 @@ def _label_overflow(
         subject={"node": node_id, "field": field_name},
         evidence={
             "text": text,
-            "estimated_width": round(_text_width(text, preferred_size), 2),
+            "estimated_width": round(text_width(text, preferred_size), 2),
             "available_width": box.w - NODE_TEXT_PADDING,
             "projected_minimum_width": round(
-                _text_width(text, MIN_NODE_TEXT_FONT_SIZE), 2
+                text_width(text, MIN_NODE_TEXT_FONT_SIZE), 2
             ),
             "minimum_font_size": MIN_NODE_TEXT_FONT_SIZE,
             "maximum_projected_width": box.w + NODE_TEXT_PADDING,
@@ -1523,7 +515,7 @@ def emit_svg(
         )
 
     # zones first (background layer), parents before children so children draw on top
-    for zid in sorted(zone_boxes, key=lambda z: len(_zone_ancestors(spec, z))):
+    for zid in sorted(zone_boxes, key=lambda z: len(zone_ancestors(spec, z))):
         parts.append(_zone_svg(zone_by_id[zid], zone_boxes[zid]))
 
     for routed in routed_edges:
@@ -1789,7 +781,7 @@ def _layout_report(spec: Spec, result: RenderResult) -> dict[str, object]:
     """Expose the exact boxes and waypoints used by SVG emission."""
     return {
         "nodes": [
-            {"id": node.id, "box": _box_evidence(result.node_boxes[node.id])}
+            {"id": node.id, "box": box_evidence(result.node_boxes[node.id])}
             for node in spec.nodes
         ],
         "zones": [
@@ -1798,7 +790,7 @@ def _layout_report(spec: Spec, result: RenderResult) -> dict[str, object]:
                 "label": zone.label,
                 "parent": zone.parent,
                 "members": [node.id for node in spec.nodes if node.zone == zone.id],
-                "box": _box_evidence(result.zone_boxes[zone.id]),
+                "box": box_evidence(result.zone_boxes[zone.id]),
             }
             for zone in spec.zones
         ],
@@ -1820,7 +812,7 @@ def _layout_report(spec: Spec, result: RenderResult) -> dict[str, object]:
             {
                 "edge": {"from": routed.edge.src, "to": routed.edge.dst},
                 "text": routed.edge.label,
-                "box": _box_evidence(_edge_label_box(routed)),
+                "box": box_evidence(edge_label_box(routed)),
             }
             for routed in result.routed_edges
             if routed.edge.label
