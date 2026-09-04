@@ -46,7 +46,7 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
 1. **Parse** the user's request: components (with descriptions), containment hierarchy (zones — VPC/Region/Resource Group/Subnet), connections (with semantic types if specified), and cloud provider(s).
 2. **Resolve services to icons.** For each cloud component, read `references/services-aws.yaml`, `references/services-azure.yaml`, or `references/services-gcp.yaml` (whichever matches its provider) — or `references/icons-generic.md` for non-cloud — and note the exact slug to use as that node's `service` field. If a service genuinely has no icon in that provider's set (documented per-provider in each table), either pick the closest sibling category or leave `service` unset — the renderer falls back to a labeled placeholder rather than a wrong icon.
 3. **Ensure the icon cache is warm** for every provider used (see Prerequisites). Skip this for `provider: generic`.
-4. **Author the spec** — a small YAML file per `references/spec-format.md`: `title`, `direction` (`LR`/`TB`), `zones` (with `parent` for nesting), `nodes` (`id`, `label`, `service`, `zone`, `color`), `edges` (`from`, `to`, `label`, `type`).
+4. **Author the spec** — a small YAML file per `references/spec-format.md`: `title`, `direction` (`LR`/`TB`), `zones` (with `parent` for nesting), `nodes` (`id`, `label`, `service`, `zone`, `color`), `edges` (`id`, `from`, `to`, `label`, `type`).
 5. **Validate without writing an artifact:**
    ```bash
    python3 scripts/render.py validate spec.yaml --quality showcase --json
@@ -58,7 +58,12 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
    python3 scripts/render.py deliver spec.yaml -o diagram.svg --quality showcase --json
    ```
    `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. Every failure leaves a previous artifact unchanged.
-7. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
+7. **Compare authored revisions when needed:**
+   ```bash
+   python3 scripts/render.py compare base.yaml head.yaml
+   ```
+   `compare` emits a JSON receipt keyed only by authored node and edge ids. It reports added, removed, changed, moved, and rerouted entities with exact field paths. Its mandatory limitation is: `Authored specification only; no runtime impact, causality, risk, or merge safety is inferred.`
+8. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
 
 ## Spec fields at a glance
 
@@ -86,7 +91,8 @@ nodes:
     external: boolean      # default false
     storage: boolean       # true requires a security zone under deployment-ownership
 edges:
-  - from: string            # node id
+  - id: string              # required and stable when using compare
+    from: string            # node id
     to: string              # node id
     label: string           # required for security-boundary crossings under deployment-ownership
     type: realtime | batch | event | control | default

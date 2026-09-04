@@ -1,0 +1,29 @@
+zones:
+  - id: left
+  - id: right
+nodes:
+  - id: changed
+    label: Before
+    zone: left
+  - id: moved
+    label: Moved
+    zone: left
+  - id: unchanged
+    label: Unchanged
+    zone: left
+  - id: removed
+    label: Removed
+    zone: left
+edges:
+  - id: changed-edge
+    from: changed
+    to: unchanged
+    label: before
+  - id: rerouted-edge
+    from: changed
+    to: unchanged
+    label: fixed
+  - id: removed-edge
+    from: moved
+    to: unchanged
+    label: removed
