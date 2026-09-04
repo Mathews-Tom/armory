@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from engine import render
+from engine import diagnostics, render
 from engine.render import check_deployment_profile, load_spec
 
 
 _FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _findings(name: str) -> list[render.Diagnostic]:
+def _findings(name: str) -> list[diagnostics.Diagnostic]:
     spec = load_spec((_FIXTURES / name).read_text())
     return check_deployment_profile(spec)
 
