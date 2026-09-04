@@ -43,6 +43,14 @@ site/dist/
 *.png
 *.svg
 
+# Package fixtures and committed reference assets are test inputs, not
+# generated output. The blanket rules above hid a test fixture from every
+# clean checkout, so the suite that reads it passed only on machines where
+# an untracked local copy happened to exist.
+!skills/*/tests/fixtures/*.svg
+!skills/*/assets/*.svg
+!skills/*/references/**/*.svg
+
 # ── Skill packaging ──────────────────────────
 *.skill
 evals/results/
