@@ -22,6 +22,7 @@ from render import (
     assign_ranks,
     check_editability,
     check_layout,
+    check_edge_through_node,
     check_route_rhythm,
     compute_positions,
     compute_zone_boxes,
@@ -521,6 +522,59 @@ class TestRouting:
         second = do_render(spec, _icon_lookup)
 
         assert first.svg == second.svg
+
+
+class TestEdgeThroughNode:
+    def _route(self) -> RoutedEdge:
+        return RoutedEdge(
+            edge=Edge("a", "b"),
+            points=((0, 10), (40, 10)),
+            label_pos=(0, 0),
+        )
+
+    def test_reports_unrelated_node_within_clearance(self) -> None:
+        node_boxes = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 5, 10, 10),
+        }
+
+        findings = check_edge_through_node(node_boxes, [self._route()])
+
+        assert [d.code for d in findings] == ["composition/edge-through-node"]
+        assert findings[0].subject == {"from": "a", "to": "b", "node": "c"}
+
+    def test_clearance_boundary_and_endpoint_exemption(self) -> None:
+        route = self._route()
+        at_clearance = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 12, 10, 10),
+        }
+        beyond_clearance = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 12.01, 10, 10),
+        }
+
+        assert [d.code for d in check_edge_through_node(at_clearance, [route])] == [
+            "composition/edge-through-node"
+        ]
+        assert check_edge_through_node(beyond_clearance, [route]) == []
+
+    def test_quality_profiles_change_edge_through_node_severity(self) -> None:
+        node_boxes = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 5, 10, 10),
+        }
+        findings = check_edge_through_node(node_boxes, [self._route()])
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
 
 
 class TestEditabilityCheck:

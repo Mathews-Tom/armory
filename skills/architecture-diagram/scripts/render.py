@@ -58,6 +58,9 @@ ARROW_HEAD_LENGTH = 6.0
 # a segment between two turns needs 16px to remain visually distinguishable.
 MIN_ROUTE_SEGMENT = 8.0
 MIN_INTERIOR_ROUTE_SEGMENT = 16.0
+# A route passing within two pixels of an unrelated node visually reads as
+# entering it. Expand every unrelated node by this clearance before testing.
+NODE_ROUTE_CLEARANCE = 2.0
 
 
 EDGE_COLORS = {
@@ -890,6 +893,76 @@ def check_route_rhythm(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
     return out
 
 
+def _expanded_box(box: Box, clearance: float) -> Box:
+    return Box(
+        box.x - clearance,
+        box.y - clearance,
+        box.w + 2 * clearance,
+        box.h + 2 * clearance,
+    )
+
+
+def _segment_intersects_box(
+    start: tuple[float, float], end: tuple[float, float], box: Box
+) -> bool:
+    x0, y0 = start
+    x1, y1 = end
+    if x0 == x1:
+        return box.x <= x0 <= box.x2 and max(min(y0, y1), box.y) <= min(
+            max(y0, y1), box.y2
+        )
+    if y0 == y1:
+        return box.y <= y0 <= box.y2 and max(min(x0, x1), box.x) <= min(
+            max(x0, x1), box.x2
+        )
+    raise ValueError("route segments must be orthogonal")
+
+
+def check_edge_through_node(
+    node_boxes: dict[str, Box], routed_edges: list[RoutedEdge]
+) -> list[Diagnostic]:
+    """Detect an unrelated node that touches a route or its 2px clearance."""
+    out: list[Diagnostic] = []
+    for routed in routed_edges:
+        edge = routed.edge
+        for node_id, node_box in node_boxes.items():
+            if node_id in (edge.src, edge.dst):
+                continue
+            expanded = _expanded_box(node_box, NODE_ROUTE_CLEARANCE)
+            for segment_index, (start, end) in enumerate(
+                zip(routed.points, routed.points[1:])
+            ):
+                if not _segment_intersects_box(start, end, expanded):
+                    continue
+                out.append(
+                    Diagnostic(
+                        code="composition/edge-through-node",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"edge {edge.src!r}->{edge.dst!r} crosses the "
+                            f"clearance around unrelated node {node_id!r}"
+                        ),
+                        subject={
+                            "from": edge.src,
+                            "to": edge.dst,
+                            "node": node_id,
+                        },
+                        evidence={
+                            "segment_index": segment_index,
+                            "start": list(start),
+                            "end": list(end),
+                            "clearance": NODE_ROUTE_CLEARANCE,
+                            "node_box": _box_evidence(node_box),
+                        },
+                        supported_fixes=(
+                            "split the flow into separate ranks with an intermediate node",
+                            "remove the unrelated connection",
+                        ),
+                    )
+                )
+    return out
+
+
 def check_layout(
     spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
 ) -> list[Diagnostic]:
@@ -1289,6 +1362,7 @@ def render(
     diagnostics += check_layout(spec, node_boxes, zone_boxes)
     routed_edges = route_edges(spec, node_boxes)
     diagnostics += check_route_rhythm(routed_edges)
+    diagnostics += check_edge_through_node(node_boxes, routed_edges)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
