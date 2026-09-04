@@ -52,6 +52,7 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
    python3 scripts/render.py validate spec.yaml --quality showcase --json
    ```
    The receipt contains exact spec and candidate-artifact SHA-256 digests, validation counts, quality profile, composition status, and coded diagnostics. `validate` never touches an output path.
+   Use `--layout-json` instead of `--json` when an agent needs the exact emitted node boxes, zone membership and boxes, routed edge waypoints, and edge-label rectangles for review. It also never writes SVG output.
 6. **Deliver only a clean candidate:**
    ```bash
    python3 scripts/render.py deliver spec.yaml -o diagram.svg --quality showcase --json
