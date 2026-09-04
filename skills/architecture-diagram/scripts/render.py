@@ -41,6 +41,24 @@ MARGIN = 32
 TITLE_H = 44
 ZONE_PAD = 22
 ZONE_LABEL_H = 26
+# Shared-side ports must stay away from the icon corners and remain legible as
+# fan-out grows. A 64px icon leaves a 32px usable span after 16px gutters:
+# five ports therefore land 8px apart without one endpoint covering another.
+PORT_GUTTER = 16.0
+PORT_MAX_SPACING = 14.0
+# Rejoin a lone source/destination pair when their spread ports are nearly
+# aligned. This keeps short hops straight without collapsing a shared side.
+FACING_PORT_ALIGNMENT_DELTA = 16.0
+# Orthogonal detours leave a real 24px endpoint stub. Centered channel offsets
+# span at most +/-16px, so even their nearest first segment is at least 8px.
+ROUTE_ENDPOINT_STUB = 24.0
+ROUTE_CHANNEL_HALF_SPREAD = 16.0
+ARROW_HEAD_LENGTH = 6.0
+# Route rhythm failures are composition findings: every segment needs 8px and
+# a segment between two turns needs 16px to remain visually distinguishable.
+MIN_ROUTE_SEGMENT = 8.0
+MIN_INTERIOR_ROUTE_SEGMENT = 16.0
+
 
 EDGE_COLORS = {
     "realtime": "#2563EB",
@@ -142,12 +160,17 @@ def apply_quality_profile(
 ) -> list[Diagnostic]:
     """Raise profile-sensitive findings to errors under the showcase profile."""
     if quality not in QUALITY_PROFILES:
-        raise ValueError(f"unknown quality profile {quality!r}; expected one of {QUALITY_PROFILES}")
+        raise ValueError(
+            f"unknown quality profile {quality!r}; expected one of {QUALITY_PROFILES}"
+        )
     if quality != QUALITY_SHOWCASE:
         return list(diagnostics)
     out = []
     for d in diagnostics:
-        if d.code.startswith(PROFILE_SENSITIVE_NAMESPACE) and d.severity != SEVERITY_ERROR:
+        if (
+            d.code.startswith(PROFILE_SENSITIVE_NAMESPACE)
+            and d.severity != SEVERITY_ERROR
+        ):
             out.append(
                 Diagnostic(
                     code=d.code,
@@ -575,71 +598,296 @@ def compute_zone_boxes(spec: Spec, node_boxes: dict[str, Box]) -> dict[str, Box]
 @dataclass
 class RoutedEdge:
     edge: Edge
-    path_d: str
+    points: tuple[tuple[float, float], ...]
     label_pos: tuple[float, float]
+
+    @property
+    def path_d(self) -> str:
+        start, *rest = self.points
+        return " ".join(
+            [f"M{start[0]:g},{start[1]:g}"] + [f"L{x:g},{y:g}" for x, y in rest]
+        )
+
+
+def _centered_offsets(count: int, maximum: float) -> list[float]:
+    if count == 1:
+        return [0.0]
+    spacing = min(maximum, 2 * maximum / (count - 1))
+    return [spacing * (index - (count - 1) / 2) for index in range(count)]
+
+
+def _dedupe_route_points(
+    points: list[tuple[float, float]],
+) -> tuple[tuple[float, float], ...]:
+    """Remove zero-length or straight-through turns before measuring rhythm."""
+    deduped: list[tuple[float, float]] = []
+    for point in points:
+        if not deduped or point != deduped[-1]:
+            deduped.append(point)
+
+    changed = True
+    while changed:
+        changed = False
+        kept = [deduped[0]]
+        for index, point in enumerate(deduped[1:-1], start=1):
+            previous = kept[-1]
+            following = deduped[index + 1]
+            if (previous[0] == point[0] == following[0]) or (
+                previous[1] == point[1] == following[1]
+            ):
+                changed = True
+                continue
+            kept.append(point)
+        kept.append(deduped[-1])
+        deduped = kept
+    return tuple(deduped)
+
+
+def _edge_sort_key(
+    spec: Spec,
+    node_boxes: dict[str, Box],
+    edge_index: int,
+    source_endpoint: bool,
+) -> tuple[float, str, str, str, str]:
+    edge = spec.edges[edge_index]
+    counterpart_id = edge.dst if source_endpoint else edge.src
+    counterpart = icon_box(node_boxes[counterpart_id])
+    counterpart_center = (
+        counterpart.x + counterpart.w / 2
+        if spec.direction == "TB"
+        else counterpart.y + counterpart.h / 2
+    )
+    return (counterpart_center, counterpart_id, edge.src, edge.dst, edge.label)
+
+
+def _port_axes(
+    spec: Spec, node_boxes: dict[str, Box]
+) -> tuple[
+    dict[tuple[int, bool], float], dict[tuple[str, str], list[tuple[int, bool]]]
+]:
+    """Allocate distinct attachment points on each used icon side."""
+    groups: dict[tuple[str, str], list[tuple[int, bool]]] = {}
+    source_side, destination_side = (
+        ("bottom", "top") if spec.direction == "TB" else ("right", "left")
+    )
+    for index, edge in enumerate(spec.edges):
+        groups.setdefault((edge.src, source_side), []).append((index, True))
+        groups.setdefault((edge.dst, destination_side), []).append((index, False))
+
+    axes: dict[tuple[int, bool], float] = {}
+    for (node_id, side), endpoints in groups.items():
+        icon = icon_box(node_boxes[node_id])
+        extent = icon.w if side in ("top", "bottom") else icon.h
+        usable = max(0.0, extent - 2 * PORT_GUTTER)
+        ordered = sorted(
+            endpoints,
+            key=lambda endpoint: _edge_sort_key(
+                spec, node_boxes, endpoint[0], endpoint[1]
+            ),
+        )
+        if len(ordered) == 1:
+            offsets = [0.0]
+        else:
+            spacing = min(PORT_MAX_SPACING, usable / (len(ordered) - 1))
+            offsets = [
+                spacing * (index - (len(ordered) - 1) / 2)
+                for index in range(len(ordered))
+            ]
+        center = (
+            icon.x + icon.w / 2 if side in ("top", "bottom") else icon.y + icon.h / 2
+        )
+        for endpoint, offset in zip(ordered, offsets, strict=True):
+            axes[endpoint] = center + offset
+    return axes, groups
+
+
+def _route_points(
+    source: tuple[float, float],
+    destination: tuple[float, float],
+    direction: str,
+    channel_offset: float,
+) -> tuple[tuple[float, float], ...]:
+    sx, sy = source
+    dx, dy = destination
+    if direction == "TB":
+        if sx == dx:
+            return ((sx, sy), (dx, dy - ARROW_HEAD_LENGTH))
+        channel = sy + ROUTE_ENDPOINT_STUB + channel_offset
+        if abs(sx - dx) < MIN_INTERIOR_ROUTE_SEGMENT:
+            bridge_x = (
+                sx - MIN_INTERIOR_ROUTE_SEGMENT
+                if dx >= sx
+                else sx + MIN_INTERIOR_ROUTE_SEGMENT
+            )
+            return _dedupe_route_points(
+                [
+                    (sx, sy),
+                    (sx, channel),
+                    (bridge_x, channel),
+                    (bridge_x, channel + ROUTE_CHANNEL_HALF_SPREAD),
+                    (dx, channel + ROUTE_CHANNEL_HALF_SPREAD),
+                    (dx, dy - ARROW_HEAD_LENGTH),
+                ]
+            )
+        return _dedupe_route_points(
+            [(sx, sy), (sx, channel), (dx, channel), (dx, dy - ARROW_HEAD_LENGTH)]
+        )
+    if sy == dy:
+        return ((sx, sy), (dx - ARROW_HEAD_LENGTH, dy))
+    channel = sx + ROUTE_ENDPOINT_STUB + channel_offset
+    if abs(sy - dy) < MIN_INTERIOR_ROUTE_SEGMENT:
+        bridge_y = (
+            sy - MIN_INTERIOR_ROUTE_SEGMENT
+            if dy >= sy
+            else sy + MIN_INTERIOR_ROUTE_SEGMENT
+        )
+        return _dedupe_route_points(
+            [
+                (sx, sy),
+                (channel, sy),
+                (channel, bridge_y),
+                (channel + ROUTE_CHANNEL_HALF_SPREAD, bridge_y),
+                (channel + ROUTE_CHANNEL_HALF_SPREAD, dy),
+                (dx - ARROW_HEAD_LENGTH, dy),
+            ]
+        )
+    return _dedupe_route_points(
+        [(sx, sy), (channel, sy), (channel, dy), (dx - ARROW_HEAD_LENGTH, dy)]
+    )
 
 
 def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
-    """Corridor membership must be known before assigning lane offsets, or a
-    parallel-edge stack can grow past the row/column gap and cross through
-    the very node row it was routing around. Verified failure mode: 4
-    same-rank targets fanning out from one TB source pushed the 3rd/4th lane
-    offset past ROW_GAP, drawing those segments through the target row's
-    node bodies instead of the gap above them. Fix: pre-count each
-    corridor's membership, then size lane spacing to fit inside the actual
-    available gap regardless of how many edges share it."""
-    corridor_of: dict[int, tuple[float, str]] = {}
-    for i, e in enumerate(spec.edges):
-        a, b = icon_box(node_boxes[e.src]), icon_box(node_boxes[e.dst])
-        if spec.direction == "TB":
-            ax, bx = a.x + a.w / 2, b.x + b.w / 2
-            if abs(ax - bx) >= 1:
-                corridor_of[i] = (a.y2, "h")
-        else:
-            ay, by = a.y + a.h / 2, b.y + b.h / 2
-            if abs(ay - by) >= 1:
-                corridor_of[i] = (a.x2, "v")
+    """Spread shared ports and use bounded channels in the layout gaps."""
+    axes, groups = _port_axes(spec, node_boxes)
+    source_side, destination_side = (
+        ("bottom", "top") if spec.direction == "TB" else ("right", "left")
+    )
+    source_axes = {index: axes[index, True] for index in range(len(spec.edges))}
+    destination_axes = {index: axes[index, False] for index in range(len(spec.edges))}
 
-    corridor_size: dict[tuple[float, str], int] = {}
-    for key in corridor_of.values():
-        corridor_size[key] = corridor_size.get(key, 0) + 1
+    for index, edge in enumerate(spec.edges):
+        source_shared = len(groups[edge.src, source_side]) > 1
+        destination_shared = len(groups[edge.dst, destination_side]) > 1
+        if (
+            not source_shared
+            and not destination_shared
+            and abs(source_axes[index] - destination_axes[index])
+            <= FACING_PORT_ALIGNMENT_DELTA
+        ):
+            merged_axis = (source_axes[index] + destination_axes[index]) / 2
+            source_axes[index] = merged_axis
+            destination_axes[index] = merged_axis
 
-    lane_index: dict[tuple[float, str], int] = {}
-    routed = []
-    for i, e in enumerate(spec.edges):
-        a, b = icon_box(node_boxes[e.src]), icon_box(node_boxes[e.dst])
+    corridors: dict[tuple[float, str], list[int]] = {}
+    for index, edge in enumerate(spec.edges):
+        source = icon_box(node_boxes[edge.src])
+        source_axis, destination_axis = source_axes[index], destination_axes[index]
+        if abs(source_axis - destination_axis) < 1:
+            continue
+        key = (source.y2, "h") if spec.direction == "TB" else (source.x2, "v")
+        corridors.setdefault(key, []).append(index)
+
+    channel_offsets: dict[int, float] = {}
+    for indices in corridors.values():
+        ordered = sorted(
+            indices, key=lambda index: _edge_sort_key(spec, node_boxes, index, True)
+        )
+        for index, offset in zip(
+            ordered,
+            _centered_offsets(len(ordered), ROUTE_CHANNEL_HALF_SPREAD),
+            strict=True,
+        ):
+            channel_offsets[index] = offset
+
+    routed: list[RoutedEdge] = []
+    for index, edge in enumerate(spec.edges):
+        source = icon_box(node_boxes[edge.src])
+        destination = icon_box(node_boxes[edge.dst])
         if spec.direction == "TB":
-            ax, ay = a.x + a.w / 2, a.y2
-            bx, by = b.x + b.w / 2, b.y
-            if abs(ax - bx) < 1:
-                d = f"M{ax:g},{ay:g} L{bx:g},{by - 6:g}"
-                mx, my = ax + 8, (ay + by) / 2
-            else:
-                key = corridor_of[i]
-                n = corridor_size[key]
-                spacing = min(8.0, 16.0 / max(n - 1, 1))
-                idx = lane_index.get(key, 0)
-                lane_index[key] = idx + 1
-                mid = ay + 10 + idx * spacing
-                d = f"M{ax:g},{ay:g} L{ax:g},{mid:g} L{bx:g},{mid:g} L{bx:g},{by - 6:g}"
-                mx, my = (ax + bx) / 2, mid - 6
+            start = (source_axes[index], source.y2)
+            end = (destination_axes[index], destination.y)
         else:
-            ax, ay = a.x2, a.y + a.h / 2
-            bx, by = b.x, b.y + b.h / 2
-            if abs(ay - by) < 1:
-                d = f"M{ax:g},{ay:g} L{bx - 6:g},{by:g}"
-                mx, my = (ax + bx) / 2, ay - 8
-            else:
-                key = corridor_of[i]
-                n = corridor_size[key]
-                spacing = min(10.0, 40.0 / max(n - 1, 1))
-                idx = lane_index.get(key, 0)
-                lane_index[key] = idx + 1
-                mid = ax + 16 + idx * spacing
-                d = f"M{ax:g},{ay:g} L{mid:g},{ay:g} L{mid:g},{by:g} L{bx - 6:g},{by:g}"
-                mx, my = mid + 6, (ay + by) / 2
-        routed.append(RoutedEdge(edge=e, path_d=d, label_pos=(mx, my)))
+            start = (source.x2, source_axes[index])
+            end = (destination.x, destination_axes[index])
+        points = _route_points(
+            start, end, spec.direction, channel_offsets.get(index, 0.0)
+        )
+        if spec.direction == "TB":
+            mx, my = (
+                (points[0][0] + points[-1][0]) / 2,
+                points[min(1, len(points) - 1)][1] - 6,
+            )
+        else:
+            mx, my = (
+                points[min(1, len(points) - 1)][0] + 6,
+                (points[0][1] + points[-1][1]) / 2,
+            )
+        routed.append(RoutedEdge(edge=edge, points=points, label_pos=(mx, my)))
     return routed
+
+
+def _segment_length(start: tuple[float, float], end: tuple[float, float]) -> float:
+    return abs(end[0] - start[0]) + abs(end[1] - start[1])
+
+
+def check_route_rhythm(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
+    """Report paths whose short orthogonal runs cannot read as separate lines."""
+    out: list[Diagnostic] = []
+    for routed in routed_edges:
+        edge = routed.edge
+        segments = list(zip(routed.points, routed.points[1:]))
+        for index, (start, end) in enumerate(segments):
+            length = _segment_length(start, end)
+            evidence = {
+                "segment_index": index,
+                "start": list(start),
+                "end": list(end),
+                "length": length,
+            }
+            subject: dict[str, object] = {
+                "from": edge.src,
+                "to": edge.dst,
+                "label": edge.label,
+            }
+            if length < MIN_ROUTE_SEGMENT:
+                out.append(
+                    Diagnostic(
+                        code="composition/micro-segment",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"edge {edge.src!r}->{edge.dst!r} segment {index} is "
+                            f"{length:g}px; routes need at least {MIN_ROUTE_SEGMENT:g}px"
+                        ),
+                        subject=subject,
+                        evidence={**evidence, "minimum": MIN_ROUTE_SEGMENT},
+                        supported_fixes=(
+                            "remove the redundant connection",
+                            "split the nodes into separate ranks with an intermediate node",
+                        ),
+                    )
+                )
+            if 0 < index < len(segments) - 1 and length < MIN_INTERIOR_ROUTE_SEGMENT:
+                out.append(
+                    Diagnostic(
+                        code="composition/short-interior-segment",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"edge {edge.src!r}->{edge.dst!r} interior segment {index} "
+                            f"is {length:g}px; turns need at least "
+                            f"{MIN_INTERIOR_ROUTE_SEGMENT:g}px"
+                        ),
+                        subject=subject,
+                        evidence={
+                            **evidence,
+                            "minimum": MIN_INTERIOR_ROUTE_SEGMENT,
+                        },
+                        supported_fixes=(
+                            "remove the redundant connection",
+                            "split the nodes into separate ranks with an intermediate node",
+                        ),
+                    )
+                )
+    return out
 
 
 def check_layout(
@@ -806,7 +1054,9 @@ def _icon_not_found(node: Node) -> Diagnostic:
     # The generic set is bundled in the package, so telling the author to
     # fetch a cache for it would send them after a cache that never exists.
     if node.provider != "generic":
-        fixes.insert(0, f"warm the icon cache: fetch_icons.py --provider {node.provider}")
+        fixes.insert(
+            0, f"warm the icon cache: fetch_icons.py --provider {node.provider}"
+        )
     fixes.append(
         "drop the node's `service` field to render the labeled placeholder deliberately"
     )
@@ -1038,6 +1288,7 @@ def render(
     zone_boxes = compute_zone_boxes(spec, node_boxes) if spec.zones else {}
     diagnostics += check_layout(spec, node_boxes, zone_boxes)
     routed_edges = route_edges(spec, node_boxes)
+    diagnostics += check_route_rhythm(routed_edges)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
