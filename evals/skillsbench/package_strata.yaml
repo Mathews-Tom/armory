@@ -329,6 +329,9 @@ excluded:
     name: package-evaluator
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
+    name: package-optimizer
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
     name: paper-to-skill
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill

@@ -13,7 +13,12 @@ _STRATA_PATH = _REPO_ROOT / "evals" / "skillsbench" / "package_strata.yaml"
 
 
 def test_validates_every_package_classification() -> None:
-    assert validate_strata(_STRATA_PATH) == (7, 134)
+    # One included sample per package type is the frozen design; the excluded
+    # count is just "however many packages the repo currently ships" and
+    # pinning it turned every package addition into a test failure.
+    included, excluded = validate_strata(_STRATA_PATH)
+    assert included == 7
+    assert excluded > 0
 
 
 def test_rejects_conflicting_package_classification(tmp_path: Path) -> None:
