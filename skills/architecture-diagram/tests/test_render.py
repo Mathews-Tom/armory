@@ -772,16 +772,33 @@ class TestEndToEndRender:
         result = do_render(spec, _icon_lookup)
         assert "stroke-dasharray" in result.svg
 
-    def test_overflowing_label_is_reported_as_a_warning(self) -> None:
+    def test_unfittable_label_blocks_rendering(self) -> None:
         spec_text = (
             'nodes:\n  - id: a\n    label: "This Is A Genuinely Very Long Label Text"\n'
         )
         spec = load_spec(spec_text)
-        result = do_render(spec, _icon_lookup)
+        result = do_render(spec, _icon_lookup, quality="showcase")
+
         found = [d for d in result.diagnostics if d.code == "layout/label-overflow"]
+
         assert [d.subject for d in found] == [{"node": "a", "field": "label"}]
-        assert found[0].severity == "warning"
-        # A label that does not fit still renders; it is not a blocking finding.
+        assert found[0].severity == "error"
+        assert not result.ok
+
+    def test_long_label_shrinks_inside_its_node_box(self) -> None:
+        label = "XXXXXXXXXXXXXXXXXXXX"
+        spec = load_spec(f'nodes:\n  - id: a\n    label: "{label}"\n')
+        result = do_render(spec, _icon_lookup)
+        font_match = re.search(
+            rf'<text x="[^"]+" y="[^"]+" font-size="([\d.]+)" font-weight="600" '
+            rf'text-anchor="middle" fill="#1F2937">{label}</text>',
+            result.svg,
+        )
+
+        assert font_match
+        fitted_size = float(font_match.group(1))
+        assert 6 <= fitted_size < 12
+        assert render._text_width(label, fitted_size) <= render.NODE_W - 8 + 1e-6
         assert result.ok
 
     def test_svg_has_valid_viewbox_matching_dimensions(self) -> None:

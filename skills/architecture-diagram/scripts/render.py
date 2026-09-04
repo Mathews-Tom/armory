@@ -72,6 +72,13 @@ MIN_AMBIGUOUS_CORRIDOR = 8.0
 # pixels to the label mask makes the connection annotation unreadable.
 EDGE_LABEL_FONT_SIZE = 10.0
 LABEL_ROUTE_CLEARANCE = 4.0
+# Node labels stay readable at no smaller than 6px. Their estimated width at
+# that floor must remain within the node plus 8px tolerance, while normal
+# fitted text remains inside the 8px-padded node box.
+NODE_LABEL_FONT_SIZE = 12.0
+NODE_SUBLABEL_FONT_SIZE = 10.5
+NODE_TEXT_PADDING = 8.0
+MIN_NODE_TEXT_FONT_SIZE = 6.0
 
 
 EDGE_COLORS = {
@@ -1340,18 +1347,36 @@ class CompositeIconLookup:
 # --- emit ----------------------------------------------------------------------
 
 
+def _fitted_node_font_size(text: str, preferred_size: float, box: Box) -> float | None:
+    """Return a readable fitted size, or None when the label cannot fit safely."""
+    available = box.w - NODE_TEXT_PADDING
+    projected_minimum_width = _text_width(text, MIN_NODE_TEXT_FONT_SIZE)
+    if projected_minimum_width > box.w + NODE_TEXT_PADDING:
+        return None
+    unit_width = _text_width(text, 1.0)
+    if unit_width == 0:
+        return preferred_size
+    fitted_size = min(preferred_size, available / unit_width)
+    return fitted_size if fitted_size >= MIN_NODE_TEXT_FONT_SIZE else None
+
+
 def _label_overflow(
-    node_id: str, field_name: str, text: str, font_size: float, available: float
+    node_id: str, field_name: str, text: str, preferred_size: float, box: Box
 ) -> Diagnostic:
     return Diagnostic(
         code="layout/label-overflow",
-        severity=SEVERITY_WARNING,
-        message=f"{field_name} may overflow its node box: {text!r} on {node_id!r}",
+        severity=SEVERITY_ERROR,
+        message=f"{field_name} cannot fit inside its node box: {text!r} on {node_id!r}",
         subject={"node": node_id, "field": field_name},
         evidence={
             "text": text,
-            "estimated_width": round(_text_width(text, font_size), 2),
-            "available_width": available,
+            "estimated_width": round(_text_width(text, preferred_size), 2),
+            "available_width": box.w - NODE_TEXT_PADDING,
+            "projected_minimum_width": round(
+                _text_width(text, MIN_NODE_TEXT_FONT_SIZE), 2
+            ),
+            "minimum_font_size": MIN_NODE_TEXT_FONT_SIZE,
+            "maximum_projected_width": box.w + NODE_TEXT_PADDING,
         },
         supported_fixes=(
             "shorten the text",
@@ -1407,23 +1432,37 @@ def _node_svg(
             f'<text x="{cx:g}" y="{cy + 6:g}" font-size="22" font-weight="700" text-anchor="middle" fill="#FFFFFF">{initial}</text>'
         )
     label_y = box.y + ICON + 18
-    label_font_size = 12.0
-    if _text_width(node.label, label_font_size) > box.w - 8:
+    label_font_size = _fitted_node_font_size(node.label, NODE_LABEL_FONT_SIZE, box)
+    if label_font_size is None:
         diagnostics.append(
-            _label_overflow(node.id, "label", node.label, label_font_size, box.w - 8)
+            _label_overflow(
+                node.id,
+                "label",
+                node.label,
+                NODE_LABEL_FONT_SIZE,
+                box,
+            )
         )
+        label_font_size = MIN_NODE_TEXT_FONT_SIZE
     parts.append(
         f'<text x="{box.x + box.w / 2:g}" y="{label_y:g}" font-size="{label_font_size:g}" font-weight="600" '
         f'text-anchor="middle" fill="#1F2937">{_escape(node.label)}</text>'
     )
     if node.sublabel:
-        sub_font_size = 10.5
-        if _text_width(node.sublabel, sub_font_size) > box.w - 8:
+        sub_font_size = _fitted_node_font_size(
+            node.sublabel, NODE_SUBLABEL_FONT_SIZE, box
+        )
+        if sub_font_size is None:
             diagnostics.append(
                 _label_overflow(
-                    node.id, "sublabel", node.sublabel, sub_font_size, box.w - 8
+                    node.id,
+                    "sublabel",
+                    node.sublabel,
+                    NODE_SUBLABEL_FONT_SIZE,
+                    box,
                 )
             )
+            sub_font_size = MIN_NODE_TEXT_FONT_SIZE
         parts.append(
             f'<text x="{box.x + box.w / 2:g}" y="{label_y + 15:g}" font-size="{sub_font_size:g}" '
             f'text-anchor="middle" fill="#6B7280">{_escape(node.sublabel)}</text>'
