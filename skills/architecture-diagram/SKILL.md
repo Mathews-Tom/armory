@@ -2,7 +2,7 @@
 name: architecture-diagram
 description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, or Inkscape. NOT for architecture reviews, use architecture-reviewer.'
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   category: visualization
   tags: [architecture, diagram, svg, aws, azure, gcp, cloud, icons]
   difficulty: intermediate
@@ -51,9 +51,8 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
    ```bash
    python3 scripts/render.py spec.yaml -o diagram.svg
    ```
-   Read every line printed to stderr. `error:` lines mean the spec is invalid (fix and rerun). `warning:` lines mean the diagram rendered but something needs attention — a missing icon, an overflowing label, overlapping zones. Fix the spec's node/zone data, not the SVG output directly.
-6. **Verify before handing off** — see Verification below. Do not skip this step; a diagram with unresolved warnings looks unprofessional even though the file is technically valid SVG.
-7. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
+   Act on the exit code, not on prose — see Exit codes below. Every finding names a spec field to change; never repair one by editing the SVG.
+6. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
 
 ## Spec fields at a glance
 
@@ -196,34 +195,33 @@ edges:
 - Use `provider: generic` and the hand-drawn icon set when no cloud provider is specified or the architecture is vendor-neutral.
 - Ask for clarification only when the component list or topology is fundamentally unclear — never when a single icon is missing (fall back per Unsupported above).
 
-## Troubleshooting
+## Exit codes and diagnostics
 
-| Problem | Cause | Fix |
+Every finding is a coded diagnostic carrying `code`, `severity`, `message`, `subject` (what it is about), `evidence` (the numbers that locate it), `supported_fixes` (spec-level moves), and sometimes `suppresses`. The exit code is the verdict:
+
+| Exit | Meaning | Action |
 |---|---|---|
-| `error: could not fetch <provider> icons` | No network on first use, or a transient GitHub/CDN timeout | Rerun `fetch_icons.py` for that provider — it retries individual file fetches automatically; a full retry from scratch is cheap since already-cached icons are skipped |
-| `warning: no icon for node 'x'` | The `service` slug doesn't exist in that provider's cache, or the icon cache for that provider was never fetched | Check `references/services-aws.yaml` (or the `-azure`/`-gcp` equivalent) for the exact slug; run `fetch_icons.py --provider aws` (or `azure`/`gcp`) if the cache is cold |
-| `warning: zone overlap` | Two zones' member nodes are interleaved in rank/order so their bounding boxes collide | Reorder the spec's `nodes` list so each zone's members are listed together, or check the zone assignments are correct |
-| `warning: label may overflow its node box` | A node or edge label is too long for the fixed-width node box | Shorten the label, or move detail into `sublabel` |
-| Diagram looks fine locally but breaks when reopened elsewhere | Should not happen — `render.py` never emits `<image>`, `<use>`, or external `href`s (enforced by `check_editability`, run automatically on every render) | If this happens anyway, file it as a bug — it means the invariant broke |
-| Icons render as plain colored squares with an initial letter, no glyph | The node has no `service` set, or the slug wasn't found — this is the deliberate fallback, not a crash | Add the correct `service` slug from the provider's reference table |
+| 0 | No error-severity findings | Hand off the SVG; any warnings are deliberate, explainable tradeoffs |
+| 1 | A blocking finding, or a spec the renderer cannot answer | Apply one of the finding's `supported_fixes` to the spec and rerun |
+| 2 | Usage error — unreadable spec path, unknown flag or profile value | Correct the command |
 
-## Verification
+`--json` prints the whole envelope (`schema_version`, `ok`, `quality`, `output`, `written`, `artifact_bytes`, `counts`, `diagnostics`) to stdout and nothing else. `--quality showcase` raises `composition/*` route-geometry findings to errors; the default `standard` keeps them as warnings.
 
-Before handing a diagram to the user, confirm:
+| Code | Meaning | Fix |
+|---|---|---|
+| `spec/*` | The spec is unanswerable: no nodes, duplicate or missing ids, unknown zone/parent/edge endpoint, zone cycle, empty zone | Each diagnostic's `supported_fixes` names the field to change |
+| `icon/not-found` | The `service` slug is absent from that provider's cache, or the cache was never fetched | Use the exact slug from that provider's reference service map, or run `fetch_icons.py --provider <name>`; drop `service` to take the labeled placeholder deliberately |
+| `layout/node-overlap` | Two node boxes collide | Separate the nodes across ranks, or remove the duplicate |
+| `layout/zone-overlap` | Two unrelated zone boxes collide because their member nodes are interleaved | List each zone's members contiguously in `nodes`, or fix the `zone` assignments |
+| `layout/label-overflow` | A `label` or `sublabel` is wider than its node box (warning) | Shorten it, or move detail into `sublabel` |
+| `editability/*` | The output contains raster, `<use>`, or an external reference | Renderer bug — a spec cannot cause this; report it |
+| `usage/spec-unreadable` | The spec path does not exist or cannot be read | Pass an existing, readable YAML path |
 
-- [ ] `render.py` exited 0 (a nonzero exit means an editability violation slipped through — treat as a bug, not something to work around)
-- [ ] Every `warning:` line printed to stderr has been addressed or is a deliberate, explainable tradeoff (e.g. "no icon exists for this service, using a placeholder")
-- [ ] Zone containment matches the described architecture (open the SVG or render it to PNG and look — `rsvg-convert diagram.svg -o /tmp/check.png`)
-- [ ] Every node the user asked for is present and labeled
-- [ ] Connection types match the described data flows, and the legend appears only when more than one type is used
+A fetch failure (`could not fetch <provider> icons`) is a network problem, not a spec problem: rerun `fetch_icons.py` for that provider, which skips already-cached icons.
 
 ## Output
 
-Write the final SVG to the working directory (or the user-specified path) and report:
-
-- The output path
-- Any warnings that were left unresolved and why
-- Whether this was the first render for a given provider (mention the icon-cache fetch cost only once, not on every subsequent render)
+Report the output path, any warning-severity findings left unresolved and why, and — only on the first render for a given provider — the icon-cache fetch cost.
 
 ## Reference table
 

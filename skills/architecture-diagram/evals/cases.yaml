@@ -7,6 +7,7 @@ cases:
       - "Output includes real <text> labels for every component, not outlined paths"
       - "Output includes connection lines or arrows between components"
       - "Output does not use raster images or <use> clones for icons"
+      - "Reports the render's exit status, and resolves any reported finding by changing the spec rather than editing the SVG"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -35,6 +36,7 @@ cases:
       - "Output shows containment hierarchy (e.g., VPC zone containing service nodes)"
       - "Output uses AWS-native icon geometry, not generic placeholder icons"
       - "Output is valid, self-contained SVG"
+      - "If an icon lookup fails, warms the provider cache or corrects the service slug instead of shipping the placeholder silently"
     trigger_expected: true
     assertions:
       - type: matches_regex
