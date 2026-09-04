@@ -155,21 +155,19 @@ Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured
 
 **Re-sync policy:** Neither upstream is vendored, so there is nothing to diff. Revisit the Kosha citation if a later pre-registered Gate-0 run records a GO verdict, and revisit the OKF question separately — OKF bundles are linked Markdown documents with untyped links, not typed property graphs, so they are out of scope for this skill.
 
-### draw.io icon geometry — used by `architecture-diagram`
+### draw.io icon geometry and provider icon terms — used by `architecture-diagram`
 
-**Upstream repo:** [jgraph/drawio](https://github.com/jgraph/drawio)
-**License:** Apache-2.0
-**Pinned commit:** `a1f615b7f5a5237da71de2ce2f057b5fa70b0aeb` (`dev` branch, verified 2026-08-15)
+**Geometry source:** [jgraph/drawio](https://github.com/jgraph/drawio), Apache-2.0, pinned commit `a1f615b7f5a5237da71de2ce2f057b5fa70b0aeb` (`dev` branch, verified 2026-08-15).
 
-**Not traditional vendoring — no files are copied into this repository.** AWS, Azure, and GCP's own terms permit using their icons to build architecture diagrams, but none grant redistribution rights for the raw files, so `architecture-diagram` ships zero icon assets. Instead:
+**Not traditional vendoring — no cloud icon files are copied into this repository.** `scripts/stencil2svg.py` converts draw.io AWS/GCP stencil geometry and `scripts/svg_inline.py` inlines/namespaces draw.io Azure SVG geometry only in a user-local cache. `scripts/fetch_icons.py` records a SHA-256 digest, source path, and the provider-specific terms below for every cache entry; `render.py` rejects a requested entry whose digest differs.
 
-- `scripts/stencil2svg.py` converts draw.io's `mxgraph.aws4`/`mxgraph.gcp2` stencil XML (vector `move`/`line`/`curve`/`arc` primitives, no embedded rasters) into inline SVG, at render time, on the end user's own machine.
-- `scripts/svg_inline.py` inlines and namespaces draw.io's `azure2` real-SVG icon library the same way.
-- `scripts/fetch_icons.py` builds a local per-user cache pinned to the commit above, so output stays reproducible without this repository ever holding the icon files.
+| Provider | Official source and permitted use | Cache ledger |
+| --- | --- | --- |
+| AWS | [Architecture icons](https://aws.amazon.com/architecture/icons/): AWS allows customers and partners to use its toolkits and assets to create architecture diagrams, whitepapers, presentations, data sheets, and posters. | `license_note.aws`, each AWS cache entry's source path and digest |
+| Azure | [Azure Icons](https://learn.microsoft.com/en-us/azure/architecture/icons/): Microsoft permits copying, distributing, and displaying icons only in architectural diagrams, training materials, or documentation; use icons as published and do not crop, flip, rotate, distort, or change their shape. | `license_note.azure`, each Azure cache entry's source path and digest |
+| Google Cloud | [Google Cloud product icons](https://cloud.google.com/icons): official icons for diagrams and technical documentation. | `license_note.gcp`, each Google Cloud cache entry's source path and digest |
 
-The pinned commit governs which stencil/icon geometry is used; bumping it is a deliberate, reviewable change to `scripts/fetch_icons.py`, not an implicit `dev`-branch tracking dependency.
-
-**Re-sync policy:** Nothing is vendored, so there is nothing to diff against upstream `dev` churn. Bump `DRAWIO_SHA` in `scripts/fetch_icons.py` only after re-running the full corpus conversion and confirming no new conversion warnings, per `references/editability.md`.
+The pinned commit governs which draw.io geometry is converted. Rebuild a provider cache with `fetch_icons.py --provider <provider> --force` after a digest failure or a pin bump; this does not fetch implicit `dev`-branch churn.
 
 ## Conceptual Inspiration
 

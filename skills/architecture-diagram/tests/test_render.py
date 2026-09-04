@@ -868,20 +868,15 @@ class TestRealIconCacheIntegration:
     ) -> None:
         cache_dir = Path(str(tmp_path))
         sha = "deadbeef"
-        provider_dir = cache_dir / sha / "aws"
-        provider_dir.mkdir(parents=True)
-        (provider_dir / "lambda.json").write_text(
-            json.dumps(
-                {
-                    "viewBox": "0 0 54 56",
-                    "body": "<path/>",
-                    "name": "lambda",
-                    "slug": "lambda",
-                    "source": "x",
-                    "warnings": [],
-                }
-            )
+        entry = fetch_icons.IconEntry(
+            slug="lambda",
+            name="lambda",
+            view_box="0 0 54 56",
+            body="<path/>",
+            source="fixture",
         )
+        stats = fetch_icons.write_cache(cache_dir, sha, "aws", [entry])
+        fetch_icons.update_manifest(cache_dir, sha, "aws", stats)
         lookup = render.CacheIconLookup(cache_dir=cache_dir, sha=sha)
         icon = lookup("aws", "lambda")
         assert icon is not None
@@ -1212,6 +1207,45 @@ class TestCliContract:
         # stdout as prose alongside the receipt.
         assert code == render.EXIT_FAILURE
         assert [d["code"] for d in payload["diagnostics"]] == ["icon/not-found"]
+
+    def test_tampered_icon_cache_fails_closed_with_digest_mismatch(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text(
+            "provider: aws\nnodes:\n  - id: a\n    label: A\n    service: lambda\n"
+        )
+        sha = "fixture-sha"
+        stats = fetch_icons.write_cache(
+            tmp_path,
+            sha,
+            "aws",
+            [
+                fetch_icons.IconEntry(
+                    slug="lambda",
+                    name="lambda",
+                    view_box="0 0 1 1",
+                    body="<path/>",
+                    source="fixture",
+                )
+            ],
+        )
+        fetch_icons.update_manifest(tmp_path, sha, "aws", stats)
+        (tmp_path / sha / "aws" / "lambda.json").write_text("{}")
+
+        code, payload, _ = self._run(
+            capsys,
+            "validate",
+            str(spec),
+            "--cache-dir",
+            str(tmp_path),
+            "--sha",
+            sha,
+            "--json",
+        )
+
+        assert code == render.EXIT_FAILURE
+        assert [d["code"] for d in payload["diagnostics"]] == ["icon/digest-mismatch"]
 
     def test_missing_icon_is_an_operational_failure(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]

@@ -103,6 +103,11 @@ class TestCacheWriting:
         written = sorted(p.name for p in provider_dir.glob("*.json"))
         assert written == ["bigquery.json", "lambda.json"]
         assert stats["count"] == 2
+        icon_records = stats["icons"]
+        assert isinstance(icon_records, dict)
+        assert icon_records["lambda.json"]["sha256"] == fetch_icons._sha256(
+            (provider_dir / "lambda.json").read_bytes()
+        )
 
     def test_cache_entry_is_directly_usable_by_a_renderer(self, tmp_path: Path) -> None:
         entries = fetch_icons.convert_stencil_provider(_real_aws_gcp_source(), "aws")
@@ -145,19 +150,65 @@ class TestCacheWriting:
 
 
 class TestManifest:
-    def test_creates_manifest_with_provider_stats(self, tmp_path: Path) -> None:
-        fetch_icons.update_manifest(tmp_path, "sha1", "aws", {"count": 3, "warned": 0})
+    def test_creates_manifest_with_per_icon_digests_and_terms(
+        self, tmp_path: Path
+    ) -> None:
+        entry = fetch_icons.IconEntry(
+            slug="lambda",
+            name="lambda",
+            view_box="0 0 1 1",
+            body="<path/>",
+            source="fixture",
+        )
+        stats = fetch_icons.write_cache(tmp_path, "sha1", "aws", [entry])
+        fetch_icons.update_manifest(tmp_path, "sha1", "aws", stats)
         manifest = json.loads((tmp_path / "sha1" / "manifest.json").read_text())
+
+        assert manifest["format_version"] == fetch_icons.CACHE_MANIFEST_VERSION
         assert manifest["sha"] == "sha1"
-        assert manifest["providers"]["aws"]["count"] == 3
+        assert manifest["license_note"]["aws"] == fetch_icons.LICENSE_NOTE["aws"]
+        record = manifest["providers"]["aws"]["icons"]["lambda.json"]
+        assert record["sha256"] == fetch_icons._sha256(
+            (tmp_path / "sha1" / "aws" / "lambda.json").read_bytes()
+        )
+        assert record["source"] == "fixture"
+        assert record["terms"] == fetch_icons.LICENSE_NOTE["aws"]["terms"]
 
     def test_merges_across_multiple_providers(self, tmp_path: Path) -> None:
-        fetch_icons.update_manifest(tmp_path, "sha1", "aws", {"count": 3})
-        fetch_icons.update_manifest(tmp_path, "sha1", "gcp", {"count": 5})
+        aws = fetch_icons.write_cache(
+            tmp_path,
+            "sha1",
+            "aws",
+            [
+                fetch_icons.IconEntry(
+                    slug="lambda",
+                    name="lambda",
+                    view_box="0 0 1 1",
+                    body="<path/>",
+                    source="fixture",
+                )
+            ],
+        )
+        gcp = fetch_icons.write_cache(
+            tmp_path,
+            "sha1",
+            "gcp",
+            [
+                fetch_icons.IconEntry(
+                    slug="bigquery",
+                    name="bigquery",
+                    view_box="0 0 1 1",
+                    body="<path/>",
+                    source="fixture",
+                )
+            ],
+        )
+        fetch_icons.update_manifest(tmp_path, "sha1", "aws", aws)
+        fetch_icons.update_manifest(tmp_path, "sha1", "gcp", gcp)
         manifest = json.loads((tmp_path / "sha1" / "manifest.json").read_text())
         assert set(manifest["providers"]) == {"aws", "gcp"}
-        assert manifest["providers"]["aws"]["count"] == 3
-        assert manifest["providers"]["gcp"]["count"] == 5
+        assert manifest["providers"]["aws"]["count"] == 1
+        assert manifest["providers"]["gcp"]["count"] == 1
 
 
 class TestFetchProviderCaching:
@@ -175,6 +226,27 @@ class TestFetchProviderCaching:
         fetch_icons.fetch_provider(source, tmp_path, "sha1", "aws", force=False)
         fetch_icons.fetch_provider(source, tmp_path, "sha1", "aws", force=True)
         assert len(source.calls) == 2
+
+    def test_rebuilds_a_legacy_manifest_with_per_icon_digests(
+        self, tmp_path: Path
+    ) -> None:
+        source = _real_aws_gcp_source()
+        fetch_icons.fetch_provider(source, tmp_path, "sha1", "aws", force=False)
+        (tmp_path / "sha1" / "manifest.json").write_text(
+            json.dumps({"sha": "sha1", "providers": {"aws": {"count": 2}}})
+        )
+
+        stats = fetch_icons.fetch_provider(source, tmp_path, "sha1", "aws", force=False)
+        manifest = json.loads((tmp_path / "sha1" / "manifest.json").read_text())
+
+        assert len(source.calls) == 2
+        assert stats["count"] == 2
+        assert manifest["format_version"] == fetch_icons.CACHE_MANIFEST_VERSION
+        assert manifest["providers"]["aws"]["icons"]["lambda.json"]["sha256"] == (
+            fetch_icons._sha256(
+                (tmp_path / "sha1" / "aws" / "lambda.json").read_bytes()
+            )
+        )
 
     def test_unknown_provider_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="unknown provider"):

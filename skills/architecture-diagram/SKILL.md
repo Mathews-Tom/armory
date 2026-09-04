@@ -2,7 +2,7 @@
 name: architecture-diagram
 description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, or Inkscape. NOT for architecture reviews, use architecture-reviewer.'
 metadata:
-  version: 2.2.0
+  version: 2.3.0
   category: visualization
   tags: [architecture, diagram, svg, aws, azure, gcp, cloud, icons]
   difficulty: intermediate
@@ -30,7 +30,7 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
 ## Prerequisites
 
 - `python3` with `pyyaml` installed (`uv run --with pyyaml python3 scripts/render.py ...` if not already available).
-- **Cloud-provider icons need a one-time, per-machine network fetch.** Icons are never bundled in this skill — AWS, Azure, and GCP's own terms permit using their icons to build diagrams but none grant redistribution rights, so nothing is vendored. The first time a diagram needs a given provider's icons, run:
+- **Cloud-provider icons need a one-time, per-machine network fetch.** Icons are never bundled in this skill; their providers publish diagram-use terms, so `architecture-diagram` records each provider's source and terms in the local cache rather than redistributing icon assets. The first time a diagram needs a given provider's icons, run:
 
   ```bash
   python3 scripts/fetch_icons.py --provider aws    # ~5s, 1037 icons
@@ -39,7 +39,7 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
   # or: --provider all
   ```
 
-  This builds a local cache (default `~/.cache/armory/cloud-icons`, override with `--cache-dir` or `$XDG_CACHE_HOME`) pinned to a specific `jgraph/drawio` commit, so output is reproducible. Subsequent renders reuse the cache — no network needed after the first fetch per provider. `provider: generic` needs no fetch at all; it uses the bundled hand-drawn icon set in `references/icons-generic.md`.
+  This builds a local cache (default `~/.cache/armory/cloud-icons`, override with `--cache-dir` or `$XDG_CACHE_HOME`) pinned to a specific `jgraph/drawio` commit, so output is reproducible. Each rendered cloud icon is verified against its manifest SHA-256 digest; `icon/digest-mismatch` fails closed and requires the provider cache to be rebuilt with `fetch_icons.py --provider <provider> --force`. Subsequent renders reuse the verified cache — no network needed after the first fetch per provider. `provider: generic` needs no fetch at all; it uses the bundled hand-drawn icon set in `references/icons-generic.md`.
 
 ## Workflow
 
