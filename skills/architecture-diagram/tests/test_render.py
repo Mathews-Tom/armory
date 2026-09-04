@@ -23,6 +23,7 @@ from render import (
     check_editability,
     check_layout,
     check_edge_through_node,
+    check_ambiguous_corridors,
     check_route_rhythm,
     check_proper_crossings,
     compute_positions,
@@ -609,6 +610,38 @@ class TestProperCrossing:
 
     def test_quality_profiles_change_crossing_severity(self) -> None:
         findings = check_proper_crossings(self._crossing_routes())
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestAmbiguousCorridor:
+    def _routes(self, second_start: float) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((second_start, 0), (30, 0)), (0, 0)),
+        ]
+
+    def test_reports_collinear_overlap_at_threshold(self) -> None:
+        findings = check_ambiguous_corridors(self._routes(12))
+
+        assert [d.code for d in findings] == ["composition/ambiguous-corridor"]
+        assert findings[0].evidence["overlap"] == 8
+
+    def test_shorter_overlap_and_shared_endpoint_are_exempt(self) -> None:
+        shared_endpoint = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("b", "c"), ((12, 0), (30, 0)), (0, 0)),
+        ]
+
+        assert check_ambiguous_corridors(self._routes(12.01)) == []
+        assert check_ambiguous_corridors(shared_endpoint) == []
+
+    def test_quality_profiles_change_corridor_severity(self) -> None:
+        findings = check_ambiguous_corridors(self._routes(12))
 
         standard = render.apply_quality_profile(findings, "standard")
         showcase = render.apply_quality_profile(findings, "showcase")
