@@ -2,7 +2,7 @@
 name: architecture-diagram
 description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, or Inkscape. NOT for architecture reviews, use architecture-reviewer.'
 metadata:
-  version: 2.1.0
+  version: 2.2.0
   category: visualization
   tags: [architecture, diagram, svg, aws, azure, gcp, cloud, icons]
   difficulty: intermediate
@@ -213,7 +213,7 @@ Every finding is a coded diagnostic carrying `code`, `severity`, `message`, `sub
 | `icon/not-found` | The `service` slug is absent from that provider's cache, or the cache was never fetched | Use the exact slug from that provider's reference service map, or run `fetch_icons.py --provider <name>`; drop `service` to take the labeled placeholder deliberately |
 | `layout/node-overlap` | Two node boxes collide | Separate the nodes across ranks, or remove the duplicate |
 | `layout/zone-overlap` | Two unrelated zone boxes collide because their member nodes are interleaved | List each zone's members contiguously in `nodes`, or fix the `zone` assignments |
-| `layout/label-overflow` | A `label` or `sublabel` is wider than its node box (warning) | Shorten it, or move detail into `sublabel` |
+| `layout/label-overflow` | A `label` or `sublabel` cannot fit in its node box at the hard 6px minimum (blocking) | Shorten it, or move detail into `sublabel` |
 | `editability/*` | The output contains raster, `<use>`, or an external reference | Renderer bug — a spec cannot cause this; report it |
 | `usage/spec-unreadable` | The spec path does not exist or cannot be read | Pass an existing, readable YAML path |
 

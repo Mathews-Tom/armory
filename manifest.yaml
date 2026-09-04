@@ -49,7 +49,7 @@ packages:
     difficulty: intermediate
     phase: ship
   - name: architecture-diagram
-    version: 2.1.0
+    version: 2.2.0
     description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams,
       or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead
       of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram",
