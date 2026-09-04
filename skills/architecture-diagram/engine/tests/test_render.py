@@ -11,33 +11,29 @@ from pathlib import Path
 import pytest
 
 from engine import diagnostics, fetch_icons, render
-from engine.render import (
-    COL_GAP,
-    ICON,
-    ROW_GAP,
-    Box,
-    Edge,
-    IconRef,
-    Node,
-    RoutedEdge,
-    Spec,
-    SpecError,
-    assign_ranks,
+from engine.geometry_checks import (
     check_ambiguous_corridors,
     check_edge_through_node,
-    check_editability,
     check_label_route_clearance,
     check_layout,
     check_proper_crossings,
     check_route_rhythm,
+)
+from engine.layout import (
+    COL_GAP,
+    ICON,
+    ROW_GAP,
+    Box,
+    assign_ranks,
     compute_positions,
     compute_zone_boxes,
     icon_box,
-    load_spec,
     order_within_ranks,
-    render as do_render,
-    route_edges,
 )
+from engine.model import Edge, Node, Spec
+from engine.render import IconRef, check_editability, render as do_render
+from engine.routing import RoutedEdge, route_edges
+from engine.spec import SpecError, load_spec
 
 
 def _icon_lookup(provider: str, service: str) -> IconRef | None:
@@ -799,7 +795,7 @@ class TestEndToEndRender:
         assert font_match
         fitted_size = float(font_match.group(1))
         assert 6 <= fitted_size < 12
-        assert render._text_width(label, fitted_size) <= render.NODE_W - 8 + 1e-6
+        assert render.text_width(label, fitted_size) <= render.NODE_W - 8 + 1e-6
         assert result.ok
 
     def test_svg_has_valid_viewbox_matching_dimensions(self) -> None:
@@ -1411,7 +1407,7 @@ class TestCliContract:
             {
                 "edge": {"from": routed.edge.src, "to": routed.edge.dst},
                 "text": routed.edge.label,
-                "box": render._box_evidence(render._edge_label_box(routed)),
+                "box": render.box_evidence(render.edge_label_box(routed)),
             }
             for routed in result.routed_edges
             if routed.edge.label
