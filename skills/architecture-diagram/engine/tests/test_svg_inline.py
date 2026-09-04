@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from svg_inline import inline_svg
+from engine.svg_inline import inline_svg
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REAL_AZURE_SVG = (FIXTURES / "azure_virtual_machine.svg").read_text()

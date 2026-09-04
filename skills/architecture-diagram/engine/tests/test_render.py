@@ -9,9 +9,9 @@ import sys
 from pathlib import Path
 
 import pytest
-import fetch_icons
-import render
-from render import (
+
+from engine import fetch_icons, render
+from engine.render import (
     COL_GAP,
     ICON,
     ROW_GAP,
@@ -23,22 +23,20 @@ from render import (
     Spec,
     SpecError,
     assign_ranks,
-    check_editability,
-    check_layout,
-    check_edge_through_node,
     check_ambiguous_corridors,
+    check_edge_through_node,
+    check_editability,
     check_label_route_clearance,
-    check_route_rhythm,
+    check_layout,
     check_proper_crossings,
+    check_route_rhythm,
     compute_positions,
     compute_zone_boxes,
     icon_box,
     load_spec,
     order_within_ranks,
-    route_edges,
-)
-from render import (
     render as do_render,
+    route_edges,
 )
 
 
@@ -910,7 +908,7 @@ class TestBundledGenericIconLookup:
         test_service_maps.py guards against for the cloud provider tables."""
 
         doc = (
-            Path(__file__).parent.parent / "references" / "icons-generic.md"
+            Path(__file__).parent.parent.parent / "references" / "icons-generic.md"
         ).read_text()
         slugs = re.findall(r"`service: ([a-z0-9-]+)`", doc)
         assert len(slugs) >= 20
@@ -1366,7 +1364,9 @@ class TestCliContract:
             tmp_path, "fixture-sha", "aws", cache_entries
         )
         fetch_icons.update_manifest(tmp_path, "fixture-sha", "aws", cache_stats)
-        spec_path = Path(__file__).parent.parent / "assets" / "example-serverless.yaml"
+        spec_path = (
+            Path(__file__).parent.parent.parent / "assets" / "example-serverless.yaml"
+        )
         argv = (
             "validate",
             str(spec_path),
@@ -1417,7 +1417,8 @@ class TestCliContract:
         completed = subprocess.run(
             [
                 sys.executable,
-                str(Path(render.__file__).resolve()),
+                "-m",
+                "engine",
                 "validate",
                 str(spec),
                 "--cache-dir",
@@ -1426,6 +1427,7 @@ class TestCliContract:
             ],
             check=False,
             capture_output=True,
+            cwd=Path(render.__file__).resolve().parents[1],
             text=True,
         )
 

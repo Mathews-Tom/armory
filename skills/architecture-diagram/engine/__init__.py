@@ -1,0 +1,1 @@
+"""Architecture diagram rendering engine."""

@@ -17,11 +17,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fetch_icons
 import pytest
 import yaml
 
-REFERENCES = Path(__file__).parent.parent / "references"
+from engine import fetch_icons
+
+REFERENCES = Path(__file__).parent.parent.parent / "references"
 MAPPING_FILES = {
     "aws": REFERENCES / "services-aws.yaml",
     "gcp": REFERENCES / "services-gcp.yaml",

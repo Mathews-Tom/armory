@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-import render
-from render import check_deployment_profile, load_spec
+
+from engine import render
+from engine.render import check_deployment_profile, load_spec
 
 
 _FIXTURES = Path(__file__).parent / "fixtures"
@@ -68,7 +69,7 @@ def test_profile_is_inert_when_omitted() -> None:
 
 def test_existing_serverless_spec_remains_outside_profile_validation() -> None:
     existing = (
-        Path(__file__).parent.parent / "assets" / "example-serverless.yaml"
+        Path(__file__).parent.parent.parent / "assets" / "example-serverless.yaml"
     ).read_text()
     spec = load_spec(existing)
 

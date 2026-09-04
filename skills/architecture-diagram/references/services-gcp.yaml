@@ -2,7 +2,7 @@
 #
 # Every `slug` value below was verified present in the real icon cache built
 # from `jgraph/drawio@a1f615b` (draw.io's `mxgraph.gcp2` stencil set, 297
-# icons total) — see scripts/fetch_icons.py.
+# icons total) — see engine/fetch_icons.py.
 #
 # GCP's stencil coverage is narrower than AWS's (297 vs 1037 icons). Several
 # services common in modern GCP architectures — GKE as a distinct icon from

@@ -159,7 +159,7 @@ Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured
 
 **Geometry source:** [jgraph/drawio](https://github.com/jgraph/drawio), Apache-2.0, pinned commit `a1f615b7f5a5237da71de2ce2f057b5fa70b0aeb` (`dev` branch, verified 2026-08-15).
 
-**Not traditional vendoring — no cloud icon files are copied into this repository.** `scripts/stencil2svg.py` converts draw.io AWS/GCP stencil geometry and `scripts/svg_inline.py` inlines/namespaces draw.io Azure SVG geometry only in a user-local cache. `scripts/fetch_icons.py` records a SHA-256 digest, source path, and the provider-specific terms below for every cache entry; `render.py` rejects a requested entry whose digest differs.
+**Not traditional vendoring — no cloud icon files are copied into this repository.** `engine/stencil2svg.py` converts draw.io AWS/GCP stencil geometry and `engine/svg_inline.py` inlines/namespaces draw.io Azure SVG geometry only in a user-local cache. `engine/fetch_icons.py` records a SHA-256 digest, source path, and the provider-specific terms below for every cache entry; `engine/render.py` rejects a requested entry whose digest differs.
 
 | Provider | Official source and permitted use | Cache ledger |
 | --- | --- | --- |
@@ -167,7 +167,7 @@ Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured
 | Azure | [Azure Icons](https://learn.microsoft.com/en-us/azure/architecture/icons/): Microsoft permits copying, distributing, and displaying icons only in architectural diagrams, training materials, or documentation; use icons as published and do not crop, flip, rotate, distort, or change their shape. | `license_note.azure`, each Azure cache entry's source path and digest |
 | Google Cloud | [Google Cloud product icons](https://cloud.google.com/icons): official icons for diagrams and technical documentation. | `license_note.gcp`, each Google Cloud cache entry's source path and digest |
 
-The pinned commit governs which draw.io geometry is converted. Rebuild a provider cache with `fetch_icons.py --provider <provider> --force` after a digest failure or a pin bump; this does not fetch implicit `dev`-branch churn.
+The pinned commit governs which draw.io geometry is converted. Rebuild a provider cache with `python3 -m engine.fetch_icons --provider <provider> --force` after a digest failure or a pin bump; this does not fetch implicit `dev`-branch churn.
 
 ## Conceptual Inspiration
 
