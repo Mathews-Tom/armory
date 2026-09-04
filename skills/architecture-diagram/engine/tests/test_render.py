@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from engine import fetch_icons, render
+from engine import diagnostics, fetch_icons, render
 from engine.render import (
     COL_GAP,
     ICON,
@@ -574,8 +574,8 @@ class TestEdgeThroughNode:
         }
         findings = check_edge_through_node(node_boxes, [self._route()])
 
-        standard = render.apply_quality_profile(findings, "standard")
-        showcase = render.apply_quality_profile(findings, "showcase")
+        standard = diagnostics.apply_quality_profile(findings, "standard")
+        showcase = diagnostics.apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -613,8 +613,8 @@ class TestProperCrossing:
     def test_quality_profiles_change_crossing_severity(self) -> None:
         findings = check_proper_crossings(self._crossing_routes())
 
-        standard = render.apply_quality_profile(findings, "standard")
-        showcase = render.apply_quality_profile(findings, "showcase")
+        standard = diagnostics.apply_quality_profile(findings, "standard")
+        showcase = diagnostics.apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -645,8 +645,8 @@ class TestAmbiguousCorridor:
     def test_quality_profiles_change_corridor_severity(self) -> None:
         findings = check_ambiguous_corridors(self._routes(12))
 
-        standard = render.apply_quality_profile(findings, "standard")
-        showcase = render.apply_quality_profile(findings, "showcase")
+        standard = diagnostics.apply_quality_profile(findings, "standard")
+        showcase = diagnostics.apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -677,8 +677,8 @@ class TestLabelRouteClearance:
     def test_quality_profiles_change_label_clearance_severity(self) -> None:
         findings = check_label_route_clearance(self._routes(13.99))
 
-        standard = render.apply_quality_profile(findings, "standard")
-        showcase = render.apply_quality_profile(findings, "showcase")
+        standard = diagnostics.apply_quality_profile(findings, "standard")
+        showcase = diagnostics.apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
@@ -950,17 +950,17 @@ class TestCompositeIconLookup:
 class TestDiagnosticEnvelope:
     def test_unknown_severity_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="unknown severity"):
-            render.Diagnostic(code="spec/x", severity="fatal", message="m")
+            diagnostics.Diagnostic(code="spec/x", severity="fatal", message="m")
 
     def test_empty_suppresses_is_omitted_from_the_payload(self) -> None:
-        payload = render.Diagnostic(
+        payload = diagnostics.Diagnostic(
             code="layout/node-overlap", severity="error", message="m"
         ).to_dict()
         assert "suppresses" not in payload
         assert payload["supported_fixes"] == []
 
     def test_suppresses_is_carried_when_set(self) -> None:
-        payload = render.Diagnostic(
+        payload = diagnostics.Diagnostic(
             code="composition/a",
             severity="warning",
             message="m",
@@ -970,11 +970,11 @@ class TestDiagnosticEnvelope:
 
     def test_counts_split_by_severity(self) -> None:
         diags = [
-            render.Diagnostic(code="a/x", severity="error", message="m"),
-            render.Diagnostic(code="b/y", severity="warning", message="m"),
-            render.Diagnostic(code="c/z", severity="warning", message="m"),
+            diagnostics.Diagnostic(code="a/x", severity="error", message="m"),
+            diagnostics.Diagnostic(code="b/y", severity="warning", message="m"),
+            diagnostics.Diagnostic(code="c/z", severity="warning", message="m"),
         ]
-        assert render.count_by_severity(diags) == {"errors": 1, "warnings": 2}
+        assert diagnostics.count_by_severity(diags) == {"errors": 1, "warnings": 2}
 
 
 class TestRouteRhythm:
@@ -1003,78 +1003,84 @@ class TestRouteRhythm:
         route = self._route(((0, 0), (7.99, 0)))
         findings = check_route_rhythm([route])
 
-        standard = render.apply_quality_profile(findings, "standard")
-        showcase = render.apply_quality_profile(findings, "showcase")
+        standard = diagnostics.apply_quality_profile(findings, "standard")
+        showcase = diagnostics.apply_quality_profile(findings, "showcase")
 
         assert [d.severity for d in standard] == ["warning"]
         assert [d.severity for d in showcase] == ["error"]
 
 
 class TestQualityProfiles:
-    def _composition_warning(self) -> render.Diagnostic:
-        return render.Diagnostic(
+    def _composition_warning(self) -> diagnostics.Diagnostic:
+        return diagnostics.Diagnostic(
             code="composition/micro-segment", severity="warning", message="m"
         )
 
     def test_standard_leaves_composition_findings_as_warnings(self) -> None:
-        out = render.apply_quality_profile([self._composition_warning()], "standard")
+        out = diagnostics.apply_quality_profile(
+            [self._composition_warning()], "standard"
+        )
         assert [d.severity for d in out] == ["warning"]
 
     def test_showcase_raises_composition_findings_to_errors(self) -> None:
-        out = render.apply_quality_profile([self._composition_warning()], "showcase")
+        out = diagnostics.apply_quality_profile(
+            [self._composition_warning()], "showcase"
+        )
         assert [d.severity for d in out] == ["error"]
         assert out[0].code == "composition/micro-segment"
 
     def test_showcase_leaves_other_namespaces_alone(self) -> None:
-        warning = render.Diagnostic(
+        warning = diagnostics.Diagnostic(
             code="layout/label-overflow", severity="warning", message="m"
         )
-        out = render.apply_quality_profile([warning], "showcase")
+        out = diagnostics.apply_quality_profile([warning], "showcase")
         assert [d.severity for d in out] == ["warning"]
 
     def test_unknown_profile_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="unknown quality profile"):
-            render.apply_quality_profile([], "pretty")
+            diagnostics.apply_quality_profile([], "pretty")
 
 
 class TestDerivedSuppression:
     def test_a_cause_removes_its_derivative(self) -> None:
-        cause = render.Diagnostic(
+        cause = diagnostics.Diagnostic(
             code="composition/cause",
             severity="error",
             message="m",
             suppresses=("composition/derived",),
         )
-        derived = render.Diagnostic(
+        derived = diagnostics.Diagnostic(
             code="composition/derived", severity="warning", message="m"
         )
-        assert render.suppress_derived([cause, derived]) == [cause]
+        assert diagnostics.suppress_derived([cause, derived]) == [cause]
 
     def test_unrelated_findings_survive(self) -> None:
-        a = render.Diagnostic(code="layout/node-overlap", severity="error", message="m")
-        b = render.Diagnostic(code="icon/not-found", severity="error", message="m")
-        assert render.suppress_derived([a, b]) == [a, b]
+        a = diagnostics.Diagnostic(
+            code="layout/node-overlap", severity="error", message="m"
+        )
+        b = diagnostics.Diagnostic(code="icon/not-found", severity="error", message="m")
+        assert diagnostics.suppress_derived([a, b]) == [a, b]
 
     def test_suppression_is_one_level_and_does_not_resolve_chains(self) -> None:
         # Documented semantics: a dropped record still suppresses, so a
         # chain removes everything below the top. Emitters must therefore
         # declare `suppresses` only for a code they directly explain.
-        top = render.Diagnostic(
+        top = diagnostics.Diagnostic(
             code="composition/top",
             severity="error",
             message="m",
             suppresses=("composition/middle",),
         )
-        middle = render.Diagnostic(
+        middle = diagnostics.Diagnostic(
             code="composition/middle",
             severity="warning",
             message="m",
             suppresses=("composition/leaf",),
         )
-        leaf = render.Diagnostic(
+        leaf = diagnostics.Diagnostic(
             code="composition/leaf", severity="warning", message="m"
         )
-        assert render.suppress_derived([top, middle, leaf]) == [top]
+        assert diagnostics.suppress_derived([top, middle, leaf]) == [top]
 
 
 class TestSpecErrorCodes:
