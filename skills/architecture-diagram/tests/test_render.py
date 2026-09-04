@@ -24,6 +24,7 @@ from render import (
     check_layout,
     check_edge_through_node,
     check_ambiguous_corridors,
+    check_label_route_clearance,
     check_route_rhythm,
     check_proper_crossings,
     compute_positions,
@@ -642,6 +643,38 @@ class TestAmbiguousCorridor:
 
     def test_quality_profiles_change_corridor_severity(self) -> None:
         findings = check_ambiguous_corridors(self._routes(12))
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestLabelRouteClearance:
+    def _routes(self, route_y: float) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b", label="X"), ((0, 0), (20, 0)), (0, 10)),
+            RoutedEdge(Edge("c", "d"), ((0, route_y), (20, route_y)), (0, 0)),
+        ]
+
+    def test_reports_other_route_inside_label_clearance(self) -> None:
+        findings = check_label_route_clearance(self._routes(13.99))
+
+        assert [d.code for d in findings] == ["composition/label-route-clearance"]
+        assert findings[0].subject["label_edge"] == {"from": "a", "to": "b"}
+        assert findings[0].subject["route_edge"] == {"from": "c", "to": "d"}
+
+    def test_clearance_boundary_and_own_route_are_exempt(self) -> None:
+        own_label_only = [
+            RoutedEdge(Edge("a", "b", label="X"), ((0, 0), (20, 0)), (0, 10))
+        ]
+
+        assert check_label_route_clearance(self._routes(14)) == []
+        assert check_label_route_clearance(own_label_only) == []
+
+    def test_quality_profiles_change_label_clearance_severity(self) -> None:
+        findings = check_label_route_clearance(self._routes(13.99))
 
         standard = render.apply_quality_profile(findings, "standard")
         showcase = render.apply_quality_profile(findings, "showcase")

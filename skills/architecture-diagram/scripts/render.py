@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from math import hypot
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -67,6 +68,10 @@ PROPER_CROSSING_EPSILON = 1e-4
 # Unrelated collinear paths sharing eight pixels or more read as one ambiguous
 # corridor rather than distinct connections.
 MIN_AMBIGUOUS_CORRIDOR = 8.0
+# Edge labels use the same glyph estimator as nodes. A route closer than four
+# pixels to the label mask makes the connection annotation unreadable.
+EDGE_LABEL_FONT_SIZE = 10.0
+LABEL_ROUTE_CLEARANCE = 4.0
 
 
 EDGE_COLORS = {
@@ -1121,6 +1126,81 @@ def check_ambiguous_corridors(routed_edges: list[RoutedEdge]) -> list[Diagnostic
     return out
 
 
+def _edge_label_box(routed: RoutedEdge) -> Box:
+    x, baseline = routed.label_pos
+    return Box(
+        x,
+        baseline - EDGE_LABEL_FONT_SIZE,
+        _text_width(routed.edge.label, EDGE_LABEL_FONT_SIZE),
+        EDGE_LABEL_FONT_SIZE,
+    )
+
+
+def _segment_box(start: tuple[float, float], end: tuple[float, float]) -> Box:
+    return Box(
+        min(start[0], end[0]),
+        min(start[1], end[1]),
+        abs(end[0] - start[0]),
+        abs(end[1] - start[1]),
+    )
+
+
+def _box_clearance(first: Box, second: Box) -> float:
+    horizontal = max(first.x - second.x2, second.x - first.x2, 0.0)
+    vertical = max(first.y - second.y2, second.y - first.y2, 0.0)
+    return hypot(horizontal, vertical)
+
+
+def check_label_route_clearance(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
+    """Detect a label mask that sits too close to a different relationship."""
+    out: list[Diagnostic] = []
+    for label_index, labeled in enumerate(routed_edges):
+        if not labeled.edge.label:
+            continue
+        label_box = _edge_label_box(labeled)
+        for route_index, routed in enumerate(routed_edges):
+            if route_index == label_index:
+                continue
+            for segment_index, (start, end) in enumerate(
+                zip(routed.points, routed.points[1:])
+            ):
+                clearance = _box_clearance(label_box, _segment_box(start, end))
+                if clearance >= LABEL_ROUTE_CLEARANCE:
+                    continue
+                out.append(
+                    Diagnostic(
+                        code="composition/label-route-clearance",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"label on edge {labeled.edge.src!r}->{labeled.edge.dst!r} "
+                            f"is {clearance:g}px from route "
+                            f"{routed.edge.src!r}->{routed.edge.dst!r}"
+                        ),
+                        subject={
+                            "label_edge": {
+                                "from": labeled.edge.src,
+                                "to": labeled.edge.dst,
+                            },
+                            "route_edge": {
+                                "from": routed.edge.src,
+                                "to": routed.edge.dst,
+                            },
+                        },
+                        evidence={
+                            "label_box": _box_evidence(label_box),
+                            "route_segment": segment_index,
+                            "clearance": clearance,
+                            "minimum": LABEL_ROUTE_CLEARANCE,
+                        },
+                        supported_fixes=(
+                            "reorder the affected nodes within their ranks",
+                            "shorten the edge label",
+                        ),
+                    )
+                )
+    return out
+
+
 def check_layout(
     spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
 ) -> list[Diagnostic]:
@@ -1374,7 +1454,7 @@ def _edge_svg(routed: RoutedEdge) -> str:
     if e.label:
         mx, my = routed.label_pos
         parts.append(
-            f'<text x="{mx:g}" y="{my:g}" font-size="10" fill="{color}">{_escape(e.label)}</text>'
+            f'<text x="{mx:g}" y="{my:g}" font-size="{EDGE_LABEL_FONT_SIZE:g}" fill="{color}">{_escape(e.label)}</text>'
         )
     parts.append("</g>")
     return "".join(parts)
@@ -1523,6 +1603,7 @@ def render(
     diagnostics += check_edge_through_node(node_boxes, routed_edges)
     diagnostics += check_proper_crossings(routed_edges)
     diagnostics += check_ambiguous_corridors(routed_edges)
+    diagnostics += check_label_route_clearance(routed_edges)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
