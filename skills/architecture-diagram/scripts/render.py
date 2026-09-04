@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+import fetch_icons
 import yaml
 
 # --- layout constants -------------------------------------------------------
@@ -1292,19 +1293,117 @@ class IconLookup(Protocol):
     def __call__(self, provider: str, service_slug: str) -> IconRef | None: ...
 
 
+class IconCacheError(RuntimeError):
+    def __init__(self, diagnostic: Diagnostic) -> None:
+        super().__init__(diagnostic.message)
+        self.diagnostic = diagnostic
+
+
 @dataclass
 class CacheIconLookup:
-    """Network-fetched cloud provider icons — see fetch_icons.py."""
+    """Verified local cloud-provider icon cache — see fetch_icons.py."""
 
     cache_dir: Path
     sha: str
 
+    def _error(
+        self,
+        code: str,
+        message: str,
+        provider: str,
+        service_slug: str,
+        evidence: dict[str, object],
+    ) -> IconCacheError:
+        return IconCacheError(
+            Diagnostic(
+                code=code,
+                severity=SEVERITY_ERROR,
+                message=message,
+                subject={"provider": provider, "service": service_slug},
+                evidence=evidence,
+                supported_fixes=(
+                    f"rebuild the {provider} icon cache: "
+                    f"fetch_icons.py --provider {provider} --force",
+                ),
+                suppresses=("icon/not-found",),
+            )
+        )
+
     def __call__(self, provider: str, service_slug: str) -> IconRef | None:
-        path = self.cache_dir / self.sha / provider / f"{service_slug}.json"
+        cache_root = self.cache_dir / self.sha
+        path = cache_root / provider / f"{service_slug}.json"
         if not path.exists():
             return None
-        data = json.loads(path.read_text())
-        return IconRef(view_box=data["viewBox"], body=data["body"])
+        manifest_path = cache_root / "manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            payload = path.read_bytes()
+        except (OSError, json.JSONDecodeError) as exc:
+            raise self._error(
+                "icon/cache-unverified",
+                f"icon cache entry {path} has no readable integrity manifest",
+                provider,
+                service_slug,
+                {"path": str(path), "error": str(exc)},
+            ) from exc
+        if (
+            not isinstance(manifest, dict)
+            or manifest.get("format_version") != fetch_icons.CACHE_MANIFEST_VERSION
+            or manifest.get("sha") != self.sha
+            or not isinstance(manifest.get("providers"), dict)
+        ):
+            raise self._error(
+                "icon/cache-unverified",
+                f"icon cache entry {path} has an unsupported integrity manifest",
+                provider,
+                service_slug,
+                {"path": str(path)},
+            )
+        provider_stats = manifest["providers"].get(provider)
+        if not isinstance(provider_stats, dict) or not isinstance(
+            provider_stats.get("icons"), dict
+        ):
+            raise self._error(
+                "icon/cache-unverified",
+                f"icon cache entry {path} is absent from its integrity manifest",
+                provider,
+                service_slug,
+                {"path": str(path)},
+            )
+        record = provider_stats["icons"].get(path.name)
+        expected_digest = record.get("sha256") if isinstance(record, dict) else None
+        actual_digest = hashlib.sha256(payload).hexdigest()
+        if not isinstance(expected_digest, str):
+            raise self._error(
+                "icon/cache-unverified",
+                f"icon cache entry {path} has no recorded content digest",
+                provider,
+                service_slug,
+                {"path": str(path)},
+            )
+        if actual_digest != expected_digest:
+            raise self._error(
+                "icon/digest-mismatch",
+                f"icon cache entry {path} does not match its recorded digest",
+                provider,
+                service_slug,
+                {
+                    "path": str(path),
+                    "expected_sha256": expected_digest,
+                    "actual_sha256": actual_digest,
+                },
+            )
+        try:
+            data = json.loads(payload)
+            return IconRef(view_box=data["viewBox"], body=data["body"])
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise self._error(
+                "icon/cache-unverified",
+                f"verified icon cache entry {path} is not a usable icon",
+                provider,
+                service_slug,
+                {"path": str(path), "error": str(exc)},
+            ) from exc
 
 
 @dataclass
@@ -1652,7 +1751,14 @@ def render(
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
-        icons[n.id] = icon_lookup(n.provider, n.service) if n.service else None
+        if not n.service:
+            icons[n.id] = None
+            continue
+        try:
+            icons[n.id] = icon_lookup(n.provider, n.service)
+        except IconCacheError as exc:
+            diagnostics.append(exc.diagnostic)
+            icons[n.id] = None
 
     svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, diagnostics)
     diagnostics += check_editability(svg)
@@ -1874,8 +1980,6 @@ def _read_spec(
 
 
 def _icon_lookup(cache_dir: Path | None, sha: str | None) -> IconLookup:
-    import fetch_icons  # local import keeps pure layout tests network-free
-
     selected_cache_dir = cache_dir or fetch_icons.default_cache_dir()
     selected_sha = sha or fetch_icons.DRAWIO_SHA
     return CompositeIconLookup(

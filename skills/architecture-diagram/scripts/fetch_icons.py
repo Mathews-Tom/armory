@@ -18,6 +18,7 @@ file, not something that happens implicitly on `dev` branch churn.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import http.client
 import json
 import os
@@ -45,13 +46,31 @@ STENCIL_PATHS = {
     "gcp": "src/main/webapp/stencils/gcp2.xml",
 }
 AZURE_TREE_PREFIX = "src/main/webapp/img/lib/azure2"
-LICENSE_NOTE = (
-    "Vector geometry sourced from jgraph/drawio (Apache-2.0): "
-    "https://github.com/jgraph/drawio/blob/dev/LICENSE. "
-    "AWS/Azure/GCP retain ownership of the underlying icon designs; this "
-    "cache exists for building your own diagrams under each provider's "
-    "'use in architecture diagrams' terms, not for redistribution."
-)
+CACHE_MANIFEST_VERSION = 2
+LICENSE_NOTE: dict[str, dict[str, str]] = {
+    "aws": {
+        "source": "https://aws.amazon.com/architecture/icons/",
+        "terms": (
+            "AWS permits customers and partners to use its architecture "
+            "assets in diagrams, whitepapers, presentations, datasheets, and posters."
+        ),
+    },
+    "azure": {
+        "source": "https://learn.microsoft.com/azure/architecture/icons/",
+        "terms": (
+            "Microsoft permits copying, distributing, and displaying Azure icons "
+            "only in architectural diagrams, training, and documentation; do not "
+            "crop, flip, rotate, distort, or otherwise modify them."
+        ),
+    },
+    "gcp": {
+        "source": "https://cloud.google.com/icons",
+        "terms": (
+            "Google provides the Cloud icon library for diagrams and technical "
+            "documentation; consult the provider page for current use terms."
+        ),
+    },
+}
 
 
 class Source(Protocol):
@@ -210,12 +229,77 @@ def convert_azure(source: Source, max_workers: int = 16) -> list[IconEntry]:
     return entries
 
 
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _empty_manifest(sha: str) -> dict[str, object]:
+    return {
+        "format_version": CACHE_MANIFEST_VERSION,
+        "sha": sha,
+        "license_note": LICENSE_NOTE,
+        "providers": {},
+    }
+
+
+def _read_manifest(manifest_path: Path) -> dict[str, object] | None:
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return manifest if isinstance(manifest, dict) else None
+
+
+def _provider_cache_is_verified(cache_dir: Path, sha: str, provider: str) -> bool:
+    provider_dir = cache_dir / sha / provider
+    manifest = _read_manifest(cache_dir / sha / "manifest.json")
+    if (
+        manifest is None
+        or manifest.get("format_version") != CACHE_MANIFEST_VERSION
+        or manifest.get("sha") != sha
+    ):
+        return False
+    providers = manifest.get("providers")
+    if not isinstance(providers, dict):
+        return False
+    stats = providers.get(provider)
+    if not isinstance(stats, dict):
+        return False
+    icons = stats.get("icons")
+    if not isinstance(icons, dict):
+        return False
+    files = sorted(provider_dir.glob("*.json"))
+    if stats.get("count") != len(icons) or len(files) != len(icons):
+        return False
+    for icon_path in files:
+        record = icons.get(icon_path.name)
+        if not isinstance(record, dict):
+            return False
+        expected_digest = record.get("sha256")
+        if (
+            not isinstance(expected_digest, str)
+            or not isinstance(record.get("source"), str)
+            or not isinstance(record.get("terms"), str)
+        ):
+            return False
+        try:
+            actual_digest = _sha256(icon_path.read_bytes())
+        except OSError:
+            return False
+        if actual_digest != expected_digest:
+            return False
+    return True
+
+
 def write_cache(
     cache_dir: Path, sha: str, provider: str, entries: list[IconEntry]
 ) -> dict[str, object]:
     provider_dir = cache_dir / sha / provider
     provider_dir.mkdir(parents=True, exist_ok=True)
+    for old_entry in provider_dir.glob("*.json"):
+        old_entry.unlink()
     seen: dict[str, int] = {}
+    icons: dict[str, dict[str, str]] = {}
     warned = 0
     for entry in entries:
         # Two shapes can normalize to the same slug (e.g. "S3" and "s3 " after
@@ -235,13 +319,21 @@ def write_cache(
             "source": entry.source,
             "warnings": entry.warnings,
         }
-        (provider_dir / f"{key}.json").write_text(json.dumps(payload, indent=2))
+        filename = f"{key}.json"
+        payload_bytes = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
+        (provider_dir / filename).write_bytes(payload_bytes)
+        icons[filename] = {
+            "sha256": _sha256(payload_bytes),
+            "source": entry.source,
+            "terms": LICENSE_NOTE[provider]["terms"],
+        }
         if entry.warnings:
             warned += 1
     return {
-        "count": len(entries),
+        "count": len(icons),
         "warned": warned,
         "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "icons": icons,
     }
 
 
@@ -250,16 +342,20 @@ def update_manifest(
 ) -> None:
     manifest_path = cache_dir / sha / "manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    if manifest_path.exists():
-        manifest: dict[str, object] = json.loads(manifest_path.read_text())
-    else:
-        manifest = {"sha": sha, "license_note": LICENSE_NOTE, "providers": {}}
+    manifest = _read_manifest(manifest_path)
+    if (
+        manifest is None
+        or manifest.get("format_version") != CACHE_MANIFEST_VERSION
+        or manifest.get("sha") != sha
+    ):
+        manifest = _empty_manifest(sha)
     providers = manifest.get("providers")
     if not isinstance(providers, dict):
         providers = {}
         manifest["providers"] = providers
+    manifest["license_note"] = LICENSE_NOTE
     providers[provider] = stats
-    manifest_path.write_text(json.dumps(manifest, indent=2))
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 
 
 def default_cache_dir() -> Path:
@@ -271,15 +367,17 @@ def default_cache_dir() -> Path:
 def fetch_provider(
     source: Source, cache_dir: Path, sha: str, provider: str, force: bool
 ) -> dict[str, object]:
-    provider_dir = cache_dir / sha / provider
-    if provider_dir.exists() and any(provider_dir.glob("*.json")) and not force:
-        return {"skipped": True, "count": len(list(provider_dir.glob("*.json")))}
+    if provider not in ("aws", "azure", "gcp"):
+        raise ValueError(f"unknown provider: {provider}")
+    if not force and _provider_cache_is_verified(cache_dir, sha, provider):
+        return {
+            "skipped": True,
+            "count": len(list((cache_dir / sha / provider).glob("*.json"))),
+        }
     if provider == "azure":
         entries = convert_azure(source)
-    elif provider in ("aws", "gcp"):
-        entries = convert_stencil_provider(source, provider)
     else:
-        raise ValueError(f"unknown provider: {provider}")
+        entries = convert_stencil_provider(source, provider)
     stats = write_cache(cache_dir, sha, provider, entries)
     update_manifest(cache_dir, sha, provider, stats)
     return stats
