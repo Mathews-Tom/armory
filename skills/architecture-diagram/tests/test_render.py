@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import fetch_icons
 import render
 from render import (
     COL_GAP,
@@ -1136,7 +1137,11 @@ class TestCliContract:
     ) -> tuple[int, dict[str, object], str]:
         code = render.main(list(argv))
         captured = capsys.readouterr()
-        payload = json.loads(captured.out) if "--json" in argv else {}
+        payload = (
+            json.loads(captured.out)
+            if "--json" in argv or "--layout-json" in argv
+            else {}
+        )
         return code, payload, captured.err
 
     def test_validate_returns_a_parsable_receipt_without_an_artifact(
@@ -1309,6 +1314,68 @@ class TestCliContract:
         assert code == render.EXIT_USAGE
         assert payload["delivery_stage"] == "input"
         assert [d["code"] for d in payload["diagnostics"]] == ["usage/spec-unreadable"]
+
+    def test_layout_json_is_stable_and_matches_emitted_geometry(
+        self, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
+        cache_entries = [
+            fetch_icons.IconEntry(
+                slug=service,
+                name=service,
+                view_box="0 0 1 1",
+                body="<path/>",
+                source="fixture",
+            )
+            for service in ("cloudfront", "api-gateway", "lambda", "dynamodb", "s3")
+        ]
+        cache_stats = fetch_icons.write_cache(
+            tmp_path, "fixture-sha", "aws", cache_entries
+        )
+        fetch_icons.update_manifest(tmp_path, "fixture-sha", "aws", cache_stats)
+        spec_path = Path(__file__).parent.parent / "assets" / "example-serverless.yaml"
+        argv = (
+            "validate",
+            str(spec_path),
+            "--cache-dir",
+            str(tmp_path),
+            "--sha",
+            "fixture-sha",
+            "--quality",
+            "showcase",
+            "--layout-json",
+        )
+
+        first_code = render.main(list(argv))
+        first_capture = capsys.readouterr()
+        second_code = render.main(list(argv))
+        second_capture = capsys.readouterr()
+        first_payload = json.loads(first_capture.out)
+        expected_layout = json.loads(
+            (
+                Path(__file__).parent / "fixtures" / "example-serverless.layout.json"
+            ).read_text()
+        )
+        result = do_render(load_spec(spec_path.read_text()), _icon_lookup, "showcase")
+
+        assert first_code == second_code == render.EXIT_OK
+        assert first_capture.out == second_capture.out
+        assert first_capture.err == second_capture.err == ""
+        assert first_payload["layout"] == expected_layout
+        assert not list(tmp_path.glob("*.svg"))
+        for reported, routed in zip(
+            first_payload["layout"]["edges"], result.routed_edges, strict=True
+        ):
+            assert reported["points"] == [{"x": x, "y": y} for x, y in routed.points]
+            assert f'd="{routed.path_d}"' in result.svg
+        assert first_payload["layout"]["labels"] == [
+            {
+                "edge": {"from": routed.edge.src, "to": routed.edge.dst},
+                "text": routed.edge.label,
+                "box": render._box_evidence(render._edge_label_box(routed)),
+            }
+            for routed in result.routed_edges
+            if routed.edge.label
+        ]
 
     def test_script_entrypoint_runs_validate(self, tmp_path: Path) -> None:
         spec = tmp_path / "s.yaml"
