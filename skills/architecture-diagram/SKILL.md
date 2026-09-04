@@ -213,7 +213,7 @@ Every finding is a coded diagnostic carrying `code`, `severity`, `message`, `sub
 | `icon/not-found` | The `service` slug is absent from that provider's cache, or the cache was never fetched | Use the exact slug from that provider's reference service map, or run `fetch_icons.py --provider <name>`; drop `service` to take the labeled placeholder deliberately |
 | `layout/node-overlap` | Two node boxes collide | Separate the nodes across ranks, or remove the duplicate |
 | `layout/zone-overlap` | Two unrelated zone boxes collide because their member nodes are interleaved | List each zone's members contiguously in `nodes`, or fix the `zone` assignments |
-| `layout/label-overflow` | A `label` or `sublabel` is wider than its node box (warning) | Shorten it, or move detail into `sublabel` |
+| `layout/label-overflow` | A `label` or `sublabel` cannot fit in its node box at the hard 6px minimum (blocking) | Shorten it, or move detail into `sublabel` |
 | `editability/*` | The output contains raster, `<use>`, or an external reference | Renderer bug — a spec cannot cause this; report it |
 | `usage/spec-unreadable` | The spec path does not exist or cannot be read | Pass an existing, readable YAML path |
 
