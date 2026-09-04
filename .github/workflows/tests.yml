@@ -6,9 +6,9 @@ name: Tests
 # therefore never executed by CI, so drift in them landed on main unnoticed.
 
 on:
+  # No base-branch filter: a pull request stacked on another pull request's
+  # branch must be gated too, or the middle of a stack merges untested.
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
