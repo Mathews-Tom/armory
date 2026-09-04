@@ -491,6 +491,26 @@ class TestRouting:
 
         assert route.points == ((92, 36), (222, 36))
 
+    def test_small_shared_port_delta_uses_a_rhythm_bridge(self) -> None:
+        boxes = {
+            "a": Box(0, 0, 120, 118),
+            "b": Box(200, 7.5, 120, 118),
+            "c": Box(200, 200, 120, 118),
+        }
+        spec2 = Spec(
+            title="",
+            direction="LR",
+            provider="generic",
+            nodes=[Node("a", "A"), Node("b", "B"), Node("c", "C")],
+            zones=[],
+            edges=[Edge("a", "b"), Edge("a", "c")],
+        )
+
+        route = route_edges(spec2, boxes)[0]
+
+        assert len(route.points) == 6
+        assert check_route_rhythm([route]) == []
+
     def test_same_spec_renders_byte_identically_across_runs(self) -> None:
         spec = load_spec(
             "nodes:\n  - id: a\n  - id: b\n  - id: c\n"

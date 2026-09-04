@@ -713,12 +713,44 @@ def _route_points(
         if sx == dx:
             return ((sx, sy), (dx, dy - ARROW_HEAD_LENGTH))
         channel = sy + ROUTE_ENDPOINT_STUB + channel_offset
+        if abs(sx - dx) < MIN_INTERIOR_ROUTE_SEGMENT:
+            bridge_x = (
+                sx - MIN_INTERIOR_ROUTE_SEGMENT
+                if dx >= sx
+                else sx + MIN_INTERIOR_ROUTE_SEGMENT
+            )
+            return _dedupe_route_points(
+                [
+                    (sx, sy),
+                    (sx, channel),
+                    (bridge_x, channel),
+                    (bridge_x, channel + ROUTE_CHANNEL_HALF_SPREAD),
+                    (dx, channel + ROUTE_CHANNEL_HALF_SPREAD),
+                    (dx, dy - ARROW_HEAD_LENGTH),
+                ]
+            )
         return _dedupe_route_points(
             [(sx, sy), (sx, channel), (dx, channel), (dx, dy - ARROW_HEAD_LENGTH)]
         )
     if sy == dy:
         return ((sx, sy), (dx - ARROW_HEAD_LENGTH, dy))
     channel = sx + ROUTE_ENDPOINT_STUB + channel_offset
+    if abs(sy - dy) < MIN_INTERIOR_ROUTE_SEGMENT:
+        bridge_y = (
+            sy - MIN_INTERIOR_ROUTE_SEGMENT
+            if dy >= sy
+            else sy + MIN_INTERIOR_ROUTE_SEGMENT
+        )
+        return _dedupe_route_points(
+            [
+                (sx, sy),
+                (channel, sy),
+                (channel, bridge_y),
+                (channel + ROUTE_CHANNEL_HALF_SPREAD, bridge_y),
+                (channel + ROUTE_CHANNEL_HALF_SPREAD, dy),
+                (dx - ARROW_HEAD_LENGTH, dy),
+            ]
+        )
     return _dedupe_route_points(
         [(sx, sy), (channel, sy), (channel, dy), (dx - ARROW_HEAD_LENGTH, dy)]
     )
