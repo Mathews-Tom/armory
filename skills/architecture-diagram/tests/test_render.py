@@ -22,7 +22,11 @@ from render import (
     assign_ranks,
     check_editability,
     check_layout,
+    check_edge_through_node,
+    check_ambiguous_corridors,
+    check_label_route_clearance,
     check_route_rhythm,
+    check_proper_crossings,
     compute_positions,
     compute_zone_boxes,
     icon_box,
@@ -521,6 +525,162 @@ class TestRouting:
         second = do_render(spec, _icon_lookup)
 
         assert first.svg == second.svg
+
+
+class TestEdgeThroughNode:
+    def _route(self) -> RoutedEdge:
+        return RoutedEdge(
+            edge=Edge("a", "b"),
+            points=((0, 10), (40, 10)),
+            label_pos=(0, 0),
+        )
+
+    def test_reports_unrelated_node_within_clearance(self) -> None:
+        node_boxes = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 5, 10, 10),
+        }
+
+        findings = check_edge_through_node(node_boxes, [self._route()])
+
+        assert [d.code for d in findings] == ["composition/edge-through-node"]
+        assert findings[0].subject == {"from": "a", "to": "b", "node": "c"}
+
+    def test_clearance_boundary_and_endpoint_exemption(self) -> None:
+        route = self._route()
+        at_clearance = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 12, 10, 10),
+        }
+        beyond_clearance = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 12.01, 10, 10),
+        }
+
+        assert [d.code for d in check_edge_through_node(at_clearance, [route])] == [
+            "composition/edge-through-node"
+        ]
+        assert check_edge_through_node(beyond_clearance, [route]) == []
+
+    def test_quality_profiles_change_edge_through_node_severity(self) -> None:
+        node_boxes = {
+            "a": Box(-10, 0, 10, 20),
+            "b": Box(40, 0, 10, 20),
+            "c": Box(15, 5, 10, 10),
+        }
+        findings = check_edge_through_node(node_boxes, [self._route()])
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestProperCrossing:
+    def _crossing_routes(self) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((10, -10), (10, 10)), (0, 0)),
+        ]
+
+    def test_reports_interior_crossing_between_unrelated_edges(self) -> None:
+        findings = check_proper_crossings(self._crossing_routes())
+
+        assert [d.code for d in findings] == ["composition/proper-crossing"]
+        assert findings[0].subject["edges"] == [
+            {"from": "a", "to": "b"},
+            {"from": "c", "to": "d"},
+        ]
+
+    def test_shared_endpoint_and_touch_are_exempt(self) -> None:
+        shared_endpoint = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("b", "c"), ((20, -10), (20, 10)), (0, 0)),
+        ]
+        endpoint_touch = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((20, -10), (20, 10)), (0, 0)),
+        ]
+
+        assert check_proper_crossings(shared_endpoint) == []
+        assert check_proper_crossings(endpoint_touch) == []
+
+    def test_quality_profiles_change_crossing_severity(self) -> None:
+        findings = check_proper_crossings(self._crossing_routes())
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestAmbiguousCorridor:
+    def _routes(self, second_start: float) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((second_start, 0), (30, 0)), (0, 0)),
+        ]
+
+    def test_reports_collinear_overlap_at_threshold(self) -> None:
+        findings = check_ambiguous_corridors(self._routes(12))
+
+        assert [d.code for d in findings] == ["composition/ambiguous-corridor"]
+        assert findings[0].evidence["overlap"] == 8
+
+    def test_shorter_overlap_and_shared_endpoint_are_exempt(self) -> None:
+        shared_endpoint = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("b", "c"), ((12, 0), (30, 0)), (0, 0)),
+        ]
+
+        assert check_ambiguous_corridors(self._routes(12.01)) == []
+        assert check_ambiguous_corridors(shared_endpoint) == []
+
+    def test_quality_profiles_change_corridor_severity(self) -> None:
+        findings = check_ambiguous_corridors(self._routes(12))
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestLabelRouteClearance:
+    def _routes(self, route_y: float) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b", label="X"), ((0, 0), (20, 0)), (0, 10)),
+            RoutedEdge(Edge("c", "d"), ((0, route_y), (20, route_y)), (0, 0)),
+        ]
+
+    def test_reports_other_route_inside_label_clearance(self) -> None:
+        findings = check_label_route_clearance(self._routes(13.99))
+
+        assert [d.code for d in findings] == ["composition/label-route-clearance"]
+        assert findings[0].subject["label_edge"] == {"from": "a", "to": "b"}
+        assert findings[0].subject["route_edge"] == {"from": "c", "to": "d"}
+
+    def test_clearance_boundary_and_own_route_are_exempt(self) -> None:
+        own_label_only = [
+            RoutedEdge(Edge("a", "b", label="X"), ((0, 0), (20, 0)), (0, 10))
+        ]
+
+        assert check_label_route_clearance(self._routes(14)) == []
+        assert check_label_route_clearance(own_label_only) == []
+
+    def test_quality_profiles_change_label_clearance_severity(self) -> None:
+        findings = check_label_route_clearance(self._routes(13.99))
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
 
 
 class TestEditabilityCheck:
