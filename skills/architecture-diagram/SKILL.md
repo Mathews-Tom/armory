@@ -68,10 +68,12 @@ Full schema and worked examples: `references/spec-format.md`. Summary:
 title: string
 direction: LR | TB        # default LR
 provider: aws | azure | gcp | generic   # default provider for nodes that omit it
+profile: deployment-ownership             # opt-in blocking deployment checks
 zones:
   - id: string
     label: string
     parent: string | null # nesting — omit for a top-level zone
+    kind: generic | region | security # default generic
 nodes:
   - id: string             # unique
     label: string
@@ -80,12 +82,19 @@ nodes:
     provider: string       # overrides the top-level provider for this node
     zone: string | null    # zone id this node belongs to
     color: "#RRGGBB"       # icon fill color
+    owner: string          # required for non-external nodes under deployment-ownership
+    external: boolean      # default false
+    storage: boolean       # true requires a security zone under deployment-ownership
 edges:
   - from: string            # node id
     to: string              # node id
-    label: string           # optional
+    label: string           # required for security-boundary crossings under deployment-ownership
     type: realtime | batch | event | control | default
 ```
+
+### Deployment ownership validation
+
+Set `profile: deployment-ownership` only when the spec is a deployment ownership record rather than a visual-only diagram. The profile fails closed: every node must resolve to exactly one `kind: region`, every non-external node needs a non-blank `owner`, every `storage: true` node must be inside `kind: security`, and a cross-security-zone edge needs a non-blank label naming its mechanism. It never infers those facts from labels, icons, service slugs, or layout. Omit `profile` to preserve existing behavior.
 
 ## Connection type semantics
 

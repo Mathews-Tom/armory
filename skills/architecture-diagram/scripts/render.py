@@ -247,6 +247,9 @@ class Node:
     zone: str | None = None
     color: str = "#3A3A3A"
     provider: str = "generic"
+    owner: str | None = None
+    external: bool = False
+    storage: bool = False
 
 
 @dataclass
@@ -254,6 +257,7 @@ class Zone:
     id: str
     label: str
     parent: str | None = None
+    kind: str = "generic"
 
 
 @dataclass
@@ -272,6 +276,7 @@ class Spec:
     nodes: list[Node]
     zones: list[Zone]
     edges: list[Edge]
+    profile: str | None = None
 
 
 class SpecError(ValueError):
@@ -316,6 +321,18 @@ def load_spec(text: str) -> Spec:
         )
 
     provider = data.get("provider", "generic")
+    profile = data.get("profile")
+    if profile not in (None, "deployment-ownership"):
+        raise _spec_error(
+            "spec/unknown-profile",
+            f"unknown profile: {profile!r}",
+            evidence={"profile": profile},
+            supported_fixes=(
+                "omit `profile` for the default visual-only validation",
+                "set `profile: deployment-ownership`",
+            ),
+        )
+
     node_ids = set()
     nodes = []
     for raw in data["nodes"]:
@@ -326,6 +343,19 @@ def load_spec(text: str) -> Spec:
                 evidence={"node": raw},
                 supported_fixes=("give the node a unique `id`",),
             )
+        for field_name in ("external", "storage"):
+            value = raw.get(field_name, False)
+            if not isinstance(value, bool):
+                raise _spec_error(
+                    "spec/invalid-node-boolean",
+                    f"node {raw['id']!r} field {field_name!r} must be boolean",
+                    subject={"node": raw["id"]},
+                    evidence={"field": field_name, "value": value},
+                    supported_fixes=(
+                        f"set `{field_name}` to true or false without quotes",
+                    ),
+                )
+
         if raw["id"] in node_ids:
             raise _spec_error(
                 "spec/duplicate-node-id",
@@ -346,6 +376,9 @@ def load_spec(text: str) -> Spec:
                 zone=raw.get("zone"),
                 color=raw.get("color", "#3A3A3A"),
                 provider=raw.get("provider", provider),
+                owner=raw.get("owner"),
+                external=raw.get("external", False),
+                storage=raw.get("storage", False),
             )
         )
 
@@ -360,11 +393,28 @@ def load_spec(text: str) -> Spec:
                 supported_fixes=("give the zone a unique `id`",),
             )
         zone_ids.add(raw["id"])
+        kind = raw.get("kind", "generic")
+        if kind not in ("generic", "region", "security"):
+            raise _spec_error(
+                "spec/invalid-zone-kind",
+                f"zone {raw['id']!r} has invalid kind {kind!r}",
+                subject={"zone": raw["id"]},
+                evidence={
+                    "kind": kind,
+                    "allowed_kinds": ["generic", "region", "security"],
+                },
+                supported_fixes=(
+                    "omit `kind` for a visual-only generic zone",
+                    "set `kind` to `generic`, `region`, or `security`",
+                ),
+            )
+
         zones.append(
             Zone(
                 id=raw["id"],
                 label=raw.get("label", raw["id"]),
                 parent=raw.get("parent"),
+                kind=kind,
             )
         )
     for n in nodes:
@@ -432,6 +482,7 @@ def load_spec(text: str) -> Spec:
         nodes=nodes,
         zones=zones,
         edges=edges,
+        profile=profile,
     )
 
 
@@ -1275,8 +1326,169 @@ def _zone_ancestors(spec: Spec, zone_id: str) -> set[str]:
     out = set()
     cur = by_id[zone_id].parent
     while cur is not None:
+        if cur in out:
+            break
         out.add(cur)
         cur = by_id[cur].parent
+    return out
+
+
+def _zone_membership(spec: Spec, node: Node) -> set[str]:
+    if node.zone is None:
+        return set()
+    return {node.zone, *_zone_ancestors(spec, node.zone)}
+
+
+def _profile_diagnostic(
+    code: str,
+    message: str,
+    subject: dict[str, object],
+    evidence: dict[str, object],
+    supported_fixes: tuple[str, ...],
+) -> Diagnostic:
+    return Diagnostic(
+        code=code,
+        severity=SEVERITY_ERROR,
+        message=message,
+        subject=subject,
+        evidence=evidence,
+        supported_fixes=supported_fixes,
+    )
+
+
+def check_deployment_profile(spec: Spec) -> list[Diagnostic]:
+    """Validate authored deployment facts without assigning missing facts."""
+    if spec.profile != "deployment-ownership":
+        return []
+
+    memberships = {node.id: _zone_membership(spec, node) for node in spec.nodes}
+    region_ids = {zone.id for zone in spec.zones if zone.kind == "region"}
+    security_ids = {zone.id for zone in spec.zones if zone.kind == "security"}
+    out: list[Diagnostic] = []
+
+    missing_kinds = [
+        kind
+        for kind, present in (
+            ("region", region_ids),
+            ("security", security_ids),
+        )
+        if not present
+    ]
+    if missing_kinds:
+        out.append(
+            _profile_diagnostic(
+                "profile/missing-required-zone-kinds",
+                f"deployment profile requires zone kinds: {', '.join(missing_kinds)}",
+                {"profile": spec.profile},
+                {
+                    "missing_kinds": missing_kinds,
+                    "declared_zones": [
+                        {"id": zone.id, "kind": zone.kind} for zone in spec.zones
+                    ],
+                },
+                (
+                    "add at least one `kind: region` zone",
+                    "add at least one `kind: security` zone",
+                ),
+            )
+        )
+
+    for node in spec.nodes:
+        if not node.external and (
+            not isinstance(node.owner, str) or not node.owner.strip()
+        ):
+            out.append(
+                _profile_diagnostic(
+                    "profile/missing-owner",
+                    f"node {node.id!r} has no non-blank owner",
+                    {"node": node.id},
+                    {"external": node.external, "owner": node.owner},
+                    (
+                        "set the node's `owner` to the accountable team or service",
+                        "set `external: true` only for an externally owned node",
+                    ),
+                )
+            )
+
+        node_regions = sorted(memberships[node.id] & region_ids)
+        if not node_regions:
+            out.append(
+                _profile_diagnostic(
+                    "profile/missing-region-scope",
+                    f"node {node.id!r} is not contained by a region zone",
+                    {"node": node.id},
+                    {
+                        "zone": node.zone,
+                        "zone_membership": sorted(memberships[node.id]),
+                    },
+                    ("assign the node to a zone nested under one `kind: region` zone",),
+                )
+            )
+        elif len(node_regions) > 1:
+            out.append(
+                _profile_diagnostic(
+                    "profile/ambiguous-region",
+                    f"node {node.id!r} is contained by multiple region zones",
+                    {"node": node.id},
+                    {"regions": node_regions},
+                    ("nest the node under exactly one `kind: region` zone",),
+                )
+            )
+
+        if node.storage and not (memberships[node.id] & security_ids):
+            out.append(
+                _profile_diagnostic(
+                    "profile/storage-outside-security-zone",
+                    f"storage node {node.id!r} is outside a security zone",
+                    {"node": node.id},
+                    {
+                        "zone": node.zone,
+                        "zone_membership": sorted(memberships[node.id]),
+                    },
+                    (
+                        "assign the storage node to a zone nested under `kind: security`",
+                    ),
+                )
+            )
+
+    for security_id in sorted(security_ids):
+        security_regions = sorted(_zone_ancestors(spec, security_id) & region_ids)
+        if len(security_regions) != 1:
+            out.append(
+                _profile_diagnostic(
+                    "profile/inconsistent-security-zone-region",
+                    f"security zone {security_id!r} does not resolve to one region",
+                    {"zone": security_id},
+                    {
+                        "regions": security_regions,
+                        "parent": next(
+                            zone.parent for zone in spec.zones if zone.id == security_id
+                        ),
+                    },
+                    ("nest the security zone under exactly one `kind: region` zone",),
+                )
+            )
+
+    for edge in spec.edges:
+        src_security = memberships[edge.src] & security_ids
+        dst_security = memberships[edge.dst] & security_ids
+        if src_security != dst_security and not edge.label.strip():
+            out.append(
+                _profile_diagnostic(
+                    "profile/missing-boundary-crossing-mechanism",
+                    f"edge {edge.src!r}->{edge.dst!r} crosses a security boundary without a mechanism",
+                    {"edge": {"from": edge.src, "to": edge.dst}},
+                    {
+                        "from_security_zones": sorted(src_security),
+                        "to_security_zones": sorted(dst_security),
+                        "from_node": edge.src,
+                        "to_node": edge.dst,
+                    },
+                    (
+                        "set a non-blank edge `label` naming the boundary-crossing mechanism",
+                    ),
+                )
+            )
     return out
 
 
@@ -1737,6 +1949,7 @@ def render(
     spec: Spec, icon_lookup: IconLookup, quality: str = QUALITY_STANDARD
 ) -> RenderResult:
     diagnostics: list[Diagnostic] = []
+    diagnostics += check_deployment_profile(spec)
     rank = assign_ranks(spec)
     order = order_within_ranks(spec, rank)
     node_boxes = compute_positions(spec, rank, order)
@@ -1799,6 +2012,8 @@ def _check_name(diagnostic: Diagnostic) -> str:
     code = diagnostic.code
     if code.startswith("spec/"):
         return "spec"
+    if code.startswith("profile/"):
+        return "profile"
     if code in ("layout/node-overlap", "layout/zone-overlap"):
         return "layout"
     if code == "layout/label-overflow":
@@ -1821,8 +2036,9 @@ def _check_name(diagnostic: Diagnostic) -> str:
 
 
 def _validation_receipt(
-    diagnostics: list[Diagnostic], quality: str
+    diagnostics: list[Diagnostic], quality: str, profile_active: bool = False
 ) -> dict[str, object]:
+    checks = _VALIDATION_CHECKS + (("profile",) if profile_active else ())
     counts = count_by_severity(diagnostics)
     composition = [d for d in diagnostics if d.code.startswith("composition/")]
     if any(d.severity == SEVERITY_ERROR for d in composition):
@@ -1835,8 +2051,8 @@ def _validation_receipt(
         _check_name(d) for d in diagnostics if d.severity == SEVERITY_ERROR
     }
     return {
-        "checks_passed": len(_VALIDATION_CHECKS) - len(failed_checks),
-        "checks_total": len(_VALIDATION_CHECKS),
+        "checks_passed": len(checks) - len(failed_checks),
+        "checks_total": len(checks),
         "quality": quality,
         "composition_status": composition_status,
         "errors": counts["errors"],
@@ -1854,6 +2070,7 @@ def _receipt(
     output: Path | None = None,
     written: bool = False,
     delivery_stage: str | None = None,
+    profile_active: bool = False,
 ) -> dict[str, object]:
     receipt: dict[str, object] = {
         "schema_version": RECEIPT_SCHEMA_VERSION,
@@ -1873,7 +2090,7 @@ def _receipt(
             "path": str(output) if output is not None else None,
             "written": written,
         },
-        "validation": _validation_receipt(diagnostics, quality),
+        "validation": _validation_receipt(diagnostics, quality, profile_active),
         "diagnostics": [d.to_dict() for d in diagnostics],
     }
     if delivery_stage is not None:
@@ -2030,6 +2247,7 @@ def _validate(
         diagnostics,
         quality,
         delivery_stage="check" if result is not None and not result.ok else None,
+        profile_active=spec is not None and spec.profile is not None,
     )
     if layout_json and spec is not None and result is not None:
         receipt["layout"] = _layout_report(spec, result)
@@ -2092,7 +2310,7 @@ def _deliver(
             if os.stat(stage_dir).st_dev != os.stat(output_parent).st_dev:
                 raise OSError("staging directory is not on the output filesystem")
             (stage_dir / "specification.yaml").write_bytes(spec_bytes)
-            _, result, artifact_bytes, diagnostics = _render_candidate(
+            spec, result, artifact_bytes, diagnostics = _render_candidate(
                 spec_text, _icon_lookup(cache_dir, sha), quality
             )
             if artifact_bytes is None:
@@ -2105,6 +2323,7 @@ def _deliver(
                     quality,
                     output=output,
                     delivery_stage="render",
+                    profile_active=spec is not None and spec.profile is not None,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
             candidate = stage_dir / "candidate.svg"
@@ -2121,6 +2340,7 @@ def _deliver(
                     quality,
                     output=output,
                     delivery_stage="check",
+                    profile_active=spec is not None and spec.profile is not None,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
             receipt = _receipt(
@@ -2133,6 +2353,7 @@ def _deliver(
                 output=output,
                 written=True,
                 delivery_stage="commit",
+                profile_active=spec is not None and spec.profile is not None,
             )
             try:
                 (stage_dir / "receipt.json").write_text(

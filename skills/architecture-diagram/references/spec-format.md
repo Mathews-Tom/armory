@@ -8,12 +8,21 @@ The input to `scripts/render.py` is a small YAML file. This is the complete sche
 title: string              # optional; omit for no title bar
 direction: LR | TB         # optional, default LR
 provider: aws | azure | gcp | generic   # optional, default generic — sets the default for nodes that omit their own provider
+profile: deployment-ownership            # optional; opt-in deployment validation
 zones: [...]                # optional
 nodes: [...]                 # required, at least one
 edges: [...]                 # optional
 ```
 
 `direction` controls the layout axis: `LR` ranks flow left-to-right (use for request/data-flow diagrams — most architecture diagrams), `TB` ranks flow top-to-bottom (use for hierarchical or layered diagrams — network topology, layered architectures).
+
+### Deployment ownership profile
+
+`profile: deployment-ownership` enables blocking checks over facts explicitly authored in the YAML. Omitting `profile` keeps the default visual-only behavior unchanged. The profile never derives an owner, a storage role, a region, or a boundary mechanism from labels, service slugs, or layout.
+
+With the profile enabled, declare at least one `kind: region` zone and one `kind: security` zone. Every node must resolve through its zone ancestry to exactly one region; every `kind: security` zone and its member nodes must resolve to one region. Every non-external node requires a non-blank `owner`. Mark storage explicitly with `storage: true`; those nodes must be inside a security zone. An edge whose endpoints have different security-zone membership requires a non-blank `label` naming its crossing mechanism.
+
+The zone-kind enum is `generic` (the default), `region`, and `security`. `generic` remains decorative; the profile only enforces the facts above when explicitly enabled.
 
 ## `nodes`
 
@@ -26,6 +35,9 @@ nodes:
     provider: string        # optional, overrides the top-level provider for this node
     zone: string             # optional, id of the zone this node belongs to
     color: "#RRGGBB"          # optional, defaults to "#3A3A3A", the icon square's fill
+    owner: string             # required for non-external nodes under deployment-ownership
+    external: boolean         # optional, default false; external nodes do not require owner
+    storage: boolean          # optional, default false; true requires a security zone under deployment-ownership
 ```
 
 `service` is the exact cache slug from `references/services-aws.yaml`, `references/services-azure.yaml`, or `references/services-gcp.yaml` (cloud providers) or `references/icons-generic.md` (`provider: generic`) — not a free-text service name. A `service` slug with no matching cache entry produces a `warning: no icon for node` at render time and the node falls back to a labeled placeholder (a colored square with the label's first letter) rather than failing the render. A node with no `service` set at all renders the same placeholder silently — that's the correct default for a component with no natural icon, not an error.
@@ -37,6 +49,7 @@ zones:
   - id: string          # required, unique
     label: string          # optional, defaults to id
     parent: string           # optional, id of an enclosing zone — omit for a top-level zone
+    kind: generic | region | security   # optional, default generic
 ```
 
 Every zone must have at least one member node (directly assigned via that node's `zone` field) or at least one child zone (another zone whose `parent` points to it). An empty zone — no members, no children — is a spec error, not a warning; fix the spec rather than working around it.
@@ -56,6 +69,8 @@ edges:
 ```
 
 An edge referencing a node id that doesn't exist in `nodes` is a spec error. Edges do not need to respect zone boundaries — a node inside a zone can connect to one outside it freely; the router treats zones as a purely visual grouping, not a routing constraint.
+
+Under `profile: deployment-ownership`, a labeled cross-security-zone edge names the mechanism used at that boundary. The profile rejects an empty or whitespace-only label; it does not infer one from `type`, a service name, or endpoint labels.
 
 `type` drives both the connector's color/style and whether a legend renders — see the connection type table in `SKILL.md`. Cycles (a connects to b, b connects back to a) are fine; the rank-assignment algorithm terminates on them rather than looping, though a diagram with many cycles will look messier since rank order stops being a clean single flow direction.
 
