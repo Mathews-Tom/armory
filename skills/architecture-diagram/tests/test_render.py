@@ -24,6 +24,7 @@ from render import (
     check_layout,
     check_edge_through_node,
     check_route_rhythm,
+    check_proper_crossings,
     compute_positions,
     compute_zone_boxes,
     icon_box,
@@ -569,6 +570,45 @@ class TestEdgeThroughNode:
             "c": Box(15, 5, 10, 10),
         }
         findings = check_edge_through_node(node_boxes, [self._route()])
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
+
+
+class TestProperCrossing:
+    def _crossing_routes(self) -> list[RoutedEdge]:
+        return [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((10, -10), (10, 10)), (0, 0)),
+        ]
+
+    def test_reports_interior_crossing_between_unrelated_edges(self) -> None:
+        findings = check_proper_crossings(self._crossing_routes())
+
+        assert [d.code for d in findings] == ["composition/proper-crossing"]
+        assert findings[0].subject["edges"] == [
+            {"from": "a", "to": "b"},
+            {"from": "c", "to": "d"},
+        ]
+
+    def test_shared_endpoint_and_touch_are_exempt(self) -> None:
+        shared_endpoint = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("b", "c"), ((20, -10), (20, 10)), (0, 0)),
+        ]
+        endpoint_touch = [
+            RoutedEdge(Edge("a", "b"), ((0, 0), (20, 0)), (0, 0)),
+            RoutedEdge(Edge("c", "d"), ((20, -10), (20, 10)), (0, 0)),
+        ]
+
+        assert check_proper_crossings(shared_endpoint) == []
+        assert check_proper_crossings(endpoint_touch) == []
+
+    def test_quality_profiles_change_crossing_severity(self) -> None:
+        findings = check_proper_crossings(self._crossing_routes())
 
         standard = render.apply_quality_profile(findings, "standard")
         showcase = render.apply_quality_profile(findings, "showcase")

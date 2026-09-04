@@ -61,6 +61,9 @@ MIN_INTERIOR_ROUTE_SEGMENT = 16.0
 # A route passing within two pixels of an unrelated node visually reads as
 # entering it. Expand every unrelated node by this clearance before testing.
 NODE_ROUTE_CLEARANCE = 2.0
+# Cross-product signs closer than this are endpoint touches or collinear runs,
+# not an interior X that makes two unrelated relationships ambiguous.
+PROPER_CROSSING_EPSILON = 1e-4
 
 
 EDGE_COLORS = {
@@ -963,6 +966,85 @@ def check_edge_through_node(
     return out
 
 
+def _cross_product(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    point: tuple[float, float],
+) -> float:
+    return (end[0] - start[0]) * (point[1] - start[1]) - (end[1] - start[1]) * (
+        point[0] - start[0]
+    )
+
+
+def _properly_crosses(
+    first_start: tuple[float, float],
+    first_end: tuple[float, float],
+    second_start: tuple[float, float],
+    second_end: tuple[float, float],
+) -> bool:
+    first_a = _cross_product(first_start, first_end, second_start)
+    first_b = _cross_product(first_start, first_end, second_end)
+    second_a = _cross_product(second_start, second_end, first_start)
+    second_b = _cross_product(second_start, second_end, first_end)
+    epsilon = PROPER_CROSSING_EPSILON
+    return (
+        (first_a > epsilon and first_b < -epsilon)
+        or (first_a < -epsilon and first_b > epsilon)
+    ) and (
+        (second_a > epsilon and second_b < -epsilon)
+        or (second_a < -epsilon and second_b > epsilon)
+    )
+
+
+def _related_edges(first: Edge, second: Edge) -> bool:
+    return bool({first.src, first.dst} & {second.src, second.dst})
+
+
+def check_proper_crossings(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
+    """Find interior X crossings between relationships with no shared node."""
+    out: list[Diagnostic] = []
+    for first_index, first in enumerate(routed_edges):
+        for second in routed_edges[first_index + 1 :]:
+            if _related_edges(first.edge, second.edge):
+                continue
+            for first_segment, (first_start, first_end) in enumerate(
+                zip(first.points, first.points[1:])
+            ):
+                for second_segment, (second_start, second_end) in enumerate(
+                    zip(second.points, second.points[1:])
+                ):
+                    if not _properly_crosses(
+                        first_start, first_end, second_start, second_end
+                    ):
+                        continue
+                    out.append(
+                        Diagnostic(
+                            code="composition/proper-crossing",
+                            severity=SEVERITY_WARNING,
+                            message=(
+                                f"unrelated edges {first.edge.src!r}->{first.edge.dst!r} "
+                                f"and {second.edge.src!r}->{second.edge.dst!r} cross"
+                            ),
+                            subject={
+                                "edges": [
+                                    {"from": first.edge.src, "to": first.edge.dst},
+                                    {"from": second.edge.src, "to": second.edge.dst},
+                                ]
+                            },
+                            evidence={
+                                "first_segment": first_segment,
+                                "second_segment": second_segment,
+                                "epsilon": PROPER_CROSSING_EPSILON,
+                            },
+                            supported_fixes=(
+                                "reorder the affected nodes within their ranks",
+                                "split one relationship through an intermediate node",
+                            ),
+                        )
+                    )
+    return out
+
+
 def check_layout(
     spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
 ) -> list[Diagnostic]:
@@ -1363,6 +1445,7 @@ def render(
     routed_edges = route_edges(spec, node_boxes)
     diagnostics += check_route_rhythm(routed_edges)
     diagnostics += check_edge_through_node(node_boxes, routed_edges)
+    diagnostics += check_proper_crossings(routed_edges)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
