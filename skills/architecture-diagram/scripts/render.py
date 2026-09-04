@@ -794,6 +794,66 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
     return routed
 
 
+def _segment_length(start: tuple[float, float], end: tuple[float, float]) -> float:
+    return abs(end[0] - start[0]) + abs(end[1] - start[1])
+
+
+def check_route_rhythm(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
+    """Report paths whose short orthogonal runs cannot read as separate lines."""
+    out: list[Diagnostic] = []
+    for routed in routed_edges:
+        edge = routed.edge
+        segments = list(zip(routed.points, routed.points[1:]))
+        for index, (start, end) in enumerate(segments):
+            length = _segment_length(start, end)
+            evidence = {
+                "segment_index": index,
+                "start": list(start),
+                "end": list(end),
+                "length": length,
+            }
+            subject = {"from": edge.src, "to": edge.dst, "label": edge.label}
+            if length < MIN_ROUTE_SEGMENT:
+                out.append(
+                    Diagnostic(
+                        code="composition/micro-segment",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"edge {edge.src!r}->{edge.dst!r} segment {index} is "
+                            f"{length:g}px; routes need at least {MIN_ROUTE_SEGMENT:g}px"
+                        ),
+                        subject=subject,
+                        evidence={**evidence, "minimum": MIN_ROUTE_SEGMENT},
+                        supported_fixes=(
+                            "remove the redundant connection",
+                            "split the nodes into separate ranks with an intermediate node",
+                        ),
+                    )
+                )
+            if 0 < index < len(segments) - 1 and length < MIN_INTERIOR_ROUTE_SEGMENT:
+                out.append(
+                    Diagnostic(
+                        code="composition/short-interior-segment",
+                        severity=SEVERITY_WARNING,
+                        message=(
+                            f"edge {edge.src!r}->{edge.dst!r} interior segment {index} "
+                            f"is {length:g}px; turns need at least "
+                            f"{MIN_INTERIOR_ROUTE_SEGMENT:g}px"
+                        ),
+                        subject=subject,
+                        evidence={
+                            **evidence,
+                            "minimum": MIN_INTERIOR_ROUTE_SEGMENT,
+                        },
+                        supported_fixes=(
+                            "remove the redundant connection",
+                            "split the nodes into separate ranks with an intermediate node",
+                        ),
+                    )
+                )
+    return out
+
+
 def check_layout(
     spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
 ) -> list[Diagnostic]:
@@ -1192,6 +1252,7 @@ def render(
     zone_boxes = compute_zone_boxes(spec, node_boxes) if spec.zones else {}
     diagnostics += check_layout(spec, node_boxes, zone_boxes)
     routed_edges = route_edges(spec, node_boxes)
+    diagnostics += check_route_rhythm(routed_edges)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:

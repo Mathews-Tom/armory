@@ -16,11 +16,13 @@ from render import (
     Edge,
     IconRef,
     Node,
+    RoutedEdge,
     Spec,
     SpecError,
     assign_ranks,
     check_editability,
     check_layout,
+    check_route_rhythm,
     compute_positions,
     compute_zone_boxes,
     icon_box,
@@ -780,6 +782,39 @@ class TestDiagnosticEnvelope:
             render.Diagnostic(code="c/z", severity="warning", message="m"),
         ]
         assert render.count_by_severity(diags) == {"errors": 1, "warnings": 2}
+
+
+class TestRouteRhythm:
+    def _route(self, points: tuple[tuple[float, float], ...]) -> RoutedEdge:
+        return RoutedEdge(edge=Edge("a", "b"), points=points, label_pos=(0, 0))
+
+    def test_micro_segment_boundary_is_strict(self) -> None:
+        too_short = self._route(((0, 0), (7.99, 0)))
+        at_floor = self._route(((0, 0), (8, 0)))
+
+        assert [d.code for d in check_route_rhythm([too_short])] == [
+            "composition/micro-segment"
+        ]
+        assert check_route_rhythm([at_floor]) == []
+
+    def test_interior_segment_boundary_is_strict(self) -> None:
+        too_short = self._route(((0, 0), (20, 0), (20, 15.99), (40, 15.99)))
+        at_floor = self._route(((0, 0), (20, 0), (20, 16), (40, 16)))
+
+        assert [d.code for d in check_route_rhythm([too_short])] == [
+            "composition/short-interior-segment"
+        ]
+        assert check_route_rhythm([at_floor]) == []
+
+    def test_quality_profiles_change_route_rhythm_severity(self) -> None:
+        route = self._route(((0, 0), (7.99, 0)))
+        findings = check_route_rhythm([route])
+
+        standard = render.apply_quality_profile(findings, "standard")
+        showcase = render.apply_quality_profile(findings, "showcase")
+
+        assert [d.severity for d in standard] == ["warning"]
+        assert [d.severity for d in showcase] == ["error"]
 
 
 class TestQualityProfiles:
