@@ -62,7 +62,8 @@ Nesting is unlimited depth via `parent`. A zone's rendered box is the bounding b
 
 ```yaml
 edges:
-  - from: string        # required, a node id
+  - id: string          # optional for rendering; required, unique, and stable for `compare`
+    from: string        # required, a node id
     to: string            # required, a node id
     label: string           # optional
     type: realtime | batch | event | control | default   # optional, default "default"
@@ -73,6 +74,14 @@ An edge referencing a node id that doesn't exist in `nodes` is a spec error. Edg
 Under `profile: deployment-ownership`, a labeled cross-security-zone edge names the mechanism used at that boundary. The profile rejects an empty or whitespace-only label; it does not infer one from `type`, a service name, or endpoint labels.
 
 `type` drives both the connector's color/style and whether a legend renders — see the connection type table in `SKILL.md`. Cycles (a connects to b, b connects back to a) are fine; the rank-assignment algorithm terminates on them rather than looping, though a diagram with many cycles will look messier since rank order stops being a clean single flow direction.
+
+## Compare two specifications
+
+Run `python3 scripts/render.py compare base.yaml head.yaml` to emit a deterministic JSON receipt. It matches nodes by their authored `id` and edges by their authored `id`; rendering hashes, generated geometry, labels-as-identifiers, and endpoint-pair matching never participate.
+
+Each node or edge is `added`, `removed`, `unchanged`, or has one or more statuses from disjoint authored field groups: node semantic fields produce `changed`, node `zone` produces `moved`, edge semantic fields (`label`, `type`) produce `changed`, and edge endpoints (`from`, `to`) produce `rerouted`. `changed_fields` records the exact JSON-pointer paths and before/after authored values.
+
+Every receipt includes this limitation: `Authored specification only; no runtime impact, causality, risk, or merge safety is inferred.`
 
 ## What the renderer computes for you (don't set these)
 
