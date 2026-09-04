@@ -56,7 +56,7 @@ Every zone must have at least one member node (directly assigned via that node's
 
 Nesting is unlimited depth via `parent`. A zone's rendered box is the bounding box of everything inside it (member nodes' positions plus child zones' boxes) with padding and a label header — you don't set zone size or position; the layout engine computes it from what's actually inside.
 
-**Keep each zone's members contiguous in the `nodes` list order.** The layout engine assigns rank/order from the node graph, not from zone membership directly; if two zones' members end up interleaved across ranks, their bounding boxes can end up overlapping. `render.py` catches this (`warning: zone overlap`) rather than shipping a broken-looking diagram, but the fix is almost always reordering `nodes` so each zone's members sit together, or reconsidering whether the topology genuinely needs that interleaving.
+**Keep each zone's members contiguous in the `nodes` list order.** The layout engine assigns rank/order from the node graph, not from zone membership directly; if two zones' members end up interleaved across ranks, their bounding boxes can end up overlapping. `geometry_checks.py` catches this (`warning: zone overlap`) rather than shipping a broken-looking diagram, but the fix is almost always reordering `nodes` so each zone's members sit together, or reconsidering whether the topology genuinely needs that interleaving.
 
 ## `edges`
 
@@ -85,7 +85,7 @@ Every receipt includes this limitation: `Authored specification only; no runtime
 
 ## What the renderer computes for you (don't set these)
 
-There is deliberately no `x`, `y`, `width`, or `height` field anywhere in the spec. Layout — which rank each node lands in, its order within that rank, zone bounding boxes, connector routing and bend points — is entirely computed by `engine/render.py`'s deterministic pipeline (rank assignment → crossing-minimizing ordering → position assignment → zone bbox union → orthogonal routing). This is a deliberate design choice: prior art in this space asks the model to compute pixel coordinates by hand and self-check them against a long list of prose rules ("no edge crosses an unrelated icon," "align nodes so edges are straight"). That's fragile. Author the graph structure; let the code place it.
+There is deliberately no `x`, `y`, `width`, or `height` field anywhere in the spec. Layout — which rank each node lands in, its order within that rank, zone bounding boxes, connector routing and bend points — is entirely computed by the deterministic `pipeline.py` composition of layout and routing modules (rank assignment → crossing-minimizing ordering → position assignment → zone bbox union → orthogonal routing). This is a deliberate design choice: prior art in this space asks the model to compute pixel coordinates by hand and self-check them against a long list of prose rules ("no edge crosses an unrelated icon," "align nodes so edges are straight"). That's fragile. Author the graph structure; let the code place it.
 
 ## Minimal valid spec
 
@@ -101,7 +101,7 @@ This is a complete, valid spec — `title` and `direction` fall back to their de
 
 ## Errors vs. warnings
 
-`render.py` distinguishes two severities, both printed to stderr:
+`commands.py` distinguishes two severities, both printed to stderr:
 
 - **`error:`** — the spec itself is invalid (missing required field, duplicate id, edge/zone reference to a nonexistent id, empty zone, zone cycle). The render does not happen; exit code 1. Fix the spec.
 - **`warning:`** — the spec parsed fine and a diagram was produced, but something in it needs attention (missing icon, overflowing label, overlapping zone boxes). Exit code 0 unless the warning is specifically an editability violation (which should never happen — see `references/editability.md`). Read every warning; don't treat "it produced a file" as "it's done."

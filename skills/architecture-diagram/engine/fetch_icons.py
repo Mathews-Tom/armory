@@ -8,7 +8,7 @@ redistribution rights for the raw icon files, so this repository ships zero
 icon assets. Instead this script builds a **per-user cache** on first use,
 converting draw.io's Apache-2.0 vector stencil/icon libraries
 (`stencil2svg.py` for AWS/GCP, `svg_inline.py` for Azure) into small
-per-service JSON entries that `render.py` reads at diagram time.
+per-service JSON entries that `icons.py` reads at diagram time.
 
 The source commit is pinned (`DRAWIO_SHA`) so output is reproducible across
 runs and machines; bumping the pin is a deliberate, reviewable change to this

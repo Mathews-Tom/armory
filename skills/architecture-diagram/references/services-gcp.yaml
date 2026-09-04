@@ -9,7 +9,7 @@
 # the generic Kubernetes logo, Vertex AI, Artifact Registry, Cloud Build,
 # Secret Manager, Cloud KMS, Anthos, Eventarc, Workflows — have no dedicated
 # icon in this stencil set. Where no real icon exists, the entry is omitted
-# rather than mapped to a misleading substitute; render.py falls back to a
+# rather than mapped to a misleading substitute; `icons.py` falls back to a
 # labeled placeholder for any node whose service isn't listed here.
 #
 # `color` is GCP's own architecture-icon palette

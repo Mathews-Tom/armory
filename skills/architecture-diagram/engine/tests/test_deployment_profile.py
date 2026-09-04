@@ -5,14 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from engine import diagnostics, render
-from engine.render import check_deployment_profile, load_spec
+from engine import commands, pipeline
+from engine.diagnostics import Diagnostic
+from engine.profile import check_deployment_profile
+from engine.spec import load_spec
 
 
 _FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _findings(name: str) -> list[diagnostics.Diagnostic]:
+def _findings(name: str) -> list[Diagnostic]:
     spec = load_spec((_FIXTURES / name).read_text())
     return check_deployment_profile(spec)
 
@@ -59,7 +61,9 @@ def test_profile_is_inert_when_omitted() -> None:
     spec_text = (_FIXTURES / "deployment-profile-valid.yaml").read_text()
     without_profile = spec_text.replace("profile: deployment-ownership\n", "")
 
-    result = render.render(load_spec(without_profile), lambda _provider, _service: None)
+    result = pipeline.render(
+        load_spec(without_profile), lambda _provider, _service: None
+    )
 
     assert result.ok
     assert not [
@@ -81,10 +85,10 @@ def test_profile_failure_has_a_distinct_receipt_check(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     assert (
-        render._check_name(_findings("deployment-profile-missing-owner.yaml")[0])
+        commands._check_name(_findings("deployment-profile-missing-owner.yaml")[0])
         == "profile"
     )
-    code = render.main(
+    code = commands.main(
         [
             "validate",
             str(_FIXTURES / "deployment-profile-missing-owner.yaml"),
@@ -95,7 +99,7 @@ def test_profile_failure_has_a_distinct_receipt_check(
     )
     receipt = json.loads(capsys.readouterr().out)
 
-    assert code == render.EXIT_FAILURE
+    assert code == commands.EXIT_FAILURE
     assert receipt["validation"] == {
         "checks_passed": 10,
         "checks_total": 11,
