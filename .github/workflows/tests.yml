@@ -1,0 +1,62 @@
+name: Tests
+
+# Nothing ran pytest before this workflow existed: `just test` covered the
+# repo-level suite only, and no workflow invoked it at all. Package test
+# suites shipped inside skills/, agents/, and the other package trees were
+# therefore never executed by CI, so drift in them landed on main unnoticed.
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: pip install uv
+
+      # --frozen also gates uv.lock against pyproject.toml, so an undeclared
+      # dependency cannot pass here and then fail on a clean install.
+      - name: Install project environment
+        run: uv sync --frozen
+
+      - name: Repo-level tests
+        run: uv run python -m pytest tests/ -q
+
+      # Mirrors the `test-packages` recipe in justfile; CI cannot assume `just`
+      # is installed. One pytest process per package, because each package's
+      # tests/conftest.py prepends its own scripts/ dir to sys.path and a
+      # shared process would resolve a same-named module to whichever package
+      # loaded first.
+      - name: Package test suites
+        shell: bash
+        run: |
+          shopt -s nullglob
+          ran=0
+          for type_dir in skills agents hooks rules commands utilities presets; do
+            for suite in "${type_dir}"/*/tests; do
+              cases=("${suite}"/test_*.py)
+              [ ${#cases[@]} -eq 0 ] && continue
+              echo "==> ${suite}"
+              uv run python -m pytest "${suite}" -q
+              ran=$((ran + 1))
+            done
+          done
+          if [ "${ran}" -eq 0 ]; then
+            echo "no package test suites found" >&2
+            exit 1
+          fi
