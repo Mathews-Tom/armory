@@ -1621,6 +1621,9 @@ def check_editability(svg_text: str) -> list[Diagnostic]:
 class RenderResult:
     svg: str
     diagnostics: list[Diagnostic] = field(default_factory=list)
+    node_boxes: dict[str, Box] = field(default_factory=dict)
+    zone_boxes: dict[str, Box] = field(default_factory=dict)
+    routed_edges: list[RoutedEdge] = field(default_factory=list)
 
     @property
     def errors(self) -> list[Diagnostic]:
@@ -1654,7 +1657,13 @@ def render(
     svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, diagnostics)
     diagnostics += check_editability(svg)
     diagnostics = apply_quality_profile(suppress_derived(diagnostics), quality)
-    return RenderResult(svg=svg, diagnostics=diagnostics)
+    return RenderResult(
+        svg=svg,
+        diagnostics=diagnostics,
+        node_boxes=node_boxes,
+        zone_boxes=zone_boxes,
+        routed_edges=routed_edges,
+    )
 
 
 EXIT_OK = 0
@@ -1766,6 +1775,49 @@ def _receipt(
     return receipt
 
 
+def _layout_report(spec: Spec, result: RenderResult) -> dict[str, object]:
+    """Expose the exact boxes and waypoints used by SVG emission."""
+    return {
+        "nodes": [
+            {"id": node.id, "box": _box_evidence(result.node_boxes[node.id])}
+            for node in spec.nodes
+        ],
+        "zones": [
+            {
+                "id": zone.id,
+                "label": zone.label,
+                "parent": zone.parent,
+                "members": [node.id for node in spec.nodes if node.zone == zone.id],
+                "box": _box_evidence(result.zone_boxes[zone.id]),
+            }
+            for zone in spec.zones
+        ],
+        "edges": [
+            {
+                "from": routed.edge.src,
+                "to": routed.edge.dst,
+                "label": routed.edge.label,
+                "type": routed.edge.type,
+                "points": [{"x": x, "y": y} for x, y in routed.points],
+                "label_position": {
+                    "x": routed.label_pos[0],
+                    "y": routed.label_pos[1],
+                },
+            }
+            for routed in result.routed_edges
+        ],
+        "labels": [
+            {
+                "edge": {"from": routed.edge.src, "to": routed.edge.dst},
+                "text": routed.edge.label,
+                "box": _box_evidence(_edge_label_box(routed)),
+            }
+            for routed in result.routed_edges
+            if routed.edge.label
+        ],
+    }
+
+
 def _report(
     receipt: dict[str, object], as_json: bool, diagnostics: list[Diagnostic]
 ) -> None:
@@ -1836,13 +1888,13 @@ def _icon_lookup(cache_dir: Path | None, sha: str | None) -> IconLookup:
 
 def _render_candidate(
     spec_text: str, lookup: IconLookup, quality: str
-) -> tuple[RenderResult | None, bytes | None, list[Diagnostic]]:
+) -> tuple[Spec | None, RenderResult | None, bytes | None, list[Diagnostic]]:
     try:
         spec = load_spec(spec_text)
     except SpecError as exc:
-        return None, None, [exc.diagnostic]
+        return None, None, None, [exc.diagnostic]
     result = render(spec, lookup, quality=quality)
-    return result, result.svg.encode("utf-8"), result.diagnostics
+    return spec, result, result.svg.encode("utf-8"), result.diagnostics
 
 
 def _validate(
@@ -1850,12 +1902,13 @@ def _validate(
     cache_dir: Path | None,
     sha: str | None,
     quality: str,
+    layout_json: bool,
 ) -> tuple[int, dict[str, object], list[Diagnostic]]:
     loaded = _read_spec("validate", spec_path, None, quality)
     if len(loaded) == 3:
         return loaded
     spec_bytes, spec_text = loaded
-    result, artifact_bytes, diagnostics = _render_candidate(
+    spec, result, artifact_bytes, diagnostics = _render_candidate(
         spec_text, _icon_lookup(cache_dir, sha), quality
     )
     if artifact_bytes is not None:
@@ -1874,6 +1927,8 @@ def _validate(
         quality,
         delivery_stage="check" if result is not None and not result.ok else None,
     )
+    if layout_json and spec is not None and result is not None:
+        receipt["layout"] = _layout_report(spec, result)
     return (EXIT_OK if receipt["ok"] else EXIT_FAILURE), receipt, diagnostics
 
 
@@ -1933,7 +1988,7 @@ def _deliver(
             if os.stat(stage_dir).st_dev != os.stat(output_parent).st_dev:
                 raise OSError("staging directory is not on the output filesystem")
             (stage_dir / "specification.yaml").write_bytes(spec_bytes)
-            result, artifact_bytes, diagnostics = _render_candidate(
+            _, result, artifact_bytes, diagnostics = _render_candidate(
                 spec_text, _icon_lookup(cache_dir, sha), quality
             )
             if artifact_bytes is None:
@@ -2033,6 +2088,11 @@ def main(argv: list[str] | None = None) -> int:
         "validate", help="render and validate without writing an output artifact"
     )
     _add_common_arguments(validate_parser)
+    validate_parser.add_argument(
+        "--layout-json",
+        action="store_true",
+        help="print the exact emitted layout geometry without writing an SVG",
+    )
     deliver_parser = commands.add_parser(
         "deliver", help="validate, stage, and atomically commit an SVG artifact"
     )
@@ -2044,13 +2104,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "validate":
         code, receipt, diagnostics = _validate(
-            args.spec, args.cache_dir, args.sha, args.quality
+            args.spec, args.cache_dir, args.sha, args.quality, args.layout_json
         )
     else:
         code, receipt, diagnostics = _deliver(
             args.spec, args.output, args.cache_dir, args.sha, args.quality
         )
-    _report(receipt, args.as_json, diagnostics)
+    _report(receipt, args.as_json or getattr(args, "layout_json", False), diagnostics)
     return code
 
 

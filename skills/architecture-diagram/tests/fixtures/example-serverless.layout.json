@@ -1,0 +1,227 @@
+{
+  "edges": [
+    {
+      "from": "cf",
+      "label": "HTTPS",
+      "label_position": {
+        "x": 146.0,
+        "y": 152.5
+      },
+      "points": [
+        {
+          "x": 124.0,
+          "y": 149.0
+        },
+        {
+          "x": 140.0,
+          "y": 149.0
+        },
+        {
+          "x": 140.0,
+          "y": 133.0
+        },
+        {
+          "x": 156.0,
+          "y": 133.0
+        },
+        {
+          "x": 156.0,
+          "y": 156.0
+        },
+        {
+          "x": 264.0,
+          "y": 156.0
+        }
+      ],
+      "to": "apigw",
+      "type": "realtime"
+    },
+    {
+      "from": "apigw",
+      "label": "invoke",
+      "label_position": {
+        "x": 480.0,
+        "y": 156.0
+      },
+      "points": [
+        {
+          "x": 334.0,
+          "y": 156.0
+        },
+        {
+          "x": 474.0,
+          "y": 156.0
+        }
+      ],
+      "to": "fn",
+      "type": "realtime"
+    },
+    {
+      "from": "fn",
+      "label": "query",
+      "label_position": {
+        "x": 690.0,
+        "y": 156.0
+      },
+      "points": [
+        {
+          "x": 544.0,
+          "y": 156.0
+        },
+        {
+          "x": 684.0,
+          "y": 156.0
+        }
+      ],
+      "to": "ddb",
+      "type": "realtime"
+    },
+    {
+      "from": "cf",
+      "label": "origin",
+      "label_position": {
+        "x": 162.0,
+        "y": 240.5
+      },
+      "points": [
+        {
+          "x": 124.0,
+          "y": 163.0
+        },
+        {
+          "x": 156.0,
+          "y": 163.0
+        },
+        {
+          "x": 156.0,
+          "y": 318.0
+        },
+        {
+          "x": 264.0,
+          "y": 318.0
+        }
+      ],
+      "to": "s3",
+      "type": "batch"
+    }
+  ],
+  "labels": [
+    {
+      "box": {
+        "height": 10.0,
+        "width": 28.000000000000004,
+        "x": 146.0,
+        "y": 142.5
+      },
+      "edge": {
+        "from": "cf",
+        "to": "apigw"
+      },
+      "text": "HTTPS"
+    },
+    {
+      "box": {
+        "height": 10.0,
+        "width": 31.200000000000003,
+        "x": 480.0,
+        "y": 146.0
+      },
+      "edge": {
+        "from": "apigw",
+        "to": "fn"
+      },
+      "text": "invoke"
+    },
+    {
+      "box": {
+        "height": 10.0,
+        "width": 28.000000000000004,
+        "x": 690.0,
+        "y": 146.0
+      },
+      "edge": {
+        "from": "fn",
+        "to": "ddb"
+      },
+      "text": "query"
+    },
+    {
+      "box": {
+        "height": 10.0,
+        "width": 28.799999999999997,
+        "x": 162.0,
+        "y": 230.5
+      },
+      "edge": {
+        "from": "cf",
+        "to": "s3"
+      },
+      "text": "origin"
+    }
+  ],
+  "nodes": [
+    {
+      "box": {
+        "height": 118,
+        "width": 120,
+        "x": 32,
+        "y": 124
+      },
+      "id": "cf"
+    },
+    {
+      "box": {
+        "height": 118,
+        "width": 120,
+        "x": 242,
+        "y": 124
+      },
+      "id": "apigw"
+    },
+    {
+      "box": {
+        "height": 118,
+        "width": 120,
+        "x": 452,
+        "y": 124
+      },
+      "id": "fn"
+    },
+    {
+      "box": {
+        "height": 118,
+        "width": 120,
+        "x": 662,
+        "y": 124
+      },
+      "id": "ddb"
+    },
+    {
+      "box": {
+        "height": 118,
+        "width": 120,
+        "x": 242,
+        "y": 286
+      },
+      "id": "s3"
+    }
+  ],
+  "zones": [
+    {
+      "box": {
+        "height": 188,
+        "width": 584,
+        "x": 220,
+        "y": 76
+      },
+      "id": "vpc",
+      "label": "VPC 10.0.0.0/16",
+      "members": [
+        "apigw",
+        "fn",
+        "ddb"
+      ],
+      "parent": null
+    }
+  ]
+}
