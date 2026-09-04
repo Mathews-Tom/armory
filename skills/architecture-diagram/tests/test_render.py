@@ -777,6 +777,27 @@ class TestDerivedSuppression:
         b = render.Diagnostic(code="icon/not-found", severity="error", message="m")
         assert render.suppress_derived([a, b]) == [a, b]
 
+    def test_suppression_is_one_level_and_does_not_resolve_chains(self) -> None:
+        # Documented semantics: a dropped record still suppresses, so a
+        # chain removes everything below the top. Emitters must therefore
+        # declare `suppresses` only for a code they directly explain.
+        top = render.Diagnostic(
+            code="composition/top",
+            severity="error",
+            message="m",
+            suppresses=("composition/middle",),
+        )
+        middle = render.Diagnostic(
+            code="composition/middle",
+            severity="warning",
+            message="m",
+            suppresses=("composition/leaf",),
+        )
+        leaf = render.Diagnostic(
+            code="composition/leaf", severity="warning", message="m"
+        )
+        assert render.suppress_derived([top, middle, leaf]) == [top]
+
 
 class TestSpecErrorCodes:
     @pytest.mark.parametrize(

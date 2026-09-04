@@ -165,10 +165,18 @@ def apply_quality_profile(
 
 
 def suppress_derived(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
-    """Drop findings whose cause is already reported."""
-    suppressed: set[str] = set()
-    for d in diagnostics:
-        suppressed.update(d.suppresses)
+    """Drop findings a reported cause makes redundant.
+
+    Suppression is one level deep and keyed on `code`: a record is dropped
+    when any record in the input names its code, and a dropped record still
+    suppresses. Resolving chains instead has no well-founded answer — if A
+    suppresses B and C suppresses A, then removing B leaves it hidden with
+    no visible cause, while keeping B oscillates on the next pass, and a
+    mutual pair has no defensible winner at all. Every emitter must
+    therefore declare `suppresses` only for a code it directly explains,
+    never for one that suppresses something else in turn.
+    """
+    suppressed = {code for d in diagnostics for code in d.suppresses}
     return [d for d in diagnostics if d.code not in suppressed]
 
 
