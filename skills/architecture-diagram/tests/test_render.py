@@ -448,6 +448,58 @@ class TestRouting:
             x = float(tok.split(",")[0])
             assert x == pytest.approx(expected_x)
 
+    def test_five_way_fan_out_uses_distinct_spaced_source_ports(self) -> None:
+        boxes = {
+            "a": Box(0, 0, 120, 118),
+            **{
+                node_id: Box(240, index * 140, 120, 118)
+                for index, node_id in enumerate("bcdef")
+            },
+        }
+        spec2 = Spec(
+            title="",
+            direction="LR",
+            provider="generic",
+            nodes=[
+                Node("a", "A"),
+                *(Node(node_id, node_id.upper()) for node_id in "bcdef"),
+            ],
+            zones=[],
+            edges=[Edge("a", node_id) for node_id in "bcdef"],
+        )
+
+        routed = route_edges(spec2, boxes)
+
+        starts = [route.points[0] for route in routed]
+        assert len(set(starts)) == 5
+        assert sorted(y for _, y in starts) == [16, 24, 32, 40, 48]
+
+    def test_facing_lone_ports_remerge_into_a_straight_hop(self) -> None:
+        boxes = {"a": Box(0, 0, 120, 118), "b": Box(200, 8, 120, 118)}
+        spec2 = Spec(
+            title="",
+            direction="LR",
+            provider="generic",
+            nodes=[Node("a", "A"), Node("b", "B")],
+            zones=[],
+            edges=[Edge("a", "b")],
+        )
+
+        route = route_edges(spec2, boxes)[0]
+
+        assert route.points == ((92, 36), (222, 36))
+
+    def test_same_spec_renders_byte_identically_across_runs(self) -> None:
+        spec = load_spec(
+            "nodes:\n  - id: a\n  - id: b\n  - id: c\n"
+            "edges:\n  - from: a\n    to: b\n  - from: a\n    to: c\n"
+        )
+
+        first = do_render(spec, _icon_lookup)
+        second = do_render(spec, _icon_lookup)
+
+        assert first.svg == second.svg
+
 
 class TestEditabilityCheck:
     def test_clean_svg_has_no_violations(self) -> None:
@@ -612,7 +664,6 @@ class TestRealIconCacheIntegration:
     def test_cache_icon_lookup_reads_real_fixture_style_entry(
         self, tmp_path: object
     ) -> None:
-
         cache_dir = Path(str(tmp_path))
         sha = "deadbeef"
         provider_dir = cache_dir / sha / "aws"
@@ -635,7 +686,6 @@ class TestRealIconCacheIntegration:
         assert icon.view_box == "0 0 54 56"
 
     def test_cache_miss_returns_none(self, tmp_path: object) -> None:
-
         lookup = render.CacheIconLookup(cache_dir=Path(str(tmp_path)), sha="deadbeef")
         assert lookup("aws", "does-not-exist") is None
 
@@ -896,7 +946,12 @@ class TestCliContract:
         spec = tmp_path / "s.yaml"
         spec.write_text("nodes:\n  - id: a\n    label: A\n    service: ghost\n")
         code, _, err = self._run(
-            capsys, str(spec), "-o", str(tmp_path / "d.svg"), "--cache-dir", str(tmp_path)
+            capsys,
+            str(spec),
+            "-o",
+            str(tmp_path / "d.svg"),
+            "--cache-dir",
+            str(tmp_path),
         )
         assert code == render.EXIT_FAILURE
         assert "[icon/not-found]" in err
