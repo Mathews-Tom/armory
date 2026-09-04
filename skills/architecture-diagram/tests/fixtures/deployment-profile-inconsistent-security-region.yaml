@@ -1,0 +1,18 @@
+profile: deployment-ownership
+zones:
+  - id: us-east-1
+    kind: region
+  - id: private
+    kind: security
+nodes:
+  - id: api
+    owner: platform
+    zone: private
+  - id: database
+    owner: data
+    storage: true
+    zone: private
+edges:
+  - from: api
+    to: database
+    label: PostgreSQL
