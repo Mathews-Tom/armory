@@ -2,8 +2,8 @@
 #
 # Every `slug` value below was verified present in the real icon cache built
 # from `jgraph/drawio@a1f615b` (draw.io's `azure2` real-SVG icon library, 704
-# icons total) — see scripts/fetch_icons.py. Unlike AWS/GCP these are inlined
-# directly (svg_inline.py), not converted from a stencil DSL.
+# icons total) — see engine/fetch_icons.py. Unlike AWS/GCP these are inlined
+# directly (engine/svg_inline.py), not converted from a stencil DSL.
 #
 # A handful of services common in Azure DevOps-heavy architectures — Azure
 # Pipelines, Boards, Artifacts, Queue Storage, File Storage, VPN Gateway as a

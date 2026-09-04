@@ -6,7 +6,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from stencil2svg import convert_body, load_shapes, slug
+
+from engine.stencil2svg import convert_body, load_shapes, slug
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

@@ -1,6 +1,6 @@
 # Spec Format
 
-The input to `scripts/render.py` is a small YAML file. This is the complete schema — every field, its type, default, and what happens when it's omitted or wrong.
+The input to `python3 -m engine` is a small YAML file. This is the complete schema — every field, its type, default, and what happens when it's omitted or wrong.
 
 ## Top level
 
@@ -77,7 +77,7 @@ Under `profile: deployment-ownership`, a labeled cross-security-zone edge names 
 
 ## Compare two specifications
 
-Run `python3 scripts/render.py compare base.yaml head.yaml` to emit a deterministic JSON receipt. It matches nodes by their authored `id` and edges by their authored `id`; rendering hashes, generated geometry, labels-as-identifiers, and endpoint-pair matching never participate.
+Run `python3 -m engine compare base.yaml head.yaml` to emit a deterministic JSON receipt. It matches nodes by their authored `id` and edges by their authored `id`; rendering hashes, generated geometry, labels-as-identifiers, and endpoint-pair matching never participate.
 
 Each node or edge is `added`, `removed`, `unchanged`, or has one or more statuses from disjoint authored field groups: node semantic fields produce `changed`, node `zone` produces `moved`, edge semantic fields (`label`, `type`) produce `changed`, and edge endpoints (`from`, `to`) produce `rerouted`. `changed_fields` records the exact JSON-pointer paths and before/after authored values.
 
@@ -85,7 +85,7 @@ Every receipt includes this limitation: `Authored specification only; no runtime
 
 ## What the renderer computes for you (don't set these)
 
-There is deliberately no `x`, `y`, `width`, or `height` field anywhere in the spec. Layout — which rank each node lands in, its order within that rank, zone bounding boxes, connector routing and bend points — is entirely computed by `scripts/render.py`'s deterministic pipeline (rank assignment → crossing-minimizing ordering → position assignment → zone bbox union → orthogonal routing). This is a deliberate design choice: prior art in this space asks the model to compute pixel coordinates by hand and self-check them against a long list of prose rules ("no edge crosses an unrelated icon," "align nodes so edges are straight"). That's fragile. Author the graph structure; let the code place it.
+There is deliberately no `x`, `y`, `width`, or `height` field anywhere in the spec. Layout — which rank each node lands in, its order within that rank, zone bounding boxes, connector routing and bend points — is entirely computed by `engine/render.py`'s deterministic pipeline (rank assignment → crossing-minimizing ordering → position assignment → zone bbox union → orthogonal routing). This is a deliberate design choice: prior art in this space asks the model to compute pixel coordinates by hand and self-check them against a long list of prose rules ("no edge crosses an unrelated icon," "align nodes so edges are straight"). That's fragile. Author the graph structure; let the code place it.
 
 ## Minimal valid spec
 

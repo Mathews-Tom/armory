@@ -7,8 +7,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import fetch_icons
 import pytest
+
+from engine import fetch_icons
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

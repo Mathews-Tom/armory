@@ -27,13 +27,15 @@ import json
 import os
 import sys
 import tempfile
-from math import hypot
 from dataclasses import dataclass, field
+from math import hypot
 from pathlib import Path
 from typing import Protocol
 
-import fetch_icons
 import yaml
+
+from . import fetch_icons
+from .data import data_path
 
 # --- layout constants -------------------------------------------------------
 
@@ -1787,9 +1789,7 @@ class BundledGenericIconLookup:
     provider == "generic"; every cloud provider is CacheIconLookup's job."""
 
     path: Path = field(
-        default_factory=lambda: (
-            Path(__file__).resolve().parent.parent / "assets" / "generic-icons.json"
-        )
+        default_factory=lambda: data_path("assets", "generic-icons.json")
     )
 
     def __call__(self, provider: str, service_slug: str) -> IconRef | None:

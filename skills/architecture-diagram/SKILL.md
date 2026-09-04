@@ -2,7 +2,7 @@
 name: architecture-diagram
 description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, or Inkscape. NOT for architecture reviews, use architecture-reviewer.'
 metadata:
-  version: 2.3.0
+  version: 2.4.0
   category: visualization
   tags: [architecture, diagram, svg, aws, azure, gcp, cloud, icons]
   difficulty: intermediate
@@ -29,17 +29,19 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
 
 ## Prerequisites
 
-- `python3` with `pyyaml` installed (`uv run --with pyyaml python3 scripts/render.py ...` if not already available).
+Run the following commands from this skill directory (`skills/architecture-diagram` in a checkout).
+
+- `python3` with `pyyaml` installed (`uv run --with pyyaml python3 -m engine ...` if not already available).
 - **Cloud-provider icons need a one-time, per-machine network fetch.** Icons are never bundled in this skill; their providers publish diagram-use terms, so `architecture-diagram` records each provider's source and terms in the local cache rather than redistributing icon assets. The first time a diagram needs a given provider's icons, run:
 
   ```bash
-  python3 scripts/fetch_icons.py --provider aws    # ~5s, 1037 icons
-  python3 scripts/fetch_icons.py --provider gcp    # ~5s, 297 icons
-  python3 scripts/fetch_icons.py --provider azure  # ~60s, 704 icons
+  python3 -m engine.fetch_icons --provider aws    # ~5s, 1037 icons
+  python3 -m engine.fetch_icons --provider gcp    # ~5s, 297 icons
+  python3 -m engine.fetch_icons --provider azure  # ~60s, 704 icons
   # or: --provider all
   ```
 
-  This builds a local cache (default `~/.cache/armory/cloud-icons`, override with `--cache-dir` or `$XDG_CACHE_HOME`) pinned to a specific `jgraph/drawio` commit, so output is reproducible. Each rendered cloud icon is verified against its manifest SHA-256 digest; `icon/digest-mismatch` fails closed and requires the provider cache to be rebuilt with `fetch_icons.py --provider <provider> --force`. Subsequent renders reuse the verified cache — no network needed after the first fetch per provider. `provider: generic` needs no fetch at all; it uses the bundled hand-drawn icon set in `references/icons-generic.md`.
+  This builds a local cache (default `~/.cache/armory/cloud-icons`, override with `--cache-dir` or `$XDG_CACHE_HOME`) pinned to a specific `jgraph/drawio` commit, so output is reproducible. Each rendered cloud icon is verified against its manifest SHA-256 digest; `icon/digest-mismatch` fails closed and requires the provider cache to be rebuilt with `python3 -m engine.fetch_icons --provider <provider> --force`. Subsequent renders reuse the verified cache — no network needed after the first fetch per provider. `provider: generic` needs no fetch at all; it uses the bundled hand-drawn icon set in `references/icons-generic.md`.
 
 ## Workflow
 
@@ -49,18 +51,18 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
 4. **Author the spec** — a small YAML file per `references/spec-format.md`: `title`, `direction` (`LR`/`TB`), `zones` (with `parent` for nesting), `nodes` (`id`, `label`, `service`, `zone`, `color`), `edges` (`id`, `from`, `to`, `label`, `type`).
 5. **Validate without writing an artifact:**
    ```bash
-   python3 scripts/render.py validate spec.yaml --quality showcase --json
+   python3 -m engine validate spec.yaml --quality showcase --json
    ```
    The receipt contains exact spec and candidate-artifact SHA-256 digests, validation counts, quality profile, composition status, and coded diagnostics. `validate` never touches an output path.
    Use `--layout-json` instead of `--json` when an agent needs the exact emitted node boxes, zone membership and boxes, routed edge waypoints, and edge-label rectangles for review. It also never writes SVG output.
 6. **Deliver only a clean candidate:**
    ```bash
-   python3 scripts/render.py deliver spec.yaml -o diagram.svg --quality showcase --json
+   python3 -m engine deliver spec.yaml -o diagram.svg --quality showcase --json
    ```
    `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. Every failure leaves a previous artifact unchanged.
 7. **Compare authored revisions when needed:**
    ```bash
-   python3 scripts/render.py compare base.yaml head.yaml
+   python3 -m engine compare base.yaml head.yaml
    ```
    `compare` emits a JSON receipt keyed only by authored node and edge ids. It reports added, removed, changed, moved, and rerouted entities with exact field paths. Its mandatory limitation is: `Authored specification only; no runtime impact, causality, risk, or merge safety is inferred.`
 8. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
@@ -255,14 +257,16 @@ Report the output path, any warning-severity findings left unresolved and why, a
 | `references/icons-generic.md` | 35 hand-drawn generic icons (server, database, queue, user, …) for non-cloud diagrams | `provider: generic`, or any node with no cloud equivalent |
 | `references/editability.md` | Why the output never uses `<use>`/raster/outlined text, and what "editable" actually verifies | Understanding or modifying the renderer's output contract |
 
-## Scripts
+## Engine
 
 | File | Purpose |
 |---|---|
-| `scripts/render.py` | Spec → SVG. The tool you actually run. |
-| `scripts/fetch_icons.py` | Builds the local icon cache (one-time per provider). |
-| `scripts/stencil2svg.py` | AWS/GCP stencil-to-SVG converter — internal, not invoked directly. |
-| `scripts/svg_inline.py` | Azure real-SVG inliner/namespacer — internal, not invoked directly. |
+| `engine/__main__.py` | `python3 -m engine` entry point for validate, deliver, and compare. |
+| `engine/render.py` | Spec → SVG implementation. |
+| `engine/fetch_icons.py` | Local icon-cache builder; invoke with `python3 -m engine.fetch_icons`. |
+| `engine/stencil2svg.py` | AWS/GCP stencil-to-SVG converter — internal. |
+| `engine/svg_inline.py` | Azure real-SVG inliner/namespacer — internal. |
+| `engine/data.py` | Single resolver for bundled assets and reference data. |
 
 ## Assets
 

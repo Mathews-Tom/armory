@@ -40,14 +40,14 @@ test-repo:
 # Run every package's own test suite
 test-packages:
     #!/usr/bin/env bash
-    # One pytest process per package: each package's tests/conftest.py
-    # prepends that package's scripts/ dir to sys.path, so a shared process
-    # would resolve a same-named module to whichever package loaded first.
+    # One pytest process per package: each package's test setup prepends the
+    # package root to sys.path, so a shared process would resolve a same-named
+    # module to whichever package loaded first.
     set -euo pipefail
     shopt -s nullglob
     ran=0
     for type_dir in skills agents hooks rules commands utilities presets; do
-        for suite in "${type_dir}"/*/tests; do
+        for suite in "${type_dir}"/*/tests "${type_dir}"/*/engine/tests; do
             cases=("${suite}"/test_*.py)
             [[ ${#cases[@]} -eq 0 ]] && continue
             echo "==> ${suite}"

@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-import render
-from render import compare_specs, load_spec
+
+from engine import render
+from engine.render import compare_specs, load_spec
 
 
 _FIXTURES = Path(__file__).parent / "fixtures"

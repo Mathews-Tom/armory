@@ -34,8 +34,8 @@ from email.message import Message
 from pathlib import Path
 from typing import Protocol
 
-from stencil2svg import convert_body, iter_shapes, slug
-from svg_inline import inline_svg
+from .stencil2svg import convert_body, iter_shapes, slug
+from .svg_inline import inline_svg
 
 DRAWIO_REPO = "jgraph/drawio"
 DRAWIO_SHA = (
