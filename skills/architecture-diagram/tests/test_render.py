@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1137,21 +1139,56 @@ class TestCliContract:
         payload = json.loads(captured.out) if "--json" in argv else {}
         return code, payload, captured.err
 
-    def test_clean_render_exits_zero_with_a_parsable_envelope(
+    def test_validate_returns_a_parsable_receipt_without_an_artifact(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("nodes:\n  - id: a\n    label: A\n")
+        code, payload, _ = self._run(
+            capsys, "validate", str(spec), "--cache-dir", str(tmp_path), "--json"
+        )
+
+        assert code == render.EXIT_OK
+        assert payload["ok"] is True
+        assert payload["command"] == "validate"
+        assert payload["input"]["path"] == str(spec)
+        assert payload["input"]["bytes"] == len(spec.read_bytes())
+        assert payload["artifact"]["bytes"] > 0
+        assert payload["output"] == {"path": None, "written": False}
+        assert payload["validation"] == {
+            "checks_passed": 10,
+            "checks_total": 10,
+            "quality": "standard",
+            "composition_status": "passed",
+            "errors": 0,
+            "warnings": 0,
+        }
+        assert payload["diagnostics"] == []
+        assert payload["schema_version"] == render.RECEIPT_SCHEMA_VERSION
+
+    def test_deliver_commits_the_validated_candidate(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         spec = tmp_path / "s.yaml"
         spec.write_text("nodes:\n  - id: a\n    label: A\n")
         out = tmp_path / "d.svg"
         code, payload, _ = self._run(
-            capsys, str(spec), "-o", str(out), "--cache-dir", str(tmp_path), "--json"
+            capsys,
+            "deliver",
+            str(spec),
+            "-o",
+            str(out),
+            "--cache-dir",
+            str(tmp_path),
+            "--json",
         )
+
         assert code == render.EXIT_OK
         assert payload["ok"] is True
-        assert payload["written"] is True
-        assert payload["diagnostics"] == []
-        assert payload["schema_version"] == render.DIAGNOSTIC_SCHEMA_VERSION
-        assert payload["artifact_bytes"] == len(out.read_text())
+        assert payload["command"] == "deliver"
+        assert payload["output"] == {"path": str(out), "written": True}
+        assert payload["artifact"]["bytes"] == len(out.read_bytes())
+        assert payload["artifact"]["sha256"] == render._sha256(out.read_bytes())
 
     def test_json_mode_puts_nothing_but_json_on_stdout(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -1160,15 +1197,14 @@ class TestCliContract:
         spec.write_text("nodes:\n  - id: a\n    label: A\n    service: ghost\n")
         code, payload, _ = self._run(
             capsys,
+            "validate",
             str(spec),
-            "-o",
-            str(tmp_path / "d.svg"),
             "--cache-dir",
             str(tmp_path),
             "--json",
         )
         # A finding is present, so this also proves diagnostics do not leak to
-        # stdout as prose alongside the envelope.
+        # stdout as prose alongside the receipt.
         assert code == render.EXIT_FAILURE
         assert [d["code"] for d in payload["diagnostics"]] == ["icon/not-found"]
 
@@ -1177,17 +1213,65 @@ class TestCliContract:
     ) -> None:
         spec = tmp_path / "s.yaml"
         spec.write_text("nodes:\n  - id: a\n    label: A\n    service: ghost\n")
-        code, _, err = self._run(
+        out = tmp_path / "d.svg"
+        code, payload, err = self._run(
             capsys,
+            "deliver",
             str(spec),
             "-o",
-            str(tmp_path / "d.svg"),
+            str(out),
             "--cache-dir",
             str(tmp_path),
+            "--json",
         )
         assert code == render.EXIT_FAILURE
-        assert "[icon/not-found]" in err
-        assert "fix: " in err
+        assert payload["delivery_stage"] == "check"
+        assert payload["output"]["written"] is False
+        assert not out.exists()
+        assert err == ""
+
+    def test_failed_showcase_delivery_preserves_the_last_good_artifact(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        good_spec = tmp_path / "good.yaml"
+        good_spec.write_text("nodes:\n  - id: a\n    label: A\n")
+        bad_spec = tmp_path / "bad.yaml"
+        bad_spec.write_text(
+            'nodes:\n  - id: a\n    label: "This Is A Genuinely Very Long Label Text"\n'
+        )
+        out = tmp_path / "diagram.svg"
+
+        good_code, _, _ = self._run(
+            capsys,
+            "deliver",
+            str(good_spec),
+            "-o",
+            str(out),
+            "--cache-dir",
+            str(tmp_path),
+            "--quality",
+            "showcase",
+            "--json",
+        )
+        last_good = out.read_bytes()
+        bad_code, payload, _ = self._run(
+            capsys,
+            "deliver",
+            str(bad_spec),
+            "-o",
+            str(out),
+            "--cache-dir",
+            str(tmp_path),
+            "--quality",
+            "showcase",
+            "--json",
+        )
+
+        assert good_code == render.EXIT_OK
+        assert bad_code == render.EXIT_FAILURE
+        assert payload["delivery_stage"] == "check"
+        assert [d["code"] for d in payload["diagnostics"]] == ["layout/label-overflow"]
+        assert out.read_bytes() == last_good
 
     def test_invalid_spec_is_an_operational_failure_and_writes_nothing(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -1196,10 +1280,18 @@ class TestCliContract:
         spec.write_text("title: empty\n")
         out = tmp_path / "d.svg"
         code, payload, _ = self._run(
-            capsys, str(spec), "-o", str(out), "--cache-dir", str(tmp_path), "--json"
+            capsys,
+            "deliver",
+            str(spec),
+            "-o",
+            str(out),
+            "--cache-dir",
+            str(tmp_path),
+            "--json",
         )
         assert code == render.EXIT_FAILURE
-        assert payload["written"] is False
+        assert payload["output"]["written"] is False
+        assert payload["delivery_stage"] == "render"
         assert [d["code"] for d in payload["diagnostics"]] == ["spec/no-nodes"]
         assert not out.exists()
 
@@ -1208,15 +1300,44 @@ class TestCliContract:
     ) -> None:
         code, payload, _ = self._run(
             capsys,
+            "deliver",
             str(tmp_path / "nope.yaml"),
             "-o",
             str(tmp_path / "d.svg"),
             "--json",
         )
         assert code == render.EXIT_USAGE
+        assert payload["delivery_stage"] == "input"
         assert [d["code"] for d in payload["diagnostics"]] == ["usage/spec-unreadable"]
+
+    def test_script_entrypoint_runs_validate(self, tmp_path: Path) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("nodes:\n  - id: a\n    label: A\n")
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(Path(render.__file__).resolve()),
+                "validate",
+                str(spec),
+                "--cache-dir",
+                str(tmp_path),
+                "--json",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert completed.returncode == render.EXIT_OK
+        assert json.loads(completed.stdout)["command"] == "validate"
+        assert completed.stderr == ""
+
+    def test_legacy_cli_is_rejected(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit) as exc:
+            render.main([str(tmp_path / "s.yaml"), "-o", str(tmp_path / "d.svg")])
+        assert exc.value.code == render.EXIT_USAGE
 
     def test_unknown_quality_profile_is_a_usage_error(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
-            render.main([str(tmp_path / "s.yaml"), "--quality", "pretty"])
+            render.main(["validate", str(tmp_path / "s.yaml"), "--quality", "pretty"])
         assert exc.value.code == render.EXIT_USAGE

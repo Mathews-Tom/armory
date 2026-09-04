@@ -22,8 +22,11 @@ in Figma/Illustrator/Inkscape, and labels stay real `<text>`, never outlined.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import sys
+import tempfile
 from math import hypot
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1658,46 +1661,355 @@ EXIT_OK = 0
 EXIT_FAILURE = 1
 EXIT_USAGE = 2
 
+RECEIPT_SCHEMA_VERSION = 1
+_VALIDATION_CHECKS = (
+    "spec",
+    "layout",
+    "route-rhythm",
+    "edge-through-node",
+    "proper-crossing",
+    "ambiguous-corridor",
+    "label-route-clearance",
+    "icons",
+    "labels",
+    "editability",
+)
 
-def _envelope(
-    ok: bool,
-    quality: str,
-    diagnostics: list[Diagnostic],
-    output: Path | None = None,
-    artifact_bytes: int | None = None,
+
+def _sha256(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _check_name(diagnostic: Diagnostic) -> str:
+    code = diagnostic.code
+    if code.startswith("spec/"):
+        return "spec"
+    if code in ("layout/node-overlap", "layout/zone-overlap"):
+        return "layout"
+    if code == "layout/label-overflow":
+        return "labels"
+    if code.startswith("composition/micro-segment") or code.startswith(
+        "composition/short-interior-segment"
+    ):
+        return "route-rhythm"
+    if code == "composition/edge-through-node":
+        return "edge-through-node"
+    if code == "composition/proper-crossing":
+        return "proper-crossing"
+    if code == "composition/ambiguous-corridor":
+        return "ambiguous-corridor"
+    if code == "composition/label-route-clearance":
+        return "label-route-clearance"
+    if code.startswith("icon/"):
+        return "icons"
+    return "editability"
+
+
+def _validation_receipt(
+    diagnostics: list[Diagnostic], quality: str
 ) -> dict[str, object]:
+    counts = count_by_severity(diagnostics)
+    composition = [d for d in diagnostics if d.code.startswith("composition/")]
+    if any(d.severity == SEVERITY_ERROR for d in composition):
+        composition_status = "failed"
+    elif composition:
+        composition_status = "warnings"
+    else:
+        composition_status = "passed"
+    failed_checks = {
+        _check_name(d) for d in diagnostics if d.severity == SEVERITY_ERROR
+    }
     return {
-        "schema_version": DIAGNOSTIC_SCHEMA_VERSION,
-        "ok": ok,
+        "checks_passed": len(_VALIDATION_CHECKS) - len(failed_checks),
+        "checks_total": len(_VALIDATION_CHECKS),
         "quality": quality,
-        "output": str(output) if output is not None else None,
-        "written": artifact_bytes is not None,
-        "artifact_bytes": artifact_bytes,
-        "counts": count_by_severity(diagnostics),
-        "diagnostics": [d.to_dict() for d in diagnostics],
+        "composition_status": composition_status,
+        "errors": counts["errors"],
+        "warnings": counts["warnings"],
     }
 
 
+def _receipt(
+    command: str,
+    input_path: Path,
+    input_bytes: bytes | None,
+    artifact_bytes: bytes | None,
+    diagnostics: list[Diagnostic],
+    quality: str,
+    output: Path | None = None,
+    written: bool = False,
+    delivery_stage: str | None = None,
+) -> dict[str, object]:
+    receipt: dict[str, object] = {
+        "schema_version": RECEIPT_SCHEMA_VERSION,
+        "ok": not any(d.severity == SEVERITY_ERROR for d in diagnostics),
+        "command": command,
+        "type": "architecture-diagram",
+        "input": {
+            "path": str(input_path),
+            "sha256": _sha256(input_bytes) if input_bytes is not None else None,
+            "bytes": len(input_bytes) if input_bytes is not None else None,
+        },
+        "artifact": {
+            "sha256": _sha256(artifact_bytes) if artifact_bytes is not None else None,
+            "bytes": len(artifact_bytes) if artifact_bytes is not None else None,
+        },
+        "output": {
+            "path": str(output) if output is not None else None,
+            "written": written,
+        },
+        "validation": _validation_receipt(diagnostics, quality),
+        "diagnostics": [d.to_dict() for d in diagnostics],
+    }
+    if delivery_stage is not None:
+        receipt["delivery_stage"] = delivery_stage
+    return receipt
+
+
 def _report(
-    envelope: dict[str, object], as_json: bool, diagnostics: list[Diagnostic]
+    receipt: dict[str, object], as_json: bool, diagnostics: list[Diagnostic]
 ) -> None:
-    """Under --json, stdout carries the envelope and nothing else, so a
-    caller can parse it without stripping human lines."""
+    """Under --json, stdout carries the receipt and nothing else."""
     if as_json:
-        print(json.dumps(envelope, indent=2, sort_keys=True))
+        print(json.dumps(receipt, indent=2, sort_keys=True))
         return
-    if envelope["written"]:
-        print(f"wrote {envelope['output']} ({envelope['artifact_bytes']} bytes)")
+    output = receipt["output"]
+    assert isinstance(output, dict)
+    if output["written"]:
+        artifact = receipt["artifact"]
+        assert isinstance(artifact, dict)
+        print(f"wrote {output['path']} ({artifact['bytes']} bytes)")
     for d in diagnostics:
         print(f"{d.severity}: [{d.code}] {d.message}", file=sys.stderr)
         for fix in d.supported_fixes:
             print(f"  fix: {fix}", file=sys.stderr)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("spec", type=Path, help="path to a YAML spec")
-    parser.add_argument("-o", "--output", type=Path, default=Path("diagram.svg"))
+def _input_failure(
+    command: str, spec_path: Path, output: Path | None, quality: str, exc: Exception
+) -> tuple[int, dict[str, object], list[Diagnostic]]:
+    diagnostic = Diagnostic(
+        code="usage/spec-unreadable",
+        severity=SEVERITY_ERROR,
+        message=f"cannot read spec {str(spec_path)!r}: {exc}",
+        subject={"path": str(spec_path)},
+        supported_fixes=("pass the path to an existing UTF-8 YAML spec",),
+    )
+    return (
+        EXIT_USAGE,
+        _receipt(
+            command,
+            spec_path,
+            None,
+            None,
+            [diagnostic],
+            quality,
+            output=output,
+            delivery_stage="input",
+        ),
+        [diagnostic],
+    )
+
+
+def _read_spec(
+    command: str, spec_path: Path, output: Path | None, quality: str
+) -> tuple[bytes, str] | tuple[int, dict[str, object], list[Diagnostic]]:
+    try:
+        source = spec_path.read_bytes()
+        return source, source.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return _input_failure(command, spec_path, output, quality, exc)
+
+
+def _icon_lookup(cache_dir: Path | None, sha: str | None) -> IconLookup:
+    import fetch_icons  # local import keeps pure layout tests network-free
+
+    selected_cache_dir = cache_dir or fetch_icons.default_cache_dir()
+    selected_sha = sha or fetch_icons.DRAWIO_SHA
+    return CompositeIconLookup(
+        [
+            CacheIconLookup(cache_dir=selected_cache_dir, sha=selected_sha),
+            BundledGenericIconLookup(),
+        ]
+    )
+
+
+def _render_candidate(
+    spec_text: str, lookup: IconLookup, quality: str
+) -> tuple[RenderResult | None, bytes | None, list[Diagnostic]]:
+    try:
+        spec = load_spec(spec_text)
+    except SpecError as exc:
+        return None, None, [exc.diagnostic]
+    result = render(spec, lookup, quality=quality)
+    return result, result.svg.encode("utf-8"), result.diagnostics
+
+
+def _validate(
+    spec_path: Path,
+    cache_dir: Path | None,
+    sha: str | None,
+    quality: str,
+) -> tuple[int, dict[str, object], list[Diagnostic]]:
+    loaded = _read_spec("validate", spec_path, None, quality)
+    if len(loaded) == 3:
+        return loaded
+    spec_bytes, spec_text = loaded
+    result, artifact_bytes, diagnostics = _render_candidate(
+        spec_text, _icon_lookup(cache_dir, sha), quality
+    )
+    if artifact_bytes is not None:
+        with tempfile.TemporaryDirectory(
+            prefix=".architecture-diagram-validate-"
+        ) as path:
+            candidate = Path(path) / "candidate.svg"
+            candidate.write_bytes(artifact_bytes)
+            artifact_bytes = candidate.read_bytes()
+    receipt = _receipt(
+        "validate",
+        spec_path,
+        spec_bytes,
+        artifact_bytes,
+        diagnostics,
+        quality,
+        delivery_stage="check" if result is not None and not result.ok else None,
+    )
+    return (EXIT_OK if receipt["ok"] else EXIT_FAILURE), receipt, diagnostics
+
+
+def _delivery_failure(
+    spec_path: Path,
+    spec_bytes: bytes | None,
+    artifact_bytes: bytes | None,
+    output: Path,
+    quality: str,
+    stage: str,
+    exc: Exception,
+) -> tuple[int, dict[str, object], list[Diagnostic]]:
+    diagnostic = Diagnostic(
+        code=f"delivery/{stage}-failed",
+        severity=SEVERITY_ERROR,
+        message=f"delivery {stage} failed: {exc}",
+        subject={"output": str(output)},
+        supported_fixes=(
+            "correct the output path or filesystem permissions and rerun delivery",
+        ),
+    )
+    return (
+        EXIT_FAILURE,
+        _receipt(
+            "deliver",
+            spec_path,
+            spec_bytes,
+            artifact_bytes,
+            [diagnostic],
+            quality,
+            output=output,
+            delivery_stage=stage,
+        ),
+        [diagnostic],
+    )
+
+
+def _deliver(
+    spec_path: Path,
+    output: Path,
+    cache_dir: Path | None,
+    sha: str | None,
+    quality: str,
+) -> tuple[int, dict[str, object], list[Diagnostic]]:
+    loaded = _read_spec("deliver", spec_path, output, quality)
+    if len(loaded) == 3:
+        return loaded
+    spec_bytes, spec_text = loaded
+    output_parent = output.parent
+    try:
+        if not output_parent.is_dir():
+            raise OSError(f"output directory does not exist: {output_parent}")
+        with tempfile.TemporaryDirectory(
+            prefix=".architecture-diagram-delivery-", dir=output_parent
+        ) as stage_name:
+            stage_dir = Path(stage_name)
+            if os.stat(stage_dir).st_dev != os.stat(output_parent).st_dev:
+                raise OSError("staging directory is not on the output filesystem")
+            (stage_dir / "specification.yaml").write_bytes(spec_bytes)
+            result, artifact_bytes, diagnostics = _render_candidate(
+                spec_text, _icon_lookup(cache_dir, sha), quality
+            )
+            if artifact_bytes is None:
+                receipt = _receipt(
+                    "deliver",
+                    spec_path,
+                    spec_bytes,
+                    None,
+                    diagnostics,
+                    quality,
+                    output=output,
+                    delivery_stage="render",
+                )
+                return EXIT_FAILURE, receipt, diagnostics
+            candidate = stage_dir / "candidate.svg"
+            candidate.write_bytes(artifact_bytes)
+            if os.stat(candidate).st_dev != os.stat(output_parent).st_dev:
+                raise OSError("candidate artifact is not on the output filesystem")
+            if result is None or not result.ok:
+                receipt = _receipt(
+                    "deliver",
+                    spec_path,
+                    spec_bytes,
+                    artifact_bytes,
+                    diagnostics,
+                    quality,
+                    output=output,
+                    delivery_stage="check",
+                )
+                return EXIT_FAILURE, receipt, diagnostics
+            receipt = _receipt(
+                "deliver",
+                spec_path,
+                spec_bytes,
+                artifact_bytes,
+                diagnostics,
+                quality,
+                output=output,
+                written=True,
+                delivery_stage="commit",
+            )
+            try:
+                (stage_dir / "receipt.json").write_text(
+                    json.dumps(receipt, indent=2, sort_keys=True)
+                )
+            except OSError as exc:
+                return _delivery_failure(
+                    spec_path,
+                    spec_bytes,
+                    artifact_bytes,
+                    output,
+                    quality,
+                    "receipt",
+                    exc,
+                )
+            try:
+                os.replace(candidate, output)
+            except OSError as exc:
+                return _delivery_failure(
+                    spec_path,
+                    spec_bytes,
+                    artifact_bytes,
+                    output,
+                    quality,
+                    "commit",
+                    exc,
+                )
+            return EXIT_OK, receipt, diagnostics
+    except OSError as exc:
+        return _delivery_failure(
+            spec_path, spec_bytes, None, output, quality, "prepare", exc
+        )
+
+
+def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("spec", type=Path, help="path to a UTF-8 YAML spec")
     parser.add_argument("--cache-dir", type=Path, default=None)
     parser.add_argument("--sha", default=None)
     parser.add_argument(
@@ -1710,50 +2022,36 @@ def main(argv: list[str] | None = None) -> int:
         "--json",
         dest="as_json",
         action="store_true",
-        help="print the diagnostic envelope to stdout and nothing else",
+        help="print the machine-readable receipt to stdout and nothing else",
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    validate_parser = commands.add_parser(
+        "validate", help="render and validate without writing an output artifact"
+    )
+    _add_common_arguments(validate_parser)
+    deliver_parser = commands.add_parser(
+        "deliver", help="validate, stage, and atomically commit an SVG artifact"
+    )
+    _add_common_arguments(deliver_parser)
+    deliver_parser.add_argument(
+        "-o", "--output", type=Path, required=True, help="target SVG path"
     )
     args = parser.parse_args(argv)
 
-    try:
-        spec_text = args.spec.read_text()
-    except OSError as exc:
-        unreadable = Diagnostic(
-            code="usage/spec-unreadable",
-            severity=SEVERITY_ERROR,
-            message=f"cannot read spec {str(args.spec)!r}: {exc.strerror or exc}",
-            subject={"path": str(args.spec)},
-            supported_fixes=("pass the path to an existing, readable YAML spec",),
+    if args.command == "validate":
+        code, receipt, diagnostics = _validate(
+            args.spec, args.cache_dir, args.sha, args.quality
         )
-        envelope = _envelope(False, args.quality, [unreadable], args.output)
-        _report(envelope, args.as_json, [unreadable])
-        return EXIT_USAGE
-
-    import fetch_icons  # local import: keeps render.py importable without pulling in networking deps for pure-layout tests
-
-    cache_dir = args.cache_dir or fetch_icons.default_cache_dir()
-    sha = args.sha or fetch_icons.DRAWIO_SHA
-    lookup = CompositeIconLookup(
-        [CacheIconLookup(cache_dir=cache_dir, sha=sha), BundledGenericIconLookup()]
-    )
-
-    try:
-        spec = load_spec(spec_text)
-    except SpecError as exc:
-        envelope = _envelope(False, args.quality, [exc.diagnostic], args.output)
-        _report(envelope, args.as_json, [exc.diagnostic])
-        return EXIT_FAILURE
-
-    result = render(spec, lookup, quality=args.quality)
-    args.output.write_text(result.svg)
-    envelope = _envelope(
-        result.ok,
-        args.quality,
-        result.diagnostics,
-        args.output,
-        artifact_bytes=len(result.svg),
-    )
-    _report(envelope, args.as_json, result.diagnostics)
-    return EXIT_OK if result.ok else EXIT_FAILURE
+    else:
+        code, receipt, diagnostics = _deliver(
+            args.spec, args.output, args.cache_dir, args.sha, args.quality
+        )
+    _report(receipt, args.as_json, diagnostics)
+    return code
 
 
 if __name__ == "__main__":

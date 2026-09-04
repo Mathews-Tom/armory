@@ -47,12 +47,17 @@ Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS
 2. **Resolve services to icons.** For each cloud component, read `references/services-aws.yaml`, `references/services-azure.yaml`, or `references/services-gcp.yaml` (whichever matches its provider) — or `references/icons-generic.md` for non-cloud — and note the exact slug to use as that node's `service` field. If a service genuinely has no icon in that provider's set (documented per-provider in each table), either pick the closest sibling category or leave `service` unset — the renderer falls back to a labeled placeholder rather than a wrong icon.
 3. **Ensure the icon cache is warm** for every provider used (see Prerequisites). Skip this for `provider: generic`.
 4. **Author the spec** — a small YAML file per `references/spec-format.md`: `title`, `direction` (`LR`/`TB`), `zones` (with `parent` for nesting), `nodes` (`id`, `label`, `service`, `zone`, `color`), `edges` (`from`, `to`, `label`, `type`).
-5. **Render:**
+5. **Validate without writing an artifact:**
    ```bash
-   python3 scripts/render.py spec.yaml -o diagram.svg
+   python3 scripts/render.py validate spec.yaml --quality showcase --json
    ```
-   Act on the exit code, not on prose — see Exit codes below. Every finding names a spec field to change; never repair one by editing the SVG.
-6. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
+   The receipt contains exact spec and candidate-artifact SHA-256 digests, validation counts, quality profile, composition status, and coded diagnostics. `validate` never touches an output path.
+6. **Deliver only a clean candidate:**
+   ```bash
+   python3 scripts/render.py deliver spec.yaml -o diagram.svg --quality showcase --json
+   ```
+   `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. Every failure leaves a previous artifact unchanged.
+7. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
 
 ## Spec fields at a glance
 
@@ -201,11 +206,11 @@ Every finding is a coded diagnostic carrying `code`, `severity`, `message`, `sub
 
 | Exit | Meaning | Action |
 |---|---|---|
-| 0 | No error-severity findings | Hand off the SVG; any warnings are deliberate, explainable tradeoffs |
-| 1 | A blocking finding, or a spec the renderer cannot answer | Apply one of the finding's `supported_fixes` to the spec and rerun |
-| 2 | Usage error — unreadable spec path, unknown flag or profile value | Correct the command |
+| 0 | `validate` completed with no error findings, or `deliver` atomically committed a validated SVG | Hand off the receipt or SVG; any warnings are deliberate, explainable tradeoffs |
+| 1 | A blocking finding or operational delivery failure | Apply a diagnostic's `supported_fixes`, or correct the output path or filesystem permissions |
+| 2 | Usage error — missing subcommand, unreadable spec path, unknown flag or profile value | Correct the command |
 
-`--json` prints the whole envelope (`schema_version`, `ok`, `quality`, `output`, `written`, `artifact_bytes`, `counts`, `diagnostics`) to stdout and nothing else. `--quality showcase` raises `composition/*` route-geometry findings to errors; the default `standard` keeps them as warnings.
+`--json` prints the receipt and nothing else on stdout. It contains `input` and `artifact` SHA-256/byte records, `output.written`, `validation.checks_passed`/`checks_total`, quality, composition status, severity counts, and diagnostics. `--quality showcase` raises `composition/*` route-geometry findings to errors; the default `standard` keeps them as warnings.
 
 | Code | Meaning | Fix |
 |---|---|---|

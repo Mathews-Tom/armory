@@ -20,7 +20,7 @@ _FORBIDDEN_MARKERS = ("<image", "base64,", "<use ", "<use>")
 
 Plus a check for any `href="http..."` or `xlink:href="http..."` — an external reference the file depends on network access to resolve, which breaks the moment the SVG is moved, emailed, or committed somewhere the referenced URL isn't reachable.
 
-If any of these appear in the output, `render.py`'s CLI exits with status 1 and prints an `editability violation` warning even though a file was still written — treat this as a bug in the renderer, not something to route around by hand-editing the SVG afterward. It should not happen; the icon pipeline was built specifically to avoid every one of these failure modes, and the tests in `tests/test_render.py::TestEditabilityCheck` and the end-to-end assertions in `TestEndToEndRender` exist to catch a regression before it ships.
+If any of these appear in a candidate, `validate` and `deliver` exit with status 1 and report an `editability` diagnostic. `deliver` never replaces an existing SVG when that happens — treat it as a renderer bug, not something to route around by hand-editing the SVG afterward. It should not happen; the icon pipeline was built specifically to avoid every one of these failure modes, and the tests in `tests/test_render.py::TestEditabilityCheck` and the end-to-end assertions in `TestEndToEndRender` exist to catch a regression.
 
 ## What this buys, concretely
 
