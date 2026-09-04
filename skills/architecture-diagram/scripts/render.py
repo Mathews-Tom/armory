@@ -844,7 +844,11 @@ def check_route_rhythm(routed_edges: list[RoutedEdge]) -> list[Diagnostic]:
                 "end": list(end),
                 "length": length,
             }
-            subject = {"from": edge.src, "to": edge.dst, "label": edge.label}
+            subject: dict[str, object] = {
+                "from": edge.src,
+                "to": edge.dst,
+                "label": edge.label,
+            }
             if length < MIN_ROUTE_SEGMENT:
                 out.append(
                     Diagnostic(
