@@ -222,8 +222,7 @@ class TestPositions:
         rank = assign_ranks(spec)
         order = order_within_ranks(spec, rank)
         boxes = compute_positions(spec, rank, order)
-        warnings = check_layout(spec, boxes, {})
-        assert not any("overlap" in w for w in warnings)
+        assert check_layout(spec, boxes, {}) == []
 
 
 class TestZoneBoxes:
@@ -457,18 +456,20 @@ class TestEditabilityCheck:
 
     def test_detects_raster_image(self) -> None:
         svg = '<svg><image href="data:image/png;base64,abc"/></svg>'
-        warnings = check_editability(svg)
-        assert any("image" in w for w in warnings)
+        codes = [d.code for d in check_editability(svg)]
+        assert codes == ["editability/forbidden-markup"] * 2
 
     def test_detects_use_clone(self) -> None:
         svg = '<svg><defs><symbol id="x"/></defs><use href="#x"/></svg>'
-        warnings = check_editability(svg)
-        assert any("use" in w for w in warnings)
+        found = check_editability(svg)
+        assert [d.code for d in found] == ["editability/forbidden-markup"]
+        assert found[0].evidence["marker"] == "<use "
 
     def test_detects_external_href(self) -> None:
         svg = '<svg><a href="http://example.com/icon.svg"/></svg>'
-        warnings = check_editability(svg)
-        assert any("external" in w for w in warnings)
+        found = check_editability(svg)
+        assert [d.code for d in found] == ["editability/external-reference"]
+        assert all(d.severity == "error" for d in found)
 
 
 class TestEndToEndRender:
@@ -485,17 +486,21 @@ class TestEndToEndRender:
         for label in ("A", "B", "C"):
             assert f">{label}<" in result.svg
 
-    def test_missing_icon_falls_back_without_crashing_and_warns(self) -> None:
+    def test_missing_icon_falls_back_without_crashing_and_reports(self) -> None:
         spec_text = "nodes:\n  - id: a\n    label: A\n    service: missing\n"
         spec = load_spec(spec_text)
         result = do_render(spec, _icon_lookup)
-        assert "no icon for node" in " ".join(result.warnings)
+        found = [d for d in result.diagnostics if d.code == "icon/not-found"]
+        assert [d.subject["node"] for d in found] == ["a"]
+        assert found[0].severity == "error"
+        assert not result.ok
         assert result.svg.startswith("<svg")
 
-    def test_node_without_service_renders_placeholder_no_warning(self) -> None:
+    def test_node_without_service_renders_placeholder_without_diagnostic(self) -> None:
         spec = load_spec("nodes:\n  - id: a\n    label: A\n")
         result = do_render(spec, _icon_lookup)
-        assert not any("no icon" in w for w in result.warnings)
+        assert result.diagnostics == []
+        assert result.ok
 
     def test_zoned_spec_renders_zone_rect(self) -> None:
         spec = load_spec(ZONED_SPEC)
@@ -533,13 +538,17 @@ class TestEndToEndRender:
         result = do_render(spec, _icon_lookup)
         assert "stroke-dasharray" in result.svg
 
-    def test_overflowing_label_warns(self) -> None:
+    def test_overflowing_label_is_reported_as_a_warning(self) -> None:
         spec_text = (
             'nodes:\n  - id: a\n    label: "This Is A Genuinely Very Long Label Text"\n'
         )
         spec = load_spec(spec_text)
         result = do_render(spec, _icon_lookup)
-        assert any("overflow" in w for w in result.warnings)
+        found = [d for d in result.diagnostics if d.code == "layout/label-overflow"]
+        assert [d.subject for d in found] == [{"node": "a", "field": "label"}]
+        assert found[0].severity == "warning"
+        # A label that does not fit still renders; it is not a blocking finding.
+        assert result.ok
 
     def test_svg_has_valid_viewbox_matching_dimensions(self) -> None:
         spec = load_spec(LINEAR_SPEC)
@@ -593,8 +602,10 @@ class TestZoneOverlapAssertion:
         order = order_within_ranks(spec, rank)
         node_boxes = compute_positions(spec, rank, order)
         zone_boxes = compute_zone_boxes(spec, node_boxes)
-        warnings = check_layout(spec, node_boxes, zone_boxes)
-        assert any("zone overlap" in w for w in warnings)
+        found = check_layout(spec, node_boxes, zone_boxes)
+        assert [d.code for d in found] == ["layout/zone-overlap"]
+        assert sorted(found[0].subject["zones"]) == ["z1", "z2"]
+        assert found[0].severity == "error"
 
 
 class TestRealIconCacheIntegration:
@@ -689,3 +700,215 @@ class TestCompositeIconLookup:
 
         composite = render.CompositeIconLookup([always_none, always_none])
         assert composite("aws", "anything") is None
+
+
+class TestDiagnosticEnvelope:
+    def test_unknown_severity_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unknown severity"):
+            render.Diagnostic(code="spec/x", severity="fatal", message="m")
+
+    def test_empty_suppresses_is_omitted_from_the_payload(self) -> None:
+        payload = render.Diagnostic(
+            code="layout/node-overlap", severity="error", message="m"
+        ).to_dict()
+        assert "suppresses" not in payload
+        assert payload["supported_fixes"] == []
+
+    def test_suppresses_is_carried_when_set(self) -> None:
+        payload = render.Diagnostic(
+            code="composition/a",
+            severity="warning",
+            message="m",
+            suppresses=("composition/b",),
+        ).to_dict()
+        assert payload["suppresses"] == ["composition/b"]
+
+    def test_counts_split_by_severity(self) -> None:
+        diags = [
+            render.Diagnostic(code="a/x", severity="error", message="m"),
+            render.Diagnostic(code="b/y", severity="warning", message="m"),
+            render.Diagnostic(code="c/z", severity="warning", message="m"),
+        ]
+        assert render.count_by_severity(diags) == {"errors": 1, "warnings": 2}
+
+
+class TestQualityProfiles:
+    def _composition_warning(self) -> render.Diagnostic:
+        return render.Diagnostic(
+            code="composition/micro-segment", severity="warning", message="m"
+        )
+
+    def test_standard_leaves_composition_findings_as_warnings(self) -> None:
+        out = render.apply_quality_profile([self._composition_warning()], "standard")
+        assert [d.severity for d in out] == ["warning"]
+
+    def test_showcase_raises_composition_findings_to_errors(self) -> None:
+        out = render.apply_quality_profile([self._composition_warning()], "showcase")
+        assert [d.severity for d in out] == ["error"]
+        assert out[0].code == "composition/micro-segment"
+
+    def test_showcase_leaves_other_namespaces_alone(self) -> None:
+        warning = render.Diagnostic(
+            code="layout/label-overflow", severity="warning", message="m"
+        )
+        out = render.apply_quality_profile([warning], "showcase")
+        assert [d.severity for d in out] == ["warning"]
+
+    def test_unknown_profile_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="unknown quality profile"):
+            render.apply_quality_profile([], "pretty")
+
+
+class TestDerivedSuppression:
+    def test_a_cause_removes_its_derivative(self) -> None:
+        cause = render.Diagnostic(
+            code="composition/cause",
+            severity="error",
+            message="m",
+            suppresses=("composition/derived",),
+        )
+        derived = render.Diagnostic(
+            code="composition/derived", severity="warning", message="m"
+        )
+        assert render.suppress_derived([cause, derived]) == [cause]
+
+    def test_unrelated_findings_survive(self) -> None:
+        a = render.Diagnostic(code="layout/node-overlap", severity="error", message="m")
+        b = render.Diagnostic(code="icon/not-found", severity="error", message="m")
+        assert render.suppress_derived([a, b]) == [a, b]
+
+
+class TestSpecErrorCodes:
+    @pytest.mark.parametrize(
+        ("spec_text", "code"),
+        [
+            ("title: empty\n", "spec/no-nodes"),
+            ("nodes:\n  - label: no id\n", "spec/node-missing-id"),
+            ("nodes:\n  - id: a\n  - id: a\n", "spec/duplicate-node-id"),
+            ("zones:\n  - label: z\nnodes:\n  - id: a\n", "spec/zone-missing-id"),
+            ("nodes:\n  - id: a\n    zone: ghost\n", "spec/unknown-zone"),
+            (
+                "zones:\n  - id: z\n    parent: ghost\nnodes:\n  - id: a\n    zone: z\n",
+                "spec/unknown-zone-parent",
+            ),
+            (
+                "zones:\n  - id: z\n    parent: z\nnodes:\n  - id: a\n    zone: z\n",
+                "spec/zone-self-parent",
+            ),
+            (
+                "nodes:\n  - id: a\nedges:\n  - from: a\n    to: ghost\n",
+                "spec/unknown-edge-node",
+            ),
+        ],
+    )
+    def test_each_rejection_carries_its_own_code(
+        self, spec_text: str, code: str
+    ) -> None:
+        with pytest.raises(SpecError) as exc:
+            load_spec(spec_text)
+        assert exc.value.diagnostic.code == code
+        assert exc.value.diagnostic.severity == "error"
+        assert exc.value.diagnostic.supported_fixes
+
+    def test_empty_zone_is_coded_at_geometry_time(self) -> None:
+        spec = load_spec("zones:\n  - id: z\nnodes:\n  - id: a\n")
+        rank = assign_ranks(spec)
+        order = order_within_ranks(spec, rank)
+        node_boxes = compute_positions(spec, rank, order)
+        with pytest.raises(SpecError) as exc:
+            compute_zone_boxes(spec, node_boxes)
+        assert exc.value.diagnostic.code == "spec/empty-zone"
+        assert exc.value.diagnostic.subject == {"zone": "z"}
+
+    def test_message_stays_human_readable(self) -> None:
+        with pytest.raises(SpecError, match="spec has no nodes"):
+            load_spec("title: empty\n")
+
+
+class TestCliContract:
+    def _run(
+        self, capsys: pytest.CaptureFixture[str], *argv: str
+    ) -> tuple[int, dict[str, object], str]:
+        code = render.main(list(argv))
+        captured = capsys.readouterr()
+        payload = json.loads(captured.out) if "--json" in argv else {}
+        return code, payload, captured.err
+
+    def test_clean_render_exits_zero_with_a_parsable_envelope(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("nodes:\n  - id: a\n    label: A\n")
+        out = tmp_path / "d.svg"
+        code, payload, _ = self._run(
+            capsys, str(spec), "-o", str(out), "--cache-dir", str(tmp_path), "--json"
+        )
+        assert code == render.EXIT_OK
+        assert payload["ok"] is True
+        assert payload["written"] is True
+        assert payload["diagnostics"] == []
+        assert payload["schema_version"] == render.DIAGNOSTIC_SCHEMA_VERSION
+        assert payload["artifact_bytes"] == len(out.read_text())
+
+    def test_json_mode_puts_nothing_but_json_on_stdout(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("nodes:\n  - id: a\n    label: A\n    service: ghost\n")
+        code, payload, _ = self._run(
+            capsys,
+            str(spec),
+            "-o",
+            str(tmp_path / "d.svg"),
+            "--cache-dir",
+            str(tmp_path),
+            "--json",
+        )
+        # A finding is present, so this also proves diagnostics do not leak to
+        # stdout as prose alongside the envelope.
+        assert code == render.EXIT_FAILURE
+        assert [d["code"] for d in payload["diagnostics"]] == ["icon/not-found"]
+
+    def test_missing_icon_is_an_operational_failure(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("nodes:\n  - id: a\n    label: A\n    service: ghost\n")
+        code, _, err = self._run(
+            capsys, str(spec), "-o", str(tmp_path / "d.svg"), "--cache-dir", str(tmp_path)
+        )
+        assert code == render.EXIT_FAILURE
+        assert "[icon/not-found]" in err
+        assert "fix: " in err
+
+    def test_invalid_spec_is_an_operational_failure_and_writes_nothing(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        spec = tmp_path / "s.yaml"
+        spec.write_text("title: empty\n")
+        out = tmp_path / "d.svg"
+        code, payload, _ = self._run(
+            capsys, str(spec), "-o", str(out), "--cache-dir", str(tmp_path), "--json"
+        )
+        assert code == render.EXIT_FAILURE
+        assert payload["written"] is False
+        assert [d["code"] for d in payload["diagnostics"]] == ["spec/no-nodes"]
+        assert not out.exists()
+
+    def test_unreadable_spec_path_is_a_usage_error(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        code, payload, _ = self._run(
+            capsys,
+            str(tmp_path / "nope.yaml"),
+            "-o",
+            str(tmp_path / "d.svg"),
+            "--json",
+        )
+        assert code == render.EXIT_USAGE
+        assert [d["code"] for d in payload["diagnostics"]] == ["usage/spec-unreadable"]
+
+    def test_unknown_quality_profile_is_a_usage_error(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit) as exc:
+            render.main([str(tmp_path / "s.yaml"), "--quality", "pretty"])
+        assert exc.value.code == render.EXIT_USAGE
