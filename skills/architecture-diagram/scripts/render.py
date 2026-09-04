@@ -73,6 +73,120 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# --- diagnostics -------------------------------------------------------------
+
+SEVERITY_ERROR = "error"
+SEVERITY_WARNING = "warning"
+_SEVERITIES = (SEVERITY_ERROR, SEVERITY_WARNING)
+
+QUALITY_STANDARD = "standard"
+QUALITY_SHOWCASE = "showcase"
+QUALITY_PROFILES = (QUALITY_STANDARD, QUALITY_SHOWCASE)
+
+# Codes in this namespace describe how the drawing reads rather than whether
+# the spec is answerable: two routes crossing, a label sitting on a route.
+# They are warnings under the standard profile and errors under showcase, so
+# stricter geometry rules can ship without breaking specs that already render.
+PROFILE_SENSITIVE_NAMESPACE = "composition/"
+
+DIAGNOSTIC_SCHEMA_VERSION = 1
+
+
+@dataclass
+class Diagnostic:
+    """One machine-readable finding.
+
+    The predecessor of this type was `list[str]` of English prose printed to
+    stderr, which forced the calling agent to regex sentences and left it to
+    invent its own repair — usually by editing the SVG, which is exactly the
+    move that destroys the reproducibility this renderer exists to provide.
+    `code` is the stable identity, `subject` says what the finding is about,
+    `evidence` carries the numbers needed to locate it, and
+    `supported_fixes` bounds the repair to changes an author can make in the
+    spec.
+    """
+
+    code: str
+    severity: str
+    message: str
+    subject: dict[str, object] = field(default_factory=dict)
+    evidence: dict[str, object] = field(default_factory=dict)
+    supported_fixes: tuple[str, ...] = ()
+    # Codes this finding makes redundant. A derived diagnostic reported
+    # alongside its cause sends the agent chasing symptoms.
+    suppresses: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.severity not in _SEVERITIES:
+            raise ValueError(
+                f"diagnostic {self.code!r} has unknown severity {self.severity!r}; "
+                f"expected one of {_SEVERITIES}"
+            )
+
+    def to_dict(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "code": self.code,
+            "severity": self.severity,
+            "message": self.message,
+            "subject": dict(self.subject),
+            "evidence": dict(self.evidence),
+            "supported_fixes": list(self.supported_fixes),
+        }
+        if self.suppresses:
+            payload["suppresses"] = list(self.suppresses)
+        return payload
+
+
+def apply_quality_profile(
+    diagnostics: list[Diagnostic], quality: str
+) -> list[Diagnostic]:
+    """Raise profile-sensitive findings to errors under the showcase profile."""
+    if quality not in QUALITY_PROFILES:
+        raise ValueError(f"unknown quality profile {quality!r}; expected one of {QUALITY_PROFILES}")
+    if quality != QUALITY_SHOWCASE:
+        return list(diagnostics)
+    out = []
+    for d in diagnostics:
+        if d.code.startswith(PROFILE_SENSITIVE_NAMESPACE) and d.severity != SEVERITY_ERROR:
+            out.append(
+                Diagnostic(
+                    code=d.code,
+                    severity=SEVERITY_ERROR,
+                    message=d.message,
+                    subject=d.subject,
+                    evidence=d.evidence,
+                    supported_fixes=d.supported_fixes,
+                    suppresses=d.suppresses,
+                )
+            )
+        else:
+            out.append(d)
+    return out
+
+
+def suppress_derived(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
+    """Drop findings a reported cause makes redundant.
+
+    Suppression is one level deep and keyed on `code`: a record is dropped
+    when any record in the input names its code, and a dropped record still
+    suppresses. Resolving chains instead has no well-founded answer — if A
+    suppresses B and C suppresses A, then removing B leaves it hidden with
+    no visible cause, while keeping B oscillates on the next pass, and a
+    mutual pair has no defensible winner at all. Every emitter must
+    therefore declare `suppresses` only for a code it directly explains,
+    never for one that suppresses something else in turn.
+    """
+    suppressed = {code for d in diagnostics for code in d.suppresses}
+    return [d for d in diagnostics if d.code not in suppressed]
+
+
+def count_by_severity(diagnostics: list[Diagnostic]) -> dict[str, int]:
+    return {
+        "errors": sum(1 for d in diagnostics if d.severity == SEVERITY_ERROR),
+        "warnings": sum(1 for d in diagnostics if d.severity == SEVERITY_WARNING),
+    }
+
+
 # --- spec -------------------------------------------------------------------
 
 
@@ -113,22 +227,67 @@ class Spec:
 
 
 class SpecError(ValueError):
-    pass
+    """A spec the renderer cannot answer.
+
+    Carries the `Diagnostic` so callers get the same coded record they get
+    for every other finding; the exception message stays human-readable for
+    tracebacks.
+    """
+
+    def __init__(self, diagnostic: Diagnostic) -> None:
+        super().__init__(diagnostic.message)
+        self.diagnostic = diagnostic
+
+
+def _spec_error(
+    code: str,
+    message: str,
+    subject: dict[str, object] | None = None,
+    evidence: dict[str, object] | None = None,
+    supported_fixes: tuple[str, ...] = (),
+) -> SpecError:
+    return SpecError(
+        Diagnostic(
+            code=code,
+            severity=SEVERITY_ERROR,
+            message=message,
+            subject=subject or {},
+            evidence=evidence or {},
+            supported_fixes=supported_fixes,
+        )
+    )
 
 
 def load_spec(text: str) -> Spec:
     data = yaml.safe_load(text) or {}
     if "nodes" not in data or not data["nodes"]:
-        raise SpecError("spec has no nodes")
+        raise _spec_error(
+            "spec/no-nodes",
+            "spec has no nodes",
+            supported_fixes=("add at least one entry under `nodes`",),
+        )
 
     provider = data.get("provider", "generic")
     node_ids = set()
     nodes = []
     for raw in data["nodes"]:
         if "id" not in raw:
-            raise SpecError(f"node missing id: {raw}")
+            raise _spec_error(
+                "spec/node-missing-id",
+                f"node missing id: {raw}",
+                evidence={"node": raw},
+                supported_fixes=("give the node a unique `id`",),
+            )
         if raw["id"] in node_ids:
-            raise SpecError(f"duplicate node id: {raw['id']}")
+            raise _spec_error(
+                "spec/duplicate-node-id",
+                f"duplicate node id: {raw['id']}",
+                subject={"node": raw["id"]},
+                supported_fixes=(
+                    "rename one of the nodes so every `id` is unique",
+                    "delete the duplicate node entry",
+                ),
+            )
         node_ids.add(raw["id"])
         nodes.append(
             Node(
@@ -146,7 +305,12 @@ def load_spec(text: str) -> Spec:
     zones = []
     for raw in data.get("zones", []) or []:
         if "id" not in raw:
-            raise SpecError(f"zone missing id: {raw}")
+            raise _spec_error(
+                "spec/zone-missing-id",
+                f"zone missing id: {raw}",
+                evidence={"zone": raw},
+                supported_fixes=("give the zone a unique `id`",),
+            )
         zone_ids.add(raw["id"])
         zones.append(
             Zone(
@@ -157,17 +321,53 @@ def load_spec(text: str) -> Spec:
         )
     for n in nodes:
         if n.zone is not None and n.zone not in zone_ids:
-            raise SpecError(f"node {n.id!r} references unknown zone {n.zone!r}")
+            raise _spec_error(
+                "spec/unknown-zone",
+                f"node {n.id!r} references unknown zone {n.zone!r}",
+                subject={"node": n.id},
+                evidence={"zone": n.zone, "known_zones": sorted(zone_ids)},
+                supported_fixes=(
+                    "declare the zone under `zones`",
+                    "point the node's `zone` at an existing zone id",
+                    "drop the node's `zone` field",
+                ),
+            )
     for z in zones:
         if z.parent is not None and z.parent not in zone_ids:
-            raise SpecError(f"zone {z.id!r} references unknown parent {z.parent!r}")
+            raise _spec_error(
+                "spec/unknown-zone-parent",
+                f"zone {z.id!r} references unknown parent {z.parent!r}",
+                subject={"zone": z.id},
+                evidence={"parent": z.parent, "known_zones": sorted(zone_ids)},
+                supported_fixes=(
+                    "declare the parent zone under `zones`",
+                    "point `parent` at an existing zone id",
+                    "drop `parent` to make this a top-level zone",
+                ),
+            )
         if z.parent == z.id:
-            raise SpecError(f"zone {z.id!r} cannot be its own parent")
+            raise _spec_error(
+                "spec/zone-self-parent",
+                f"zone {z.id!r} cannot be its own parent",
+                subject={"zone": z.id},
+                supported_fixes=(
+                    "drop `parent` to make this a top-level zone",
+                    "point `parent` at the enclosing zone",
+                ),
+            )
 
     edges = []
     for raw in data.get("edges", []) or []:
         if raw.get("from") not in node_ids or raw.get("to") not in node_ids:
-            raise SpecError(f"edge references unknown node: {raw}")
+            raise _spec_error(
+                "spec/unknown-edge-node",
+                f"edge references unknown node: {raw}",
+                evidence={"edge": raw, "known_nodes": sorted(node_ids)},
+                supported_fixes=(
+                    "point `from` and `to` at existing node ids",
+                    "declare the missing node under `nodes`",
+                ),
+            )
         edges.append(
             Edge(
                 src=raw["from"],
@@ -334,11 +534,28 @@ def compute_zone_boxes(spec: Spec, node_boxes: dict[str, Box]) -> dict[str, Box]
         if zone_id in boxes:
             return boxes[zone_id]
         if zone_id in stack:
-            raise SpecError(f"zone cycle detected at {zone_id!r}")
+            raise _spec_error(
+                "spec/zone-cycle",
+                f"zone cycle detected at {zone_id!r}",
+                subject={"zone": zone_id},
+                evidence={"chain": sorted(stack)},
+                supported_fixes=(
+                    "break the cycle so every zone's `parent` chain ends at a top-level zone",
+                ),
+            )
         parts = [node_boxes[nid] for nid in members[zone_id]]
         parts += [resolve(cid, stack | {zone_id}) for cid in children[zone_id]]
         if not parts:
-            raise SpecError(f"zone {zone_id!r} has no member nodes or child zones")
+            raise _spec_error(
+                "spec/empty-zone",
+                f"zone {zone_id!r} has no member nodes or child zones",
+                subject={"zone": zone_id},
+                supported_fixes=(
+                    "assign at least one node to the zone via that node's `zone` field",
+                    "nest a child zone under it",
+                    "delete the zone",
+                ),
+            )
         x0 = min(p.x for p in parts) - ZONE_PAD
         y0 = min(p.y for p in parts) - ZONE_PAD - ZONE_LABEL_H
         x1 = max(p.x2 for p in parts) + ZONE_PAD
@@ -427,16 +644,31 @@ def route_edges(spec: Spec, node_boxes: dict[str, Box]) -> list[RoutedEdge]:
 
 def check_layout(
     spec: Spec, node_boxes: dict[str, Box], zone_boxes: dict[str, Box]
-) -> list[str]:
-    """Hard assertions replacing the prose self-check rules prior art asks
-    the model to apply by eye ("no edge crosses an unrelated icon", "no two
-    edges overlap")."""
-    warnings = []
+) -> list[Diagnostic]:
+    """Hard assertions replacing the prose self-check rules prior art in this
+    space asks the model to apply by eye ("no edge crosses an unrelated
+    icon", "no two edges overlap")."""
+    out: list[Diagnostic] = []
     ids = list(node_boxes)
     for i, a_id in enumerate(ids):
         for b_id in ids[i + 1 :]:
             if node_boxes[a_id].overlaps(node_boxes[b_id]):
-                warnings.append(f"node overlap: {a_id!r} and {b_id!r}")
+                out.append(
+                    Diagnostic(
+                        code="layout/node-overlap",
+                        severity=SEVERITY_ERROR,
+                        message=f"node overlap: {a_id!r} and {b_id!r}",
+                        subject={"nodes": [a_id, b_id]},
+                        evidence={
+                            a_id: _box_evidence(node_boxes[a_id]),
+                            b_id: _box_evidence(node_boxes[b_id]),
+                        },
+                        supported_fixes=(
+                            "split the two nodes across different ranks by adding an edge between them",
+                            "remove one of the duplicated nodes",
+                        ),
+                    )
+                )
     zids = list(zone_boxes)
     for i, a_id in enumerate(zids):
         for b_id in zids[i + 1 :]:
@@ -444,10 +676,28 @@ def check_layout(
             if b_id in a_parent_chain or a_id in _zone_ancestors(spec, b_id):
                 continue  # nested zones are expected to overlap their ancestor
             if zone_boxes[a_id].overlaps(zone_boxes[b_id]):
-                warnings.append(
-                    f"zone overlap: {a_id!r} and {b_id!r} — group their member nodes contiguously"
+                out.append(
+                    Diagnostic(
+                        code="layout/zone-overlap",
+                        severity=SEVERITY_ERROR,
+                        message=f"zone overlap: {a_id!r} and {b_id!r}",
+                        subject={"zones": [a_id, b_id]},
+                        evidence={
+                            a_id: _box_evidence(zone_boxes[a_id]),
+                            b_id: _box_evidence(zone_boxes[b_id]),
+                        },
+                        supported_fixes=(
+                            "list each zone's member nodes contiguously in `nodes`",
+                            "correct the `zone` field on the interleaved nodes",
+                            "nest one zone inside the other via `parent` if containment was intended",
+                        ),
+                    )
                 )
-    return warnings
+    return out
+
+
+def _box_evidence(box: Box) -> dict[str, float]:
+    return {"x": box.x, "y": box.y, "width": box.w, "height": box.h}
 
 
 def _zone_ancestors(spec: Spec, zone_id: str) -> set[str]:
@@ -531,7 +781,51 @@ class CompositeIconLookup:
 # --- emit ----------------------------------------------------------------------
 
 
-def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -> str:
+def _label_overflow(
+    node_id: str, field_name: str, text: str, font_size: float, available: float
+) -> Diagnostic:
+    return Diagnostic(
+        code="layout/label-overflow",
+        severity=SEVERITY_WARNING,
+        message=f"{field_name} may overflow its node box: {text!r} on {node_id!r}",
+        subject={"node": node_id, "field": field_name},
+        evidence={
+            "text": text,
+            "estimated_width": round(_text_width(text, font_size), 2),
+            "available_width": available,
+        },
+        supported_fixes=(
+            "shorten the text",
+            "move the detail into `sublabel`",
+        ),
+    )
+
+
+def _icon_not_found(node: Node) -> Diagnostic:
+    fixes = ["use the exact slug from that provider's reference service map"]
+    # The generic set is bundled in the package, so telling the author to
+    # fetch a cache for it would send them after a cache that never exists.
+    if node.provider != "generic":
+        fixes.insert(0, f"warm the icon cache: fetch_icons.py --provider {node.provider}")
+    fixes.append(
+        "drop the node's `service` field to render the labeled placeholder deliberately"
+    )
+    return Diagnostic(
+        code="icon/not-found",
+        severity=SEVERITY_ERROR,
+        message=(
+            f"no icon for node {node.id!r} "
+            f"(service={node.service!r}, provider={node.provider!r})"
+        ),
+        subject={"node": node.id},
+        evidence={"service": node.service, "provider": node.provider},
+        supported_fixes=tuple(fixes),
+    )
+
+
+def _node_svg(
+    node: Node, box: Box, icon: IconRef | None, diagnostics: list[Diagnostic]
+) -> str:
     parts = [f'<g id="node-{_escape(node.id)}">']
     icon_pos = icon_box(box)
     parts.append(
@@ -545,9 +839,7 @@ def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -
         )
     else:
         if node.service:
-            warnings.append(
-                f"no icon for node {node.id!r} (service={node.service!r}, provider={node.provider!r})"
-            )
+            diagnostics.append(_icon_not_found(node))
         cx, cy = icon_pos.x + ICON / 2, icon_pos.y + ICON / 2
         initial = _escape(node.label[:1].upper() or "?")
         parts.append(
@@ -556,8 +848,8 @@ def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -
     label_y = box.y + ICON + 18
     label_font_size = 12.0
     if _text_width(node.label, label_font_size) > box.w - 8:
-        warnings.append(
-            f"label may overflow its node box: {node.label!r} on {node.id!r}"
+        diagnostics.append(
+            _label_overflow(node.id, "label", node.label, label_font_size, box.w - 8)
         )
     parts.append(
         f'<text x="{box.x + box.w / 2:g}" y="{label_y:g}" font-size="{label_font_size:g}" font-weight="600" '
@@ -566,8 +858,10 @@ def _node_svg(node: Node, box: Box, icon: IconRef | None, warnings: list[str]) -
     if node.sublabel:
         sub_font_size = 10.5
         if _text_width(node.sublabel, sub_font_size) > box.w - 8:
-            warnings.append(
-                f"sublabel may overflow its node box: {node.sublabel!r} on {node.id!r}"
+            diagnostics.append(
+                _label_overflow(
+                    node.id, "sublabel", node.sublabel, sub_font_size, box.w - 8
+                )
             )
         parts.append(
             f'<text x="{box.x + box.w / 2:g}" y="{label_y + 15:g}" font-size="{sub_font_size:g}" '
@@ -626,7 +920,7 @@ def emit_svg(
     zone_boxes: dict[str, Box],
     routed_edges: list[RoutedEdge],
     icons: dict[str, IconRef | None],
-    warnings: list[str],
+    diagnostics: list[Diagnostic],
 ) -> str:
     zone_by_id = {z.id: z for z in spec.zones}
     all_extents = [b for b in node_boxes.values()] + [b for b in zone_boxes.values()]
@@ -667,7 +961,7 @@ def emit_svg(
         parts.append(_edge_svg(routed))
 
     for n in spec.nodes:
-        parts.append(_node_svg(n, node_boxes[n.id], icons.get(n.id), warnings))
+        parts.append(_node_svg(n, node_boxes[n.id], icons.get(n.id), diagnostics))
 
     if show_legend:
         parts.append(_legend_svg(edge_types, MARGIN, height - legend_h + 6))
@@ -681,18 +975,40 @@ def emit_svg(
 _FORBIDDEN_MARKERS = ("<image", "base64,", "<use ", "<use>")
 
 
-def check_editability(svg_text: str) -> list[str]:
+def check_editability(svg_text: str) -> list[Diagnostic]:
     """Enforce the output contract this rewrite exists to deliver: no raster
     fallback, no `<use>` clones (Inkscape/MDN both document that clone nodes
     aren't independently node-editable — see `references/editability.md`),
     no external references. A regression here means a future change quietly
     reintroduced one of the failure modes the whole design avoids."""
-    found = [m for m in _FORBIDDEN_MARKERS if m in svg_text]
-    warnings = [f"editability violation: found {m!r}" for m in found]
+    out: list[Diagnostic] = []
+    for marker in _FORBIDDEN_MARKERS:
+        if marker in svg_text:
+            out.append(
+                Diagnostic(
+                    code="editability/forbidden-markup",
+                    severity=SEVERITY_ERROR,
+                    message=f"editability violation: found {marker!r}",
+                    evidence={"marker": marker},
+                    supported_fixes=(
+                        "file this as a renderer bug: the spec cannot introduce this markup",
+                    ),
+                )
+            )
     for marker in ('href="http', 'xlink:href="http'):
         if marker in svg_text:
-            warnings.append(f"editability violation: external reference ({marker!r})")
-    return warnings
+            out.append(
+                Diagnostic(
+                    code="editability/external-reference",
+                    severity=SEVERITY_ERROR,
+                    message=f"editability violation: external reference ({marker!r})",
+                    evidence={"marker": marker},
+                    supported_fixes=(
+                        "file this as a renderer bug: the output must stay self-contained",
+                    ),
+                )
+            )
+    return out
 
 
 # --- top-level render ----------------------------------------------------------
@@ -701,25 +1017,76 @@ def check_editability(svg_text: str) -> list[str]:
 @dataclass
 class RenderResult:
     svg: str
-    warnings: list[str] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
+
+    @property
+    def errors(self) -> list[Diagnostic]:
+        return [d for d in self.diagnostics if d.severity == SEVERITY_ERROR]
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
 
 
-def render(spec: Spec, icon_lookup: IconLookup) -> RenderResult:
-    warnings: list[str] = []
+def render(
+    spec: Spec, icon_lookup: IconLookup, quality: str = QUALITY_STANDARD
+) -> RenderResult:
+    diagnostics: list[Diagnostic] = []
     rank = assign_ranks(spec)
     order = order_within_ranks(spec, rank)
     node_boxes = compute_positions(spec, rank, order)
     zone_boxes = compute_zone_boxes(spec, node_boxes) if spec.zones else {}
-    warnings += check_layout(spec, node_boxes, zone_boxes)
+    diagnostics += check_layout(spec, node_boxes, zone_boxes)
     routed_edges = route_edges(spec, node_boxes)
 
     icons: dict[str, IconRef | None] = {}
     for n in spec.nodes:
         icons[n.id] = icon_lookup(n.provider, n.service) if n.service else None
 
-    svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, warnings)
-    warnings += check_editability(svg)
-    return RenderResult(svg=svg, warnings=warnings)
+    svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, diagnostics)
+    diagnostics += check_editability(svg)
+    diagnostics = apply_quality_profile(suppress_derived(diagnostics), quality)
+    return RenderResult(svg=svg, diagnostics=diagnostics)
+
+
+EXIT_OK = 0
+EXIT_FAILURE = 1
+EXIT_USAGE = 2
+
+
+def _envelope(
+    ok: bool,
+    quality: str,
+    diagnostics: list[Diagnostic],
+    output: Path | None = None,
+    artifact_bytes: int | None = None,
+) -> dict[str, object]:
+    return {
+        "schema_version": DIAGNOSTIC_SCHEMA_VERSION,
+        "ok": ok,
+        "quality": quality,
+        "output": str(output) if output is not None else None,
+        "written": artifact_bytes is not None,
+        "artifact_bytes": artifact_bytes,
+        "counts": count_by_severity(diagnostics),
+        "diagnostics": [d.to_dict() for d in diagnostics],
+    }
+
+
+def _report(
+    envelope: dict[str, object], as_json: bool, diagnostics: list[Diagnostic]
+) -> None:
+    """Under --json, stdout carries the envelope and nothing else, so a
+    caller can parse it without stripping human lines."""
+    if as_json:
+        print(json.dumps(envelope, indent=2, sort_keys=True))
+        return
+    if envelope["written"]:
+        print(f"wrote {envelope['output']} ({envelope['artifact_bytes']} bytes)")
+    for d in diagnostics:
+        print(f"{d.severity}: [{d.code}] {d.message}", file=sys.stderr)
+        for fix in d.supported_fixes:
+            print(f"  fix: {fix}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -728,7 +1095,33 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-o", "--output", type=Path, default=Path("diagram.svg"))
     parser.add_argument("--cache-dir", type=Path, default=None)
     parser.add_argument("--sha", default=None)
+    parser.add_argument(
+        "--quality",
+        choices=QUALITY_PROFILES,
+        default=QUALITY_STANDARD,
+        help="showcase raises composition findings from warnings to errors",
+    )
+    parser.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="print the diagnostic envelope to stdout and nothing else",
+    )
     args = parser.parse_args(argv)
+
+    try:
+        spec_text = args.spec.read_text()
+    except OSError as exc:
+        unreadable = Diagnostic(
+            code="usage/spec-unreadable",
+            severity=SEVERITY_ERROR,
+            message=f"cannot read spec {str(args.spec)!r}: {exc.strerror or exc}",
+            subject={"path": str(args.spec)},
+            supported_fixes=("pass the path to an existing, readable YAML spec",),
+        )
+        envelope = _envelope(False, args.quality, [unreadable], args.output)
+        _report(envelope, args.as_json, [unreadable])
+        return EXIT_USAGE
 
     import fetch_icons  # local import: keeps render.py importable without pulling in networking deps for pure-layout tests
 
@@ -739,17 +1132,23 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     try:
-        spec = load_spec(args.spec.read_text())
+        spec = load_spec(spec_text)
     except SpecError as exc:
-        print(f"error: invalid spec — {exc}", file=sys.stderr)
-        return 1
+        envelope = _envelope(False, args.quality, [exc.diagnostic], args.output)
+        _report(envelope, args.as_json, [exc.diagnostic])
+        return EXIT_FAILURE
 
-    result = render(spec, lookup)
+    result = render(spec, lookup, quality=args.quality)
     args.output.write_text(result.svg)
-    print(f"wrote {args.output} ({len(result.svg)} bytes)")
-    for w in result.warnings:
-        print(f"warning: {w}", file=sys.stderr)
-    return 1 if any("editability violation" in w for w in result.warnings) else 0
+    envelope = _envelope(
+        result.ok,
+        args.quality,
+        result.diagnostics,
+        args.output,
+        artifact_bytes=len(result.svg),
+    )
+    _report(envelope, args.as_json, result.diagnostics)
+    return EXIT_OK if result.ok else EXIT_FAILURE
 
 
 if __name__ == "__main__":
