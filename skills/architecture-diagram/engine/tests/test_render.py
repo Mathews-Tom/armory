@@ -22,6 +22,7 @@ from engine.geometry_checks import (
 from engine.layout import (
     COL_GAP,
     ICON,
+    NODE_W,
     ROW_GAP,
     Box,
     assign_ranks,
@@ -29,6 +30,7 @@ from engine.layout import (
     compute_zone_boxes,
     icon_box,
     order_within_ranks,
+    text_width,
 )
 from engine.model import Edge, Node, Spec
 from engine.render import IconRef, check_editability, render as do_render
@@ -795,7 +797,7 @@ class TestEndToEndRender:
         assert font_match
         fitted_size = float(font_match.group(1))
         assert 6 <= fitted_size < 12
-        assert render.text_width(label, fitted_size) <= render.NODE_W - 8 + 1e-6
+        assert text_width(label, fitted_size) <= NODE_W - 8 + 1e-6
         assert result.ok
 
     def test_svg_has_valid_viewbox_matching_dimensions(self) -> None:
