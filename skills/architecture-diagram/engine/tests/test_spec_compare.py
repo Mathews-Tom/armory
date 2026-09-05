@@ -7,6 +7,7 @@ import pytest
 
 from engine import commands
 from engine.compare import compare_specs
+from engine.receipts import COMPARISON_LIMITATIONS
 from engine.spec import load_spec
 
 
@@ -90,7 +91,7 @@ def test_compare_cli_always_includes_the_limitations_text(
 
     assert code == commands.EXIT_OK
     assert captured.err == ""
-    assert json.loads(captured.out)["limitations"] == commands.COMPARISON_LIMITATIONS
+    assert json.loads(captured.out)["limitations"] == COMPARISON_LIMITATIONS
 
 
 def test_compare_cli_rejects_an_edge_without_an_authored_id(
@@ -106,4 +107,4 @@ def test_compare_cli_rejects_an_edge_without_an_authored_id(
     assert [finding["code"] for finding in payload["diagnostics"]] == [
         "compare/missing-edge-id"
     ]
-    assert payload["limitations"] == commands.COMPARISON_LIMITATIONS
+    assert payload["limitations"] == COMPARISON_LIMITATIONS

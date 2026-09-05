@@ -7,6 +7,7 @@ import pytest
 
 from engine import commands, pipeline
 from engine.diagnostics import Diagnostic
+from engine.receipts import check_name
 from engine.profile import check_deployment_profile
 from engine.spec import load_spec
 
@@ -85,8 +86,7 @@ def test_profile_failure_has_a_distinct_receipt_check(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     assert (
-        commands._check_name(_findings("deployment-profile-missing-owner.yaml")[0])
-        == "profile"
+        check_name(_findings("deployment-profile-missing-owner.yaml")[0]) == "profile"
     )
     code = commands.main(
         [
