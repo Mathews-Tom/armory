@@ -94,10 +94,31 @@ def _icon_not_found(node: Node) -> Diagnostic:
     )
 
 
+def _source_attributes(source_ids: tuple[str, ...]) -> str:
+    if not source_ids:
+        return ">"
+    joined = ",".join(sorted(source_ids))
+    return f' data-source-ids="{_escape(joined)}"><title>{_escape(joined)}</title>'
+
+
+def _source_badge(source_ids: tuple[str, ...], x: float, y: float) -> str:
+    if not source_ids:
+        return ""
+    return (
+        f'<text x="{x:g}" y="{y:g}" font-size="8" font-weight="700" '
+        f'text-anchor="middle" fill="#047857">VERIFIED SRC {len(source_ids)}</text>'
+    )
+
+
 def _node_svg(
-    node: Node, box: Box, icon: IconRef | None, diagnostics: list[Diagnostic]
+    node: Node,
+    box: Box,
+    icon: IconRef | None,
+    diagnostics: list[Diagnostic],
+    source_badges: bool,
 ) -> str:
-    parts = [f'<g id="node-{_escape(node.id)}">']
+    source_ids = node.sources if source_badges else ()
+    parts = [f'<g id="node-{_escape(node.id)}"{_source_attributes(source_ids)}']
     icon_position = icon_box(box)
     parts.append(
         f'<rect x="{icon_position.x:g}" y="{icon_position.y:g}" width="{ICON:g}" height="{ICON:g}" rx="10" fill="{node.color}"/>'
@@ -149,6 +170,7 @@ def _node_svg(
             f'<text x="{box.x + box.w / 2:g}" y="{label_y + 15:g}" font-size="{sublabel_font_size:g}" '
             f'text-anchor="middle" fill="#6B7280">{_escape(node.sublabel)}</text>'
         )
+    parts.append(_source_badge(source_ids, box.x + box.w / 2, box.y + box.h - 8))
     parts.append("</g>")
     return "".join(parts)
 
@@ -163,12 +185,15 @@ def _zone_svg(zone: Zone, box: Box) -> str:
     )
 
 
-def _edge_svg(routed: RoutedEdge) -> str:
+def _edge_svg(routed: RoutedEdge, source_badges: bool) -> str:
     edge = routed.edge
     color = EDGE_COLORS.get(edge.type, EDGE_COLORS["default"])
     dash = ' stroke-dasharray="6 4"' if edge.type == "batch" else ""
     marker = f'marker-end="url(#arrow-{edge.type})"'
-    parts = [f'<g id="edge-{_escape(edge.src)}-{_escape(edge.dst)}">']
+    source_ids = edge.sources if source_badges else ()
+    parts = [
+        f'<g id="edge-{_escape(edge.src)}-{_escape(edge.dst)}"{_source_attributes(source_ids)}'
+    ]
     parts.append(
         f'<path d="{routed.path_d}" fill="none" stroke="{color}" stroke-width="1.8"{dash} {marker}/>'
     )
@@ -177,6 +202,8 @@ def _edge_svg(routed: RoutedEdge) -> str:
         parts.append(
             f'<text x="{x:g}" y="{y:g}" font-size="{EDGE_LABEL_FONT_SIZE:g}" fill="{color}">{_escape(edge.label)}</text>'
         )
+    x, y = routed.label_pos
+    parts.append(_source_badge(source_ids, x, y + 14))
     parts.append("</g>")
     return "".join(parts)
 
@@ -203,6 +230,7 @@ def emit_svg(
     routed_edges: list[RoutedEdge],
     icons: dict[str, IconRef | None],
     diagnostics: list[Diagnostic],
+    source_badges: bool = False,
 ) -> str:
     """Emit standalone editable SVG markup from computed layout and icons."""
     zone_by_id = {zone.id: zone for zone in spec.zones}
@@ -241,10 +269,16 @@ def emit_svg(
     ):
         parts.append(_zone_svg(zone_by_id[zone_id], zone_boxes[zone_id]))
     for routed in routed_edges:
-        parts.append(_edge_svg(routed))
+        parts.append(_edge_svg(routed, source_badges))
     for node in spec.nodes:
         parts.append(
-            _node_svg(node, node_boxes[node.id], icons.get(node.id), diagnostics)
+            _node_svg(
+                node,
+                node_boxes[node.id],
+                icons.get(node.id),
+                diagnostics,
+                source_badges,
+            )
         )
     if show_legend:
         parts.append(_legend_svg(edge_types, MARGIN, height - legend_height + 6))

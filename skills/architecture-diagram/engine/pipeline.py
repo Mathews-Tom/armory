@@ -51,7 +51,10 @@ class RenderResult:
 
 
 def render(
-    spec: Spec, icon_lookup: IconLookup, quality: str = QUALITY_STANDARD
+    spec: Spec,
+    icon_lookup: IconLookup,
+    quality: str = QUALITY_STANDARD,
+    source_badges: bool = False,
 ) -> RenderResult:
     diagnostics: list[Diagnostic] = []
     diagnostics += check_deployment_profile(spec)
@@ -78,7 +81,15 @@ def render(
             diagnostics.append(exc.diagnostic)
             icons[node.id] = None
 
-    svg = emit_svg(spec, node_boxes, zone_boxes, routed_edges, icons, diagnostics)
+    svg = emit_svg(
+        spec,
+        node_boxes,
+        zone_boxes,
+        routed_edges,
+        icons,
+        diagnostics,
+        source_badges,
+    )
     diagnostics += check_editability(svg)
     diagnostics = apply_quality_profile(suppress_derived(diagnostics), quality)
     return RenderResult(

@@ -148,6 +148,13 @@ def test_deliver_verifies_before_writing(
     repo, revision = repository
     spec_path = _write_spec(repo, revision, "src/api.py", "[1, 3]")
     output = repo / "diagram.svg"
+    _git(
+        repo,
+        "remote",
+        "set-url",
+        "origin",
+        "https://user:secret@example.invalid/diagram.git",
+    )
 
     assert (
         main(
@@ -164,11 +171,14 @@ def test_deliver_verifies_before_writing(
     )
 
     receipt = json.loads(capsys.readouterr().out)
+    sidecar_path = repo / "diagram.sources.json"
+    sidecar = json.loads(sidecar_path.read_text())
+
     assert output.is_file()
     assert receipt["evidence"]["verified_sources"] == 1
-    assert receipt["evidence"] == {
-        "mode": "verified",
-        "sourced_edges": 0,
-        "sourced_nodes": 1,
-        "verified_sources": 1,
-    }
+    assert receipt["evidence"]["sidecar"]["path"] == str(sidecar_path)
+    assert sidecar["artifact"]["sha256"] == receipt["artifact"]["sha256"]
+    assert sidecar["sources"][0]["id"] == "api"
+    assert sidecar["repository"]["origin"] == "https://example.invalid/diagram.git"
+    assert 'data-source-ids="api"' in output.read_text()
+    assert "VERIFIED SRC 1" in output.read_text()
