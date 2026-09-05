@@ -40,6 +40,7 @@ class RenderResult:
     node_boxes: dict[str, Box] = field(default_factory=dict)
     zone_boxes: dict[str, Box] = field(default_factory=dict)
     routed_edges: list[RoutedEdge] = field(default_factory=list)
+    icons: dict[str, IconRef | None] = field(default_factory=dict)
 
     @property
     def errors(self) -> list[Diagnostic]:
@@ -98,4 +99,5 @@ def render(
         node_boxes=node_boxes,
         zone_boxes=zone_boxes,
         routed_edges=routed_edges,
+        icons=icons,
     )
