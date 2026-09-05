@@ -12,12 +12,14 @@ from pathlib import Path
 
 from . import fetch_icons
 from .compare import compare_specs
+from .delivery import BundleCommitError, commit_bundle
 from .diagnostics import (
     QUALITY_PROFILES,
     QUALITY_STANDARD,
     SEVERITY_ERROR,
     Diagnostic,
 )
+from .evidence import sidecar_bytes
 from .evidence import summary as evidence_summary
 from .evidence import verify_sources
 from .geometry_checks import edge_label_box
@@ -29,9 +31,9 @@ from .icons import (
 )
 from .layout import box_evidence
 from .model import Spec
+from .receipts import comparison_receipt, receipt as build_receipt, sha256
 from .pipeline import RenderResult, render
 from .spec import SpecError, load_spec
-from .receipts import comparison_receipt, receipt as build_receipt
 
 
 EXIT_OK = 0
@@ -210,13 +212,13 @@ def _icon_lookup(cache_dir: Path | None, sha: str | None) -> IconLookup:
 
 
 def _render_candidate(
-    spec_text: str, lookup: IconLookup, quality: str
+    spec_text: str, lookup: IconLookup, quality: str, source_badges: bool
 ) -> tuple[Spec | None, RenderResult | None, bytes | None, list[Diagnostic]]:
     try:
         spec = load_spec(spec_text)
     except SpecError as exc:
         return None, None, None, [exc.diagnostic]
-    result = render(spec, lookup, quality=quality)
+    result = render(spec, lookup, quality=quality, source_badges=source_badges)
     return spec, result, result.svg.encode("utf-8"), result.diagnostics
 
 
@@ -233,7 +235,7 @@ def _validate(
         return loaded
     spec_bytes, spec_text = loaded
     spec, result, artifact_bytes, diagnostics = _render_candidate(
-        spec_text, _icon_lookup(cache_dir, sha), quality
+        spec_text, _icon_lookup(cache_dir, sha), quality, verify_sources_enabled
     )
     evidence = None
     if verify_sources_enabled and spec is not None:
@@ -321,9 +323,10 @@ def _deliver(
                 raise OSError("staging directory is not on the output filesystem")
             (stage_dir / "specification.yaml").write_bytes(spec_bytes)
             spec, result, artifact_bytes, diagnostics = _render_candidate(
-                spec_text, _icon_lookup(cache_dir, sha), quality
+                spec_text, _icon_lookup(cache_dir, sha), quality, verify_sources_enabled
             )
             evidence = None
+            verified_sources = None
             if verify_sources_enabled and spec is not None:
                 verified_sources, evidence_diagnostics = verify_sources(spec, spec_path)
                 diagnostics = [*diagnostics, *evidence_diagnostics]
@@ -344,6 +347,17 @@ def _deliver(
                 return EXIT_FAILURE, receipt, diagnostics
             candidate = stage_dir / "candidate.svg"
             candidate.write_bytes(artifact_bytes)
+            sidecar_candidate = None
+            sidecar_path = None
+            if verified_sources is not None:
+                sidecar_path = output.with_name(f"{output.stem}.sources.json")
+                sidecar_candidate = stage_dir / "candidate.sources.json"
+                sidecar = sidecar_bytes(verified_sources, output, artifact_bytes)
+                sidecar_candidate.write_bytes(sidecar)
+                evidence["sidecar"] = {
+                    "path": str(sidecar_path),
+                    "sha256": sha256(sidecar),
+                }
             if os.stat(candidate).st_dev != os.stat(output_parent).st_dev:
                 raise OSError("candidate artifact is not on the output filesystem")
             if (
@@ -394,8 +408,11 @@ def _deliver(
                     exc,
                 )
             try:
-                os.replace(candidate, output)
-            except OSError as exc:
+                replacements = [(candidate, output)]
+                if sidecar_candidate is not None and sidecar_path is not None:
+                    replacements.append((sidecar_candidate, sidecar_path))
+                commit_bundle(stage_dir, replacements)
+            except BundleCommitError as exc:
                 return _delivery_failure(
                     spec_path,
                     spec_bytes,

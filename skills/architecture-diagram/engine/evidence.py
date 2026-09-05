@@ -1,10 +1,13 @@
 """Fail-closed local verification of authored Git source references."""
 
 from __future__ import annotations
-
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 import subprocess
+from urllib.parse import urlsplit, urlunsplit
 
 from .diagnostics import SEVERITY_ERROR, Diagnostic
 from .model import SourceReference, Spec
@@ -176,3 +179,43 @@ def summary(spec: Spec, evidence: SourceEvidence | None) -> dict[str, object]:
         "sourced_nodes": sum(bool(node.sources) for node in spec.nodes),
         "sourced_edges": sum(bool(edge.sources) for edge in spec.edges),
     }
+
+
+def redact_origin(origin: str) -> str:
+    """Remove credentials from HTTP(S) and SSH-style remote URLs."""
+    parsed = urlsplit(origin)
+    if parsed.scheme and parsed.netloc:
+        host = parsed.hostname or ""
+        if parsed.port is not None:
+            host = f"{host}:{parsed.port}"
+        return urlunsplit(
+            (parsed.scheme, host, parsed.path, parsed.query, parsed.fragment)
+        )
+    if "@" in origin and ":" in origin.split("@", 1)[1]:
+        return origin.split("@", 1)[1]
+    return origin
+
+
+def sidecar_bytes(evidence: SourceEvidence, artifact: Path, svg: bytes) -> bytes:
+    """Serialize the durable evidence receipt without source content or local paths."""
+    payload = {
+        "schema_version": 1,
+        "artifact": {
+            "path": artifact.name,
+            "sha256": hashlib.sha256(svg).hexdigest(),
+            "bytes": len(svg),
+        },
+        "repository": {"origin": redact_origin(evidence.origin)},
+        "verified_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "sources": [
+            {
+                "id": source.id,
+                "revision": source.revision,
+                "path": source.path,
+                "lines": list(source.lines),
+                "line_count": source.line_count,
+            }
+            for source in evidence.sources
+        ],
+    }
+    return (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()

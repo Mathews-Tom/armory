@@ -60,7 +60,7 @@ Run the following commands from this skill directory (`skills/architecture-diagr
    ```bash
    python3 -m engine deliver spec.yaml -o diagram.svg --quality showcase --json
    ```
-   `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. Every failure leaves a previous artifact unchanged.
+   `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. With `--verify-sources`, it delivers `diagram.svg` and `diagram.sources.json`; the SVG carries local `VERIFIED SRC n` badges and source-id metadata, while the sidecar binds verified references to the delivered SVG digest. Caught write or replacement failures restore the prior pair; process termination between replacements is outside that rollback contract.
 7. **Compare authored revisions when needed:**
    ```bash
    python3 -m engine compare base.yaml head.yaml
