@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 import yaml
 
 from .diagnostics import Diagnostic, SEVERITY_ERROR
-from .model import Edge, Node, Spec, Zone
+from .model import Edge, Node, SourceReference, Spec, Zone
 
 
 class SpecError(ValueError):
@@ -35,6 +37,182 @@ def _spec_error(
     )
 
 
+_SOURCE_REVISION = re.compile(r"[0-9a-fA-F]{40}\Z")
+
+
+def _source_error(
+    code: str,
+    message: str,
+    subject: dict[str, object],
+    evidence: dict[str, object],
+    supported_fixes: tuple[str, ...],
+) -> SpecError:
+    return _spec_error(code, message, subject, evidence, supported_fixes)
+
+
+def _parse_sources(data: dict[str, object]) -> list[SourceReference]:
+    raw_sources = data.get("sources", [])
+    if not isinstance(raw_sources, list):
+        raise _source_error(
+            "source/invalid-declarations",
+            "`sources` must be a YAML list",
+            {"sources": raw_sources},
+            {"type": type(raw_sources).__name__},
+            ("declare source references as a YAML list",),
+        )
+
+    sources: list[SourceReference] = []
+    source_ids: set[str] = set()
+    for raw in raw_sources:
+        if not isinstance(raw, dict):
+            raise _source_error(
+                "source/invalid-declaration",
+                "each source declaration must be a mapping",
+                {"source": raw},
+                {"type": type(raw).__name__},
+                ("declare `id`, `revision`, `path`, and `lines` for every source",),
+            )
+
+        source_id = raw.get("id")
+        if (
+            not isinstance(source_id, str)
+            or not source_id
+            or source_id.strip() != source_id
+        ):
+            raise _source_error(
+                "source/invalid-id",
+                "source declarations require a non-blank string `id`",
+                {"source": source_id},
+                {"id": source_id},
+                ("set `id` to a non-blank string without surrounding whitespace",),
+            )
+        if source_id in source_ids:
+            raise _source_error(
+                "source/duplicate-id",
+                f"duplicate source id: {source_id!r}",
+                {"source": source_id},
+                {"id": source_id},
+                ("give every source declaration a unique `id`",),
+            )
+
+        revision = raw.get("revision")
+        if (
+            not isinstance(revision, str)
+            or _SOURCE_REVISION.fullmatch(revision) is None
+        ):
+            raise _source_error(
+                "source/invalid-revision",
+                f"source {source_id!r} requires a 40-character hexadecimal `revision`",
+                {"source": source_id},
+                {"revision": revision},
+                ("set `revision` to a full 40-character Git object id",),
+            )
+
+        path = raw.get("path")
+        path_parts = path.split("/") if isinstance(path, str) else []
+        if (
+            not isinstance(path, str)
+            or not path
+            or path.strip() != path
+            or path.startswith("/")
+            or "\\" in path
+            or ":" in path
+            or any(part in ("", ".", "..") for part in path_parts)
+        ):
+            raise _source_error(
+                "source/invalid-path",
+                f"source {source_id!r} requires a relative POSIX `path`",
+                {"source": source_id},
+                {"path": path},
+                ("use a non-empty relative POSIX path without `.` or `..` segments",),
+            )
+
+        lines = raw.get("lines")
+        if (
+            not isinstance(lines, list)
+            or len(lines) != 2
+            or any(
+                not isinstance(line, int) or isinstance(line, bool) for line in lines
+            )
+        ):
+            raise _source_error(
+                "source/invalid-lines",
+                f"source {source_id!r} requires `lines: [start, end]` with integers",
+                {"source": source_id},
+                {"lines": lines},
+                ("set `lines` to two integer line numbers",),
+            )
+        start_line, end_line = lines
+        if start_line < 1 or end_line < start_line:
+            raise _source_error(
+                "source/invalid-line-range",
+                f"source {source_id!r} has an invalid inclusive line range",
+                {"source": source_id},
+                {"lines": lines},
+                ("use positive line numbers with start less than or equal to end",),
+            )
+
+        source_ids.add(source_id)
+        sources.append(
+            SourceReference(
+                id=source_id,
+                revision=revision,
+                path=path,
+                lines=(start_line, end_line),
+            )
+        )
+    return sources
+
+
+def _parse_source_attachments(
+    raw: dict[str, object],
+    subject: dict[str, object],
+    source_ids: set[str],
+) -> tuple[str, ...]:
+    attachments = raw.get("sources", [])
+    if not isinstance(attachments, list):
+        raise _source_error(
+            "source/invalid-attachments",
+            "`sources` attachments must be a YAML list",
+            subject,
+            {"sources": attachments, "type": type(attachments).__name__},
+            ("list zero or more declared source ids under `sources`",),
+        )
+
+    parsed: list[str] = []
+    for source_id in attachments:
+        if (
+            not isinstance(source_id, str)
+            or not source_id
+            or source_id.strip() != source_id
+        ):
+            raise _source_error(
+                "source/invalid-attachment",
+                "source attachments must be non-blank string ids",
+                subject,
+                {"source": source_id},
+                ("reference a declared source id",),
+            )
+        if source_id in parsed:
+            raise _source_error(
+                "source/duplicate-attachment",
+                f"source {source_id!r} is attached more than once",
+                subject,
+                {"source": source_id},
+                ("list each source id at most once per node or edge",),
+            )
+        if source_id not in source_ids:
+            raise _source_error(
+                "source/unknown-attachment",
+                f"source attachment {source_id!r} is not declared",
+                subject,
+                {"source": source_id, "known_sources": sorted(source_ids)},
+                ("declare the source under top-level `sources`",),
+            )
+        parsed.append(source_id)
+    return tuple(parsed)
+
+
 def load_spec(text: str) -> Spec:
     """Parse and validate one authored YAML specification."""
     data = yaml.safe_load(text) or {}
@@ -57,6 +235,9 @@ def load_spec(text: str) -> Spec:
                 "set `profile: deployment-ownership`",
             ),
         )
+
+    sources = _parse_sources(data)
+    source_ids = {source.id for source in sources}
 
     node_ids = set()
     nodes = []
@@ -104,6 +285,7 @@ def load_spec(text: str) -> Spec:
                 owner=raw.get("owner"),
                 external=raw.get("external", False),
                 storage=raw.get("storage", False),
+                sources=_parse_source_attachments(raw, {"node": raw["id"]}, source_ids),
             )
         )
 
@@ -198,6 +380,11 @@ def load_spec(text: str) -> Spec:
                 id=raw.get("id"),
                 label=raw.get("label", ""),
                 type=raw.get("type", "default"),
+                sources=_parse_source_attachments(
+                    raw,
+                    {"edge": raw.get("id", {"from": raw["from"], "to": raw["to"]})},
+                    source_ids,
+                ),
             )
         )
 
@@ -209,4 +396,5 @@ def load_spec(text: str) -> Spec:
         zones=zones,
         edges=edges,
         profile=profile,
+        sources=sources,
     )

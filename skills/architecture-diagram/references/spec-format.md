@@ -9,6 +9,7 @@ title: string              # optional; omit for no title bar
 direction: LR | TB         # optional, default LR
 provider: aws | azure | gcp | generic   # optional, default generic — sets the default for nodes that omit their own provider
 profile: deployment-ownership            # optional; opt-in deployment validation
+sources: [...]              # optional authored source declarations
 zones: [...]                # optional
 nodes: [...]                 # required, at least one
 edges: [...]                 # optional
@@ -24,6 +25,20 @@ With the profile enabled, declare at least one `kind: region` zone and one `kind
 
 The zone-kind enum is `generic` (the default), `region`, and `security`. `generic` remains decorative; the profile only enforces the facts above when explicitly enabled.
 
+## `sources`
+
+Source declarations record authored evidence without changing rendering or `compare` results. Every attachment on a node or edge must name one declaration.
+
+```yaml
+sources:
+  - id: src-api             # required, unique non-blank string
+    revision: 0123...cdef   # required, full 40-character hexadecimal Git object id
+    path: src/api.py        # required, non-empty relative POSIX path
+    lines: [41, 73]         # required, positive inclusive start and end lines
+```
+
+`path` cannot be absolute or contain `.` or `..` segments. `lines` must contain exactly two integer values, with `start >= 1` and `end >= start`. This schema declares references only; it does not read a repository or verify that an object, path, or line range exists.
+
 ## `nodes`
 
 ```yaml
@@ -38,6 +53,7 @@ nodes:
     owner: string             # required for non-external nodes under deployment-ownership
     external: boolean         # optional, default false; external nodes do not require owner
     storage: boolean          # optional, default false; true requires a security zone under deployment-ownership
+    sources: [src-api]       # optional declared source ids, each at most once
 ```
 
 `service` is the exact cache slug from `references/services-aws.yaml`, `references/services-azure.yaml`, or `references/services-gcp.yaml` (cloud providers) or `references/icons-generic.md` (`provider: generic`) — not a free-text service name. A `service` slug with no matching cache entry produces a `warning: no icon for node` at render time and the node falls back to a labeled placeholder (a colored square with the label's first letter) rather than failing the render. A node with no `service` set at all renders the same placeholder silently — that's the correct default for a component with no natural icon, not an error.
@@ -67,6 +83,7 @@ edges:
     to: string            # required, a node id
     label: string           # optional
     type: realtime | batch | event | control | default   # optional, default "default"
+    sources: [src-api]       # optional declared source ids, each at most once
 ```
 
 An edge referencing a node id that doesn't exist in `nodes` is a spec error. Edges do not need to respect zone boundaries — a node inside a zone can connect to one outside it freely; the router treats zones as a purely visual grouping, not a routing constraint.

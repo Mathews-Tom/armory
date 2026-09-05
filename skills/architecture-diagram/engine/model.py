@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class SourceReference:
+    """One immutable authored source location."""
+
+    id: str
+    revision: str
+    path: str
+    lines: tuple[int, int]
 
 
 @dataclass
@@ -17,6 +27,7 @@ class Node:
     owner: str | None = None
     external: bool = False
     storage: bool = False
+    sources: tuple[str, ...] = ()
 
 
 @dataclass
@@ -34,6 +45,7 @@ class Edge:
     label: str = ""
     type: str = "default"
     id: str | None = None
+    sources: tuple[str, ...] = ()
 
 
 @dataclass
@@ -45,3 +57,4 @@ class Spec:
     zones: list[Zone]
     edges: list[Edge]
     profile: str | None = None
+    sources: list[SourceReference] = field(default_factory=list)
