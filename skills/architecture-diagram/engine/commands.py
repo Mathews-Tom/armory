@@ -18,6 +18,8 @@ from .diagnostics import (
     SEVERITY_ERROR,
     Diagnostic,
 )
+from .evidence import summary as evidence_summary
+from .evidence import verify_sources
 from .geometry_checks import edge_label_box
 from .icons import (
     BundledGenericIconLookup,
@@ -224,6 +226,7 @@ def _validate(
     sha: str | None,
     quality: str,
     layout_json: bool,
+    verify_sources_enabled: bool,
 ) -> tuple[int, dict[str, object], list[Diagnostic]]:
     loaded = _read_spec("validate", spec_path, None, quality)
     if len(loaded) == 3:
@@ -232,6 +235,11 @@ def _validate(
     spec, result, artifact_bytes, diagnostics = _render_candidate(
         spec_text, _icon_lookup(cache_dir, sha), quality
     )
+    evidence = None
+    if verify_sources_enabled and spec is not None:
+        verified_sources, evidence_diagnostics = verify_sources(spec, spec_path)
+        diagnostics = [*diagnostics, *evidence_diagnostics]
+        evidence = evidence_summary(spec, verified_sources)
     if artifact_bytes is not None:
         with tempfile.TemporaryDirectory(
             prefix=".architecture-diagram-validate-"
@@ -248,6 +256,7 @@ def _validate(
         quality,
         delivery_stage="check" if result is not None and not result.ok else None,
         profile_active=spec is not None and spec.profile is not None,
+        evidence=evidence,
     )
     if layout_json and spec is not None and result is not None:
         receipt["layout"] = _layout_report(spec, result)
@@ -294,6 +303,7 @@ def _deliver(
     cache_dir: Path | None,
     sha: str | None,
     quality: str,
+    verify_sources_enabled: bool,
 ) -> tuple[int, dict[str, object], list[Diagnostic]]:
     loaded = _read_spec("deliver", spec_path, output, quality)
     if len(loaded) == 3:
@@ -313,6 +323,11 @@ def _deliver(
             spec, result, artifact_bytes, diagnostics = _render_candidate(
                 spec_text, _icon_lookup(cache_dir, sha), quality
             )
+            evidence = None
+            if verify_sources_enabled and spec is not None:
+                verified_sources, evidence_diagnostics = verify_sources(spec, spec_path)
+                diagnostics = [*diagnostics, *evidence_diagnostics]
+                evidence = evidence_summary(spec, verified_sources)
             if artifact_bytes is None:
                 receipt = build_receipt(
                     "deliver",
@@ -324,13 +339,20 @@ def _deliver(
                     output=output,
                     delivery_stage="render",
                     profile_active=spec is not None and spec.profile is not None,
+                    evidence=evidence,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
             candidate = stage_dir / "candidate.svg"
             candidate.write_bytes(artifact_bytes)
             if os.stat(candidate).st_dev != os.stat(output_parent).st_dev:
                 raise OSError("candidate artifact is not on the output filesystem")
-            if result is None or not result.ok:
+            if (
+                result is None
+                or not result.ok
+                or any(
+                    diagnostic.severity == SEVERITY_ERROR for diagnostic in diagnostics
+                )
+            ):
                 receipt = build_receipt(
                     "deliver",
                     spec_path,
@@ -341,6 +363,7 @@ def _deliver(
                     output=output,
                     delivery_stage="check",
                     profile_active=spec is not None and spec.profile is not None,
+                    evidence=evidence,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
             receipt = build_receipt(
@@ -354,6 +377,7 @@ def _deliver(
                 written=True,
                 delivery_stage="commit",
                 profile_active=spec is not None and spec.profile is not None,
+                evidence=evidence,
             )
             try:
                 (stage_dir / "receipt.json").write_text(
@@ -404,6 +428,11 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="print the machine-readable receipt to stdout and nothing else",
     )
+    parser.add_argument(
+        "--verify-sources",
+        action="store_true",
+        help="verify declared source references against the local Git checkout",
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -439,11 +468,21 @@ def main(argv: list[str] | None = None) -> int:
         return code
     if args.command == "validate":
         code, receipt, diagnostics = _validate(
-            args.spec, args.cache_dir, args.sha, args.quality, args.layout_json
+            args.spec,
+            args.cache_dir,
+            args.sha,
+            args.quality,
+            args.layout_json,
+            args.verify_sources,
         )
     else:
         code, receipt, diagnostics = _deliver(
-            args.spec, args.output, args.cache_dir, args.sha, args.quality
+            args.spec,
+            args.output,
+            args.cache_dir,
+            args.sha,
+            args.quality,
+            args.verify_sources,
         )
     _report(receipt, args.as_json or getattr(args, "layout_json", False), diagnostics)
     return code
