@@ -99,6 +99,7 @@ def receipt(
     written: bool = False,
     delivery_stage: str | None = None,
     profile_active: bool = False,
+    evidence: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build the stable validate or deliver JSON receipt."""
     result: dict[str, object] = {
@@ -122,6 +123,8 @@ def receipt(
         "validation": validation_receipt(diagnostics, quality, profile_active),
         "diagnostics": [diagnostic.to_dict() for diagnostic in diagnostics],
     }
+    if evidence is not None:
+        result["evidence"] = evidence
     if delivery_stage is not None:
         result["delivery_stage"] = delivery_stage
     return result

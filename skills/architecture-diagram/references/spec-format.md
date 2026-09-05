@@ -95,10 +95,15 @@ Under `profile: deployment-ownership`, a labeled cross-security-zone edge names 
 ## Compare two specifications
 
 Run `python3 -m engine compare base.yaml head.yaml` to emit a deterministic JSON receipt. It matches nodes by their authored `id` and edges by their authored `id`; rendering hashes, generated geometry, labels-as-identifiers, and endpoint-pair matching never participate.
-
 Each node or edge is `added`, `removed`, `unchanged`, or has one or more statuses from disjoint authored field groups: node semantic fields produce `changed`, node `zone` produces `moved`, edge semantic fields (`label`, `type`) produce `changed`, and edge endpoints (`from`, `to`) produce `rerouted`. `changed_fields` records the exact JSON-pointer paths and before/after authored values.
 
 Every receipt includes this limitation: `Authored specification only; no runtime impact, causality, risk, or merge safety is inferred.`
+
+## Verify authored source references
+
+Run `python3 -m engine validate --verify-sources spec.yaml --json` to fail closed unless every declared source names a local Git commit, a blob at the declared path, and an in-bounds inclusive line range. Verification starts from the spec file's directory and requires that checkout to have an `origin` remote; detached HEAD is valid because declarations name immutable commits.
+
+Verification uses only direct local Git object reads. It neither copies source bytes into command output nor performs remote lookups. The verifier accepts uppercase Git object ids and records canonical lowercase ids internally. A tree path, binary blob, absent commit/path, or range beyond the blob's line count is a coded error.
 
 ## What the renderer computes for you (don't set these)
 

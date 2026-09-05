@@ -54,6 +54,7 @@ Run the following commands from this skill directory (`skills/architecture-diagr
    python3 -m engine validate spec.yaml --quality showcase --json
    ```
    The receipt contains exact spec and candidate-artifact SHA-256 digests, validation counts, quality profile, composition status, and coded diagnostics. `validate` never touches an output path.
+   For declared `sources`, add `--verify-sources`; it fail-closes against local Git commits, blobs, and inclusive line ranges from the spec's checkout. It requires an `origin` remote and never copies source content or contacts a remote service.
    Use `--layout-json` instead of `--json` when an agent needs the exact emitted node boxes, zone membership and boxes, routed edge waypoints, and edge-label rectangles for review. It also never writes SVG output.
 6. **Deliver only a clean candidate:**
    ```bash
