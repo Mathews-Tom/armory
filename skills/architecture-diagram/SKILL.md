@@ -76,6 +76,11 @@ title: string
 direction: LR | TB        # default LR
 provider: aws | azure | gcp | generic   # default provider for nodes that omit it
 profile: deployment-ownership             # opt-in blocking deployment checks
+sources:
+  - id: string               # unique authored reference id
+    revision: 40-char hex    # declared Git object id
+    path: relative POSIX path
+    lines: [start, end]      # positive inclusive range
 zones:
   - id: string
     label: string
@@ -92,12 +97,14 @@ nodes:
     owner: string          # required for non-external nodes under deployment-ownership
     external: boolean      # default false
     storage: boolean       # true requires a security zone under deployment-ownership
+    sources: [source-id]     # optional declared source ids
 edges:
   - id: string              # required and stable when using compare
     from: string            # node id
     to: string              # node id
     label: string           # required for security-boundary crossings under deployment-ownership
     type: realtime | batch | event | control | default
+    sources: [source-id]     # optional declared source ids
 ```
 
 ### Deployment ownership validation
