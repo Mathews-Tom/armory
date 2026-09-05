@@ -1,6 +1,6 @@
 ---
 name: architecture-diagram
-description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, or Inkscape. NOT for architecture reviews, use architecture-reviewer.'
+description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams, or hand-drawn generic icons for everything else. Optionally deliver a self-contained editable draw.io mxGraph companion. Deterministic layout computes zone nesting and orthogonal routing instead of hand-placed coordinates. Triggers on: "architecture diagram", "infra diagram", "system diagram", "deployment diagram", "topology diagram", "draw architecture", "AWS diagram", "Azure diagram", "GCP diagram", "cloud infrastructure diagram", "VPC diagram", "draw my AWS setup". Use when a user wants a static architecture diagram they can still edit afterward in Figma, Illustrator, Inkscape, or draw.io. NOT for architecture reviews, use architecture-reviewer.'
 metadata:
   version: 2.4.0
   category: visualization
@@ -11,7 +11,7 @@ metadata:
 
 # Architecture Diagram Generator
 
-Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS/Azure/GCP official architecture icons, or a hand-drawn generic set for anything else), deterministic zone-aware layout, orthogonal connection routing, real `<text>` labels. Zero raster images, zero `<use>` clones — every icon is inlined per node so the output opens cleanly as an editable layer tree in Figma, Illustrator, Inkscape, or draw.io.
+Produces standalone, fully editable `.svg` files: real inlined vector icons (AWS/Azure/GCP official architecture icons, or a hand-drawn generic set for everything else), deterministic zone-aware layout, orthogonal connection routing, and real `<text>` labels. `deliver --emit drawio` additionally produces a self-contained editable `.drawio` mxGraph companion. SVG output uses zero raster images and zero `<use>` clones; draw.io output uses independently editable cells with local vector icon data and no remote image, external URL, or provider stencil dependency.
 
 ## When to use this
 
@@ -58,15 +58,19 @@ Run the following commands from this skill directory (`skills/architecture-diagr
    Use `--layout-json` instead of `--json` when an agent needs the exact emitted node boxes, zone membership and boxes, routed edge waypoints, and edge-label rectangles for review. It also never writes SVG output.
 6. **Deliver only a clean candidate:**
    ```bash
-   python3 -m engine deliver spec.yaml -o diagram.svg --quality showcase --json
+   python3 -m engine deliver spec.yaml -o diagram.svg --quality showcase --emit drawio --json
    ```
-   `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces the target only after every check passes. With `--verify-sources`, it delivers `diagram.svg` and `diagram.sources.json`; the SVG carries local `VERIFIED SRC n` badges and source-id metadata, while the sidecar binds verified references to the delivered SVG digest. Caught write or replacement failures restore the prior pair; process termination between replacements is outside that rollback contract.
-7. **Compare authored revisions when needed:**
+   `deliver` stages the exact spec and candidate SVG beside the target, then atomically replaces every requested output only after every check passes. `--emit drawio` also delivers `diagram.drawio`; the JSON receipt's top-level `artifacts` list records the path, SHA-256, and byte count for each committed file. With `--verify-sources`, it atomically delivers `diagram.svg`, `diagram.drawio`, and `diagram.sources.json`; the SVG and draw.io output carry local `VERIFIED SRC n` badges, while the sidecar binds verified references to the delivered SVG digest. Caught write or replacement failures restore the prior bundle; process termination between replacements is outside that rollback contract.
+7. **Review a draw.io companion before handoff:**
+   1. Open `diagram.drawio` in draw.io.
+   2. Confirm that a zone, node container, icon, node label, edge, and edge label select independently.
+   3. Move a node label and save. The output preserves authored structure and initial computed placement; it does not promise round-trip SVG bytes or manual-route preservation.
+8. **Compare authored revisions when needed:**
    ```bash
    python3 -m engine compare base.yaml head.yaml
    ```
    `compare` emits a JSON receipt keyed only by authored node and edge ids. It reports added, removed, changed, moved, and rerouted entities with exact field paths. Its mandatory limitation is: `Authored specification only; no runtime impact, causality, risk, or merge safety is inferred.`
-8. **Output** the final `.svg` to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
+9. **Output** the final `.svg` and requested `.drawio` companion to the working directory or user-specified path. Mention the icon-cache prerequisite only if this was the first render for a given provider.
 
 ## Spec fields at a glance
 
@@ -232,11 +236,11 @@ Every finding is a coded diagnostic carrying `code`, `severity`, `message`, `sub
 
 | Exit | Meaning | Action |
 |---|---|---|
-| 0 | `validate` completed with no error findings, or `deliver` atomically committed a validated SVG | Hand off the receipt or SVG; any warnings are deliberate, explainable tradeoffs |
+| 0 | `validate` completed with no error findings, or `deliver` atomically committed a validated SVG bundle | Hand off the receipt and requested artifacts; any warnings are deliberate, explainable tradeoffs |
 | 1 | A blocking finding or operational delivery failure | Apply a diagnostic's `supported_fixes`, or correct the output path or filesystem permissions |
 | 2 | Usage error — missing subcommand, unreadable spec path, unknown flag or profile value | Correct the command |
 
-`--json` prints the receipt and nothing else on stdout. It contains `input` and `artifact` SHA-256/byte records, `output.written`, `validation.checks_passed`/`checks_total`, quality, composition status, severity counts, and diagnostics. `--quality showcase` raises `composition/*` route-geometry findings to errors; the default `standard` keeps them as warnings.
+`--json` prints the receipt and nothing else on stdout. It contains `input` and primary-SVG `artifact` SHA-256/byte records, `output.written`, `validation.checks_passed`/`checks_total`, quality, composition status, severity counts, and diagnostics. When `--emit drawio` is present, `artifacts` lists every committed output with its path, SHA-256, and byte count. `--quality showcase` raises `composition/*` route-geometry findings to errors; the default `standard` keeps them as warnings.
 
 | Code | Meaning | Fix |
 |---|---|---|
@@ -252,7 +256,7 @@ A fetch failure (`could not fetch <provider> icons`) is a network problem, not a
 
 ## Output
 
-Report the output path, any warning-severity findings left unresolved and why, and — only on the first render for a given provider — the icon-cache fetch cost.
+Report the SVG path, requested draw.io companion path, and any warning-severity findings left unresolved and why. Mention the icon-cache fetch cost only on the first render for a given provider.
 
 ## Reference table
 

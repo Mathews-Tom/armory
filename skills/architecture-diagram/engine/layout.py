@@ -131,9 +131,11 @@ def compute_positions(
     spec: Spec, rank: dict[str, int], order: dict[str, int]
 ) -> dict[str, Box]:
     """Place node boxes from authored direction and computed rank/order."""
-    top_offset = MARGIN + TITLE_H
-    if spec.zones:
-        top_offset += ZONE_PAD + ZONE_LABEL_H
+    deepest_zone = max(
+        (len(zone_ancestors(spec, zone.id)) + 1 for zone in spec.zones),
+        default=0,
+    )
+    top_offset = MARGIN + TITLE_H + deepest_zone * (ZONE_PAD + ZONE_LABEL_H)
     boxes: dict[str, Box] = {}
     for node in spec.nodes:
         rank_id, order_id = rank[node.id], order[node.id]

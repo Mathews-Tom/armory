@@ -1,0 +1,17 @@
+title: Editable review fixture
+zones:
+  - id: vpc
+    label: VPC
+nodes:
+  - id: public
+    label: Public endpoint
+  - id: service
+    label: Service
+    sublabel: Private tier
+    zone: vpc
+edges:
+  - id: ingress
+    from: public
+    to: service
+    label: HTTPS
+    type: realtime

@@ -8,6 +8,7 @@ import pytest
 
 from engine.commands import main
 from engine.evidence import verify_sources
+from engine.receipts import sha256
 from engine.spec import load_spec
 
 
@@ -182,3 +183,45 @@ def test_deliver_verifies_before_writing(
     assert sidecar["repository"]["origin"] == "https://example.invalid/diagram.git"
     assert 'data-source-ids="api"' in output.read_text()
     assert "VERIFIED SRC 1" in output.read_text()
+
+
+def test_combined_delivery_commits_a_coherent_source_evidence_bundle(
+    repository: tuple[Path, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo, revision = repository
+    spec_path = _write_spec(repo, revision, "src/api.py", "[1, 3]")
+    output = repo / "diagram.svg"
+    drawio_path = repo / "diagram.drawio"
+    sidecar_path = repo / "diagram.sources.json"
+
+    assert (
+        main(
+            [
+                "deliver",
+                str(spec_path),
+                "--verify-sources",
+                "--emit",
+                "drawio",
+                "--json",
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+
+    receipt = json.loads(capsys.readouterr().out)
+    assert [artifact["path"] for artifact in receipt["artifacts"]] == [
+        str(output),
+        str(drawio_path),
+        str(sidecar_path),
+    ]
+    for artifact, path in zip(
+        receipt["artifacts"], (output, drawio_path, sidecar_path), strict=True
+    ):
+        assert artifact == {
+            "path": str(path),
+            "sha256": sha256(path.read_bytes()),
+            "bytes": path.stat().st_size,
+        }
+    assert "source-badge-node-service" in drawio_path.read_text()

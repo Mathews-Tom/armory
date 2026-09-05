@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="architecture-diagram" name="Architecture Diagram">
+    <mxGraphModel grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="zone-vpc" value="VPC" style="swimlane;horizontal=0;startSize=28;rounded=1;arcSize=8;html=1;fillColor=#F5F3FF;strokeColor=#7C3AED;fontColor=#7C3AED;" parent="1" vertex="1">
+          <mxGeometry x="220" y="76" width="164" height="188" as="geometry" />
+        </mxCell>
+        <mxCell id="node-public" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#3A3A3A;" parent="1" vertex="1">
+          <mxGeometry x="32" y="124" width="120" height="118" as="geometry" />
+        </mxCell>
+        <mxCell id="icon-public" value="" style="shape=ellipse;html=1;fillColor=#3A3A3A;strokeColor=#3A3A3A;" parent="node-public" vertex="1">
+          <mxGeometry x="28" y="0" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="label-public" value="Public endpoint" style="text;html=1;align=center;verticalAlign=middle;fontStyle=1;fontColor=#1F2937;" parent="node-public" vertex="1">
+          <mxGeometry x="0" y="70" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="node-service" value="" style="rounded=1;arcSize=8;html=1;fillColor=#FFFFFF;strokeColor=#3A3A3A;" parent="zone-vpc" vertex="1">
+          <mxGeometry x="22" y="48" width="120" height="118" as="geometry" />
+        </mxCell>
+        <mxCell id="icon-service" value="" style="shape=ellipse;html=1;fillColor=#3A3A3A;strokeColor=#3A3A3A;" parent="node-service" vertex="1">
+          <mxGeometry x="28" y="0" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="label-service" value="Service" style="text;html=1;align=center;verticalAlign=middle;fontStyle=1;fontColor=#1F2937;" parent="node-service" vertex="1">
+          <mxGeometry x="0" y="70" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="sublabel-service" value="Private tier" style="text;html=1;align=center;verticalAlign=middle;fontColor=#6B7280;" parent="node-service" vertex="1">
+          <mxGeometry x="0" y="90" width="120" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-ingress-0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#2563EB;" parent="1" edge="1" source="node-public" target="node-service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-label-ingress-0" value="HTTPS" style="text;html=1;align=center;verticalAlign=middle;fontColor=#2563EB;" parent="edge-ingress-0" vertex="1">
+          <mxGeometry x="0" y="-16" width="90" height="18" as="geometry" relative="1" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

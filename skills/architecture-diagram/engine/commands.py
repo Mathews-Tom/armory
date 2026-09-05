@@ -13,6 +13,7 @@ from pathlib import Path
 from . import fetch_icons
 from .compare import compare_specs
 from .delivery import BundleCommitError, commit_bundle
+from .drawio import emit_drawio as emit_drawio_xml
 from .diagnostics import (
     QUALITY_PROFILES,
     QUALITY_STANDARD,
@@ -306,6 +307,7 @@ def _deliver(
     sha: str | None,
     quality: str,
     verify_sources_enabled: bool,
+    emit_drawio_enabled: bool,
 ) -> tuple[int, dict[str, object], list[Diagnostic]]:
     loaded = _read_spec("deliver", spec_path, output, quality)
     if len(loaded) == 3:
@@ -347,13 +349,26 @@ def _deliver(
                 return EXIT_FAILURE, receipt, diagnostics
             candidate = stage_dir / "candidate.svg"
             candidate.write_bytes(artifact_bytes)
-            sidecar_candidate = None
-            sidecar_path = None
+            replacements: list[tuple[Path, Path]] = [(candidate, output)]
+            if emit_drawio_enabled:
+                assert spec is not None
+                assert result is not None
+                drawio_path = output.with_name(f"{output.stem}.drawio")
+                drawio_candidate = stage_dir / "candidate.drawio"
+                drawio_candidate.write_text(
+                    emit_drawio_xml(
+                        spec,
+                        result,
+                        source_badges=verify_sources_enabled,
+                    )
+                )
+                replacements.append((drawio_candidate, drawio_path))
             if verified_sources is not None:
                 sidecar_path = output.with_name(f"{output.stem}.sources.json")
                 sidecar_candidate = stage_dir / "candidate.sources.json"
                 sidecar = sidecar_bytes(verified_sources, output, artifact_bytes)
                 sidecar_candidate.write_bytes(sidecar)
+                replacements.append((sidecar_candidate, sidecar_path))
                 evidence["sidecar"] = {
                     "path": str(sidecar_path),
                     "sha256": sha256(sidecar),
@@ -380,6 +395,16 @@ def _deliver(
                     evidence=evidence,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
+            artifacts = None
+            if emit_drawio_enabled:
+                artifacts = [
+                    {
+                        "path": str(target),
+                        "sha256": sha256(candidate.read_bytes()),
+                        "bytes": candidate.stat().st_size,
+                    }
+                    for candidate, target in replacements
+                ]
             receipt = build_receipt(
                 "deliver",
                 spec_path,
@@ -392,6 +417,7 @@ def _deliver(
                 delivery_stage="commit",
                 profile_active=spec is not None and spec.profile is not None,
                 evidence=evidence,
+                artifacts=artifacts,
             )
             try:
                 (stage_dir / "receipt.json").write_text(
@@ -408,9 +434,6 @@ def _deliver(
                     exc,
                 )
             try:
-                replacements = [(candidate, output)]
-                if sidecar_candidate is not None and sidecar_path is not None:
-                    replacements.append((sidecar_candidate, sidecar_path))
                 commit_bundle(stage_dir, replacements)
             except BundleCommitError as exc:
                 return _delivery_failure(
@@ -471,6 +494,12 @@ def main(argv: list[str] | None = None) -> int:
     deliver_parser.add_argument(
         "-o", "--output", type=Path, required=True, help="target SVG path"
     )
+    deliver_parser.add_argument(
+        "--emit",
+        choices=("drawio",),
+        default=None,
+        help="stage and atomically deliver the requested companion artifact",
+    )
     compare_parser = commands.add_parser(
         "compare", help="compare two authored specifications into a JSON receipt"
     )
@@ -500,6 +529,7 @@ def main(argv: list[str] | None = None) -> int:
             args.sha,
             args.quality,
             args.verify_sources,
+            args.emit == "drawio",
         )
     _report(receipt, args.as_json or getattr(args, "layout_json", False), diagnostics)
     return code

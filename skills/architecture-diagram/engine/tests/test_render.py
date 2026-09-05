@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import xml.etree.ElementTree as ElementTree
 
 import pytest
 
@@ -762,6 +763,38 @@ class TestEndToEndRender:
         result = do_render(spec, _icon_lookup)
         assert 'id="zone-vpc"' in result.svg
         assert "VPC" in result.svg
+
+    def test_title_clears_outermost_zone_label(self) -> None:
+        spec = load_spec(
+            """
+title: Cross-Cloud Analytics Mesh
+zones:
+  - id: region
+    label: AWS · us-east-1
+  - id: boundary
+    label: Ingestion Boundary
+    parent: region
+nodes:
+  - id: source
+  - id: destination
+    zone: boundary
+edges:
+  - from: source
+    to: destination
+"""
+        )
+        result = do_render(spec, _icon_lookup)
+        document = ElementTree.fromstring(result.svg)
+        namespace = {"svg": "http://www.w3.org/2000/svg"}
+        labels = {
+            text.text: text for text in document.findall(".//svg:text", namespace)
+        }
+
+        assert (
+            float(labels["AWS · us-east-1"].attrib["y"])
+            - float(labels["Cross-Cloud Analytics Mesh"].attrib["y"])
+            >= 17
+        )
 
     def test_legend_appears_only_with_multiple_edge_types(self) -> None:
         spec_text = "nodes:\n  - id: a\n  - id: b\n  - id: c\nedges:\n  - from: a\n    to: b\n    type: realtime\n  - from: b\n    to: c\n    type: batch\n"
