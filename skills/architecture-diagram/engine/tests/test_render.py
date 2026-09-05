@@ -48,6 +48,7 @@ from engine.icons import (
     IconRef,
 )
 from engine.model import Edge, Node, Spec
+from engine.receipts import RECEIPT_SCHEMA_VERSION, sha256
 from engine.routing import RoutedEdge, route_edges
 from engine.spec import SpecError, load_spec
 from engine.svg import check_editability
@@ -1179,7 +1180,7 @@ class TestCliContract:
             "warnings": 0,
         }
         assert payload["diagnostics"] == []
-        assert payload["schema_version"] == commands.RECEIPT_SCHEMA_VERSION
+        assert payload["schema_version"] == RECEIPT_SCHEMA_VERSION
 
     def test_deliver_commits_the_validated_candidate(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -1203,7 +1204,7 @@ class TestCliContract:
         assert payload["command"] == "deliver"
         assert payload["output"] == {"path": str(out), "written": True}
         assert payload["artifact"]["bytes"] == len(out.read_bytes())
-        assert payload["artifact"]["sha256"] == commands._sha256(out.read_bytes())
+        assert payload["artifact"]["sha256"] == sha256(out.read_bytes())
 
     def test_json_mode_puts_nothing_but_json_on_stdout(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]

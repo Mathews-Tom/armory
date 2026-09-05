@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -18,7 +17,6 @@ from .diagnostics import (
     QUALITY_STANDARD,
     SEVERITY_ERROR,
     Diagnostic,
-    count_by_severity,
 )
 from .geometry_checks import edge_label_box
 from .icons import (
@@ -31,151 +29,12 @@ from .layout import box_evidence
 from .model import Spec
 from .pipeline import RenderResult, render
 from .spec import SpecError, load_spec
+from .receipts import comparison_receipt, receipt as build_receipt
 
 
 EXIT_OK = 0
 EXIT_FAILURE = 1
 EXIT_USAGE = 2
-
-RECEIPT_SCHEMA_VERSION = 1
-COMPARISON_LIMITATIONS = "Authored specification only; no runtime impact, causality, risk, or merge safety is inferred."
-
-
-def _comparison_receipt(
-    base_path: Path,
-    base_bytes: bytes | None,
-    head_path: Path,
-    head_bytes: bytes | None,
-    diagnostics: list[Diagnostic],
-    comparison: dict[str, list[dict[str, object]]] | None = None,
-) -> dict[str, object]:
-    return {
-        "schema_version": RECEIPT_SCHEMA_VERSION,
-        "ok": not any(d.severity == SEVERITY_ERROR for d in diagnostics),
-        "command": "compare",
-        "type": "architecture-diagram",
-        "base": {
-            "path": str(base_path),
-            "sha256": _sha256(base_bytes) if base_bytes is not None else None,
-            "bytes": len(base_bytes) if base_bytes is not None else None,
-        },
-        "head": {
-            "path": str(head_path),
-            "sha256": _sha256(head_bytes) if head_bytes is not None else None,
-            "bytes": len(head_bytes) if head_bytes is not None else None,
-        },
-        "comparison": comparison or {"nodes": [], "edges": []},
-        "limitations": COMPARISON_LIMITATIONS,
-        "diagnostics": [diagnostic.to_dict() for diagnostic in diagnostics],
-    }
-
-
-_VALIDATION_CHECKS = (
-    "spec",
-    "layout",
-    "route-rhythm",
-    "edge-through-node",
-    "proper-crossing",
-    "ambiguous-corridor",
-    "label-route-clearance",
-    "icons",
-    "labels",
-    "editability",
-)
-
-
-def _sha256(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
-
-
-def _check_name(diagnostic: Diagnostic) -> str:
-    code = diagnostic.code
-    if code.startswith("spec/"):
-        return "spec"
-    if code.startswith("profile/"):
-        return "profile"
-    if code in ("layout/node-overlap", "layout/zone-overlap"):
-        return "layout"
-    if code == "layout/label-overflow":
-        return "labels"
-    if code.startswith("composition/micro-segment") or code.startswith(
-        "composition/short-interior-segment"
-    ):
-        return "route-rhythm"
-    if code == "composition/edge-through-node":
-        return "edge-through-node"
-    if code == "composition/proper-crossing":
-        return "proper-crossing"
-    if code == "composition/ambiguous-corridor":
-        return "ambiguous-corridor"
-    if code == "composition/label-route-clearance":
-        return "label-route-clearance"
-    if code.startswith("icon/"):
-        return "icons"
-    return "editability"
-
-
-def _validation_receipt(
-    diagnostics: list[Diagnostic], quality: str, profile_active: bool = False
-) -> dict[str, object]:
-    checks = _VALIDATION_CHECKS + (("profile",) if profile_active else ())
-    counts = count_by_severity(diagnostics)
-    composition = [d for d in diagnostics if d.code.startswith("composition/")]
-    if any(d.severity == SEVERITY_ERROR for d in composition):
-        composition_status = "failed"
-    elif composition:
-        composition_status = "warnings"
-    else:
-        composition_status = "passed"
-    failed_checks = {
-        _check_name(d) for d in diagnostics if d.severity == SEVERITY_ERROR
-    }
-    return {
-        "checks_passed": len(checks) - len(failed_checks),
-        "checks_total": len(checks),
-        "quality": quality,
-        "composition_status": composition_status,
-        "errors": counts["errors"],
-        "warnings": counts["warnings"],
-    }
-
-
-def _receipt(
-    command: str,
-    input_path: Path,
-    input_bytes: bytes | None,
-    artifact_bytes: bytes | None,
-    diagnostics: list[Diagnostic],
-    quality: str,
-    output: Path | None = None,
-    written: bool = False,
-    delivery_stage: str | None = None,
-    profile_active: bool = False,
-) -> dict[str, object]:
-    receipt: dict[str, object] = {
-        "schema_version": RECEIPT_SCHEMA_VERSION,
-        "ok": not any(d.severity == SEVERITY_ERROR for d in diagnostics),
-        "command": command,
-        "type": "architecture-diagram",
-        "input": {
-            "path": str(input_path),
-            "sha256": _sha256(input_bytes) if input_bytes is not None else None,
-            "bytes": len(input_bytes) if input_bytes is not None else None,
-        },
-        "artifact": {
-            "sha256": _sha256(artifact_bytes) if artifact_bytes is not None else None,
-            "bytes": len(artifact_bytes) if artifact_bytes is not None else None,
-        },
-        "output": {
-            "path": str(output) if output is not None else None,
-            "written": written,
-        },
-        "validation": _validation_receipt(diagnostics, quality, profile_active),
-        "diagnostics": [d.to_dict() for d in diagnostics],
-    }
-    if delivery_stage is not None:
-        receipt["delivery_stage"] = delivery_stage
-    return receipt
 
 
 def _layout_report(spec: Spec, result: RenderResult) -> dict[str, object]:
@@ -252,7 +111,7 @@ def _input_failure(
     )
     return (
         EXIT_USAGE,
-        _receipt(
+        build_receipt(
             command,
             spec_path,
             None,
@@ -309,7 +168,7 @@ def _compare(
     if diagnostics:
         return (
             EXIT_FAILURE,
-            _comparison_receipt(
+            comparison_receipt(
                 base_path, base_bytes, head_path, head_bytes, diagnostics
             ),
             diagnostics,
@@ -323,14 +182,14 @@ def _compare(
         diagnostics = [exc.diagnostic]
         return (
             EXIT_FAILURE,
-            _comparison_receipt(
+            comparison_receipt(
                 base_path, base_bytes, head_path, head_bytes, diagnostics
             ),
             diagnostics,
         )
     return (
         EXIT_OK,
-        _comparison_receipt(
+        comparison_receipt(
             base_path, base_bytes, head_path, head_bytes, [], comparison
         ),
         [],
@@ -380,7 +239,7 @@ def _validate(
             candidate = Path(path) / "candidate.svg"
             candidate.write_bytes(artifact_bytes)
             artifact_bytes = candidate.read_bytes()
-    receipt = _receipt(
+    receipt = build_receipt(
         "validate",
         spec_path,
         spec_bytes,
@@ -415,7 +274,7 @@ def _delivery_failure(
     )
     return (
         EXIT_FAILURE,
-        _receipt(
+        build_receipt(
             "deliver",
             spec_path,
             spec_bytes,
@@ -455,7 +314,7 @@ def _deliver(
                 spec_text, _icon_lookup(cache_dir, sha), quality
             )
             if artifact_bytes is None:
-                receipt = _receipt(
+                receipt = build_receipt(
                     "deliver",
                     spec_path,
                     spec_bytes,
@@ -472,7 +331,7 @@ def _deliver(
             if os.stat(candidate).st_dev != os.stat(output_parent).st_dev:
                 raise OSError("candidate artifact is not on the output filesystem")
             if result is None or not result.ok:
-                receipt = _receipt(
+                receipt = build_receipt(
                     "deliver",
                     spec_path,
                     spec_bytes,
@@ -484,7 +343,7 @@ def _deliver(
                     profile_active=spec is not None and spec.profile is not None,
                 )
                 return EXIT_FAILURE, receipt, diagnostics
-            receipt = _receipt(
+            receipt = build_receipt(
                 "deliver",
                 spec_path,
                 spec_bytes,
