@@ -224,6 +224,36 @@ cases:
         target: "(block|DESIGN NO-GO|drift)"
         weight: 0.8
 
+  - id: isolated_lane_execution_and_verification
+    prompt: >
+      M7 and M8 are independent and ready. Gather each design gate's evidence without filling this
+      session with predecessor diffs and CI logs, run both implementations concurrently, and confirm
+      the merge gates without trusting either lane's own completion report.
+    fixtures: []
+    rubric:
+      - "collects design-gate evidence in dedicated read-only subagents while keeping verdicts and ledger appends serialized in the canonical session"
+      - "launches each implementation as an independent session in its own worktree with absolute paths"
+      - "verifies merge gates through a context that did not implement the milestone"
+      - "requires cited evidence rather than a lane's self-reported success"
+      - "keeps merge, rebase, retarget, cleanup, and release commands in the canonical session"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(subagent|isolated lane|evidence lane)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(worktree|independent session|claude -p)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(serial|canonical session|one writer|single writer)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(did not implement|independent verification|not.*self-report|unverified)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(cited evidence|citation|exact output|check conclusion)"
+        weight: 0.8
+
   - id: overlapping_parallel_milestones
     prompt: >
       M5 and M6 have no dependency edge and both report DESIGN GO, but their reconciled plans
