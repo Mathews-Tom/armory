@@ -229,6 +229,36 @@ cases:
       - type: matches_regex
         target: "(do not tag|do not publish|without source evidence)"
         weight: 0.8
+  - id: isolated_ingestion_lanes
+    prompt: >
+      The source material is a docs/ folder with fourteen large design documents plus an existing
+      repository. Create .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md without loading
+      every document into one context, and audit the written artifacts before reporting.
+    fixtures: []
+    rubric:
+      - "dispatches read-only ingestion and repository-grounding subagents in one batch instead of reading everything inline"
+      - "keeps authority resolution, gap calls, and artifact authoring in the planning session"
+      - "re-checks cited paths and sections before planning from returned evidence"
+      - "audits the written artifacts with a fresh read-only context that has no authoring history"
+      - "never lets a subagent write .docs artifacts, the history ledger, or .gitignore"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(subagent|isolated lane|read-only lane)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(one batch|single batch|parallel|concurrent)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(re-check|vet|verify).*(citation|path|section)|citation.*(re-check|vet|verify)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(audit|fresh context).*(artifact|written|quality gate)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(returns findings|never writes|writes nothing|only this session writes)"
+        weight: 0.8
+
   - id: negative_unresolved_destination
     prompt: "The destination itself is still unclear. Identify the questions we must resolve."
     fixtures: []
