@@ -1,0 +1,63 @@
+cases:
+  - id: capture_current_task
+    prompt: "/librarian capture --source current-task"
+    fixtures: []
+    rubric:
+      - "Parses capture mode and current-task source"
+      - "Delegates to skill-librarian without reading the source or implementing capture logic"
+      - "Returns the capture report unchanged"
+    trigger_expected: true
+
+  - id: review_filtered_batch
+    prompt: "/librarian review --target stacked-prs --limit 10"
+    fixtures: []
+    rubric:
+      - "Parses review mode, stacked-prs target, and integer limit 10"
+      - "Passes normalized options to skill-librarian"
+      - "Does not inspect the queue or add an approval decision"
+    trigger_expected: true
+
+  - id: status_all_targets
+    prompt: "/librarian status"
+    fixtures: []
+    rubric:
+      - "Parses status mode with no target filter"
+      - "Delegates to skill-librarian and returns its metadata-only report unchanged"
+    trigger_expected: true
+
+  - id: reject_limit_on_capture
+    prompt: "/librarian capture --limit 10"
+    fixtures: []
+    rubric:
+      - "Rejects --limit because capture accepts only --source"
+      - "Does not delegate or infer a corrected invocation"
+    trigger_expected: true
+
+  - id: reject_out_of_range_limit
+    prompt: "/librarian review --limit 0"
+    fixtures: []
+    rubric:
+      - "Rejects zero and requires an integer from 1 through 100"
+      - "Does not delegate an invalid limit"
+    trigger_expected: true
+
+  - id: direct_skill_refinement
+    prompt: "Refine the stacked-prs skill and run its evals."
+    fixtures: []
+    rubric:
+      - "Does not activate; direct refinement is not a librarian command"
+    trigger_expected: false
+
+  - id: automatic_stop_hook
+    prompt: "Install a Stop hook that records every session automatically."
+    fixtures: []
+    rubric:
+      - "Does not activate; automatic monitoring is outside the command surface"
+    trigger_expected: false
+
+  - id: decision_map_command
+    prompt: "/decision-map work #482"
+    fixtures: []
+    rubric:
+      - "Does not activate; decision-map owns this command"
+    trigger_expected: false
