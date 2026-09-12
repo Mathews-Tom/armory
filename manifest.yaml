@@ -1685,21 +1685,20 @@ packages:
     category: security
     difficulty: advanced
   - name: skill-librarian
-    version: 1.0.0
-    description: 'Reflective write-phase orchestrator that observes completed task transcripts and proposes additions or augmentations
-      to the armory skill library. Implements the write phase of the Memento-Skills reflective loop (arXiv 2603.18743): classifies
-      a conversation as handled by an existing skill, needing augmentation, or requiring a new draft. Routes drafts through
-      paper-to-skill''s specification stage and test-engineer''s generate-verify loop, gates on package-evaluator, and opens
-      a pull request tagged for human review. Triggers on: "librarian review", "review this transcript for new skills", "propose
-      a skill from this conversation", "draft skill from transcript", "catalog this workflow", "suggest skill addition", "analyze
-      conversation for skill gaps", "reflective skill review". NOT for refining in-progress skills (use test-engineer directly)
-      or creating skills from research papers (use paper-to-skill directly).'
+    version: 1.1.0
+    description: 'Reflective learning orchestrator for completed AI-agent work. Captures reusable corrections and workflow
+      gaps in a durable privacy-safe queue, reports queue status, and reviews bounded observation batches before proposing
+      package changes. Routes approved changes through Armory''s existing optimization, generation, eval, and human-PR gates.
+      Triggers on: "librarian capture", "capture this skill lesson", "record this reusable correction", "librarian status",
+      "librarian review", "review skill observations", "propose a skill from this conversation", "analyze conversation for
+      skill gaps". NOT for automatic session surveillance, direct package editing, or creating skills from research papers.'
     path: agents/skill-librarian
     source: https://github.com/Mathews-Tom/armory/blob/main/agents/skill-librarian/AGENT.md
     model: sonnet
     tags:
     - memento-skills
     - reflective-learning
+    - observation-capture
     - write-phase
     - skill-generation
     - sonnet
@@ -2105,6 +2104,24 @@ packages:
     category: development
     difficulty: intermediate
     phase: ship
+  - name: librarian
+    version: 1.0.0
+    description: 'Slash-command wrapper for the skill-librarian agent. `/librarian capture` records one reusable, privacy-safe
+      observation from a completed task; `/librarian status` reports queue metadata without reading evidence bodies; `/librarian
+      review` selects a bounded batch for human-gated disposition. Triggers on: "/librarian capture", "/librarian review",
+      "/librarian status", "record this skill lesson", "review skill observations", "show librarian backlog". Use this command
+      for explicit reflective capture and review, not automatic transcript monitoring or direct package refinement.'
+    path: commands/librarian
+    source: https://github.com/Mathews-Tom/armory/blob/main/commands/librarian/COMMAND.md
+    tags:
+    - skills
+    - reflection
+    - observations
+    - slash-command
+    - privacy
+    category: development
+    difficulty: advanced
+    phase: reflect
   - name: pr-swarm
     version: 1.0.0
     description: 'Slash-command wrapper for the pr-swarm skill. `/pr-swarm #123 #456` (or bare numbers, space- or comma-separated)
