@@ -152,6 +152,33 @@ Evidence contains durable locators, not copied transcripts. A local path may be
 stored in an `internal` observation but must be replaced with a non-identifying
 description before any public artifact is created.
 
+### Queue mutation protocol
+
+Every create, update, status transition, and archive move uses one store-wide
+lock:
+
+1. Generate a UUID owner token. Atomically create
+   `~/.armory/skill-librarian/.mutation.lock` (or the configured-root
+   equivalent) with the host runtime's exclusive-create primitive. Record the
+   token, PID, hostname, and acquisition time.
+2. If exclusive creation reports that the lock exists, return `queue_busy` and
+   make no queue mutation. Never wait indefinitely, overwrite the lock, or
+   delete a lock owned by another process. Report its metadata so a human can
+   verify a genuinely stale owner before removing it.
+3. After acquiring the lock, repeat the relevant queue scan and re-read every
+   record that will change. Decisions made before acquisition are stale.
+4. Serialize the complete YAML to a temporary file in the destination
+   directory, flush it, and atomically publish it. Use exclusive creation for a
+   new UUID path and atomic replacement for an existing record. Archive moves
+   must also be atomic within the store.
+5. In a `finally` path, re-read the lock and remove it only when its owner token
+   still matches this invocation. A missing or mismatched token is an error;
+   never remove that lock.
+
+Status mode does not acquire the lock. Atomic record publication and archive
+moves ensure it observes either the previous complete record or the next
+complete record, never a partially written YAML document.
+
 ## Capture Workflow
 
 ### Step 1 — Ingest one completed task
@@ -226,10 +253,11 @@ that a one-package target means siblings were considered.
 Only the controller agent writes. Subagents may return candidate observations
 with evidence, but they never create or modify queue files.
 
-Write one UUID-named file for a new observation. Re-read an existing file
-immediately before a deduplication update. After writing, read the stored
-record and verify its ID, status, privacy classification, targets, and
-principle.
+Acquire the store lock, repeat Step 4 inside the lock, and then write one
+UUID-named file for a new observation or atomically replace the matched record.
+After publishing, read the stored record and verify its ID, status, privacy
+classification, targets, principle, and instance count. Release only the lock
+owned by this invocation.
 
 Capture terminates here. It never invokes `paper-to-skill`,
 `package-optimizer`, `test-engineer`, `package-evaluator`, git, or GitHub.
@@ -351,8 +379,8 @@ After the user records the disposition:
 - blocked on a named external condition: set `status: parked`;
 - replaced by another record: set `status: superseded`.
 
-Move resolved records to `archive/` only after re-reading them and confirming
-the final status and reason.
+Acquire the store lock, re-read the selected records, and move resolved records
+to `archive/` atomically only after confirming the final status and reason.
 
 ## Review Output
 
@@ -395,24 +423,27 @@ Approval required: yes
 
 1. **Explicit invocation only.** No session-start, per-tool, or Stop hook
    activation ships with this agent.
-2. **One controller writer.** Subagents report candidates; only the parent
-   librarian writes observations.
+2. **One controller writer per invocation.** Subagents report candidates; only
+   the parent librarian writes observations, and every controller uses the
+   store-wide mutation lock.
 3. **Mode is a hard boundary.** Capture and status cannot draft, edit, spawn
    refinement, run git, or call GitHub.
 4. **Privacy precedes persistence.** Sensitive source material never enters the
    queue or a public artifact.
-5. **Deduplicate before writing.** Similarity is checked against the open queue
-   before minting a UUID.
-6. **No shared counters.** UUID filenames are immutable and never renumbered.
-7. **Review is bounded.** Apply target, age ordering, and limit before reading
+5. **Deduplicate while locked.** Repeat similarity checks after acquiring the
+   mutation lock and before minting a UUID.
+6. **Publish records atomically.** A reader sees a complete previous or next
+   record, never a partial write.
+7. **No shared counters.** UUID filenames are immutable and never renumbered.
+8. **Review is bounded.** Apply target, age ordering, and limit before reading
    full bodies.
-8. **Evidence before disposition.** An unverifiable observation cannot justify
+9. **Evidence before disposition.** An unverifiable observation cannot justify
    a package change.
-9. **Never infer ownership from path.** Read source and attribution metadata;
-   ask what generates the file when ownership remains unclear.
-10. **Librarian proposes; existing machinery implements.** Use
+10. **Never infer ownership from path.** Read source and attribution metadata;
+    ask what generates the file when ownership remains unclear.
+11. **Librarian proposes; existing machinery implements.** Use
     `package-optimizer`, `paper-to-skill`, `test-engineer`, and
     `package-evaluator` at their declared boundaries.
-11. **Never auto-merge.** Human review owns `librarian-approve`.
-12. **Fail loud.** Surface downstream errors; never convert partial work into a
+12. **Never auto-merge.** Human review owns `librarian-approve`.
+13. **Fail loud.** Surface downstream errors; never convert partial work into a
     successful capture, review, or PR.

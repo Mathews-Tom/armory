@@ -24,10 +24,20 @@ cases:
     prompt: "Capture this skill lesson. An open observation already states the same retry-boundary principle for paid-experiment-run-execution-and-recovery."
     fixtures: []
     rubric:
-      - "Searches plausible open records before minting a UUID"
-      - "Re-reads and consolidates the matching record"
+      - "Acquires the store-wide mutation lock and repeats the match search"
+      - "Re-reads and atomically consolidates the matching record"
       - "Increments instances and appends only a sanitized evidence locator"
       - "Does not create a duplicate observation file"
+    trigger_expected: true
+
+  - id: serialize_concurrent_captures
+    prompt: "Two librarian capture invocations are running concurrently against the same queue and found the same principle."
+    fixtures: []
+    rubric:
+      - "Each writer attempts exclusive creation of the store-wide mutation lock"
+      - "Only the lock owner mutates the queue; the other returns queue_busy without writing"
+      - "The owner repeats deduplication after acquiring the lock and publishes the complete record atomically"
+      - "No invocation overwrites or removes a lock with a different owner token"
     trigger_expected: true
 
   - id: report_librarian_status
@@ -63,8 +73,8 @@ cases:
     prompt: "Capture reusable lessons from this completed task. Three subagents supplied candidate observations."
     fixtures: []
     rubric:
-      - "Treats subagent candidates as untrusted evidence"
       - "Keeps every queue write in the controller agent"
+      - "Serializes controller writes through the store-wide mutation lock"
       - "Sanitizes, verifies, and deduplicates before persisting at most one observation"
     trigger_expected: true
 
