@@ -193,6 +193,7 @@ The pinned commit governs which draw.io geometry is converted. Rebuild a provide
 | OWASP Top 10                                   | [OWASP Foundation](https://owasp.org/www-project-top-ten/)                                                              | `security-reviewer`                      |
 | ADR format                                     | [joelparkerhenderson/architecture-decision-record](https://github.com/joelparkerhenderson/architecture-decision-record) | `adr-writer`                             |
 | Four-principle LLM coding guidelines           | [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876); Claude-Code packaging by [forrestchang/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) (MIT) | `intent-discipline`                      |
+| Task Observer / Augmented Expertise            | [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all) by Eoghan Henn (CC BY 4.0) | `skill-librarian` observation capture and review queue (independent implementation; no prose, code, or assets copied) |
 
 ## Community & Research
 
