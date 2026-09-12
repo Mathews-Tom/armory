@@ -1,0 +1,5 @@
+cases:
+  - name: rejects blank title
+    input:
+      title: "   "
+    error: "job title must not be empty"

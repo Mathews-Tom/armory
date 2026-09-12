@@ -1134,6 +1134,24 @@ packages:
     category: review
     difficulty: advanced
     phase: review
+  - name: repo-tutor
+    version: 1.0.0
+    description: Use when a user supplies a local repository path or remote Git URL and asks to "teach me this repo", "explain
+      this codebase simply", "show how this system works", "help me use this project", "onboard me to this repository", or
+      "show me how to build on it", especially when the result should be a visual or multipage HTML guide. Not for audits,
+      API references, or architecture-only diagrams.
+    path: skills/repo-tutor
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/repo-tutor/SKILL.md
+    tags:
+    - repository
+    - teaching
+    - onboarding
+    - architecture
+    - html
+    - mermaid
+    category: development
+    difficulty: advanced
+    phase: define
   - name: research-critique
     version: 1.0.1
     description: 'Critical analysis of research papers evaluating methodology, claims-evidence alignment, and contribution
