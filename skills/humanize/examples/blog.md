@@ -12,7 +12,7 @@
 
 > The productivity claims are slippery. GitHub says Copilot users "accept 30% of suggestions," but acceptance isn't correctness. If you don't have tests, you're guessing.
 
-**Patterns removed:** Significance inflation — "rapidly evolving technological landscape", "transformative force" (1), promotional — "groundbreaking", "incredibly promising" (4), negative parallelism — "It's not just about X; it's about Y" (9), rule of three — "ideate, iterate, and deliver" and "collaboration, and enhancing" (10), generic positive conclusion — "exciting times lie ahead" (24), AI vocabulary — "fostering", "enhancing" (7).
+**Patterns removed:** significance inflation — "rapidly evolving technological landscape", "transformative force"; promotional language — "groundbreaking", "incredibly promising"; negative parallelism — "It's not just about X; it's about Y"; rule of three — "ideate, iterate, and deliver"; formulaic upbeat conclusion — "exciting times lie ahead"; AI-frequency vocabulary — "fostering", "enhancing".
 
 ---
 
@@ -28,7 +28,7 @@
 
 > It's a solid upgrade if you're on a two-year-old model. If you bought last year's version, probably not worth it.
 
-**Patterns removed:** Promotional language — "remarkable", "impressive", "stunning", "powerful", "excellence" (4), copula avoidance — "boasts" (8), rule of three — "display, battery life, and processor" (10), superficial -ing — "showcasing" (3), generic conclusion — "significant step forward for the industry" (24), AI vocabulary — "enhanced", "commitment to" (7).
+**Patterns removed:** promotional language — "remarkable", "impressive", "stunning", "powerful", "excellence"; copula avoidance — "boasts"; rule of three — "display, battery life, and processor"; superficial -ing rider — "showcasing"; formulaic upbeat conclusion — "significant step forward for the industry"; AI-frequency vocabulary — "enhanced", "commitment to".
 
 ---
 
@@ -40,4 +40,4 @@
 **After (humanized):**
 > This guide covers setting up a Python dev environment from scratch: virtual environments, package management with uv, and VS Code configuration. Takes about 20 minutes. Assumes you have Python 3.12+ installed.
 
-**Patterns removed:** Chatbot artifacts — "Welcome to", "Let's dive in!" (19), AI vocabulary — "delve", "intricacies", "comprehensive", "essential", "enhance" (7), promotional — "streamline your workflow and enhance your productivity" (4), false range — "seasoned developer or just starting your coding journey" (12).
+**Patterns removed:** chatbot wrappers — "Welcome to", "Let's dive in!"; AI-frequency vocabulary — "delve", "intricacies", "comprehensive", "essential", "enhance"; promotional language — "streamline your workflow and enhance your productivity" and the sales-brochure range "seasoned developer or just starting your coding journey".
