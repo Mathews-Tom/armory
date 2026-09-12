@@ -158,6 +158,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [remotion-video](skills/remotion-video/)                             | Production motion graphics using Remotion (React) — branded content, data-driven video, audio sync, TailwindCSS      |
 | [html-presentation](skills/html-presentation/)                       | Convert documents and outlines into self-contained HTML slide presentations                                          |
 | [marp-slides](skills/marp-slides/)                                   | Author MARP Markdown slide decks exportable to PDF, PPTX, and HTML via marp-cli                                     |
+| [repo-tutor](skills/repo-tutor/)                                     | Teach a local or remote repository through an evidence-grounded, multipage offline HTML learning guide                |
 | [static-web-artifacts-builder](skills/static-web-artifacts-builder/) | Self-contained interactive HTML artifacts — infographics, dashboards, diagrams                                       |
 | [md-to-pdf](skills/md-to-pdf/)                                       | Markdown to styled PDF with Mermaid diagrams, KaTeX math, and syntax highlighting                                    |
 
