@@ -8,7 +8,7 @@
 **After (humanized):**
 > This study examines how urbanization affects biodiversity, focusing on the role of green infrastructure in maintaining ecological function. The findings suggest that targeted urban planning decisions — specifically green corridors and retention ponds — correlate with higher species counts in adjacent areas. Nature-based solutions improved three measured ecosystem services: stormwater absorption, pollination rates, and ambient temperature regulation.
 
-**Patterns removed:** Significance inflation (1), AI vocabulary — "delve", "intricate", "interplay", "crucial", "fostering", "enduring", "vibrant", "landscape" (7), superficial -ing phrases (3), promotional language — "groundbreaking" (4).
+**Patterns removed:** significance inflation; AI-frequency vocabulary — "delve", "intricate", "interplay", "crucial", "fostering", "enduring", "vibrant", "landscape"; superficial -ing riders; promotional language — "groundbreaking".
 
 ---
 
@@ -20,7 +20,7 @@
 **After (humanized):**
 > Transformer architectures have become the dominant approach in NLP research since Vaswani et al. (2017). Attention mechanisms replaced recurrent processing as the core component in language models, with BERT (Devlin et al., 2019) and GPT-2 (Radford et al., 2019) demonstrating state-of-the-art results across benchmark tasks. The primary limitation is computational cost: training GPT-3 required an estimated $4.6M in compute (Li et al., 2020), restricting replication to well-funded labs.
 
-**Patterns removed:** Significance inflation — "evolving landscape", "pivotal shift" (1), vague attributions — "Several studies", "Experts argue" (5), AI vocabulary — "key role", "underscoring", "valuable", "garner" (7), copula avoidance — "serve as" (8), formulaic challenges (6).
+**Patterns removed:** significance inflation — "evolving landscape", "pivotal shift"; vague attributions — "Several studies", "Experts argue"; AI-frequency vocabulary — "key role", "underscoring", "valuable", "garner"; copula avoidance — "serve as"; formulaic challenges section.
 
 ---
 
@@ -32,4 +32,4 @@
 **After (humanized):**
 > We surveyed 450 participants using a stratified random sample drawn from the university's enrollment database. The survey included 32 Likert-scale items and 4 open-ended questions, administered online via Qualtrics between March and May 2024. The sample size exceeds the minimum of 385 required for 95% confidence at 5% margin of error (Cochran, 1977).
 
-**Patterns removed:** Filler phrases — "In order to", "It is important to note that" (22), promotional language — "robust and reliable", "comprehensive" (4), vague language replaced with specifics throughout.
+**Patterns removed:** filler phrases — "In order to", "It is important to note that"; promotional language — "robust and reliable", "comprehensive"; vague language replaced with specifics throughout.

@@ -573,7 +573,7 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: humanize
-    version: 1.0.1
+    version: 2.0.0
     description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts. Triggers on: "humanize
       text", "make this sound human", "remove AI patterns", "rewrite to sound natural", "make this less AI", "de-slop this",
       "not sound like ChatGPT", "human pass".'
@@ -581,9 +581,9 @@ packages:
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/humanize/SKILL.md
     tags:
     - writing
-    - ai-detection
     - natural-language
     - rewriting
+    - editing
     category: review
     difficulty: intermediate
   - name: idea-validator
@@ -651,7 +651,7 @@ packages:
     category: visualization
     difficulty: beginner
   - name: linkedin-post-style
-    version: 1.2.2
+    version: 1.2.3
     description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance.
       Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I
       phrase this".'
@@ -707,7 +707,7 @@ packages:
     difficulty: advanced
     phase: review
   - name: manuscript-review
-    version: 1.3.0
+    version: 1.3.1
     description: 'Pre-publication manuscript audit producing a section-level refactoring report with citation hygiene and
       submission-readiness checks. Triggers on: "review my paper", "check before submission", "is this ready to submit", "pre-pub
       checklist", "refactor my paper", "check my references", "does the abstract work".'

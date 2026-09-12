@@ -169,6 +169,18 @@ Kosha's pre-registered real-model Gate-0 evaluation is also cited, as a measured
 
 The pinned commit governs which draw.io geometry is converted. Rebuild a provider cache with `python3 -m engine.fetch_icons --provider <provider> --force` after a digest failure or a pin bump; this does not fetch implicit `dev`-branch churn.
 
+### Wikipedia:Signs of AI writing — used by `humanize`, `linkedin-post-style`, `manuscript-review`
+
+**Source:** [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup
+**License:** CC BY-SA 4.0
+**Synced revision:** 2026-09-11
+
+**What we derived:**
+
+- The pattern taxonomy behind `_templates/detection-patterns.md` (synced into the three consumer skills' `references/`). The strength-class organization, all descriptive prose, and every before/after example are original to armory — no source text is copied, so no share-alike text obligation attaches. This record credits the taxonomy's origin.
+
+**Re-sync policy:** The source is a living page. When refreshing the pattern list, diff against the recorded revision date. Patterns the source retires or demotes move to `skills/humanize/references/historical-patterns.md` rather than being silently dropped — evals must never assert on a retired pattern.
+
 ## Conceptual Inspiration
 
 | Concept                                        | Source                                                                                                                  | Used by                                  |
@@ -194,5 +206,5 @@ The pinned commit governs which draw.io geometry is converted. Rebuild a provide
 ## Notes
 
 - Remotion's license has commercial use restrictions. Lightpanda is AGPL-3.0 — armory wraps these as skills without distributing their binaries.
-- Skills that are pure prompt engineering (e.g., `humanize`, `code-refiner`, `architecture-reviewer`) have no upstream library dependency.
+- Skills that are pure prompt engineering (e.g., `humanize`, `code-refiner`, `architecture-reviewer`) have no upstream library dependency. `humanize`'s pattern taxonomy derives from the Wikipedia source recorded under Vendoring Records.
 - The `immune` skill's Cheatsheet/Immune pattern draws from Stephanie Forrest's original Artificial Immune Systems research and aligns with Memento-Skills' stateful-prompt concept (arXiv 2603.18743) — cheatsheet entries act as positive-pattern memory, antibodies as negative-pattern memory.

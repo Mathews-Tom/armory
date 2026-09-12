@@ -12,7 +12,7 @@
 
 > Next milestone: staging deployment on March 20.
 
-**Patterns removed:** Chatbot artifacts — "I hope this email finds you well!", "Please don't hesitate to reach out" (19), filler — "I wanted to provide you with a comprehensive update" (22), promotional — "significant strides", "ambitious targets" (4), AI vocabulary — "aligned with", "key areas" (7), vague language replaced with specific dates, names, and status.
+**Patterns removed:** chatbot wrappers — "I hope this email finds you well!", "Please don't hesitate to reach out"; filler phrases — "I wanted to provide you with a comprehensive update"; promotional language — "significant strides", "ambitious targets"; AI-frequency vocabulary — "aligned with", "key areas"; vague language replaced with specific dates, names, and status.
 
 ---
 
@@ -24,7 +24,7 @@
 **After (humanized):**
 > The proposal is to replace the current batch-processing pipeline with a streaming architecture using Apache Kafka. This reduces data latency from 4 hours to under 30 seconds for the three dashboards the operations team uses daily. Integration with the existing PostgreSQL warehouse requires a Kafka Connect sink, estimated at 2 weeks of engineering time.
 
-**Patterns removed:** Significance inflation — "testament to", "pivotal role" (1), promotional — "innovative", "cutting-edge", "groundbreaking" (4), AI vocabulary — "fostering", "ensuring", "enhanced", "valuable", "key stakeholders" (7), copula avoidance — "serves as" (8), superficial -ing — "leveraging", "ensuring", "driving", "delivering" (3).
+**Patterns removed:** significance inflation — "testament to", "pivotal role"; promotional language — "innovative", "cutting-edge", "groundbreaking"; AI-frequency vocabulary — "fostering", "ensuring", "enhanced", "valuable", "key stakeholders"; copula avoidance — "serves as"; superficial -ing riders — "leveraging", "ensuring", "driving", "delivering".
 
 ---
 
@@ -42,4 +42,4 @@
 
 > Open item: nobody has confirmed who owns the data migration spec. Flagged for resolution by EOD Friday.
 
-**Patterns removed:** Copula avoidance — "served as" (8), AI vocabulary — "critical", "crucial", "key takeaways", "align", "fostering", "highlighted" (7), vague attributions — "it was noted" (5), filler — "Additionally" (22), superficial -ing — "ensuring", "maintaining", "fostering" (3). Replaced abstract summary with specific decisions, owners, and dates.
+**Patterns removed:** copula avoidance — "served as"; AI-frequency vocabulary — "critical", "crucial", "key takeaways", "align", "fostering", "highlighted"; vague attributions — "it was noted"; filler phrases — "Additionally"; superficial -ing riders — "ensuring", "maintaining", "fostering". Replaced abstract summary with specific decisions, owners, and dates.

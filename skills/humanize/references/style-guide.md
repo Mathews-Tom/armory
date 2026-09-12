@@ -1,6 +1,6 @@
 # Domain Style Profiles
 
-Voice calibration rules per writing domain. Apply the matching profile during Phase 3 (Vocabulary and Style Pass).
+Voice calibration rules per writing domain. Apply the matching profile during Phase 2 (draft the rewrite). Target tells are referenced by pattern name — see `detection-patterns.md`.
 
 ---
 
@@ -11,7 +11,7 @@ Voice calibration rules per writing domain. Apply the matching profile during Ph
 
 Rules:
 
-- Maintain hedging where epistemically appropriate ("suggests" vs. "proves") — but remove _excessive_ hedging (Pattern 23)
+- Maintain hedging where epistemically appropriate ("suggests" vs. "proves") — but remove _excessive_ hedging (stacked qualifiers)
 - Preserve citation structure and in-text references exactly
 - Passive voice is acceptable where convention demands it (methods sections)
 - Do not inject personality or first-person unless the original uses it
@@ -22,7 +22,7 @@ Rules:
 
 **Preserve:** Citation formats, section headings (Introduction/Methods/Results/Discussion), figure/table references, statistical notation.
 
-**Target tells to fix:** Significance inflation (Pattern 1), AI vocabulary (Pattern 7), formulaic challenges/future-work sections (Pattern 6), vague attributions (Pattern 5).
+**Target tells to fix:** significance inflation, AI-frequency vocabulary, formulaic challenges/future-outlook sections, vague attributions.
 
 ---
 
@@ -39,11 +39,11 @@ Rules:
 - Contractions are fine
 - First person ("I configured...", "we deployed...") is natural in technical blogs and docs
 - Replace promotional language with specifics: "blazing fast" -> "handles 10K requests/second"
-- Remove all chatbot artifacts aggressively (Pattern 19)
+- Remove all chatbot wrappers aggressively
 
 **Preserve:** Code blocks, command-line examples, version numbers, API endpoints, configuration values, error messages.
 
-**Target tells to fix:** Promotional language (Pattern 4), copula avoidance (Pattern 8), AI vocabulary (Pattern 7), inline-header lists (Pattern 15).
+**Target tells to fix:** promotional language, copula avoidance, AI-frequency vocabulary, boldface and inline-header lists.
 
 ---
 
@@ -65,7 +65,7 @@ Rules:
 
 **Preserve:** Personal anecdotes, named sources, specific experiences, the author's apparent opinions.
 
-**Target tells to fix:** All HIGH priority patterns, plus structural patterns (Rule of Three, Negative Parallelisms).
+**Target tells to fix:** all Class A staging patterns and Class B inflation patterns, plus forced triads.
 
 ---
 
@@ -88,7 +88,7 @@ Rules:
 
 **Preserve:** Links, usernames/handles, quoted text, platform-specific formatting.
 
-**Target tells to fix:** Communication artifacts (Pattern 19-21), hedging (Pattern 23), filler (Pattern 22), promotional language (Pattern 4).
+**Target tells to fix:** chatbot wrappers, knowledge-cutoff disclaimers, excessive hedging, filler phrases, promotional language.
 
 ---
 
@@ -109,7 +109,7 @@ Rules:
 
 **Preserve:** Names, dates, action items, deadlines, project references, organizational terminology.
 
-**Target tells to fix:** Sycophantic tone (Pattern 21), filler phrases (Pattern 22), AI vocabulary (Pattern 7), generic conclusions (Pattern 24).
+**Target tells to fix:** chatbot wrappers and sycophancy, filler phrases, AI-frequency vocabulary, formulaic upbeat conclusions.
 
 ---
 
@@ -130,4 +130,26 @@ Rules:
 
 **Preserve:** Product names, feature lists, pricing, CTAs, testimonials (if sourced), comparison data.
 
-**Target tells to fix:** Vague attributions (Pattern 5), generic positive conclusions (Pattern 24), AI vocabulary (Pattern 7), significance inflation (Pattern 1).
+**Target tells to fix:** vague attributions, formulaic upbeat conclusions, AI-frequency vocabulary, significance inflation.
+
+---
+
+## Engineering
+
+**Register:** Terse, factual, artifact-shaped. PR descriptions, commit messages, changelogs, code review replies, ADRs, issue comments.
+**Audience:** Maintainers, reviewers, future readers of `git log`.
+
+Rules:
+
+- Lead with what changed and why; observable behavior over intent narration
+- Commit subjects stay imperative; bodies explain what/why, never "this commit was created to..."
+- Describe the code as it is now — edit history belongs to version control, not the text (writing-about-the-previous-version pattern)
+- Review replies answer first and add only what is new to the reviewer (re-explaining-shared-context pattern)
+- Concrete numbers over adjectives: "removes ~4% idle CPU", not "significantly improves performance"
+- Issue/PR references, SHAs, version numbers, and error messages pass through exactly
+- Lists are natural for changelogs and parallel changes — do not force prose
+- No emoji in headings, no bold-label bullets that restate their label
+
+**Preserve:** Issue references, commit SHAs, semver strings, file paths, flag names, benchmark numbers, reviewer names.
+
+**Target tells to fix:** staged run-up, negative parallelism, boldface and inline-header lists, chatbot wrappers and sycophancy, writing about the previous version, re-explaining shared context, mechanical chat residue.

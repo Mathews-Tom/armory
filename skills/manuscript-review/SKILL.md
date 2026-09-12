@@ -2,7 +2,7 @@
 name: manuscript-review
 description: 'Pre-publication manuscript audit producing a section-level refactoring report with citation hygiene and submission-readiness checks. Triggers on: "review my paper", "check before submission", "is this ready to submit", "pre-pub checklist", "refactor my paper", "check my references", "does the abstract work".'
 metadata:
-  version: 1.3.0
+  version: 1.3.1
   complements:
     [
       manuscript-provenance,
@@ -174,12 +174,12 @@ drafted or polished with AI assistants often retain detectable tells.
 
 Focus on patterns relevant to academic writing:
 
-- Significance inflation (#1) — "pivotal", "groundbreaking", "paradigm shift"
-- AI-frequency vocabulary (#7) — "delve", "landscape", "tapestry", "underscore"
-- Copula avoidance (#8) — "serves as" instead of "is"
-- Vague attributions (#5) — "experts argue", "studies have shown" without citations
-- Filler phrases (#22) — "it is important to note that"
-- Excessive hedging (#23) — beyond what epistemically appropriate hedging requires
+- Significance inflation — "pivotal", "groundbreaking", "paradigm shift"
+- AI-frequency vocabulary — "delve", "landscape", "tapestry", "underscore"
+- Copula avoidance — "serves as" instead of "is"
+- Vague attributions — "experts argue", "studies have shown" without citations
+- Superficial -ing riders — "..., highlighting the importance of..."
+- Excessive hedging — beyond what epistemically appropriate hedging requires
 
 Skip patterns that are acceptable in academic prose:
 

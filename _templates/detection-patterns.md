@@ -1,275 +1,402 @@
 # AI Writing Detection Patterns
 
-Source: [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup. Last synced: 2025-01.
+Source: [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup (CC BY-SA 4.0). Last synced: revision of 2026-09-11. All examples below are original to this repository.
 
-24 patterns organized by detection priority. Each pattern includes signal words, the problem it creates, and a before/after example.
+29 patterns in five classes, ordered by strength. Class A patterns justify an edit on a single sighting. Patterns marked **weak alone** are habits careful writers also have — act on them only when several tells share the same passage. Cross-reference patterns by **name**; numbers are for compact reporting and may change between versions.
 
----
-
-## HIGH Priority — Content Inflation
-
-### Pattern 1: Significance and Legacy Inflation
-
-**Signal words:** stands/serves as, is a testament/reminder, vital/significant/crucial/pivotal/key role/moment, underscores/highlights importance, reflects broader, symbolizing ongoing/enduring/lasting, setting the stage, marking/shaping, represents/marks a shift, key turning point, evolving landscape, focal point, indelible mark, deeply rooted
-
-**Problem:** Puffs up importance by claiming arbitrary aspects represent or contribute to broader topics.
-
-Before:
-> The Statistical Institute of Catalonia was officially established in 1989, marking a pivotal moment in the evolution of regional statistics in Spain.
-
-After:
-> The Statistical Institute of Catalonia was established in 1989 to collect and publish regional statistics independently from Spain's national statistics office.
-
-### Pattern 2: Notability and Media Emphasis
-
-**Signal words:** independent coverage, local/regional/national media outlets, written by a leading expert, active social media presence
-
-**Problem:** Hits readers over the head with claims of notability without context.
-
-Before:
-> Her views have been cited in The New York Times, BBC, Financial Times, and The Hindu. She maintains an active social media presence with over 500,000 followers.
-
-After:
-> In a 2024 New York Times interview, she argued that AI regulation should focus on outcomes rather than methods.
-
-### Pattern 3: Superficial -ing Analyses
-
-**Signal words:** highlighting/underscoring/emphasizing..., ensuring..., reflecting/symbolizing..., contributing to..., cultivating/fostering..., encompassing..., showcasing...
-
-**Problem:** Tacks present participle phrases onto sentences to add fake depth.
-
-Before:
-> The temple's color palette resonates with the region's natural beauty, symbolizing Texas bluebonnets, reflecting the community's deep connection to the land.
-
-After:
-> The temple uses blue, green, and gold colors. The architect said these were chosen to reference local bluebonnets and the Gulf coast.
-
-### Pattern 4: Promotional Language
-
-**Signal words:** boasts a, vibrant, rich (figurative), profound, enhancing its, showcasing, exemplifies, commitment to, natural beauty, nestled, in the heart of, groundbreaking (figurative), renowned, breathtaking, must-visit, stunning
-
-**Problem:** Cannot maintain neutral tone, especially for cultural heritage topics.
-
-Before:
-> Nestled within the breathtaking region of Gonder, Alamata Raya Kobo stands as a vibrant town with a rich cultural heritage and stunning natural beauty.
-
-After:
-> Alamata Raya Kobo is a town in the Gonder region of Ethiopia, known for its weekly market and 18th-century church.
-
-### Pattern 5: Vague Attributions
-
-**Signal words:** Industry reports, Observers have cited, Experts argue, Some critics argue, several sources/publications
-
-**Problem:** Attributes opinions to vague authorities without specific sources.
-
-Before:
-> Experts believe it plays a crucial role in the regional ecosystem.
-
-After:
-> The river supports several endemic fish species, according to a 2019 survey by the Chinese Academy of Sciences.
-
-### Pattern 6: Formulaic Challenges Sections
-
-**Signal words:** Despite its... faces several challenges..., Despite these challenges, Challenges and Legacy, Future Outlook
-
-**Problem:** Formulaic "Challenges" sections that inflate and then dismiss problems.
-
-Before:
-> Despite its industrial prosperity, Korattur faces challenges typical of urban areas. Despite these challenges, Korattur continues to thrive.
-
-After:
-> Traffic congestion increased after 2015 when three new IT parks opened. The municipal corporation began a stormwater drainage project in 2022.
+Why these patterns exist: a language model writes whatever is most likely to come next, so by default it makes the choice that fits the widest range of readers and subjects. A person chooses for one reader and one subject. Word habits churn with every model release; the structural habits persist. That is why structure leads this list and vocabulary sits in the middle.
 
 ---
 
-## HIGH Priority — Vocabulary
+## Class A — Staging instead of stating
 
-### Pattern 7: AI-Frequency Vocabulary
+The strongest and most frequent tells in current model prose. One sighting justifies an edit.
 
-**Overused words:** Additionally, align with, crucial, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore (verb), valuable, vibrant
+### Pattern 1: Negative Parallelism (Not X but Y)
 
-**Problem:** These words appear at statistically anomalous frequency in post-2023 text and often co-occur.
+**Watch for:** "not just X, it's Y", "not only... but also...", "it's not X — it's Y", "X rather than Y", the contrast split across sentences ("This doesn't mean X. It means Y."), and the clipped negative tail ("..., no guesswork").
 
-Before:
-> Additionally, a distinctive feature is the incorporation of camel meat. An enduring testament to Italian colonial influence is the widespread adoption of pasta in the local culinary landscape.
-
-After:
-> Somali cuisine also includes camel meat, which is considered a delicacy. Pasta dishes, introduced during Italian colonization, remain common in the south.
-
-### Pattern 8: Copula Avoidance
-
-**Signal words:** serves as/stands as/marks/represents [a], boasts/features/offers [a]
-
-**Problem:** Substitutes elaborate constructions for simple "is", "are", "has".
+**Problem:** The negative half denies something nobody claimed, so the positive half sounds bigger. Weight is added without a claim. Keep a contrast only when the negative half corrects a belief the reader actually holds, or when both halves carry information.
 
 Before:
-> Gallery 825 serves as LAAA's exhibition space. The gallery features four separate spaces and boasts over 3,000 square feet.
+> The migration isn't just a version bump — it's a fundamental rethinking of how the service handles state.
 
 After:
-> Gallery 825 is LAAA's exhibition space. The gallery has four rooms totaling 3,000 square feet.
+> The migration moves session state out of the service and into Redis.
 
-### Pattern 22: Filler Phrases
+### Pattern 2: One-Line Closers and Dramatic Fragments
+
+**Watch for:** a one-sentence paragraph that restates the paragraph above it; "That's the real win."; "Read that again."; "Let that sink in."; the same closer after several sections; rows of fragments ("No config. No setup. No surprises."); word-by-word emphasis ("every. single. request.").
+
+**Problem:** The line asks the reader to pause on a claim instead of adding one. A short sentence earns its place when it carries a new fact. Cut closers that repeat; merge fragment rows into a sentence with a specific claim.
+
+Before:
+> The cache cut median latency from 80ms to 12ms.
+>
+> That's the real win.
+
+After:
+> The cache cut median latency from 80ms to 12ms.
+
+### Pattern 3: Deep-Sounding Sayings
+
+**Watch for:** "the real question is", "at its core", "what really matters", "the heart of the matter", "X is the language/currency/architecture of Y", "X becomes a trap", "X isn't a tool, it's a mindset".
+
+**Problem:** An ordinary point is dressed as a hidden truth or aphorism, and the dressing adds no detail. Replace the saying with the specific claim it gestures at.
+
+Before:
+> At its core, observability is the language of trust between a team and its systems.
+
+After:
+> Traces let the on-call engineer see which downstream call failed without guessing.
+
+### Pattern 4: Staged Run-Up
+
+**Watch for:** "Let's dive in", "let's explore", "here's what you need to know", "without further ado", "Here's the thing:", "Honestly?", "Let's be honest", standalone "Look," before a routine claim.
+
+**Problem:** The writer announces the point or stages a moment of candor instead of making the point. Delete the run-up and state the point. "Honestly" inside a casual sentence is ordinary; the tell is the standalone opener.
+
+Before:
+> Here's the thing: connection pooling matters more than most teams realize. Let's break down why.
+
+After:
+> Each new database connection costs a TLS handshake and an auth round trip, so a pool of warm connections saves 40-80ms per request.
+
+### Pattern 5: Arguing With No One
+
+**Watch for:** "This isn't mainly about...", "I'm not saying...", "To be clear,", "Don't get me wrong,", "Some might argue... but", "A tempting approach would be...", "One might be tempted to...", "You might think... but".
+
+**Problem:** The text rebuts an objection or rejects an option that appears nowhere else — usually residue from an earlier draft. Delete the phantom debate; if it hides a real claim, state the claim. Keep an objection the text attributes to a real source and answers in full, and keep an alternative a reader would genuinely weigh. Several unrelated rejections in a row are a stronger sign than one.
+
+Before:
+> A tempting approach would be to retry the whole batch, but that would double-process successful rows. Instead, the worker retries only failed rows.
+
+After:
+> The worker retries only failed rows, so successful rows are never double-processed.
+
+---
+
+## Class B — Inflation and Borrowed Authority
+
+The fact underneath is usually sound. Keep the fact, cut the dressing. Act on one sighting.
+
+### Pattern 6: Significance and Legacy Inflation
+
+**Watch for:** "stands as a testament", "marks a pivotal moment", "plays a key/vital/crucial role", "underscores the importance", "reflects a broader trend", "setting the stage for", "evolving landscape", "indelible mark", "deeply rooted", "represents a shift".
+
+**Problem:** An ordinary detail is claimed to mark a change, prove a legacy, or embody a trend. Keep the fact, drop the significance claim.
+
+Before:
+> The 2019 rewrite marked a pivotal moment in the platform's evolution, setting the stage for the microservices architecture that followed.
+
+After:
+> The 2019 rewrite split the monolith's billing and auth modules into separate services.
+
+### Pattern 7: Promotional Language
+
+**Watch for:** "boasts", "vibrant", "rich" (figurative), "nestled", "breathtaking", "stunning", "renowned", "groundbreaking" (figurative), "must-visit", "state-of-the-art", "seamless", "cutting-edge", "world-class", sales-brochure ranges like "whether you're a beginner or a seasoned expert".
+
+**Problem:** Neutral description slides into advertisement. State what the thing is and what it measurably does.
+
+Before:
+> The library boasts a seamless, cutting-edge API that empowers developers of all skill levels.
+
+After:
+> The library exposes four functions and needs no configuration for the default case.
+
+### Pattern 8: Superficial -ing Analyses
+
+**Watch for:** trailing participle phrases: "..., highlighting...", "..., underscoring...", "..., reflecting...", "..., showcasing...", "..., ensuring...", "..., fostering...", "..., contributing to...".
+
+**Problem:** A clause of fake analysis rides on the end of a factual sentence, asserting meaning the source never gave. Keep only riders the source supports; otherwise end the sentence at the fact.
+
+Before:
+> The team adopted trunk-based development, reflecting its deep commitment to engineering excellence and fostering a culture of continuous delivery.
+
+After:
+> The team adopted trunk-based development. Merge conflicts dropped by half in the first quarter.
+
+### Pattern 9: Notability and Borrowed Authority
+
+**Watch for:** "cited in NYT, BBC, and Forbes", "written by a leading expert", "recognized globally", "an active social media presence", lists of outlets or awards without any specific claim.
+
+**Problem:** The text asserts that a subject matters by stacking media mentions or credentials instead of saying anything. Name one real source and what it actually said, or cut the list.
+
+Before:
+> Her work has been featured in TechCrunch, Wired, and The Verge, and she is widely recognized as a thought leader in distributed systems.
+
+After:
+> In a 2025 Wired interview she argued that consensus protocols are over-deployed for workloads that tolerate stale reads.
+
+### Pattern 10: Vague Attributions
+
+**Watch for:** "Experts believe", "Industry reports suggest", "Observers have noted", "Some critics argue", "Studies have shown" with no study named.
+
+**Problem:** Opinions attributed to authorities that are never identified. Name the source and what it said, or remove the claim.
+
+Before:
+> Experts agree that monorepos improve developer productivity in most organizations.
+
+After:
+> Google's 2016 paper on its monorepo reports simplified dependency management across 25,000 engineers; it does not measure productivity directly.
+
+### Pattern 11: Vague Connection or Association
+
+**Watch for:** "associated with", "in association with", "connected to", "in connection with", "linked to", "tied to".
+
+**Problem:** Two things are declared connected without saying how. "She was associated with the project's leadership" hides whether she led it, advised it, or attended one meeting. State the relationship the source gives; if the source doesn't say, keep the vague wording rather than inventing a role.
+
+Before:
+> He was associated with the development of the payments platform.
+
+After:
+> He was the tech lead for the payments platform from 2021 to 2023.
+
+### Pattern 12: Formulaic Challenges and Upbeat Conclusions
+
+**Watch for:** "Despite these challenges... continues to thrive", stock "Challenges and Future Outlook" sections, "The future looks bright", "exciting times ahead", "a step in the right direction", any final paragraph that only cheers.
+
+**Problem:** Problems are raised and dismissed in one rhetorical move, or the piece ends on generic optimism instead of information. State the problems plainly. End on the last concrete fact; if the source states real plans, use those.
+
+Before:
+> Despite scaling challenges, the platform continues to thrive. The future looks bright as the team pushes toward excellence.
+
+After:
+> The job queue saturates above 10K events/sec. The team's Q3 plan is to shard it by tenant.
+
+---
+
+## Class C — Language Habits
+
+Vocabulary and grammar tells. The word list churns with each model generation — treat it as the weakest signal class and re-sync from the source periodically.
+
+### Pattern 13: AI-Frequency Vocabulary
+
+**Overused words:** additionally, align with, bolstered, crucial, deep dive, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract), leverage (verb), meticulous(ly), pivotal, robust (figurative), showcase, tapestry (abstract), testament, underscore (verb), valuable, vibrant.
+
+**Problem:** These words appear at anomalous frequency in model output, especially in clusters. A single formal word is not a tell; a sentence carrying three of them is. Keep genuine technical uses ("robust statistics", "feature gating"). This is the only vocabulary list — a word being overused does not make its synonyms suspect.
+
+Before:
+> Additionally, the intricate interplay between caching layers underscores the pivotal importance of a robust invalidation strategy.
+
+After:
+> The two caching layers can serve stale data unless invalidation is coordinated between them.
+
+### Pattern 14: Copula Avoidance
+
+**Watch for:** "serves as", "stands as", "functions as", "acts as", "represents", "boasts", "features", "offers" — where "is", "are", or "has" would do.
+
+**Problem:** Simple copulas are systematically replaced with elaborate substitutes.
+
+Before:
+> The gateway serves as the single entry point and features built-in rate limiting.
+
+After:
+> The gateway is the single entry point and has built-in rate limiting.
+
+### Pattern 15: Filler Phrases
 
 Common substitutions:
-- "In order to achieve this goal" -> "To achieve this"
-- "Due to the fact that" -> "Because"
-- "At this point in time" -> "Now"
-- "In the event that" -> "If"
-- "has the ability to" -> "can"
-- "It is important to note that" -> (delete, state the fact directly)
 
-### Pattern 23: Excessive Hedging
+- "In order to" → "To"
+- "Due to the fact that" → "Because"
+- "At this point in time" → "Now"
+- "In the event that" → "If"
+- "has the ability to" → "can"
+- "It is important to note that" → delete, state the fact
+- "It is worth noting that" → delete
+- "a wide range of" → name the range or delete
+- "in terms of" → delete or restructure
+- "plays a role in" → name the action
 
-**Problem:** Over-qualifying every statement.
+### Pattern 16: Excessive Hedging
+
+**Watch for:** stacked qualifiers — "could potentially possibly", "might arguably", "it may perhaps be the case that". **Weak alone.**
+
+**Problem:** Qualifiers pile up until every claim sounds uncertain, usually to soften an earlier overstatement rather than to report real doubt. Keep one qualifier the evidence supports. Ordinary hedges ("perhaps", "tends to") are human habits, not tells; keep scope statements, legal notices, and genuine epistemic caution.
 
 Before:
-> It could potentially possibly be argued that the policy might have some effect on outcomes.
+> It could potentially be argued that the index might possibly improve query performance in some cases.
 
 After:
-> The policy may affect outcomes.
+> The index should speed up lookups by customer ID; range scans are unaffected.
+
+### Pattern 17: Rule of Three
+
+**Watch for:** triads everywhere — "fast, reliable, and scalable"; three parallel examples; three short facts and a lesson. **Weak alone** — writers use deliberate triads for rhythm.
+
+**Problem:** Ideas are forced into threes to sound complete whether or not the meaning has three parts. Check that each item adds a distinct idea; merge or cut the ones that don't. Keep a triad when the content genuinely has three parts.
+
+Before:
+> The new pipeline is faster, more reliable, and easier to maintain, delivering speed, stability, and simplicity.
+
+After:
+> The new pipeline runs in 4 minutes instead of 11, and its failures now surface in one log stream.
+
+### Pattern 18: Repeated Sentence Openings
+
+**Watch for:** several consecutive sentences opening with the same subject or word. **Weak alone** — writers repeat openings deliberately for rhythm ("She came. She saw. She conquered.").
+
+**Problem:** Repetition is handled by rule instead of by ear. Merge sentences, change the subject, or lead with the action. Do not ban the repeated word; one remaining sentence may still start with it.
+
+Before:
+> The service reads the queue. The service batches the events. The service writes them to the warehouse.
+
+After:
+> The service reads the queue, batches the events, and writes them to the warehouse.
+
+### Pattern 19: Passive Voice and Missing Subjects
+
+**Watch for:** "No configuration needed.", "Results are preserved automatically.", "Mistakes were made." **Weak alone** — passive is standard in some registers (methods sections, incident reports).
+
+**Problem:** The actor disappears. Name the actor when that adds clarity.
+
+Before:
+> The flag is read at startup and settings are applied automatically.
+
+After:
+> The daemon reads the flag at startup and applies the settings.
 
 ---
 
-## MEDIUM Priority — Structure
+## Class D — Formatting by Rule
 
-### Pattern 9: Negative Parallelisms
+Individually weak; strong in clusters. A document showing three of these at once is likely generated.
 
-**Problem:** "Not only...but..." and "It's not just about..., it's..." constructions are overused.
+### Pattern 20: Em Dash Overuse
 
-Before:
-> It's not just about the beat; it's part of the aggression. It's not merely a song, it's a statement.
+**Watch for:** dashes as the universal connector — multiple per paragraph, spaced hyphens (` -- `) used as dashes. **Weak alone** — many strong writers use dashes deliberately.
 
-After:
-> The heavy beat adds to the aggressive tone.
-
-### Pattern 10: Rule of Three
-
-**Problem:** Forces ideas into groups of three to appear comprehensive.
+**Problem:** A dash lets the writer skip deciding how two clauses relate. Replace with a period, comma, colon, or parentheses, or rewrite the sentence. If the writer's own sample uses dashes, match the sample's rate. Leave dashes inside code, commands, paths, and URLs alone.
 
 Before:
-> The event features keynote sessions, panel discussions, and networking opportunities. Attendees can expect innovation, inspiration, and industry insights.
+> The deploy failed — the config was stale — and the rollback — which nobody had tested — failed too.
 
 After:
-> The event includes talks and panels. There's also time for informal networking between sessions.
+> The deploy failed because the config was stale. The rollback failed too; nobody had tested it.
 
-### Pattern 11: Elegant Variation (Synonym Cycling)
+### Pattern 21: Boldface and Inline-Header Lists
 
-**Problem:** Excessive synonym substitution driven by repetition-penalty.
+**Watch for:** bold as decoration ("**OKRs**, **KPIs**"); bullet lists where every item is a **Bold Label:** followed by a sentence; the label restated in the sentence ("**Performance:** Performance improved").
+
+**Problem:** Emphasis and structure applied mechanically. Remove decorative bold. Turn a labeled list into prose when the items are sentences in disguise; keep a list when items are genuinely parallel data.
 
 Before:
-> The protagonist faces challenges. The main character must overcome obstacles. The central figure triumphs. The hero returns.
+> - **Speed:** Speed has been significantly improved.
+> - **Security:** Security has been strengthened with encryption at rest.
 
 After:
-> The protagonist faces many challenges but eventually triumphs and returns home.
+> This release cuts cold-start time to 300ms and adds encryption at rest.
 
-### Pattern 12: False Ranges
+### Pattern 22: Decorative Headings
 
-**Problem:** "From X to Y" constructions where X and Y are not on a meaningful scale.
+**Watch for:** Title Case In Every Heading, emoji or arrows decorating headings and bullets ("🚀 Launch Phase:", "→ Key Insight:"), headings that only contain other headings.
+
+**Problem:** Formatting as ornament. Use sentence case; delete emoji and arrows unless the venue's own style uses them.
 
 Before:
-> Our journey has taken us from the singularity of the Big Bang to the grand cosmic web, from the birth of stars to the enigmatic dance of dark matter.
+> ## 🚀 Strategic Roadmap And Vision
 
 After:
-> The book covers the Big Bang, star formation, and current theories about dark matter.
+> ## Roadmap
 
-### Pattern 15: Inline-Header Vertical Lists
+### Pattern 23: Curly Quotation Marks
 
-**Problem:** Lists where items start with bolded headers followed by colons.
+**Watch for:** curly quotes (“...”) and curly apostrophes (’) in plain-text or code-adjacent contexts, or mixed curly and straight in the same document. **Weak alone** — word processors and typographic pipelines insert them; published prose legitimately uses them; some models never emit them.
 
-Before:
-> - **User Experience:** The UX has been significantly improved.
-> - **Performance:** Performance has been enhanced through optimized algorithms.
-> - **Security:** Security has been strengthened with end-to-end encryption.
-
-After:
-> The update improves the interface, speeds up load times through optimized algorithms, and adds end-to-end encryption.
+**Problem:** In Markdown, source code, and technical docs, straight quotes are the convention. Normalize to straight quotes there; leave typographically curly documents alone.
 
 ---
 
-## MEDIUM Priority — Style
+## Class E — Leftovers From the Chat and the Draft
 
-### Pattern 13: Em Dash Overuse
+Text that was written for the chat session or an earlier draft, not for the reader. Act on one sighting.
 
-**Problem:** Em dashes appear more frequently in AI text than human text, mimicking "punchy" sales writing.
+### Pattern 24: Chatbot Wrappers and Sycophancy
 
-Before:
-> The term is promoted by Dutch institutions — not by the people themselves. You don't say "Netherlands, Europe" — yet this mislabeling continues — even in official documents.
+**Watch for:** "Great question!", "Certainly!", "I'd be happy to help", "Welcome to this guide", "I hope this helps!", "Feel free to reach out", "Let me know if you'd like...".
 
-After:
-> The term is promoted by Dutch institutions, not by the people themselves. You don't say "Netherlands, Europe," yet this mislabeling continues in official documents.
-
-**Fix:** Replace most em dashes with commas, periods, or parentheses. Keep only when the aside genuinely interrupts the sentence.
-
-### Pattern 14: Boldface Overuse
-
-**Problem:** Mechanical emphasis on phrases.
+**Problem:** Conversation residue wrapping the actual content. Delete the wrapper, keep the content.
 
 Before:
-> It blends **OKRs**, **KPIs**, and visual tools such as the **Business Model Canvas** and **Balanced Scorecard**.
+> Great question! Here's a comprehensive overview of the retry logic. I hope this helps!
 
 After:
-> It blends OKRs, KPIs, and visual tools like the Business Model Canvas and Balanced Scorecard.
+> The client retries failed requests three times with exponential backoff starting at 200ms.
 
-### Pattern 16: Title Case in Headings
+### Pattern 25: Knowledge-Cutoff Disclaimers and Unsupported Guesses
 
-Before: `## Strategic Negotiations And Global Partnerships`
-After: `## Strategic negotiations and global partnerships`
+**Watch for:** "While details are limited in available sources, it appears...", "As of my last update...", "it is likely that...", "presumably" bridging a gap in sources.
 
-### Pattern 17: Emoji Decoration
-
-**Problem:** Decorating headings or bullet points with emoji.
+**Problem:** The model narrates its own uncertainty and then guesses. State what the source shows, or remove the sentence. Do not replace a disclaimer with an invented fact.
 
 Before:
-> - :rocket: **Launch Phase:** The product launches in Q3
-> - :bulb: **Key Insight:** Users prefer simplicity
+> While specific details about the migration are limited, it likely involved significant refactoring of the core modules.
 
 After:
-> The product launches in Q3. User research showed a preference for simplicity.
+> The changelog for v4.0 lists the migration but gives no detail on scope.
 
-### Pattern 18: Curly Quotation Marks
+### Pattern 26: Heading Echoed in the First Sentence
 
-**Problem:** ChatGPT uses curly quotes instead of straight quotes. Not all AI models do this, but it is a tell when present.
+**Watch for:** a section whose first sentence restates its heading ("## Performance" followed by "Performance is a critical aspect of the system.").
 
-Fix: Replace all curly quotes with straight quotes.
+**Problem:** The heading already did that work. Start the section with a fact.
+
+Before:
+> ## Error handling
+> Error handling is an important part of any robust application.
+
+After:
+> ## Error handling
+> All handlers return typed errors; the middleware maps them to HTTP status codes.
+
+### Pattern 27: Writing About the Previous Version
+
+**Watch for:** prose describing the edit instead of the subject: "This function was added to replace...", "This section has been updated to...", "The revised approach now...", "(previously X)" clutter.
+
+**Problem:** Draft archaeology shipped to the reader. Describe what the thing is and does now. Edit history belongs in version control, not in the text.
+
+Before:
+> This module was refactored to improve clarity and now handles validation, which was previously done in the controller.
+
+After:
+> This module validates request payloads before they reach the controller.
+
+### Pattern 28: Re-Explaining Shared Context
+
+**Watch for:** a reply that opens by restating the question or the situation both parties already know; a review response that re-derives the whole diagnosis before answering; background paragraphs addressed to someone who wrote the background.
+
+**Problem:** Every sentence-level tell can be clean and the text still reads as a generated memo, because it explains things the reader already has. In replies, comments, and follow-ups: answer first, add only what is new, and cut any restatement of shared context.
+
+Before:
+> Thanks for raising this. As you pointed out, the null check on line 42 can be bypassed when the payload is empty, which would cause the handler to dereference a missing field. To address this concern, I've added a guard clause.
+
+After:
+> Fixed — added a guard clause above line 42. Empty payloads now return 400.
+
+### Pattern 29: Mechanical Chat Residue
+
+**Watch for:** citation artifacts leaked from chat interfaces — `:contentReference[oaicite:0]{index=0}`, `turn0search0`, `[cite: 3]`, `[span_1](start_span)`; tracking parameters like `utm_source=chatgpt.com` in URLs; placeholder text ("[Insert name here]", "TODO: add example" in shipped prose); Markdown headings that skip levels; Markdown syntax in venues that don't render it.
+
+**Problem:** These are mechanical fingerprints, not style. In file mode, strip citation artifacts and tracking parameters, fill or flag placeholders (never invent content for them), and fix heading levels. Highest-confidence signals in this document — but always verify a URL still works after removing parameters.
 
 ---
 
-## LOW Priority — Communication Artifacts
+## False-Positive Guards
 
-### Pattern 19: Collaborative Communication Artifacts
+Do not flag these — the source lists them as ineffective or misleading indicators:
 
-**Signal words:** I hope this helps, Of course!, Certainly!, You're absolutely right!, Would you like..., let me know, here is a...
+- **Perfect grammar.** Many people write cleanly.
+- **Formal, academic, or "fancy" prose.** Only the specific words in the vocabulary list are elevated in model output; formality itself is not a tell.
+- **Transition words in isolation.** "However" and "Furthermore" are conventional in essayistic and academic writing.
+- **Mixed casual and formal registers.** Common in technical writers, multilingual writers, and multi-author documents.
+- **"Bland" or "robotic" feel without a named pattern.** A vibe is not evidence; name the pattern or leave the text alone.
+- **A single dash, triad, hedge, or curly quote.** Weak-alone patterns need company.
+- **Deliberate repetition and rhetorical fragments in an author's own voice sample.** The sample wins.
+- **Unsourced content.** Predates LLMs as a phenomenon; modern chatbots often do include citations.
 
-**Problem:** Chatbot conversation artifacts left in published text.
+One further guard: absence of every pattern above does not prove a human wrote the text, and their presence does not prove a machine did. These patterns justify editing prose on its own merits — they are not an authorship test.
 
-Before:
-> Here is an overview of the French Revolution. I hope this helps! Let me know if you'd like me to expand on any section.
+## Retired Patterns
 
-After:
-> The French Revolution began in 1789 when financial crisis and food shortages led to widespread unrest.
-
-### Pattern 20: Knowledge-Cutoff Disclaimers
-
-**Signal words:** as of [date], Up to my last training update, While specific details are limited/scarce, based on available information
-
-Before:
-> While specific details about the founding are not extensively documented in readily available sources, it appears to have been established sometime in the 1990s.
-
-After:
-> The company was founded in 1994, according to its registration documents.
-
-### Pattern 21: Sycophantic Tone
-
-Before:
-> Great question! You're absolutely right that this is a complex topic. That's an excellent point.
-
-After:
-> The economic factors you mentioned are relevant here.
-
-### Pattern 24: Generic Positive Conclusions
-
-Before:
-> The future looks bright. Exciting times lie ahead as they continue their journey toward excellence. This represents a major step in the right direction.
-
-After:
-> The company plans to open two more locations next year.
+Two patterns from earlier versions of this file were removed when the source reclassified them. **False ranges** ("from the Big Bang to dark matter") no longer appears in the source at all. **Elegant variation / synonym cycling** was moved to the source's historical indicators — it was a repetition-penalty artifact of older models. Do not flag either as a primary signal; see `historical-patterns.md` in the humanize skill for details.
