@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 137](https://img.shields.io/badge/packages-137-informational)](manifest.yaml)
+[![packages: 143](https://img.shields.io/badge/packages-143-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -59,7 +59,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [proposal-writer](agents/proposal-writer/)       | opus   | Technical proposals with ROI calculations, three-tier pricing, and Problem-Agitate-Solve framing                |
 | [content-strategist](agents/content-strategist/) | sonnet | Multi-channel content creation with per-channel adaptation and automated quality passes                         |
 | [media-producer](agents/media-producer/)         | sonnet | Visual and video format router — selects the right skill based on concept type and output needs                 |
-| [skill-librarian](agents/skill-librarian/)       | sonnet | Reflective write-phase orchestrator — turns completed task transcripts into skill proposals or augmentations    |
+| [skill-librarian](agents/skill-librarian/)       | sonnet | Explicit reflective capture — queues privacy-safe lessons, reports status, and reviews approved package changes |
 
 ### Agents — Analyzers
 
@@ -250,6 +250,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [route](commands/route/)                 | Package discovery and task-to-package routing |
 | [stack-pr](commands/stack-pr/)           | Stacked PR workflow command surface |
 | [decision-map](commands/decision-map/)           | Slash-command surface for charting and working decision maps |
+| [librarian](commands/librarian/)         | Explicit capture, status, and review for reusable skill observations |
 
 ## Hooks
 

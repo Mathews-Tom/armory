@@ -1,53 +1,81 @@
 cases:
   # --- Positive cases ---
-  - id: review_transcript_for_new_skill
-    prompt: "Librarian review: we just spent 15 turns solving a database migration rollback problem with ad-hoc sql and manual rollback scripts. Should this become a skill?"
+  - id: capture_existing_package_gap
+    prompt: "/librarian capture --source current-task. We worked around stacked-prs treating pre-retarget CI as fresh. Record the reusable lesson, but do not draft, edit, spawn refinement, or open a PR."
     fixtures: []
     rubric:
-      - "Activates skill-librarian agent"
-      - "Runs Phase 1 transcript ingestion and extracts the task under reflection"
-      - "Produces Phase 2 classification verdict with evidence"
-      - "If draft_new or augment_existing, proceeds through Phase 3-6"
-      - "Does not directly edit any skill file — drafts only"
+      - "Activates skill-librarian in capture mode"
+      - "Classifies the lesson as augment_existing with target stacked-prs"
+      - "Sanitizes and deduplicates before writing at most one UUID-named observation"
+      - "Stops after the capture receipt without drafting, editing, spawning refinement, running git, or calling GitHub"
     trigger_expected: true
 
-  - id: propose_skill_from_conversation
-    prompt: "Propose a skill from this conversation if the workflow is reusable. We just built a custom approach for auditing GraphQL schemas for deprecation risks."
+  - id: capture_sensitive_transcript
+    prompt: "/librarian capture --source ./private-session.txt. The transcript contains a production API token, a private customer URL, and a reusable rollback correction."
     fixtures: []
     rubric:
-      - "Performs Phase 2 overlap check against manifest.yaml"
-      - "If no overlap, drafts new skill spec via paper-to-skill extractor stage"
-      - "Hands off to test-engineer for generate-verify loop"
-      - "Opens PR only after package-evaluator >= 70% gate"
+      - "Runs the privacy pass before persistence"
+      - "Never copies the token, private URL, client identity, or raw transcript excerpt into any artifact"
+      - "Stores only a generalized principle and non-secret locator, or returns no_action when safe generalization is impossible"
+      - "Does not send sensitive material to downstream agents or a public PR"
     trigger_expected: true
 
-  - id: augment_existing_skill_from_gap
-    prompt: "We kept working around a gap in the code-reviewer skill — it never checks for SQL injection in TypeScript string templates. Librarian, suggest an augmentation."
+  - id: consolidate_duplicate_observation
+    prompt: "Capture this skill lesson. An open observation already states the same retry-boundary principle for paid-experiment-run-execution-and-recovery."
     fixtures: []
     rubric:
-      - "Classifies as augment_existing with target skill code-reviewer"
-      - "Checks for open PRs labeled evoskills-in-progress on code-reviewer"
-      - "Drafts augmentation, not new skill"
-      - "Runs quality gate before opening PR"
+      - "Acquires the store-wide mutation lock and repeats the match search"
+      - "Re-reads and atomically consolidates the matching record"
+      - "Increments instances and appends only a sanitized evidence locator"
+      - "Does not create a duplicate observation file"
     trigger_expected: true
 
-  - id: no_action_verdict_on_trivial
-    prompt: "Skill-librarian: review this conversation. We just ran a git status and committed three files."
+  - id: serialize_concurrent_captures
+    prompt: "Two librarian capture invocations are running concurrently against the same queue and found the same principle."
     fixtures: []
     rubric:
-      - "Classifies as no_action (trivial task, nothing to reflect on)"
-      - "Exits without invoking paper-to-skill or test-engineer"
-      - "Returns only the decision log"
+      - "Each writer attempts exclusive creation of the store-wide mutation lock"
+      - "Only the lock owner mutates the queue; the other returns queue_busy without writing"
+      - "The owner repeats deduplication after acquiring the lock and publishes the complete record atomically"
+      - "No invocation overwrites or removes a lock with a different owner token"
     trigger_expected: true
 
-  - id: deferred_verdict_on_concurrent_refinement
-    prompt: "Librarian review: we found a gap in the debug-investigator skill that should be augmented. There is already an open PR refining debug-investigator."
+  - id: report_librarian_status
+    prompt: "/librarian status"
     fixtures: []
     rubric:
-      - "Detects the evoskills-in-progress label on the existing PR"
-      - "Returns verdict deferred per Rule 2 (librarian-test-engineer ownership boundary)"
-      - "Does not spawn test-engineer"
-      - "Logs the conflict in the decision log"
+      - "Reads only observation header fields needed for aggregate counts"
+      - "Reports open, parked, verdict, age, and distinct-target counts"
+      - "Does not read evidence bodies or mutate the queue"
+      - "Does not draft, invoke downstream packages, run git, or call GitHub"
+    trigger_expected: true
+
+  - id: review_bounded_target_batch
+    prompt: "/librarian review --target stacked-prs --limit 10"
+    fixtures: []
+    rubric:
+      - "Filters by stacked-prs, orders oldest first, and applies limit 10 before reading full bodies"
+      - "Verifies and clusters the selected observations"
+      - "Presents sanitized dispositions and exact downstream paths"
+      - "Stops for explicit approval before any package mutation or refinement spawn"
+    trigger_expected: true
+
+  - id: no_action_on_trivial_task
+    prompt: "Skill-librarian: capture a lesson from this conversation. We only ran git status."
+    fixtures: []
+    rubric:
+      - "Classifies the task as no_action"
+      - "Writes no observation and does not create the queue directory"
+      - "Does not invoke paper-to-skill, package-optimizer, test-engineer, git, or GitHub"
+    trigger_expected: true
+
+  - id: parent_only_write_with_subagents
+    prompt: "Capture reusable lessons from this completed task. Three subagents supplied candidate observations."
+    fixtures: []
+    rubric:
+      - "Keeps every queue write in the controller agent"
+      - "Serializes controller writes through the store-wide mutation lock"
+      - "Sanitizes, verifies, and deduplicates before persisting at most one observation"
     trigger_expected: true
 
   # --- Negative cases ---
@@ -55,22 +83,27 @@ cases:
     prompt: "Refine the existing code-reviewer skill to be faster. Run 5 rounds of co-evolutionary refinement."
     fixtures: []
     rubric:
-      - "Direct refinement of an existing skill is test-engineer's job, not librarian"
-      - "Should activate test-engineer agent, not skill-librarian"
+      - "Does not activate; direct refinement belongs to test-engineer"
     trigger_expected: false
 
   - id: create_skill_from_arxiv_paper
     prompt: "Create a skill from the arXiv paper on retrieval-augmented generation. Use the paper's methodology."
     fixtures: []
     rubric:
-      - "Creating skills from papers is paper-to-skill's job, not librarian"
-      - "Librarian reviews transcripts, not papers"
+      - "Does not activate; paper-derived skill creation belongs to paper-to-skill"
     trigger_expected: false
 
-  - id: reorganize_skill_directory_structure
-    prompt: "Reorganize the skills directory — move all review-related skills into a review/ subdirectory and update manifest.yaml."
+  - id: reorganize_package_catalog
+    prompt: "Reorganize the skills directory and rename every review package."
     fixtures: []
     rubric:
-      - "Library reorganization is a human decision, not a librarian task"
-      - "Librarian drafts skills only, it does not restructure the repo"
+      - "Does not activate; catalog restructuring is outside the librarian's scope"
+    trigger_expected: false
+
+  - id: monitor_every_session_automatically
+    prompt: "Install an always-on Stop hook that silently captures every conversation into the librarian queue."
+    fixtures: []
+    rubric:
+      - "Does not treat automatic surveillance as a supported librarian mode"
+      - "Rejects silent raw-session capture and preserves explicit invocation"
     trigger_expected: false

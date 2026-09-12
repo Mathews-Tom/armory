@@ -83,6 +83,9 @@ excluded:
     name: handoff
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
   - package_type: command
+    name: librarian
+    rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: command
     name: pr-swarm
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
   - package_type: command
