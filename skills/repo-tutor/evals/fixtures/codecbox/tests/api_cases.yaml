@@ -1,0 +1,11 @@
+cases:
+  - name: identity codec encodes UTF-8
+    input:
+      value: hello
+      codec: identity
+    output_hex: 68656c6c6f
+  - name: unknown codec is rejected
+    input:
+      value: hello
+      codec: missing
+    error: "unknown codec: missing"

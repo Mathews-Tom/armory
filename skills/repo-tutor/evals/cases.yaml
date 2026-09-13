@@ -1,0 +1,158 @@
+cases:
+  - id: local_repository_beginner_tour
+    prompt: >
+      Find the added repo-tutor package directory, then teach me its local fixture at
+      evals/fixtures/queuebox in extremely simple language. I want to understand what it
+      does, use it once, follow what happens inside, and learn where I could make my first
+      engineering change. Deliver the requested multipage HTML guide.
+    fixtures:
+      - evals/fixtures/queuebox
+    rubric:
+      - "activates repo-tutor for a readable non-Git local repository"
+      - "orders the curriculum around the submit-job journey rather than a file or command inventory"
+      - "recommends the permitted validator seam, not the governance-frozen transport work"
+      - "labels the fixture as a non-Git snapshot and marks its documented command as not run"
+      - "reports browser checks honestly when browser automation is unavailable"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "ARMORY_EVAL_ROUTE: engaged"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(non-Git snapshot|snapshot basis|provenance)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(user journey|submit.*job)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(developer journey|validator)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(Documented, not run|Browser checks not performed|browser-verified)"
+        weight: 0.8
+
+  - id: remote_repository_clone_failure
+    prompt: >
+      Use https://invalid.example/repo-tutor-eval.git and tutor me through that repository.
+      Explain how a user gets value and how a software engineer can extend it, then deliver
+      the visual HTML learning artifact. Do not substitute another repository if this URL fails.
+    fixtures: []
+    rubric:
+      - "activates repo-tutor for a remote Git repository request"
+      - "attempts only safe temporary resolution and reports the clone failure"
+      - "does not fabricate repository content, journeys, evidence, or an artifact"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "ARMORY_EVAL_ROUTE: engaged"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(clone|Git).*(fail|error|unavailable|resolve)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(cannot|could not|no artifact|stopped before analysis)"
+        weight: 0.8
+
+  - id: teach_specific_feature_path
+    prompt: >
+      Find the queuebox fixture inside the added repo-tutor package's evals/fixtures directory.
+      Onboard me to its submit-job flow like a tutor: start from what the user does, trace the
+      system workflow, then show a safe first engineering change. Respect CONTRIBUTING.md.
+    fixtures:
+      - evals/fixtures/queuebox
+    rubric:
+      - "activates repo-tutor and narrows the teaching spine to submit-job"
+      - "defines terms before use and connects beginner, deeper, and code layers"
+      - "uses contribution governance to reject a transport adapter as the first change"
+      - "uses the validator seam and its focused test as the developer journey"
+      - "includes evidence-backed retrieval, prediction, tracing, and planning exercises"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "ARMORY_EVAL_ROUTE: engaged"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(submit.?job|submit job)"
+        weight: 0.8
+      - type: matches_regex
+        target: '(?i)(validator|validators\.py)'
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(contributing|governance|frozen|permitted)"
+        weight: 0.8
+
+  - id: explain_library_without_cli
+    prompt: >
+      Find the codecbox fixture inside the added repo-tutor package's evals/fixtures directory.
+      Explain this library so a new developer can use its public API and understand the internal
+      data path. There is no CLI. Teach how to build on its codec extension point and provide the
+      offline HTML learning artifact.
+    fixtures:
+      - evals/fixtures/codecbox
+    rubric:
+      - "activates repo-tutor for a non-Git library fixture without assuming a CLI"
+      - "teaches encode_text as the public entry point and Codec as the extension seam"
+      - "preserves observed/inferred/unknown status and documented-not-run honesty"
+      - "summarizes the artifact and verification state without requiring artifact contents in stdout"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "ARMORY_EVAL_ROUTE: engaged"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(encode_text|public API|library boundary)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(Codec|extension seam|developer journey)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(non-Git snapshot|snapshot basis|provenance)"
+        weight: 0.8
+
+  - id: negative_architecture_diagram_only
+    prompt: "Draw an editable SVG architecture diagram for the services in this repository."
+    fixtures: []
+    rubric:
+      - "architecture-only output is architecture-diagram territory"
+      - "does not activate repo-tutor because no teaching or onboarding is requested"
+    trigger_expected: false
+
+  - id: negative_repository_audit
+    prompt: "Audit this codebase for correctness, security, performance, and test gaps, then prioritize fixes."
+    fixtures: []
+    rubric:
+      - "repository audit and prioritization use the applicable audit/advisor skill"
+      - "does not activate repo-tutor"
+    trigger_expected: false
+
+  - id: negative_api_reference
+    prompt: "Generate exhaustive OpenAPI documentation and endpoint examples for this FastAPI service."
+    fixtures: []
+    rubric:
+      - "API reference generation is api-docs-generator territory"
+      - "does not activate repo-tutor"
+    trigger_expected: false
+
+  - id: negative_maintainer_documentation
+    prompt: "Write installation, configuration, contributing, security, and changelog documentation for this project."
+    fixtures: []
+    rubric:
+      - "maintainer documentation authoring is not a repository tutoring request"
+      - "does not activate repo-tutor"
+    trigger_expected: false
+
+  - id: negative_general_concept_lesson
+    prompt: "Teach me how OAuth 2.0 authorization code flow works using simple language and examples."
+    fixtures: []
+    rubric:
+      - "a general concept lesson without a repository is outside repo-tutor"
+      - "does not invent or request a repository merely to activate the skill"
+    trigger_expected: false
+
+  - id: negative_dashboard_overview
+    prompt: "Create a slick dashboard-style visual overview of this repo's services and deployment metrics."
+    fixtures: []
+    rubric:
+      - "a dashboard visual without a tutoring or onboarding goal uses a visualization skill"
+      - "does not activate repo-tutor based only on the words repo and overview"
+    trigger_expected: false
