@@ -91,11 +91,37 @@ RM_CALLED="$TMP_ROOT/rm-called"
 mkdir -p "$FAKE_BIN"
 printf '#!/usr/bin/env bash\nprintf called > %q\nexit 99\n' "$RM_CALLED" > "$FAKE_BIN/rm"
 chmod +x "$FAKE_BIN/rm"
-PLAN_OUT="$TMP_ROOT/plan.txt"
-PATH="$FAKE_BIN:$PATH" "$SCRIPT" plan --root "$ROOT" --candidate A-001 > "$PLAN_OUT"
+PLAN_SCRIPT="$TMP_ROOT/cleanup.sh"
+PATH="$FAKE_BIN:$PATH" "$SCRIPT" plan --root "$ROOT" --candidate A-001 > "$PLAN_SCRIPT"
 [ ! -e "$RM_CALLED" ] || fail "plan executed rm"
-assert_contains "rm -rf -- '$ROOT/rust/target'" "$PLAN_OUT"
-assert_contains 'cargo build' "$PLAN_OUT"
+bash -n "$PLAN_SCRIPT"
+assert_contains '#!/usr/bin/env bash' "$PLAN_SCRIPT"
+assert_contains 'Preview only.' "$PLAN_SCRIPT"
+assert_contains '--execute' "$PLAN_SCRIPT"
+PREVIEW_OUT="$TMP_ROOT/preview.txt"
+PATH="$FAKE_BIN:$PATH" bash "$PLAN_SCRIPT" > "$PREVIEW_OUT"
+[ ! -e "$RM_CALLED" ] || fail "preview executed rm"
+assert_contains "$ROOT/rust/target" "$PREVIEW_OUT"
+
+TAMPERED_SCRIPT="$TMP_ROOT/tampered.sh"
+"$SCRIPT" plan --root "$ROOT" --candidate A-001 --candidate A-002 > "$TAMPERED_SCRIPT"
+mkdir -p "$TMP_ROOT/outside"
+python3 -c 'import pathlib, sys; path = pathlib.Path(sys.argv[1]); path.write_text(path.read_text().replace(sys.argv[2], sys.argv[3], 1))' \
+    "$TAMPERED_SCRIPT" "$ROOT/rust/target" "$TMP_ROOT/outside"
+set +e
+bash "$TAMPERED_SCRIPT" --execute > "$TMP_ROOT/tampered.txt" 2>&1
+TAMPERED_STATUS=$?
+set -e
+[ "$TAMPERED_STATUS" -ne 0 ] || fail "tampered plan accepted out-of-root target"
+assert_contains 'Refusing path outside audit root' "$TMP_ROOT/tampered.txt"
+[ -d "$ROOT/rust/target" ] || fail "tampered plan removed a valid target"
+[ -d "$ROOT/python/.venv" ] || fail "tampered plan removed a valid target"
+
+bash "$PLAN_SCRIPT" --execute
+[ ! -d "$ROOT/rust/target" ] || fail "execute did not remove selected target"
+[ -f "$SENTINEL" ] || fail "execute removed local data"
+SENTINEL_HASH_AFTER_PLAN=$(shasum -a 256 "$SENTINEL" | cut -d ' ' -f 1)
+assert_equals "$SENTINEL_HASH_BEFORE" "$SENTINEL_HASH_AFTER_PLAN" "cleanup changed local data"
 
 set +e
 "$SCRIPT" plan --root "$ROOT" --candidate P-001 > "$TMP_ROOT/protected.txt" 2>&1
