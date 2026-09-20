@@ -10,7 +10,7 @@ Never invoke `rm`, `rmdir`, `mv`, `cp`, `touch`, `mkdir`, a package manager, `gi
 
 Render a script only when all conditions hold:
 
-1. The user explicitly selected one or more current `A-###` candidates.
+1. The user explicitly selected one or more current actionable `A-###` candidates.
 2. A strict scan reports `stable`.
 3. Every path is canonical, absolute, inside the requested root, and contains no control characters.
 4. Every candidate remains exactly classified as `rebuildable`.

@@ -24,6 +24,8 @@ declare -a ENTRY_ELIGIBLE=()
 declare -a REQUESTED_IDS=()
 declare -a PROJECT_PATHS=()
 declare -a PROJECT_KIB=()
+declare -a PROJECT_TYPES=()
+declare -a PROJECT_NESTED_REPO_COUNTS=()
 declare -a PROJECT_GIT_STATUS=()
 declare -a PROJECT_LAST_COMMIT=()
 declare -a PROJECT_PROCESS_COUNT=()
@@ -85,6 +87,10 @@ has_unsupported_name() {
 is_git_repo() {
     git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
+has_git_marker() {
+    [ -d "$1/.git" ] || [ -f "$1/.git" ]
+}
+
 
 is_ignored() {
     local repo=$1
@@ -111,12 +117,18 @@ add_project() {
     PROJECT_LAST_COMMIT+=("$4")
     PROJECT_PROCESS_COUNT+=("$5")
     PROJECT_WORKTREE_COUNT+=("$6")
+    PROJECT_TYPES+=("$7")
+    PROJECT_NESTED_REPO_COUNTS+=("$8")
 }
 
 project_git_status() {
     local changed
     if ! is_git_repo "$1"; then
-        printf 'not-a-repository\n'
+        if has_git_marker "$1"; then
+            printf 'invalid-repository\n'
+        else
+            printf 'not-a-repository\n'
+        fi
         return
     fi
     changed=$(git -C "$1" status --porcelain=v1 --untracked-files=normal 2>/dev/null | awk 'END { print NR + 0 }')
@@ -149,13 +161,14 @@ discover_workspace_projects() {
     {
         find -P "$ROOT" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null
         find -P "$ROOT" -mindepth 2 -maxdepth 5 \
-            \( -type d -name .git -print -prune \) -o \
+            \( -name .git \( -type d -o -type f \) -print -prune \) -o \
             \( -type d \( -name target -o -name node_modules -o -name .venv \) -prune \) \
             2>/dev/null | sed 's#/.git$##'
     } | sort -u
 }
 collect_projects() {
-    local project base kib git_status last_commit process_count worktree_count
+    local project candidate base kib git_status last_commit process_count worktree_count
+    local project_type nested_repo_count
     local -a projects=()
 
     case "$SCOPE" in
@@ -185,12 +198,31 @@ collect_projects() {
     for project in "${projects[@]}"; do
         [ -L "$project" ] && continue
         base=${project##*/}
+        nested_repo_count=0
+        for candidate in "${projects[@]}"; do
+            case "$candidate" in
+                "$project"/*)
+                    if has_git_marker "$candidate"; then
+                        nested_repo_count=$((nested_repo_count + 1))
+                    fi
+                    ;;
+            esac
+        done
+        if is_git_repo "$project"; then
+            project_type="repository"
+        elif has_git_marker "$project"; then
+            project_type="invalid-repository"
+        elif [ "$nested_repo_count" -gt 0 ]; then
+            project_type="repository-container"
+        else
+            project_type="directory"
+        fi
         kib=$(du_kib "$project")
         git_status=$(project_git_status "$project")
         last_commit=$(project_last_commit "$project")
         process_count=$(project_process_count "$project")
         worktree_count=$(project_worktree_count "$project")
-        add_project "$project" "$kib" "$git_status" "$last_commit" "$process_count" "$worktree_count"
+        add_project "$project" "$kib" "$git_status" "$last_commit" "$process_count" "$worktree_count" "$project_type" "$nested_repo_count"
 
         case "$base" in
             data|dataset|datasets|corpus|corpora|results|checkpoints|models|embeddings|graphs)
@@ -275,6 +307,8 @@ scan() {
     PROJECT_GIT_STATUS=()
     PROJECT_LAST_COMMIT=()
     PROJECT_PROCESS_COUNT=()
+    PROJECT_TYPES=()
+    PROJECT_NESTED_REPO_COUNTS=()
 
     ROOT_KIB_BEFORE=$(du_kib "$ROOT")
     collect_projects
@@ -293,9 +327,11 @@ render_json() {
     printf '{"root":"%s","scope":"%s","strict":%s,"status":"%s","allocated_kib":%s,"projects":[' \
         "$(json_escape "$ROOT")" "$SCOPE" "$STRICT" "$SNAPSHOT_STATUS" "$ROOT_KIB_AFTER"
     for ((i = 0; i < ${#PROJECT_PATHS[@]}; i++)); do
-        printf '%s{"path":"%s","allocated_kib":%s,"git_status":"%s","last_commit":"%s","process_count":%s,"worktree_count":%s}' \
+        printf '%s{"path":"%s","project_type":"%s","nested_repo_count":%s,"allocated_kib":%s,"git_status":"%s","last_commit":"%s","process_count":%s,"worktree_count":%s}' \
             "$comma" \
             "$(json_escape "${PROJECT_PATHS[$i]}")" \
+            "${PROJECT_TYPES[$i]}" \
+            "${PROJECT_NESTED_REPO_COUNTS[$i]}" \
             "${PROJECT_KIB[$i]}" \
             "${PROJECT_GIT_STATUS[$i]}" \
             "${PROJECT_LAST_COMMIT[$i]}" \
@@ -321,10 +357,25 @@ render_json() {
 }
 
 render_markdown() {
-    local i
+    local i candidate_ids=""
     printf '# Storage audit — READ-ONLY\n\n'
     printf 'Root: `%s`\n\n' "$ROOT"
     printf 'Snapshot: **%s** · Allocated size: **%s KiB**\n\n' "$SNAPSHOT_STATUS" "$ROOT_KIB_AFTER"
+    printf '## Projects\n\n'
+    printf '| Type | Nested repos | KiB | Git | Last commit | Processes | Worktrees | Path |\n'
+    printf '|---|---:|---:|---|---|---:|---:|---|\n'
+    for ((i = 0; i < ${#PROJECT_PATHS[@]}; i++)); do
+        printf '| %s | %s | %s | %s | %s | %s | %s | `%s` |\n' \
+            "${PROJECT_TYPES[$i]}" \
+            "${PROJECT_NESTED_REPO_COUNTS[$i]}" \
+            "${PROJECT_KIB[$i]}" \
+            "${PROJECT_GIT_STATUS[$i]}" \
+            "${PROJECT_LAST_COMMIT[$i]}" \
+            "${PROJECT_PROCESS_COUNT[$i]}" \
+            "${PROJECT_WORKTREE_COUNT[$i]}" \
+            "${PROJECT_PATHS[$i]}"
+    done
+    printf '\n## Classified entries\n\n'
     printf '| ID | Class | KiB | Path | Action |\n|---|---|---:|---|---|\n'
     for ((i = 0; i < ${#ENTRY_IDS[@]}; i++)); do
         printf '| %s | %s | %s | `%s` | %s |\n' \
@@ -336,6 +387,19 @@ render_markdown() {
     done
     if [ "$SNAPSHOT_STATUS" != "stable" ]; then
         printf '\nCleanup script suppressed: rerun a strict audit on a quiescent filesystem.\n'
+        return
+    fi
+    for ((i = 0; i < ${#ENTRY_IDS[@]}; i++)); do
+        if [ "${ENTRY_ELIGIBLE[$i]}" = "true" ]; then
+            if [ -n "$candidate_ids" ]; then
+                candidate_ids+=", "
+            fi
+            candidate_ids+="${ENTRY_IDS[$i]}"
+        fi
+    done
+    if [ -n "$candidate_ids" ]; then
+        printf '\nTo generate a guarded cleanup script, review the IDs below, remove any you do not approve, then reply with:\n\n'
+        printf '```text\nUse the storage-audit skill to run a fresh strict scan of `%s` and render—but do not save or execute—a cleanup script for cleanup-eligible candidates %s.\n```\n' "$ROOT" "$candidate_ids"
     fi
 }
 
