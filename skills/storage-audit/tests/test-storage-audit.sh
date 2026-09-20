@@ -41,7 +41,7 @@ bash -n "$SCRIPT"
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/storage-audit.XXXXXX")
 trap 'rm -rf "$TMP_ROOT"' EXIT
 ROOT="$TMP_ROOT/workspace"
-mkdir -p "$ROOT/rust/target" "$ROOT/python/.venv" "$ROOT/data" "$ROOT/linked-target"
+mkdir -p "$ROOT/rust/target" "$ROOT/python/.venv" "$ROOT/data" "$ROOT/container" "$ROOT/broken-container/stale-worktree" "$ROOT/linked-target"
 
 (
     cd "$ROOT/rust"
@@ -50,6 +50,9 @@ mkdir -p "$ROOT/rust/target" "$ROOT/python/.venv" "$ROOT/data" "$ROOT/linked-tar
     printf 'target/\n' > .gitignore
     dd if=/dev/zero of=target/cache.bin bs=1024 count=16 status=none
     mkdir -p .worktrees/active
+    git add Cargo.toml .gitignore
+    git -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'add fixture'
+    git worktree add --detach -q "$ROOT/container/rust-worktree"
 )
 (
     cd "$ROOT/python"
@@ -59,6 +62,7 @@ mkdir -p "$ROOT/rust/target" "$ROOT/python/.venv" "$ROOT/data" "$ROOT/linked-tar
     printf '.venv/\n' > .gitignore
     printf 'environment\n' > .venv/marker
 )
+printf 'gitdir: /missing/worktree/metadata\n' > "$ROOT/broken-container/stale-worktree/.git"
 printf 'local corpus\n' > "$ROOT/data/corpus.jsonl"
 ln -s "$ROOT/rust/target" "$ROOT/linked-target/target-link"
 ROOT=$(cd -P "$ROOT" && pwd -P)
@@ -68,6 +72,10 @@ SENTINEL_HASH_BEFORE=$(shasum -a 256 "$SENTINEL" | cut -d ' ' -f 1)
 AUDIT_JSON="$TMP_ROOT/audit.json"
 "$SCRIPT" audit --root "$ROOT" --scope workspace --strict --format json > "$AUDIT_JSON"
 python3 -c 'import json, pathlib, sys; json.loads(pathlib.Path(sys.argv[1]).read_text())' "$AUDIT_JSON"
+python3 -c 'import json, pathlib, sys; projects = {row["path"]: row for row in json.loads(pathlib.Path(sys.argv[1]).read_text())["projects"]}; container = projects[sys.argv[2]]; worktree = projects[sys.argv[3]]; assert container["project_type"] == "repository-container"; assert container["nested_repo_count"] == 1; assert worktree["project_type"] == "repository"' \
+    "$AUDIT_JSON" "$ROOT/container" "$ROOT/container/rust-worktree"
+python3 -c 'import json, pathlib, sys; projects = {row["path"]: row for row in json.loads(pathlib.Path(sys.argv[1]).read_text())["projects"]}; container = projects[sys.argv[2]]; stale = projects[sys.argv[3]]; assert container["project_type"] == "repository-container"; assert container["nested_repo_count"] == 1; assert stale["project_type"] == "invalid-repository"; assert stale["git_status"] == "invalid-repository"' \
+    "$AUDIT_JSON" "$ROOT/broken-container" "$ROOT/broken-container/stale-worktree"
 SENTINEL_HASH_AFTER=$(shasum -a 256 "$SENTINEL" | cut -d ' ' -f 1)
 assert_equals "$SENTINEL_HASH_BEFORE" "$SENTINEL_HASH_AFTER" "audit changed fixture content"
 assert_contains '"status":"stable"' "$AUDIT_JSON"
@@ -84,6 +92,12 @@ assert_not_contains 'target-link' "$AUDIT_JSON"
 REPO_JSON="$TMP_ROOT/repo.json"
 "$SCRIPT" audit --root "$ROOT/rust" --scope repo --strict --format json > "$REPO_JSON"
 assert_contains "$ROOT/rust/target" "$REPO_JSON"
+AUDIT_MARKDOWN="$TMP_ROOT/audit.md"
+"$SCRIPT" audit --root "$ROOT" --scope workspace --strict --format markdown > "$AUDIT_MARKDOWN"
+assert_contains 'Use the storage-audit skill to run a fresh strict scan' "$AUDIT_MARKDOWN"
+assert_contains 'render—but do not save or execute—a cleanup script for cleanup-eligible candidates A-001, A-002.' "$AUDIT_MARKDOWN"
+assert_not_contains '<selected IDs>' "$AUDIT_MARKDOWN"
+
 assert_contains '"cleanup_eligible":true' "$REPO_JSON"
 
 FAKE_BIN="$TMP_ROOT/fake-bin"

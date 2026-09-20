@@ -10,6 +10,8 @@
 |`local-data`|A project named `data`, `datasets`, `corpora`, `results`, `checkpoints`, `models`, `embeddings`, or `graphs`|Exact path classification|Never|
 |`git-protected`|`.worktrees/`|Exact worktree-root path|Never; use a dedicated worktree audit|
 
+Cleanup-eligible `rebuildable` entries receive `A-###` IDs, where `A` means **actionable**. Protected or review-required entries receive `P-###` IDs. These prefixes identify handling policy, not a tier hierarchy.
+
 Everything outside an exact row is source or unknown material. Do not create a removal recommendation for it.
 
 A clean Git status, remote configuration, commit age, or a missing process is insufficient evidence to delete a source tree. Those signals only inform an archive-review decision.
