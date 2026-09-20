@@ -1284,6 +1284,24 @@ packages:
     difficulty: intermediate
     complements:
     - chart-clarity
+  - name: storage-audit
+    version: 0.1.0
+    description: 'Read-only disk-storage audit for a repository or workspace root. Measures project footprints, identifies
+      rebuildable dependencies, classifies local data and Git-protected paths, and reports project liveness without modifying
+      files. Triggers on: "audit disk space", "storage audit", "find removable build artifacts", "which projects use the most
+      space", "cleanup commands but do not run them", "analyze repository storage", "workspace disk cleanup". Use this skill
+      when a developer needs evidence-backed storage recovery recommendations but must retain control of every deletion.'
+    path: skills/storage-audit
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/storage-audit/SKILL.md
+    tags:
+    - disk-usage
+    - storage
+    - cleanup
+    - safety
+    - git
+    category: development
+    difficulty: intermediate
+    phase: review
   - name: surrogate-verifier
     version: 1.0.1
     description: 'Generates structured test assertions and failure diagnostics for skill packages from a definition and task
