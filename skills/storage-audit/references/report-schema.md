@@ -33,10 +33,12 @@
 }
 ```
 
-`status` is `stable` only when the strict pre-scan and post-scan root allocation match. `fast` means the user requested `--fast`; `unstable` means the root changed while scanning. Neither permits cleanup-command output.
+`status` is `stable` only when the strict pre-scan and post-scan root allocation match. `fast` means the user requested `--fast`; `unstable` means the root changed while scanning. Neither permits cleanup-script output.
 
 `process_count` comes from `lsof +D` without exposing command lines. `-1` means `lsof` is unavailable; Tier A eligibility is then suppressed rather than guessed.
 
 Entry IDs are deterministic within a stable scan: eligible entries are sorted by allocated KiB descending, then canonical path; protected entries use the `P-###` prefix and follow the same ordering. Project rows are canonical-path ordered.
 
 Markdown output contains the same facts in a review table. Allocated KiB describes `du -skx` accounting, not guaranteed physical recovery on copy-on-write filesystems, in snapshots, or for open-but-deleted files.
+
+`plan` is not an audit-report format. It requires explicit `A-###` selection from a fresh stable strict scan and writes a self-contained Bash script to standard output. The rendered script previews its embedded canonical targets by default, rejects unknown or extra arguments, and removes only those targets when the operator invokes it with exactly `--execute`. Rendering never writes or executes that script.

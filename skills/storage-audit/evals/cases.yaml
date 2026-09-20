@@ -11,16 +11,17 @@ cases:
         target: "READ-ONLY"
         weight: 1.0
 
-  - id: render_selected_cleanup_commands
-    prompt: "Show cleanup commands for the selected A-001 and A-002 build-cache candidates, but do not run them."
+  - id: render_selected_cleanup_script
+    prompt: "Render a reusable cleanup script for selected A-001 and A-002 build-cache candidates, but do not run it."
     rubric:
-      - "Requires a fresh stable strict scan before rendering commands."
-      - "Prints one absolute quoted rm command per eligible candidate."
-      - "Explicitly states that no command was executed."
+      - "Requires a fresh stable strict scan and explicit selected Tier A IDs."
+      - "Renders one self-contained script with canonical selected targets and a loop."
+      - "Makes preview the default and requires exactly --execute before removal."
+      - "Explicitly states that the script was neither saved nor executed."
     trigger_expected: true
     assertions:
       - type: contains
-        target: "No command executed."
+        target: "Preview only."
         weight: 1.0
 
   - id: reject_old_project_deletion
