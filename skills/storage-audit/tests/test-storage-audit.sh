@@ -94,8 +94,8 @@ REPO_JSON="$TMP_ROOT/repo.json"
 assert_contains "$ROOT/rust/target" "$REPO_JSON"
 AUDIT_MARKDOWN="$TMP_ROOT/audit.md"
 "$SCRIPT" audit --root "$ROOT" --scope workspace --strict --format markdown > "$AUDIT_MARKDOWN"
-assert_contains 'Use the storage-audit skill to run a fresh strict scan' "$AUDIT_MARKDOWN"
-assert_contains 'render—but do not save or execute—a cleanup script for cleanup-eligible candidates A-001, A-002.' "$AUDIT_MARKDOWN"
+assert_contains 'Reply `render all` to render a preview-only cleanup script for every actionable candidate from this audit.' "$AUDIT_MARKDOWN"
+assert_not_contains 'fresh strict scan' "$AUDIT_MARKDOWN"
 assert_not_contains '<selected IDs>' "$AUDIT_MARKDOWN"
 
 assert_contains '"cleanup_eligible":true' "$REPO_JSON"
@@ -106,7 +106,7 @@ mkdir -p "$FAKE_BIN"
 printf '#!/usr/bin/env bash\nprintf called > %q\nexit 99\n' "$RM_CALLED" > "$FAKE_BIN/rm"
 chmod +x "$FAKE_BIN/rm"
 PLAN_SCRIPT="$TMP_ROOT/cleanup.sh"
-PATH="$FAKE_BIN:$PATH" "$SCRIPT" plan --root "$ROOT" --candidate A-001 > "$PLAN_SCRIPT"
+PATH="$FAKE_BIN:$PATH" "$SCRIPT" plan --root "$ROOT" --candidate A-001 --expected-path "$ROOT/rust/target" > "$PLAN_SCRIPT"
 [ ! -e "$RM_CALLED" ] || fail "plan executed rm"
 bash -n "$PLAN_SCRIPT"
 assert_contains '#!/usr/bin/env bash' "$PLAN_SCRIPT"
@@ -117,8 +117,55 @@ PATH="$FAKE_BIN:$PATH" bash "$PLAN_SCRIPT" > "$PREVIEW_OUT"
 [ ! -e "$RM_CALLED" ] || fail "preview executed rm"
 assert_contains "$ROOT/rust/target" "$PREVIEW_OUT"
 
+
+set +e
+"$SCRIPT" plan --root "$ROOT" --candidate A-001 > "$TMP_ROOT/missing-binding.txt" 2>&1
+MISSING_BINDING_STATUS=$?
+set -e
+[ "$MISSING_BINDING_STATUS" -ne 0 ] || fail "plan accepted an unbound candidate"
+assert_contains 'requires one --expected-path per --candidate' "$TMP_ROOT/missing-binding.txt"
+set +e
+"$SCRIPT" plan --root "$ROOT" --candidate A-001 --expected-path "$ROOT/python/.venv" > "$TMP_ROOT/mismatched-binding.txt" 2>&1
+MISMATCHED_BINDING_STATUS=$?
+set -e
+[ "$MISMATCHED_BINDING_STATUS" -ne 0 ] || fail "plan accepted a remapped candidate"
+assert_contains 'no longer matches the selected path' "$TMP_ROOT/mismatched-binding.txt"
+
+ALL_PLAN_SCRIPT="$TMP_ROOT/all-cleanup.sh"
+"$SCRIPT" plan --root "$ROOT" --scope workspace --all > "$ALL_PLAN_SCRIPT"
+bash -n "$ALL_PLAN_SCRIPT"
+assert_contains "$ROOT/rust/target" "$ALL_PLAN_SCRIPT"
+assert_contains "$ROOT/python/.venv" "$ALL_PLAN_SCRIPT"
+
+DRIFT_STATE="$TMP_ROOT/drift-state"
+cat > "$FAKE_BIN/du" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "-skx" ] && [ "$2" = "$DRIFT_ROOT" ]; then
+    if [ ! -e "$DRIFT_STATE" ]; then
+        printf 'first\n' > "$DRIFT_STATE"
+        printf '100\t%s\n' "$DRIFT_ROOT"
+    else
+        printf '101\t%s\n' "$DRIFT_ROOT"
+    fi
+    exit 0
+fi
+exec /usr/bin/du "$@"
+EOF
+chmod +x "$FAKE_BIN/du"
+DRIFTING_PLAN_SCRIPT="$TMP_ROOT/drifting-cleanup.sh"
+PATH="$FAKE_BIN:$PATH" DRIFT_ROOT="$ROOT" DRIFT_STATE="$DRIFT_STATE" \
+    "$SCRIPT" plan --root "$ROOT" --candidate A-001 --expected-path "$ROOT/rust/target" > "$DRIFTING_PLAN_SCRIPT"
+bash -n "$DRIFTING_PLAN_SCRIPT"
+assert_contains "$ROOT/rust/target" "$DRIFTING_PLAN_SCRIPT"
+
+set +e
+"$SCRIPT" plan --root "$ROOT" --scope workspace --all --candidate A-001 --expected-path "$ROOT/rust/target" > "$TMP_ROOT/conflicting-selection.txt" 2>&1
+CONFLICTING_SELECTION_STATUS=$?
+set -e
+[ "$CONFLICTING_SELECTION_STATUS" -ne 0 ] || fail "plan accepted --all with explicit candidates"
+assert_contains 'cannot combine --all with explicit candidates' "$TMP_ROOT/conflicting-selection.txt"
 TAMPERED_SCRIPT="$TMP_ROOT/tampered.sh"
-"$SCRIPT" plan --root "$ROOT" --candidate A-001 --candidate A-002 > "$TAMPERED_SCRIPT"
+"$SCRIPT" plan --root "$ROOT" --candidate A-001 --expected-path "$ROOT/rust/target" --candidate A-002 --expected-path "$ROOT/python/.venv" > "$TAMPERED_SCRIPT"
 mkdir -p "$TMP_ROOT/outside"
 python3 -c 'import pathlib, sys; path = pathlib.Path(sys.argv[1]); path.write_text(path.read_text().replace(sys.argv[2], sys.argv[3], 1))' \
     "$TAMPERED_SCRIPT" "$ROOT/rust/target" "$TMP_ROOT/outside"
@@ -138,7 +185,7 @@ SENTINEL_HASH_AFTER_PLAN=$(shasum -a 256 "$SENTINEL" | cut -d ' ' -f 1)
 assert_equals "$SENTINEL_HASH_BEFORE" "$SENTINEL_HASH_AFTER_PLAN" "cleanup changed local data"
 
 set +e
-"$SCRIPT" plan --root "$ROOT" --candidate P-001 > "$TMP_ROOT/protected.txt" 2>&1
+"$SCRIPT" plan --root "$ROOT" --candidate P-001 --expected-path "$ROOT/data" > "$TMP_ROOT/protected.txt" 2>&1
 PROTECTED_STATUS=$?
 set -e
 [ "$PROTECTED_STATUS" -ne 0 ] || fail "plan accepted protected local data"
