@@ -14,7 +14,8 @@ cases:
   - id: render_selected_cleanup_script
     prompt: "Render a reusable cleanup script for selected A-001 and A-002 build-cache candidates, but do not run it."
     rubric:
-      - "Requires a fresh stable strict scan and explicit selected actionable candidate IDs."
+      - "Uses a fresh strict candidate snapshot; aggregate allocation drift does not suppress rendering."
+      - "Binds every selected ID to its audited canonical path and refuses an ID-to-path mismatch after rescanning."
       - "Renders one self-contained script with canonical selected targets and a loop."
       - "Makes preview the default and requires exactly --execute before removal."
       - "Explicitly states that the script was neither saved nor executed."
@@ -24,12 +25,12 @@ cases:
         target: "Preview only."
         weight: 1.0
 
-  - id: report_nested_repo_containers_and_next_action
-    prompt: "Audit a workspace where top-level folders contain multiple Git repositories, then tell me exactly how to request a cleanup script."
+  - id: report_nested_repo_containers_and_selection
+    prompt: "Audit a workspace where top-level folders contain multiple Git repositories, then tell me how to request a cleanup script for every actionable candidate without repeating the full list."
     rubric:
       - "Labels top-level multi-repository folders as repository containers while listing every nested repository separately, including linked worktrees with .git files."
       - "Reports each container's nested-repository count instead of treating it as an unexplained non-repository."
-      - "Ends a stable eligible audit with a copy-ready prompt requiring a fresh strict scan and containing every actual actionable candidate ID."
+      - "Ends a stable eligible audit with concise explicit `render all` and subset-selection instructions rather than a copied list of every candidate ID."
       - "Uses cleanup-eligible and actionable terminology without inventing a hierarchy."
     trigger_expected: true
     assertions:
@@ -37,10 +38,10 @@ cases:
         target: "(?i)repository-container|repository container"
         weight: 1.0
       - type: matches_regex
-        target: "(?i)fresh strict scan.*cleanup-eligible candidates A-\\d{3}"
+        target: "(?i)render all"
         weight: 1.0
       - type: not_contains
-        target: "<selected IDs>"
+        target: "fresh strict scan"
         weight: 1.0
 
   - id: reject_old_project_deletion

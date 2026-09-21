@@ -1285,7 +1285,7 @@ packages:
     complements:
     - chart-clarity
   - name: storage-audit
-    version: 0.4.0
+    version: 0.6.0
     description: 'Read-only disk-storage audit for a repository or workspace root. Measures project footprints, identifies
       rebuildable dependencies, classifies local data and Git-protected paths, and reports project liveness without modifying
       files. Triggers on: "audit disk space", "storage audit", "find removable build artifacts", "which projects use the most
