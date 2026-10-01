@@ -1,6 +1,6 @@
 {
   "name": "armory",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Production-grade skills, agents, hooks, rules, and commands for Claude Code — 110 packages across 7 types",
   "author": {
     "name": "Mathews-Tom",
@@ -21,6 +21,55 @@
     "hooks",
     "rules"
   ],
-  "agents": "./agents/*/AGENT.md",
-  "commands": "./commands/*/COMMAND.md"
+  "agents": [
+    "./agents/code-reviewer/AGENT.md",
+    "./agents/codebase-auditor/AGENT.md",
+    "./agents/content-strategist/AGENT.md",
+    "./agents/full-stack-builder/AGENT.md",
+    "./agents/idea-scout/AGENT.md",
+    "./agents/media-producer/AGENT.md",
+    "./agents/project-architect/AGENT.md",
+    "./agents/project-planner/AGENT.md",
+    "./agents/proposal-writer/AGENT.md",
+    "./agents/release-captain/AGENT.md",
+    "./agents/research-analyst/AGENT.md",
+    "./agents/secret-scanner/AGENT.md",
+    "./agents/security-reviewer/AGENT.md",
+    "./agents/skill-librarian/AGENT.md",
+    "./agents/skill-router/AGENT.md",
+    "./agents/team-lead/AGENT.md",
+    "./agents/test-engineer/AGENT.md"
+  ],
+  "commands": {
+    "decision-map": {
+      "source": "./commands/decision-map/COMMAND.md"
+    },
+    "evolve": {
+      "source": "./commands/evolve/COMMAND.md"
+    },
+    "handoff": {
+      "source": "./commands/handoff/COMMAND.md"
+    },
+    "librarian": {
+      "source": "./commands/librarian/COMMAND.md"
+    },
+    "pr-swarm": {
+      "source": "./commands/pr-swarm/COMMAND.md"
+    },
+    "refactor": {
+      "source": "./commands/refactor/COMMAND.md"
+    },
+    "route": {
+      "source": "./commands/route/COMMAND.md"
+    },
+    "security-scan": {
+      "source": "./commands/security-scan/COMMAND.md"
+    },
+    "stack-pr": {
+      "source": "./commands/stack-pr/COMMAND.md"
+    },
+    "tdd": {
+      "source": "./commands/tdd/COMMAND.md"
+    }
+  }
 }
