@@ -3,7 +3,7 @@ name: research
 type: preset
 description:
   "DEPRECATED: Superseded by the research-analyst agent, which orchestrates
-  literature-review, tavily, youtube-analysis, competitive-analyzer, and web-fetch
+  literature-review, tavily, watch, competitive-analyzer, and web-fetch
   with parallel multi-source investigation, cross-referencing, and confidence-rated
   synthesis. Use research-analyst agent instead."
 metadata:

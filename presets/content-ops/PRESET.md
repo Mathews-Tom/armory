@@ -4,7 +4,7 @@ type: preset
 description:
   "DEPRECATED: Superseded by the content-strategist agent, which orchestrates
   content skills (humanize, linkedin-post-style, html-presentation, md-to-pdf, tavily,
-  youtube-analysis) with per-channel adaptation, audience-aware tone, and automated
+  watch) with per-channel adaptation, audience-aware tone, and automated
   quality passes. Use content-strategist agent instead."
 metadata:
   version: 1.1.0

@@ -74,7 +74,7 @@ profiles:
       skills:
         - literature-review
         - research-critique
-        - youtube-analysis
+        - watch
         - tavily
         - web-fetch
       agents:

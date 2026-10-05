@@ -39,7 +39,7 @@ cases:
     prompt: "Summarize this YouTube video for me: https://youtube.com/watch?v=abc123"
     fixtures: []
     rubric:
-      - "does not activate research-analyst (youtube-analysis skill territory)"
+      - "does not activate research-analyst (watch skill territory)"
     trigger_expected: false
 
   - id: business_idea_validation

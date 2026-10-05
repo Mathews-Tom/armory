@@ -109,7 +109,7 @@ cases:
     fixtures: []
     rubric:
       - "does not activate youtube-search (this is video analysis, not search)"
-      - "should activate youtube-analysis instead"
+      - "should activate watch instead"
     trigger_expected: false
 
   - id: youtube_search_negative_download

@@ -26,7 +26,7 @@ metadata:
       [
         literature-review,
         tavily,
-        youtube-analysis,
+        watch,
         competitive-analyzer,
         to-markdown,
       ]
@@ -61,7 +61,7 @@ report with citations and confidence ratings.
 - User wants academic literature review only (use `literature-review` skill)
 - User wants competitive/market analysis specifically (use `competitive-analyzer` or `market-analyzer` skill)
 - User wants to validate a business idea (use `idea-scout` agent)
-- User wants to analyze a specific YouTube video (use `youtube-analysis` skill)
+- User wants to analyze a specific video (use `watch` skill)
 
 ---
 
@@ -84,7 +84,7 @@ If the research question is vague, ask up to 3 clarifying questions to narrow sc
 | -------------------- | ----- | ---------- | ----------------------------------------------------------------- |
 | tavily               | skill | Phase 2    | Web search for current information, industry data, technical docs |
 | literature-review    | skill | Phase 2    | Academic papers, preprints, peer-reviewed research                |
-| youtube-analysis     | skill | Phase 2    | Extract insights from talks, tutorials, conference presentations  |
+| watch                | skill | Phase 2    | Extract timestamped speech and visual evidence from talks, tutorials, and presentations |
 | competitive-analyzer | skill | Phase 2    | Compare products, tools, or frameworks in a space                 |
 | to-markdown          | skill | Phase 2    | Convert user-provided documents (PDF, DOCX) to searchable text    |
 
@@ -121,7 +121,7 @@ Spawn parallel research agents using the Agent tool. Issue all relevant Agent ca
 
 **Agent C — Video/Talk Research** (when applicable):
 
-> Use the Agent tool to find and analyze relevant video content on [topic]. Use the `youtube-analysis` skill to extract insights from conference talks, tutorials, and expert discussions. Focus on practitioner experience, real-world case studies, and emerging trends not yet in papers. Return structured findings with video titles, speakers, and key takeaways.
+> Use the Agent tool to find and analyze relevant video content on [topic]. Use the `watch` skill to extract insights from conference talks, tutorials, and expert discussions. Focus on practitioner experience, real-world case studies, and emerging trends not yet in papers. Return structured findings with video titles, speakers, evidence timestamps, and key takeaways; distinguish observed content from interpretation.
 
 **Agent D — Competitive/Comparative Analysis** (when applicable):
 
