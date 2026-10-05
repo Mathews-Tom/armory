@@ -19,8 +19,10 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 | **Remotion**                             | [remotion-dev/remotion](https://github.com/remotion-dev/remotion)                                             | Custom (Remotion License) | `remotion-video`                     |
 | **MarkItDown** (Microsoft)               | [microsoft/markitdown](https://github.com/microsoft/markitdown)                                               | MIT                       | `to-markdown`                        |
 | **notebooklm-py** (teng-lin)             | [teng-lin/notebooklm-py](https://github.com/teng-lin/notebooklm-py)                                           | MIT                       | `notebooklm`                         |
-| **yt-dlp**                               | [yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp)                                                             | Unlicense                 | `youtube-search`, `youtube-analysis` |
-| **youtube-transcript-api** (jdepoix)     | [jdepoix/youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)                           | MIT                       | `youtube-analysis`                   |
+| **yt-dlp**                               | [yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp)                                                             | Unlicense                 | `youtube-search`, `watch` |
+| **youtube-transcript-api** (jdepoix)     | [jdepoix/youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)                           | MIT                       | `watch` |
+| **FFmpeg** | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | LGPL/GPL depending on build | `watch` (external media tools) |
+| **WhisperX** (optional) | [m-bain/whisperX](https://github.com/m-bain/whisperX) | BSD-2-Clause; model/dependency terms separate | `watch` (opt-in local transcription) |
 | **Reveal.js**                            | [hakimel/reveal.js](https://github.com/hakimel/reveal.js)                                                     | MIT                       | `html-presentation`                  |
 | **Lightpanda Browser**                   | [lightpanda-io/browser](https://github.com/lightpanda-io/browser)                                             | AGPL-3.0                  | `lightpanda-browser`                 |
 | **agent-browser** (Lightpanda)           | [lightpanda-io/agent-skill](https://github.com/lightpanda-io/agent-skill)                                     | —                         | `lightpanda-browser`                 |
@@ -38,6 +40,14 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 ## Vendoring Records
 
 Records of upstream content that was copied or adapted directly into armory skills, with pinned commits and re-sync policies. Each record documents exactly what was taken, what was reimplemented from paper descriptions, and what was skipped.
+
+### claude-video — used by `watch`
+
+**Upstream repo:** [bradautomates/claude-video](https://github.com/bradautomates/claude-video)
+**Pinned commit:** `03ceb42f7fa2c4439aca01752118044baabffb8f`
+**License:** MIT, copyright 2026 Bradley Bonanno; notice preserved at `skills/watch/references/upstream/LICENSE`.
+
+Watch independently implements the upstream question-driven video-evidence concept: timestamped frames and captions, cue-focused inspection, and explicit native Gemini analysis. Armory retains its existing concept-analysis patterns. Upstream runtime modules, setup wizard, plugin packaging, automatic cloud selection, cloud speech providers, and uncapped sampling are not copied wholesale. Scope, dependency terms, timestamp-boundary differences, and re-sync policy are recorded in `skills/watch/references/upstream/provenance.md`.
 
 ### Code2Video — used by `concept-to-video`
 

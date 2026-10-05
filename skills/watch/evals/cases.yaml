@@ -1,0 +1,117 @@
+cases:
+  - id: video_concept_summary
+    prompt: "Summarize the key concepts and actionable takeaways from https://www.youtube.com/watch?v=qSuCPooR3E4. I only need the spoken ideas."
+    fixtures: []
+    rubric:
+      - "uses transcript evidence without unnecessary media download or cloud processing"
+      - "produces TL;DR, key concepts, and actionable takeaways grounded in actual speech"
+      - "does not claim to have inspected slides or visual demonstrations"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(transcript|caption)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(key concepts|takeaways|TL;DR)"
+        weight: 0.8
+
+  - id: visual_tool_lookup
+    prompt: "Watch https://www.youtube.com/watch?v=qSuCPooR3E4 locally around 02:00–02:25. Read the tool name shown at 02:13 and explain the demonstration."
+    fixtures: []
+    rubric:
+      - "inspects actual frames rather than inferring the tool name from captions"
+      - "uses source-relative focus/cue times within the requested interval"
+      - "cites an inspected frame and distinguishes visual observations from interpretation"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(frame|visual evidence|on.screen)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(02:13|2:13|133)"
+        weight: 0.8
+
+  - id: local_private_captionless_video
+    prompt: "Analyze private-demo.mp4. It must stay on this machine and has no captions. Do not install a speech model; explain what the visuals establish and what speech evidence is missing."
+    fixtures: []
+    rubric:
+      - "uses local visual evidence and explicitly reports missing speech"
+      - "does not upload video/audio or install WhisperX automatically"
+      - "does not invent speech, captions, or speaker identities"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(missing|unavailable|disabled).*(speech|caption|transcript)|(speech|caption|transcript).*(missing|unavailable|disabled)"
+        weight: 1.0
+
+  - id: explicit_gemini_question
+    prompt: "I authorize sending this public video URL to Google. Use Gemini to find the tokenizer demonstration in https://www.youtube.com/watch?v=7xTGNNLPyMI, and return timestamped findings. My key is already in the environment."
+    fixtures: []
+    rubric:
+      - "selects Gemini only after explicit cloud authorization"
+      - "passes the user's question to the native video API"
+      - "attributes findings to Gemini rather than claiming direct frame inspection"
+      - "retains timestamps and does not promise free/perfect analysis"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)Gemini"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(timestamp|[0-9]+:[0-9]{2})"
+        weight: 0.8
+
+  - id: available_key_not_consent
+    prompt: "Watch private-demo.mp4. GEMINI_API_KEY is set, but I have not authorized uploading this recording."
+    fixtures: []
+    rubric:
+      - "keeps processing local; key availability is not cloud consent"
+      - "does not upload video or audio"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(local|consent|authoriz)"
+        weight: 1.0
+
+  - id: vimeo_video_analysis
+    prompt: "Watch this Vimeo video and summarize what is said and shown: https://vimeo.com/76979871"
+    fixtures: []
+    rubric:
+      - "activates watch for an existing non-YouTube video"
+      - "uses supported downloader evidence or reports source-access failure explicitly"
+      - "does not fabricate content when acquisition fails"
+    trigger_expected: true
+
+  - id: retention_correlation_boundary
+    prompt: "Use supplied retention.csv to inspect the three largest retention drops in my recording.mp4. Distinguish what happens around each drop from a hypothesis about why viewers leave."
+    fixtures: []
+    rubric:
+      - "uses supplied analytics rather than inventing retention data"
+      - "inspects relevant intervals and cites evidence timestamps"
+      - "labels causes as hypotheses; correlation does not establish viewer intent"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(hypothes|correlat|causat|cannot.*why)"
+        weight: 1.0
+
+  - id: video_discovery_request
+    prompt: "Find five YouTube videos about binary search."
+    fixtures: []
+    rubric:
+      - "does not activate watch; this is youtube-search discovery"
+    trigger_expected: false
+
+  - id: video_creation_request
+    prompt: "Create an animated video explaining binary search."
+    fixtures: []
+    rubric:
+      - "does not activate watch; this is video generation"
+    trigger_expected: false
+
+  - id: filesystem_watch_request
+    prompt: "Watch my source directory and rebuild whenever a file changes."
+    fixtures: []
+    rubric:
+      - "does not activate watch; this is a filesystem watcher, not video analysis"
+    trigger_expected: false

@@ -123,8 +123,8 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Deep multi-source research | `research-analyst` agent | — |
 | Literature review (academic) | `literature-review` skill | `arxiv-search` utility |
 | Search arXiv papers | `arxiv-search` utility | `literature-review` |
-| YouTube content analysis | `youtube-analysis` skill | `youtube-search` skill |
-| Search YouTube | `youtube-search` skill | `youtube-analysis` |
+| Video content analysis | `watch` skill | `youtube-search` skill |
+| Search YouTube | `youtube-search` skill | `watch` |
 | Critique research methodology | `research-critique` skill | `literature-review` |
 | NotebookLM-style analysis | `notebooklm` skill | — |
 | Web fetch / scrape | `web-fetch` skill | `lightpanda-browser` |

@@ -30,7 +30,7 @@ metadata:
         html-presentation,
         md-to-pdf,
         tavily,
-        youtube-analysis,
+        watch,
       ]
     agents: []
   tags: [content, strategy, planning, sonnet]
@@ -62,7 +62,7 @@ multiple formats through a structured research-strategy-production pipeline.
 - User asks only to build slides (use `html-presentation` skill)
 - User asks only to humanize existing text (use `humanize` skill)
 - User asks for web research without content production (use `tavily` skill)
-- User asks for YouTube video analysis without content production (use `youtube-analysis` skill)
+- User asks for video analysis without content production (use `watch` skill)
 
 ---
 
@@ -83,7 +83,7 @@ multiple formats through a structured research-strategy-production pipeline.
 | Component           | Type  | Invoked In | Purpose                                        |
 | ------------------- | ----- | ---------- | ---------------------------------------------- |
 | tavily              | skill | Phase 2    | Topic research and fact gathering              |
-| youtube-analysis    | skill | Phase 2    | Extract insights and quotes from video sources |
+| watch               | skill | Phase 2    | Extract timestamped speech and visual evidence from video sources |
 | linkedin-post-style | skill | Phase 4    | Platform-optimized LinkedIn post generation    |
 | html-presentation   | skill | Phase 4    | HTML slide deck production                     |
 | md-to-pdf           | skill | Phase 4    | Polished PDF document output                   |
@@ -111,7 +111,7 @@ multiple formats through a structured research-strategy-production pipeline.
 1. If the topic requires factual grounding or the user's source material is thin:
    - Invoke the `tavily` skill to research the topic, gather current data, statistics, and expert perspectives
 2. If the user provides video URLs or references video content:
-   - Invoke the `youtube-analysis` skill to extract key insights, quotes, timestamps, and structural patterns
+   - Invoke the `watch` skill to extract key insights, quotes, timestamps, and structural patterns; keep visual observations distinct from interpretation
 3. Compile a source brief: key facts, data points, quotes, and narrative angles gathered from research
 4. Skip this phase entirely if the user provides comprehensive source material that needs no supplementation.
 

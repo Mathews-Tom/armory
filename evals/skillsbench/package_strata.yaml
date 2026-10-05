@@ -428,7 +428,7 @@ excluded:
     name: web-fetch
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
-    name: youtube-analysis
+    name: watch
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
     name: youtube-search

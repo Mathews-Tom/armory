@@ -194,7 +194,7 @@ yt-dlp "https://www.youtube.com/@ChannelName/search?query=skills" \
 ### Extract URLs Only (for Piping)
 
 ```bash
-# Get just URLs for feeding into other tools (youtube-analysis, notebooklm)
+# Get just URLs for feeding into other tools (watch, notebooklm)
 yt-dlp "ytsearch10:claude code MCP" \
   --dump-json --flat-playlist --no-warnings 2>/dev/null \
   | jq -r '.url'
@@ -204,14 +204,14 @@ yt-dlp "ytsearch10:claude code MCP" \
 
 This skill produces URLs and metadata that feed into other skills:
 
-- **youtube-analysis**: Pass URLs to extract transcripts and perform concept analysis
+- **watch**: Pass URLs for transcript concepts, timestamped visual evidence, and question-driven video analysis
 - **notebooklm**: Pass URLs as sources via `notebooklm source add "URL"`
 
 Example pipeline (manual steps, not automated):
 
 1. `/yt-search` — discover 10 relevant videos
 2. User reviews and selects videos
-3. Feed selected URLs into `notebooklm source add` or `youtube-analysis`
+3. Feed selected URLs into `notebooklm source add` or `watch`
 
 ## Error Handling
 

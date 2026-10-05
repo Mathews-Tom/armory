@@ -16,7 +16,7 @@ cases:
     fixtures: []
     rubric:
       - "activates content-strategist agent"
-      - "invokes youtube-analysis skill to extract insights from video"
+      - "invokes watch skill to extract insights from video"
       - "produces blog article adapted from talk content"
       - "invokes linkedin-post-style skill for social post"
       - "invokes humanize skill before delivering"

@@ -305,6 +305,8 @@ packages:
     - explainer
     category: visualization
     difficulty: advanced
+    complements:
+    - watch
   - name: debug-investigator
     version: 1.1.1
     description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal
@@ -869,6 +871,8 @@ packages:
     - source-analysis
     category: research
     difficulty: intermediate
+    complements:
+    - watch
   - name: opus-4-7-migration
     version: 1.0.0
     description: 'Scan a repository for Opus-4.6-era patterns that break or degrade on Opus 4.7 — fixed-budget Extended Thinking
@@ -1119,6 +1123,8 @@ packages:
     - motion-graphics
     category: business
     difficulty: advanced
+    complements:
+    - watch
   - name: repo-sentinel
     version: 1.1.1
     description: 'Full security audit for public repositories across 12 attack surfaces: git history, secrets, CI/CD, containers,
@@ -1438,6 +1444,27 @@ packages:
     phase: review
     complements:
     - chart-clarity
+  - name: watch
+    version: 2.0.0
+    description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video",
+      "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video",
+      or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video
+      or remotion-video).'
+    path: skills/watch
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/watch/SKILL.md
+    complements:
+    - youtube-search
+    - notebooklm
+    - concept-to-video
+    - remotion-video
+    tags:
+    - video
+    - youtube
+    - analysis
+    - multimodal
+    - evidence
+    category: visualization
+    difficulty: intermediate
   - name: web-fetch
     version: 1.1.1
     description: 'Web content fetching via curl and WebFetch when a specific URL is provided. Covers HTTP GET/POST, JSON APIs,
@@ -1454,19 +1481,6 @@ packages:
     difficulty: beginner
     complements:
     - competitive-analyzer
-  - name: youtube-analysis
-    version: 1.1.1
-    description: 'Extract YouTube transcripts and produce structured concept analysis with multi-level summaries, key concepts,
-      takeaways. Uses youtube-transcript-api with yt-dlp fallback. Triggers on: "analyze youtube video", "youtube transcript",
-      "summarize this video", "extract concepts from video", "video key points", or any youtube.com/youtu.be URL.'
-    path: skills/youtube-analysis
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/youtube-analysis/SKILL.md
-    tags:
-    - youtube
-    - analysis
-    - skill
-    category: visualization
-    difficulty: intermediate
   - name: youtube-search
     version: 1.1.1
     description: 'Search YouTube by keyword and return structured video metadata (title, URL, channel, views, duration, date)
@@ -1480,6 +1494,8 @@ packages:
     - skill
     category: research
     difficulty: beginner
+    complements:
+    - watch
   agents:
   - name: code-reviewer
     version: 1.0.0
@@ -2348,8 +2364,8 @@ packages:
   - name: content-ops
     version: 1.1.0
     description: 'DEPRECATED: Superseded by the content-strategist agent, which orchestrates content skills (humanize, linkedin-post-style,
-      html-presentation, md-to-pdf, tavily, youtube-analysis) with per-channel adaptation, audience-aware tone, and automated
-      quality passes. Use content-strategist agent instead.'
+      html-presentation, md-to-pdf, tavily, watch) with per-channel adaptation, audience-aware tone, and automated quality
+      passes. Use content-strategist agent instead.'
     path: presets/content-ops
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/content-ops/PRESET.md
     tags:
@@ -2421,7 +2437,7 @@ packages:
     difficulty: intermediate
   - name: research
     version: 1.1.0
-    description: 'DEPRECATED: Superseded by the research-analyst agent, which orchestrates literature-review, tavily, youtube-analysis,
+    description: 'DEPRECATED: Superseded by the research-analyst agent, which orchestrates literature-review, tavily, watch,
       competitive-analyzer, and web-fetch with parallel multi-source investigation, cross-referencing, and confidence-rated
       synthesis. Use research-analyst agent instead.'
     path: presets/research
