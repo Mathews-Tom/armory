@@ -10,4 +10,5 @@
 - Add explicitly authorized native Gemini video analysis, stateless interaction requests, streamed file upload and cleanup, credential-safe diagnostics, and no automatic engine switching.
 - Add separately provisioned, offline local WhisperX speech recognition. Ordinary invocations do not install models or upload audio.
 - Add regression coverage for source-time/pixel alignment, nonzero media starts, frame budgets, caption normalization, private file ownership, cloud consent, upload lifecycle, and silent focus intervals.
+- Make PR quality and eval-coverage checks rename-safe: fetch base history and validate surviving changed definitions instead of removed packages.
 - Preserve the pinned upstream MIT notice and document independent implementation scope and dependency terms.
