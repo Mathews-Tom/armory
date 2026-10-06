@@ -36,7 +36,7 @@ def metadata(source: str) -> SourceInfo:
         "duration_seconds": 120.0,
         "upload_date": None,
         "description": "",
-        "video_id": "qSuCPooR3E4",
+        "video_id": "Bgtr1Ue40Jo",
     }
 
 
@@ -46,18 +46,16 @@ def forbidden(*args: object, **kwargs: object) -> NoReturn:
     )
 
 
-def test_existing_key_does_not_authorize_cloud(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize("engine", ["gemini", "unknown"])
+def test_unsupported_engine_is_rejected_before_acquisition(
+    engine: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("GEMINI_API_KEY", "test-secret")
-    monkeypatch.setattr(watch, "analyze_video", forbidden)
+    monkeypatch.setattr(watch, "source_info", forbidden)
     monkeypatch.setattr(watch, "download_media", forbidden)
-    with pytest.raises(EvidenceError, match="consent"):
+    with pytest.raises(EvidenceError):
         watch.collect(
             watch.Options(
-                source=str(tmp_path / "private.mp4"),
-                engine="gemini",
-                out_dir=tmp_path / "reports",
+                source="Bgtr1Ue40Jo", engine=engine, out_dir=tmp_path / "reports"
             )
         )
     assert not (tmp_path / "reports").exists()
@@ -71,10 +69,9 @@ def test_transcript_summary_and_quiet_focus_do_not_download_or_transcribe(
     monkeypatch.setattr(watch, "download_media", forbidden)
     monkeypatch.setattr(watch, "probe", forbidden)
     monkeypatch.setattr(watch, "transcribe_local", forbidden)
-    monkeypatch.setattr(watch, "analyze_video", forbidden)
     report = watch.collect(
         watch.Options(
-            source="qSuCPooR3E4",
+            source="Bgtr1Ue40Jo",
             engine="transcript",
             start=30.0,
             end=40.0,
@@ -85,7 +82,6 @@ def test_transcript_summary_and_quiet_focus_do_not_download_or_transcribe(
     assert report["transcript"]["status"] == "no_speech"
     assert report["transcript"]["segments"] == []
     assert report["local_media"] is None
-    assert report["cloud_answer"] is None
     assert any("focus interval" in gap for gap in report["gaps"])
 
 
@@ -100,7 +96,7 @@ def test_media_failure_keeps_usable_caption_evidence(
 
     monkeypatch.setattr(watch, "download_media", blocked)
     report = watch.collect(
-        watch.Options(source="qSuCPooR3E4", engine="local", out_dir=tmp_path)
+        watch.Options(source="Bgtr1Ue40Jo", engine="local", out_dir=tmp_path)
     )
     assert report["transcript"]["status"] == "available"
     assert report["frames"] == []
@@ -132,7 +128,7 @@ def test_untrusted_path_cannot_break_out_of_report_code_span() -> None:
 @pytest.mark.parametrize(
     "source",
     [
-        "https://user:password@www.youtube.com/watch?v=qSuCPooR3E4",
+        "https://user:password@www.youtube.com/watch?v=Bgtr1Ue40Jo",
         "https://example.com:invalid/video",
         "https://example.com/" + "a" * 2048,
         "https://example.com/\nvideo",
@@ -158,7 +154,7 @@ def test_invalid_visual_budget_fails_before_acquisition(
     with pytest.raises(EvidenceError):
         watch.collect(
             watch.Options(
-                source="qSuCPooR3E4",
+                source="Bgtr1Ue40Jo",
                 max_frames=cap,
                 resolution=resolution,
                 out_dir=tmp_path / "reports",

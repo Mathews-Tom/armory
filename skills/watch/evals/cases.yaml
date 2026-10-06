@@ -1,6 +1,6 @@
 cases:
   - id: video_concept_summary
-    prompt: "Summarize the key concepts and actionable takeaways from https://www.youtube.com/watch?v=qSuCPooR3E4. I only need the spoken ideas."
+    prompt: "Summarize the key concepts and actionable takeaways from https://www.youtube.com/watch?v=Bgtr1Ue40Jo. I only need the spoken ideas."
     fixtures: []
     rubric:
       - "uses transcript evidence without unnecessary media download or cloud processing"
@@ -16,7 +16,7 @@ cases:
         weight: 0.8
 
   - id: visual_tool_lookup
-    prompt: "Watch https://www.youtube.com/watch?v=qSuCPooR3E4 locally around 02:00–02:25. Read the tool name shown at 02:13 and explain the demonstration."
+    prompt: "Watch https://www.youtube.com/watch?v=Bgtr1Ue40Jo locally around 00:30–01:20. Read the tool name shown at 00:58 and explain the demonstration."
     fixtures: []
     rubric:
       - "inspects actual frames rather than inferring the tool name from captions"
@@ -28,7 +28,7 @@ cases:
         target: "(?i)(frame|visual evidence|on.screen)"
         weight: 1.0
       - type: matches_regex
-        target: "(02:13|2:13|133)"
+        target: "(00:58|0:58|58)"
         weight: 0.8
 
   - id: local_private_captionless_video
@@ -44,28 +44,28 @@ cases:
         target: "(?i)(missing|unavailable|disabled).*(speech|caption|transcript)|(speech|caption|transcript).*(missing|unavailable|disabled)"
         weight: 1.0
 
-  - id: explicit_gemini_question
-    prompt: "I authorize sending this public video URL to Google. Use Gemini to find the tokenizer demonstration in https://www.youtube.com/watch?v=7xTGNNLPyMI, and return timestamped findings. My key is already in the environment."
+  - id: long_video_local_review
+    prompt: "Watch the whole video https://www.youtube.com/watch?v=Bgtr1Ue40Jo and explain the central thesis and demonstrations. Keep media processing local, use bounded frame sampling, and inspect focused intervals when important visual details are missing."
     fixtures: []
     rubric:
-      - "selects Gemini only after explicit cloud authorization"
-      - "passes the user's question to the native video API"
-      - "attributes findings to Gemini rather than claiming direct frame inspection"
-      - "retains timestamps and does not promise free/perfect analysis"
+      - "uses transcript and local-frame evidence without uploading video or audio"
+      - "inspects sampled frames and follows up with focused intervals for important details"
+      - "distinguishes spoken claims, inspected visuals, and interpretation"
+      - "does not describe bounded sampling as exhaustive visual coverage"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(?i)Gemini"
+        target: "(?i)local"
         weight: 1.0
       - type: matches_regex
-        target: "(?i)(timestamp|[0-9]+:[0-9]{2})"
+        target: "(?i)(frame|sampl|focus)"
         weight: 0.8
 
-  - id: available_key_not_consent
-    prompt: "Watch private-demo.mp4. GEMINI_API_KEY is set, but I have not authorized uploading this recording."
+  - id: private_local_analysis
+    prompt: "Watch private-demo.mp4. It must stay on this machine. Use available local evidence and do not upload it or install a speech model."
     fixtures: []
     rubric:
-      - "keeps processing local; key availability is not cloud consent"
+      - "keeps media processing local"
       - "does not upload video or audio"
     trigger_expected: true
     assertions:

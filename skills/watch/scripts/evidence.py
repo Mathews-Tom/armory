@@ -48,14 +48,6 @@ class Frame(TypedDict):
     requested_seconds: NotRequired[float]
 
 
-class CloudAnswer(TypedDict):
-    text: str
-    model: str
-    processing: str
-    total_tokens: int | None
-    cleanup_warning: str | None
-
-
 def empty_transcript(
     status: Literal["unavailable", "failed", "disabled", "no_speech"],
     message: str,
