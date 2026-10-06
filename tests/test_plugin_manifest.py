@@ -3,6 +3,7 @@
 Claude Code does not expand globs in plugin.json, so each package is listed
 explicitly and a new one must be added here by hand.
 """
+
 from __future__ import annotations
 
 import json
