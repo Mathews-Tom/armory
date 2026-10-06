@@ -118,7 +118,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [literature-review](skills/literature-review/) | Systematic literature review — search, screen, extract, and synthesize academic research with gap analysis and structured citations                               |
 | [youtube-search](skills/youtube-search/)       | Search YouTube by keyword via yt-dlp — returns structured metadata (title, URL, channel, views, duration, date) for discovery and source curation                 |
-| [watch](skills/watch/) | Question-driven video analysis from timestamped captions, bounded local frames, or opt-in Gemini — concepts, visual evidence, takeaways, and source-linked notes |
+| [watch](skills/watch/) | Local video analysis from timestamped captions, bounded frames, and explicitly provisioned speech transcription — concepts, visual evidence, takeaways, and source-linked notes |
 | [notebooklm](skills/notebooklm/)               | Google NotebookLM automation via notebooklm-py — create notebooks, add sources, chat, generate podcasts, videos, infographics, quizzes, flashcards, and more      |
 | [research-critique](skills/research-critique/) | Critical analysis of research papers — methodology evaluation, claims-evidence alignment, contribution assessment with collegial analytical posture               |
 | [immune](skills/immune/)                       | Hybrid adaptive memory with Cheatsheet (positive patterns) and Immune (negative patterns) — Hot/Cold tiered memory, multi-domain antibody scanning, auto-learning |

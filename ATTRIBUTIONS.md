@@ -41,14 +41,6 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 
 Records of upstream content that was copied or adapted directly into armory skills, with pinned commits and re-sync policies. Each record documents exactly what was taken, what was reimplemented from paper descriptions, and what was skipped.
 
-### claude-video — used by `watch`
-
-**Upstream repo:** [bradautomates/claude-video](https://github.com/bradautomates/claude-video)
-**Pinned commit:** `03ceb42f7fa2c4439aca01752118044baabffb8f`
-**License:** MIT, copyright 2026 Bradley Bonanno; notice preserved at `skills/watch/references/upstream/LICENSE`.
-
-Watch independently implements the upstream question-driven video-evidence concept: timestamped frames and captions, cue-focused inspection, and explicit native Gemini analysis. Armory retains its existing concept-analysis patterns. Upstream runtime modules, setup wizard, plugin packaging, automatic cloud selection, cloud speech providers, and uncapped sampling are not copied wholesale. Scope, dependency terms, timestamp-boundary differences, and re-sync policy are recorded in `skills/watch/references/upstream/provenance.md`.
-
 ### Code2Video — used by `concept-to-video`
 
 **Paper:** [Code2Video: A Code-Centric Paradigm for Educational Video Generation](https://arxiv.org/abs/2510.01174)

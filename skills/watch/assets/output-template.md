@@ -27,10 +27,6 @@
 
 {visual_observations_with_frame_timestamps}
 
-### Gemini-Reported Observations
-
-{attributed_provider_observations_or_not_used}
-
 ### Interpretation
 
 {reasoning_and_hypotheses_separate_from_observation}

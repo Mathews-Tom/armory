@@ -1445,7 +1445,7 @@ packages:
     complements:
     - chart-clarity
   - name: watch
-    version: 2.0.0
+    version: 3.0.0
     description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video",
       "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video",
       or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video
