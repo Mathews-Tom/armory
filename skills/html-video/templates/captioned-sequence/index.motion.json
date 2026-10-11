@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#cue-1", "bySec": 1.5 },
+    { "kind": "appearsBy", "selector": "#cue-3", "bySec": 7.5 },
+    { "kind": "appearsBy", "selector": "#cue-4", "bySec": 10.5 },
+    { "kind": "before", "a": "#cue-1", "b": "#cue-2" },
+    { "kind": "before", "a": "#cue-3", "b": "#cue-4" },
+    { "kind": "staysInFrame", "selector": "#cue-2" },
+    { "kind": "keepsMoving", "withinSelector": "#bar-1", "maxStaticSec": 1 }
+  ]
+}

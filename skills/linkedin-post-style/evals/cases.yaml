@@ -107,3 +107,46 @@ cases:
         target: "80\\s*ms"
       - type: matches_regex
         target: "25\\s*ms"
+
+  - id: html_video_companion_engine_choice
+    prompt: "Write a LinkedIn post about how our agent's retry behavior changed over 14 days of traces, and plan a short Hyperframes HTML video to go with it"
+    fixtures: []
+    rubric:
+      - "Writes the post in the author's voice first, using the 5-act structure"
+      - "Routes the video to html-video because Hyperframes was named explicitly, not to concept-to-video or remotion-video"
+      - "Treats the subject as temporal (behavior change over time) and keeps the video optional rather than required"
+      - "Does not claim the video was rendered or that any toolchain was installed"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)html-video"
+        weight: 1.0
+      - type: not_contains
+        target: "!"
+        weight: 0.6
+
+  - id: pure_text_post_no_companion
+    prompt: "Write a LinkedIn post about this: our CI queue time dropped from 14 minutes to 6 after we cached the dependency layer. Text only, no visuals."
+    fixtures: []
+    rubric:
+      - "Produces only the post text and does not invoke or recommend any visual companion skill"
+      - "Does not mention html-video, concept-to-video, remotion-video, md-to-pdf or concept-to-image as required steps"
+      - "Preserves the 14 minute and 6 minute figures"
+    trigger_expected: true
+    assertions:
+      - type: not_contains
+        target: "html-video"
+        weight: 1.0
+      - type: not_contains
+        target: "remotion-video"
+        weight: 0.8
+      - type: matches_regex
+        target: "14\\s*min"
+        weight: 0.6
+
+  - id: plain_html_page_not_video
+    prompt: "Build me a single HTML landing page with a CSS animated hero section for my product"
+    fixtures: []
+    rubric:
+      - "An ordinary web page with no video output is not a LinkedIn post or a video request; linkedin-post-style does not activate and html-video is not selected"
+    trigger_expected: false

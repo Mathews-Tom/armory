@@ -64,6 +64,7 @@ profiles:
         - md-to-pdf
         - concept-to-image
         - concept-to-video
+        - html-video
       agents:
         - content-strategist
         - media-producer

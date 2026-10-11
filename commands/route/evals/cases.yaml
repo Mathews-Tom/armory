@@ -53,3 +53,35 @@ cases:
     rubric:
       - "does not activate route command (direct implementation task, not a discovery question)"
     trigger_expected: false
+
+  - id: route_html_hyperframes_video
+    prompt: "/route I want to make a video from HTML and CSS rendered with Hyperframes"
+    fixtures: []
+    rubric:
+      - "recommends html-video skill as primary"
+      - "does not recommend remotion-video, because the user named HTML/Hyperframes rather than React"
+    trigger_expected: true
+
+  - id: route_explicit_manim_marketing
+    prompt: "which skill should I use for a marketing video made with Manim?"
+    fixtures: []
+    rubric:
+      - "recommends concept-to-video as primary because the engine was named explicitly"
+      - "states that an explicit engine outranks the content-type preference for remotion-video"
+    trigger_expected: true
+
+  - id: route_existing_video_analysis_vs_creation
+    prompt: "/route I have a recorded product demo video and want a summary of what it shows"
+    fixtures: []
+    rubric:
+      - "recommends watch skill as primary (analysis of an existing video)"
+      - "does not recommend html-video, concept-to-video, or remotion-video, which create new videos"
+    trigger_expected: true
+
+  - id: route_plain_web_page_not_video
+    prompt: "/route I need a static HTML and CSS landing page, no video"
+    fixtures: []
+    rubric:
+      - "recommends static-web-artifacts-builder or a web-page oriented package"
+      - "does not recommend html-video (no video output requested)"
+    trigger_expected: true

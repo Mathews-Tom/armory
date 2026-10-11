@@ -1,0 +1,37 @@
+# Single source of truth for the pinned Hyperframes toolchain.
+#
+# Every script reads this file. No other file in the package states the
+# version, so a bump is one edit here plus a re-run of `bootstrap`.
+
+[hyperframes]
+# Public npm package name. The `@hyperframes/cli` name is not published.
+package = "hyperframes"
+version = "0.8.147"
+
+[runtime]
+node_min_major = 22
+
+[render]
+fps = 30
+workers = 1
+# Initial render-ready timeout (ms) for `check`; the CLI default of 3000 is
+# too tight for a cold browser start.
+check_timeout_ms = 10000
+
+[check]
+# Upper bound on boundary samples passed to `check --at`.
+max_samples = 80
+
+[snapshot]
+# Frames written for visual review; always includes first, middle and last.
+max_frames = 12
+
+[environment]
+# Forced into every Hyperframes child process.
+HYPERFRAMES_NO_TELEMETRY = "1"
+HYPERFRAMES_NO_UPDATE_CHECK = "1"
+
+[scrub]
+# Removed from the child environment. `snapshot` runs a hosted vision model
+# by default when this key is present.
+env = ["GEMINI_API_KEY"]

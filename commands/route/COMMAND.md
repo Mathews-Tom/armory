@@ -9,7 +9,7 @@ description: >-
   "help me pick a skill", "discover packages". Use this command when unsure
   which armory skill, agent, or command to use for a task.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   category: operations
   tags: [discovery, routing, meta, navigation]
   difficulty: beginner
@@ -139,8 +139,12 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Slide presentation (HTML) | `html-presentation` skill | — |
 | Architecture diagram | `architecture-diagram` skill | `architecture-reviewer` |
 | Generate image from concept | `concept-to-image` skill | — |
-| Generate video from concept | `concept-to-video` skill | `remotion-video` |
-| Programmatic video (Remotion) | `remotion-video` skill | — |
+| Generate video from concept (Manim, or no engine named) | `concept-to-video` skill | `remotion-video` |
+| Video authored as HTML/CSS and rendered with Hyperframes | `html-video` skill | — |
+| Programmatic video (React / Remotion, including HTML inside a React composition) | `remotion-video` skill | — |
+| Engine precedence for video creation | An explicit engine wins: Hyperframes → `html-video`, Manim → `concept-to-video`, React/Remotion → `remotion-video`; otherwise `media-producer` agent picks by content type | — |
+| Plain web page or dashboard with no video output | `static-web-artifacts-builder` skill (not `html-video`) | — |
+| Analyze an existing video (not create one) | `watch` skill | — |
 | Build static website | `static-web-artifacts-builder` skill | — |
 | Convert to Markdown | `to-markdown` skill | — |
 | Convert Markdown to PDF | `md-to-pdf` skill | — |

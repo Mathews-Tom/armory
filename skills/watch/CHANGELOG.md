@@ -1,5 +1,10 @@
 # Changelog — Watch
 
+## 3.0.1
+
+- Add `html-video` as an optional complement and list it among creation skills excluded from Watch. Watch stays independently usable and does not depend on it at runtime.
+- Add an evaluation case separating existing-video analysis from HTML/Hyperframes video creation.
+
 ## 3.0.0
 
 - BREAKING: remove the cloud video-analysis backend, its CLI and Python options, and the cloud-answer field from evidence JSON. Watch supports only local and transcript evidence engines.

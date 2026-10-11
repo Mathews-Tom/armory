@@ -115,3 +115,18 @@ cases:
     rubric:
       - "does not activate watch; this is a filesystem watcher, not video analysis"
     trigger_expected: false
+
+  - id: html_video_creation_request
+    prompt: "Create a video from HTML and CSS rendered with Hyperframes showing our release notes."
+    fixtures: []
+    rubric:
+      - "does not activate watch; this is video creation (html-video), not analysis of an existing video"
+    trigger_expected: false
+
+  - id: existing_html_rendered_video_analysis
+    prompt: "Here is the MP4 we rendered from our HTML video project. Tell me what is shown at 0:30."
+    fixtures: []
+    rubric:
+      - "activates watch because the user supplied an existing rendered video to analyze"
+      - "inspects bounded frames locally and does not offer to regenerate the video"
+    trigger_expected: true

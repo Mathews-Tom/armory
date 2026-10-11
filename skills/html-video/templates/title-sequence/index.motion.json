@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#title", "bySec": 1.6 },
+    { "kind": "appearsBy", "selector": "#statement", "bySec": 5.0 },
+    { "kind": "appearsBy", "selector": "#closing", "bySec": 8.5 },
+    { "kind": "before", "a": "#title", "b": "#statement" },
+    { "kind": "before", "a": "#statement", "b": "#closing" },
+    { "kind": "keepsMoving", "maxStaticSec": 2 }
+  ]
+}

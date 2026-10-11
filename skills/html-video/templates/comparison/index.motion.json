@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#label-a", "bySec": 2.4 },
+    { "kind": "appearsBy", "selector": "#a1", "bySec": 3.5 },
+    { "kind": "appearsBy", "selector": "#b3", "bySec": 8.0 },
+    { "kind": "appearsBy", "selector": "#verdict", "bySec": 10.5 },
+    { "kind": "before", "a": "#a1", "b": "#a3" },
+    { "kind": "before", "a": "#a3", "b": "#verdict" },
+    { "kind": "keepsMoving", "maxStaticSec": 2 }
+  ]
+}
