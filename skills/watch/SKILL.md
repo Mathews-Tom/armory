@@ -1,12 +1,12 @@
 ---
 name: watch
-description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video", "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video", or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video or remotion-video).'
+description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video", "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video", or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video, remotion-video, or html-video).'
 metadata:
-  version: 3.0.0
+  version: 3.0.1
   category: visualization
   tags: [video, youtube, analysis, multimodal, evidence]
   difficulty: intermediate
-  complements: [youtube-search, notebooklm, concept-to-video, remotion-video]
+  complements: [youtube-search, notebooklm, concept-to-video, remotion-video, html-video]
 ---
 
 # Watch
@@ -23,7 +23,7 @@ Analyze an existing video from timestamped speech and locally inspected visual e
 | Recreate a visual reference | `local` | Pass inspected evidence to a generation skill; Watch does not generate video |
 | Align supplied retention analytics with content | Focused `local` | Association is not proof of why viewers left |
 
-Do not activate for video discovery, new-video creation, financial watchlists, or watching filesystem changes. Other URL sources use yt-dlp support, not a promise that every website or private video is accessible.
+Do not activate for video discovery, new-video creation (including HTML/Hyperframes, Manim, or Remotion video), financial watchlists, or watching filesystem changes. Other URL sources use yt-dlp support, not a promise that every website or private video is accessible.
 
 ## Prerequisites
 

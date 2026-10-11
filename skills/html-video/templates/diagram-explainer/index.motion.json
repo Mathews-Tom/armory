@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#n1", "bySec": 2.5 },
+    { "kind": "appearsBy", "selector": "#n2", "bySec": 5.5 },
+    { "kind": "appearsBy", "selector": "#n3", "bySec": 8.5 },
+    { "kind": "appearsBy", "selector": "#summary", "bySec": 12.0 },
+    { "kind": "before", "a": "#n1", "b": "#n2" },
+    { "kind": "before", "a": "#n2", "b": "#n3" },
+    { "kind": "staysInFrame", "selector": "#n3" },
+    { "kind": "keepsMoving", "maxStaticSec": 2 }
+  ]
+}

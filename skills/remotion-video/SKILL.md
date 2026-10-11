@@ -1,8 +1,8 @@
 ---
 name: remotion-video
-description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with voiceover". NOT for math animations, use concept-to-video.'
+description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with voiceover". For math animations with no requested engine, use concept-to-video; explicit React/Remotion requests stay here. NOT for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition stays here).'
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   category: business
   tags: [video, react, remotion, motion-graphics]
   difficulty: advanced
@@ -225,4 +225,6 @@ bash scripts/render.sh --composition MyComposition --quality final --format mp4
 
 ## Cross-Reference
 
-For **mathematical animations**, **algorithm visualizations**, or when **Node.js is unavailable**, use `concept-to-video` (Manim/Python) instead. Manim runs in any Python environment and excels at geometric proofs, equation animations, and LaTeX rendering.
+For **mathematical animations** or **algorithm visualizations** with no explicit React/Remotion request, use `concept-to-video` (Manim/Python). Manim uses its own Python, Cairo/Pango and FFmpeg setup rather than Node.js. Missing Node.js does not authorize switching an explicit React request to another engine; report the missing prerequisite.
+
+For videos the user explicitly wants authored as plain HTML and CSS or rendered with Hyperframes, use `html-video` instead; that is not a React project. An explicit engine request outranks generic branded or marketing preferences. Keep Remotion when the user asks for React or Remotion, including HTML or CSS content embedded inside a React composition. An ordinary web page with no video output is neither skill's task.

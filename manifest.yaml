@@ -574,6 +574,26 @@ packages:
     - html
     category: visualization
     difficulty: intermediate
+  - name: html-video
+    version: 1.0.0
+    description: 'Use when the user wants a video authored as HTML and CSS and rendered with Hyperframes: "html video", "hyperframes",
+      "render html to mp4", "animate html css to video", "title sequence from html", "html caption video", "side by side comparison
+      video in html", "diagram explainer video in html". NOT for React or Remotion compositions, Manim animations, analysing
+      an existing video, or ordinary web pages with no video output.'
+    path: skills/html-video
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/html-video/SKILL.md
+    tags:
+    - video
+    - html
+    - css
+    - hyperframes
+    - mp4
+    - offline
+    - templates
+    category: visualization
+    difficulty: intermediate
+    complements:
+    - watch
   - name: humanize
     version: 2.1.0
     description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts, using a deterministic
@@ -653,7 +673,7 @@ packages:
     category: visualization
     difficulty: beginner
   - name: linkedin-post-style
-    version: 1.2.4
+    version: 1.3.0
     description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance.
       Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I
       phrase this".'
@@ -1110,10 +1130,12 @@ packages:
     category: development
     difficulty: beginner
   - name: remotion-video
-    version: 1.1.1
+    version: 1.2.0
     description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers
       on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with
-      voiceover". NOT for math animations, use concept-to-video.'
+      voiceover". For math animations with no requested engine, use concept-to-video; explicit React/Remotion requests stay
+      here. NOT for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition
+      stays here).'
     path: skills/remotion-video
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/remotion-video/SKILL.md
     tags:
@@ -1445,11 +1467,11 @@ packages:
     complements:
     - chart-clarity
   - name: watch
-    version: 3.0.0
+    version: 3.0.1
     description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video",
       "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video",
-      or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video
-      or remotion-video).'
+      or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video,
+      remotion-video, or html-video).'
     path: skills/watch
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/watch/SKILL.md
     complements:
@@ -1457,6 +1479,7 @@ packages:
     - notebooklm
     - concept-to-video
     - remotion-video
+    - html-video
     tags:
     - video
     - youtube
@@ -1590,7 +1613,7 @@ packages:
     category: research
     difficulty: intermediate
   - name: media-producer
-    version: 1.0.0
+    version: 1.1.0
     description: 'Visual and video asset creation with intelligent format routing. Analyzes concepts and automatically selects
       the optimal output format — static images, architecture diagrams, animated explainers, motion graphics, interactive
       dashboards, or slide presentations. Orchestrates specialized production skills and provides styling guidance for consistent,
@@ -2210,7 +2233,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.0.0
+    version: 1.1.0
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
@@ -2406,7 +2429,7 @@ packages:
     category: review
     difficulty: intermediate
   - name: media-craft
-    version: 1.1.0
+    version: 1.1.1
     description: 'DEPRECATED: Superseded by the media-producer agent, which orchestrates the same skills (concept-to-image,
       concept-to-video, remotion-video, html-presentation, static-web-artifacts-builder, architecture-diagram) with intelligent
       format routing based on content type. Use media-producer agent instead.'

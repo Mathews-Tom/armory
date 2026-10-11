@@ -66,3 +66,40 @@ cases:
     rubric:
       - "static image generation is not a video task"
     trigger_expected: false
+
+  - id: negative_explicit_hyperframes_html_video
+    prompt: "Make a title sequence video from plain HTML and CSS rendered with Hyperframes"
+    fixtures: []
+    rubric:
+      - "explicit Hyperframes or plain HTML/CSS video is html-video territory, not Remotion"
+    trigger_expected: false
+
+  - id: html_inside_react_composition
+    prompt: "Create a Remotion video whose scenes render HTML and CSS pricing tables inside React components"
+    fixtures: []
+    rubric:
+      - "HTML inside a React/Remotion composition stays remotion-video"
+      - "uses Remotion compositions and does not redirect to html-video"
+    trigger_expected: true
+
+  - id: negative_plain_web_page
+    prompt: "Build an HTML and CSS pricing web page for the site"
+    fixtures: []
+    rubric:
+      - "an ordinary web page with no video output is not a Remotion task"
+    trigger_expected: false
+
+  - id: explicit_remotion_math_animation
+    prompt: "Use React and Remotion to animate the derivation of Euler's identity"
+    fixtures: []
+    rubric:
+      - "honors the explicit React/Remotion engine even for mathematical content"
+      - "does not redirect to Manim solely because the topic is math"
+    trigger_expected: true
+
+  - id: negative_explicit_manim_brand_video
+    prompt: "Use Manim to make a branded product launch animation"
+    fixtures: []
+    rubric:
+      - "the explicit Manim engine outranks generic branded-video preferences"
+    trigger_expected: false

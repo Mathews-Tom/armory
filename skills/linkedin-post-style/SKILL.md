@@ -2,7 +2,7 @@
 name: linkedin-post-style
 description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance. Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I phrase this".'
 metadata:
-  version: 1.2.4
+  version: 1.3.0
   category: review
   tags: [linkedin, social-media, writing, content]
   difficulty: intermediate
@@ -199,16 +199,17 @@ Output dimensions: 1200×630 (link preview) or 1080×1080 (square post image).
 
 Invoke the `concept-to-image` skill for rendering.
 
-### Tier 3: `concept-to-video` or `remotion-video` (temporal subjects only)
+### Tier 3: `html-video`, `concept-to-video` or `remotion-video` (temporal subjects only)
 
 Animation restricted to concepts inherently about change over time: agent behavior traces, before/after transformations, process evolution.
 
 Video reach is declining on LinkedIn. Use only when static formats cannot convey the temporal dimension.
 
+- **`html-video`** (HTML/CSS rendered with Hyperframes) — title sequences, side-by-side comparisons, diagram walk-throughs and captioned sequences authored as editable HTML. Works offline once its toolchain is set up.
 - **`concept-to-video`** (Manim/Python) — algorithm visualizations, math concepts, technical step-throughs. Works headless.
 - **`remotion-video`** (React/Node.js) — branded motion graphics, product demos, data-driven video with audio sync and TailwindCSS styling.
 
-Invoke the matching video skill for rendering.
+An explicit engine request outranks the subject-based suggestions above: Hyperframes or HTML video means `html-video`, Manim means `concept-to-video`, React or Remotion means `remotion-video`. An engine-named request is still a temporal-subject video, so the temporal-subject limit decides whether to make a video at all. A plain HTML page with no video output is not a video request. Invoke the matching video skill for rendering.
 
 ### Carousel Adaptation (5-Act → 5 Slides)
 
@@ -239,7 +240,7 @@ Baseline LinkedIn engagement rates by format: text-only ~4%, text+image ~4.85%, 
 - Does not generate engagement-bait, clickbait, or follower-growth tactics — those patterns are blocked by design.
 - Posts are 150–200 words in practice; cannot produce long-form LinkedIn articles (1,000+ words) in this voice without structural breakdown.
 - Carousel and document posts require companion skills (`md-to-pdf`, `concept-to-image`). The base skill produces text and post structure only.
-- Video companion requires `concept-to-video` or `remotion-video` and is restricted to temporal subjects.
+- Video companion requires `html-video`, `concept-to-video` or `remotion-video` and is restricted to temporal subjects. Every companion is optional; the base text workflow never depends on one.
 
 ---
 

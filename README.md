@@ -155,6 +155,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [architecture-diagram](skills/architecture-diagram/)                 | Editable SVG architecture diagrams with native AWS/Azure/GCP icons, deterministic zone-aware layout                 |
 | [concept-to-image](skills/concept-to-image/)                         | Turn concepts into polished HTML visuals, export as PNG or SVG                                                       |
 | [concept-to-video](skills/concept-to-video/)                         | Turn concepts into animated explainer videos using Manim — MP4/GIF output with audio overlay, templates, multi-scene |
+| [html-video](skills/html-video/)                                     | Video authored as HTML and CSS and rendered to MP4 with a pinned, project-local Hyperframes CLI — bundled templates, offline authoring and verification, user-supplied fonts |
 | [remotion-video](skills/remotion-video/)                             | Production motion graphics using Remotion (React) — branded content, data-driven video, audio sync, TailwindCSS      |
 | [html-presentation](skills/html-presentation/)                       | Convert documents and outlines into self-contained HTML slide presentations                                          |
 | [marp-slides](skills/marp-slides/)                                   | Author MARP Markdown slide decks exportable to PDF, PPTX, and HTML via marp-cli                                     |
@@ -206,7 +207,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | Skill                                              | Description                                                                                                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [humanize](skills/humanize/)                       | Prose editing with deterministic Markdown-aware scanning, selected mechanical cleanup, and preservation checks; contextual rewriting and voice matching remain judgment tasks |
-| [linkedin-post-style](skills/linkedin-post-style/) | Write LinkedIn posts in a specific technical voice with visual companion support — carousels via md-to-pdf, images via concept-to-image, video via concept-to-video |
+| [linkedin-post-style](skills/linkedin-post-style/) | Write LinkedIn posts in a specific technical voice with optional visual companions — carousels via md-to-pdf, images via concept-to-image, and temporal-subject video via the engine you name: html-video (Hyperframes), concept-to-video (Manim), or remotion-video (React) |
 
 ### Skills — Skill Evolution (EvoSkills)
 

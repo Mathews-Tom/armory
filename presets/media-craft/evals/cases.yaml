@@ -19,3 +19,17 @@ cases:
     rubric:
       - "academic research workflows are covered by research-analyst agent, not media-craft"
     trigger_expected: false
+
+  - id: html_video_routes_to_standalone_skill
+    prompt: "Render an HTML and CSS title sequence to MP4 with Hyperframes"
+    fixtures: []
+    rubric:
+      - "does not activate media-craft preset (deprecated); explicit Hyperframes requests route to the standalone html-video skill, not concept-to-video or remotion-video"
+    trigger_expected: false
+
+  - id: negative_plain_html_page
+    prompt: "Build a single HTML landing page with a CSS animated hero section"
+    fixtures: []
+    rubric:
+      - "an ordinary web page with no video output is not a media-craft or html-video request"
+    trigger_expected: false

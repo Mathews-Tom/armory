@@ -66,3 +66,54 @@ cases:
     rubric:
       - "does not activate media-producer (code generation, not visual asset)"
     trigger_expected: false
+
+  - id: explicit_hyperframes_technical_diagram_video
+    prompt: "Make a short technical diagram explainer video of our request pipeline, authored as HTML and CSS and rendered with Hyperframes."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to html-video because the user explicitly named Hyperframes/HTML video, even though the content is technical"
+      - "does not route to concept-to-video on content type alone, and does not route to architecture-diagram (a video was requested)"
+      - "passes layout, color, and timing guidance to the skill"
+    trigger_expected: true
+
+  - id: explicit_manim_marketing_video
+    prompt: "Produce a marketing video for our launch using Manim."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to concept-to-video (Manim) because the engine was named explicitly, overriding the default preference of remotion-video for marketing content"
+      - "does not route to html-video or remotion-video"
+    trigger_expected: true
+
+  - id: explicit_remotion_html_content
+    prompt: "Build a Remotion video where the scenes embed HTML and CSS landing-page sections inside React components."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to remotion-video because HTML inside a React/Remotion composition stays remotion-video"
+      - "does not route to html-video"
+    trigger_expected: true
+
+  - id: unspecified_branded_html_not_assumed_react
+    prompt: "Make a branded product teaser video; I want to write it as plain HTML and CSS, no React."
+    fixtures: []
+    rubric:
+      - "activates media-producer agent"
+      - "routes to html-video because the user asked for HTML/CSS-authored video and rejected React"
+      - "does not claim that HTML marketing video requires remotion-video"
+    trigger_expected: true
+
+  - id: negative_existing_video_analysis
+    prompt: "Watch this recorded demo video and summarize what happens on screen."
+    fixtures: []
+    rubric:
+      - "does not activate media-producer (analysis of an existing video; use watch)"
+    trigger_expected: false
+
+  - id: negative_plain_web_page
+    prompt: "Build a responsive HTML and CSS landing page for our product with no video."
+    fixtures: []
+    rubric:
+      - "does not activate media-producer or select html-video (ordinary web page with no video output)"
+    trigger_expected: false

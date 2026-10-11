@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Captioned sequence</title>
+    <link rel="stylesheet" href="assets/fonts.css" />
+    <style id="html-video-fonts"><!-- Populated by fonts add; no fonts are bundled. --></style>
+    <style>
+      /* Timing lives in the data-start / data-duration attributes below.
+         Motion is finite CSS keyframes: the renderer seeks them, never plays them.
+         Only HTML elements are seeked; do not animate SVG child elements.
+         Each caption cue is one top-level clip on the single caption track. */
+      html, body { margin: 0; background: #0b1220; }
+      #root {
+        position: relative; width: 1920px; height: 1080px; overflow: hidden;
+        background: #0b1220; color: #f5f7fa; isolation: isolate;
+        font-family: "HV Text", sans-serif;
+      }
+      .clip { position: absolute; margin: 0; }
+
+      #topic { left: 160px; top: 90px; width: 1600px; font-size: 72px; line-height: 1.15; font-weight: 700; animation: rise 0.8s ease-out 0.1s both; }
+
+      /* Five level bars stand in for the visual. Replace them with your own
+         image or video clip; iteration counts are finite and cover 12 s exactly. */
+      .bar { top: 280px; width: 64px; height: 340px; border-radius: 12px; transform-origin: center bottom; animation-name: level; animation-timing-function: ease-in-out; animation-direction: alternate; animation-fill-mode: both; }
+      #bar-1 { left: 728px; background: #5ce1e6; animation-duration: 0.8s; animation-iteration-count: 15; }
+      #bar-2 { left: 828px; background: #ffc857; animation-duration: 1s; animation-iteration-count: 12; }
+      #bar-3 { left: 928px; background: #7ee787; animation-duration: 0.6s; animation-iteration-count: 20; }
+      #bar-4 { left: 1028px; background: #ff8fab; animation-duration: 1.2s; animation-iteration-count: 10; }
+      #bar-5 { left: 1128px; background: #b8a1ff; animation-duration: 0.75s; animation-iteration-count: 16; }
+
+      .caption-cue {
+        left: 260px; top: 760px; width: 1400px; box-sizing: border-box; padding: 18px 32px; border-radius: 14px;
+        background: #000000; color: #ffffff; font-size: 52px; line-height: 1.3; text-align: center;
+        animation: rise 0.4s ease-out 0s both;
+      }
+
+      #rail { left: 160px; top: 1030px; width: 1600px; height: 6px; background: #24324d; }
+      #progress { left: 160px; top: 1030px; width: 1600px; height: 6px; background: #ffc857; transform-origin: left center; animation: grow 12s linear both; }
+
+      @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+      @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes level { from { transform: scaleY(0.2); } to { transform: scaleY(1); } }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="12" data-width="1920" data-height="1080" data-no-timeline>
+      <div id="rail" class="clip" data-start="0" data-duration="12" data-track-index="0"></div>
+      <div id="progress" class="clip" data-start="0" data-duration="12" data-track-index="1"></div>
+
+      <h1 id="topic" class="clip" data-start="0" data-duration="12" data-track-index="2">Topic of the sequence</h1>
+
+      <div id="bar-1" class="clip bar" data-start="0" data-duration="12" data-track-index="3"></div>
+      <div id="bar-2" class="clip bar" data-start="0" data-duration="12" data-track-index="4"></div>
+      <div id="bar-3" class="clip bar" data-start="0" data-duration="12" data-track-index="5"></div>
+      <div id="bar-4" class="clip bar" data-start="0" data-duration="12" data-track-index="6"></div>
+      <div id="bar-5" class="clip bar" data-start="0" data-duration="12" data-track-index="7"></div>
+
+      <!-- Caption cues: edit the text and the data-start / data-duration pairs. Keep cues on track 9. -->
+      <p id="cue-1" class="clip caption-cue" data-track-kind="captions" data-start="0.5" data-duration="3" data-track-index="9">First caption line goes here.</p>
+      <p id="cue-2" class="clip caption-cue" data-track-kind="captions" data-start="3.5" data-duration="3" data-track-index="9">The second cue replaces it exactly when it ends.</p>
+      <p id="cue-3" class="clip caption-cue" data-track-kind="captions" data-start="6.5" data-duration="3" data-track-index="9">Keep each cue to one or two short lines.</p>
+      <p id="cue-4" class="clip caption-cue" data-track-kind="captions" data-start="9.5" data-duration="2.5" data-track-index="9">A closing caption.</p>
+    </div>
+  </body>
+</html>

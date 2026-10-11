@@ -1,0 +1,118 @@
+cases:
+  - id: hyperframes_title_sequence
+    prompt: "Make a 10 second title sequence as an HTML/CSS video with Hyperframes and give me the editable HTML plus the MP4"
+    fixtures: []
+    rubric:
+      - "starts from the bundled title-sequence template instead of writing a composition from scratch"
+      - "separates explicit bootstrap (pinned CLI, Node, FFmpeg, browser, font) from authoring and rendering"
+      - "asks the user for a redistributable font file and licence rather than downloading or assuming one"
+      - "runs audit, lint, check, snapshot and render in that order and delivers HTML, assets, licence record and MP4 together"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(html_video\\.py|hyperframes)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(bootstrap)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(font)"
+        weight: 0.8
+      - type: not_contains
+        target: "npx -y"
+        weight: 1.0
+
+  - id: side_by_side_comparison
+    prompt: "Build an HTML video comparing two pricing plans side by side, animated with CSS, rendered to MP4"
+    fixtures: []
+    rubric:
+      - "uses the comparison template and edits text and data-start/data-duration values"
+      - "keeps motion as finite CSS keyframes on HTML elements and does not add GSAP or any CDN script"
+      - "verifies check coverage: browserSkipped false, positive layout samples, motion enabled, contrast pairs checked"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(comparison|side.by.side)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(keyframes|data-start)"
+        weight: 0.8
+      - type: not_contains
+        target: "cdn.jsdelivr"
+        weight: 1.0
+
+  - id: diagram_explainer_offline
+    prompt: "Turn this three-step architecture into an animated HTML diagram video I can edit later; no network access at render time"
+    fixtures: []
+    rubric:
+      - "uses the diagram-explainer template with HTML boxes for nodes and connectors, not animated SVG children"
+      - "audits that every referenced asset is a local file and states that dynamic network calls in scripts cannot be proven absent by the audit"
+      - "recommends network isolation outside the tool when a hard offline guarantee is required"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(audit|offline|local)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(isolat|sandbox|network)"
+        weight: 0.8
+
+  - id: captioned_sequence_with_licence_gate
+    prompt: "Add timed captions to an HTML video with Hyperframes and make sure the font licence and asset provenance ship with the MP4"
+    fixtures: []
+    rubric:
+      - "uses the captioned-sequence template with one top-level clip per caption cue on a single caption track"
+      - "records font and asset provenance and licence files in PROVENANCE.json through fonts add"
+      - "runs deliver so the bundle is re-audited from source/ and refuses stale reports"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(caption)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(licen[cs]e|provenance)"
+        weight: 1.0
+
+  - id: bootstrap_without_silent_installs
+    prompt: "Set up Hyperframes to render an HTML composition, pinned, with no surprise downloads"
+    fixtures: []
+    rubric:
+      - "uses the explicit bootstrap step that installs the pinned package from the project lockfile's package manager"
+      - "pins the browser explicitly (existing executable or an explicit download) and records its actual version"
+      - "never renders through npx or an unpinned latest install"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(bootstrap)"
+        weight: 1.0
+      - type: not_contains
+        target: "@latest"
+        weight: 1.0
+
+  - id: react_video_not_html_video
+    prompt: "Create a programmatic video in React with Remotion that renders a sales dashboard"
+    fixtures: []
+    rubric:
+      - "does not activate html-video for a React or Remotion composition"
+    trigger_expected: false
+
+  - id: manim_animation_not_html_video
+    prompt: "Animate the Fourier series converging using Manim and export a GIF"
+    fixtures: []
+    rubric:
+      - "does not activate html-video for a Manim animation"
+    trigger_expected: false
+
+  - id: video_analysis_not_html_video
+    prompt: "Watch this recorded demo video and summarize the key points with timestamps"
+    fixtures: []
+    rubric:
+      - "does not activate html-video for analysing an existing video"
+    trigger_expected: false
+
+  - id: static_webpage_not_html_video
+    prompt: "Build a responsive landing page in HTML and CSS for my bakery"
+    fixtures: []
+    rubric:
+      - "does not activate html-video for ordinary web page work with no video output"
+    trigger_expected: false
