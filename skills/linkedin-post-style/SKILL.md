@@ -2,7 +2,7 @@
 name: linkedin-post-style
 description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance. Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I phrase this".'
 metadata:
-  version: 1.2.3
+  version: 1.2.4
   category: review
   tags: [linkedin, social-media, writing, content]
   difficulty: intermediate

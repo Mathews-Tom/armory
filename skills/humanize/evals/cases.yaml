@@ -195,6 +195,82 @@ cases:
         target: "**Performance:**"
         weight: 0.6
 
+  - id: mechanical_cleanup_only
+    prompt: "Strip only the chat artifacts from notes.md and do not rewrite anything else. It has leaked [cite: 1] markers in the prose and ends with 'I hope this helps!'. Write the result to a new file."
+    fixtures: []
+    rubric:
+      - "runs the deterministic scan first and selects specific rule IDs (citation artifacts, chat wrappers) for the fix"
+      - "writes the cleaned text to a new output path instead of editing notes.md in place"
+      - "performs no rewriting and generates no replacement prose"
+      - "reports which findings were applied and which were skipped"
+      - "does not claim the text is now free of AI patterns or human-written"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "lint_prose\\.py"
+        weight: 1.0
+      - type: matches_regex
+        target: "HUM001|HUM005"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)--output|new file"
+        weight: 0.8
+      - type: not_contains
+        target: "Patterns detected:"
+        weight: 0.6
+
+  - id: preserve_protected_content_and_literals
+    prompt: "Humanize the prose in release-notes.md without touching the code blocks, the pricing table, or any numbers. It says things like 'at least 500 requests per second' and 'saves $1,200 per month', and names the vendor Globex. Confirm nothing technical changed before you save."
+    fixtures: []
+    rubric:
+      - "rewrites only prose paragraphs and leaves code blocks and tables exact"
+      - "runs the preservation checker on source and draft before writing the file"
+      - "passes the vendor name through the explicit literal option because names are not detected automatically"
+      - "resolves any checker failure by restoring the source text, and does not describe a passing check as proof that meaning is unchanged"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "check_preservation\\.py"
+        weight: 1.0
+      - type: matches_regex
+        target: "--literal"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)semantic"
+        weight: 0.4
+
+  - id: changed_lines_only
+    prompt: "I edited only lines 40-52 of draft.md. Remove the AI tells from just what I changed and leave the rest of the file alone."
+    fixtures: []
+    rubric:
+      - "limits the scan to the named line range with paragraph context"
+      - "rewrites only paragraphs that contain confirmed findings in that range"
+      - "leaves every paragraph outside the range byte-identical"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--lines\\s+40-52"
+        weight: 1.0
+      - type: matches_regex
+        target: "check_preservation\\.py"
+        weight: 0.6
+
+  - id: tracking_links_stay_exact
+    prompt: "Humanize post.md for me. It links to https://example.com/report?utm_source=chatgpt.com and to a signed download URL. I did not ask you to touch the links."
+    fixtures: []
+    rubric:
+      - "leaves every URL byte-identical, including the utm_source parameter and the signed URL"
+      - "reports the tracking parameter to the user instead of removing it"
+      - "offers URL cleanup as a separate explicit step rather than doing it silently"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)utm_source"
+        weight: 0.8
+      - type: not_contains
+        target: "--strip-tracking --output"
+        weight: 0.6
+
   # Negative cases (trigger_expected: false)
   - id: translate_text
     prompt: "Translate this paragraph from English to Spanish."
@@ -234,4 +310,20 @@ cases:
     rubric:
       - "does not activate humanization workflow"
       - "summarization is a different text transformation"
+    trigger_expected: false
+
+  - id: ai_detector_probability
+    prompt: "Run an AI detector on this essay and give me the percent probability that ChatGPT wrote it."
+    fixtures: []
+    rubric:
+      - "does not activate humanization workflow"
+      - "authorship probability scoring is not pattern cleanup; the skill makes no detector claims"
+    trigger_expected: false
+
+  - id: lint_source_code
+    prompt: "Run ruff on src/ and fix the lint errors in my Python files."
+    fixtures: []
+    rubric:
+      - "does not activate humanization workflow"
+      - "code linting is unrelated to prose cleanup"
     trigger_expected: false

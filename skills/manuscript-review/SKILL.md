@@ -2,7 +2,7 @@
 name: manuscript-review
 description: 'Pre-publication manuscript audit producing a section-level refactoring report with citation hygiene and submission-readiness checks. Triggers on: "review my paper", "check before submission", "is this ready to submit", "pre-pub checklist", "refactor my paper", "check my references", "does the abstract work".'
 metadata:
-  version: 1.3.1
+  version: 1.3.2
   complements:
     [
       manuscript-provenance,

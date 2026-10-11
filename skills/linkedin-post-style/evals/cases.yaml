@@ -92,3 +92,18 @@ cases:
     rubric:
       - "Does not apply LinkedIn post style rules (this is long-form blog content, not LinkedIn short-form post)"
     trigger_expected: false
+
+  - id: preserve_signed_source_link
+    prompt: "Rewrite this for LinkedIn in my style, keeping the source link in the first comment exactly: 'Our batch worker cut p95 from 80 ms to 25 ms. Source: https://example.org/results?utm_source=chatgpt.com&sig=abc123'"
+    fixtures: []
+    rubric:
+      - "Preserves the signed source URL and every query parameter exactly, even when moving it to a comment"
+      - "Preserves both latency measurements without claiming that a style check verified the benchmark"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "https://example.org/results?utm_source=chatgpt.com&sig=abc123"
+      - type: matches_regex
+        target: "80\\s*ms"
+      - type: matches_regex
+        target: "25\\s*ms"

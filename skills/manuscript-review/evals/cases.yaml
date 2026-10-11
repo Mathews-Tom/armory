@@ -58,3 +58,16 @@ cases:
     rubric:
       - "writing new manuscript content is outside review scope"
     trigger_expected: false
+
+  - id: preserve_signed_citation_link
+    prompt: "Review this manuscript excerpt before submission. The evidence URL is signed; preserve it exactly in any suggested edit: 'The experiment reports p95 of 25 ms [1]. [1] https://example.org/results?utm_source=chatgpt.com&sig=abc123'"
+    fixtures: []
+    rubric:
+      - "Keeps the citation target, including tracking and signature parameters, unchanged"
+      - "Reviews the excerpt without treating URL normalization as prose cleanup or claiming verified factual accuracy"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "https://example.org/results?utm_source=chatgpt.com&sig=abc123"
+      - type: matches_regex
+        target: "25\\s*ms"
