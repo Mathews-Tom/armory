@@ -123,6 +123,13 @@ cases:
       - "does not activate watch; this is video creation (html-video), not analysis of an existing video"
     trigger_expected: false
 
+  - id: manim_video_creation_request
+    prompt: "Create a Manim video that animates the quicksort partition step."
+    fixtures: []
+    rubric:
+      - "does not activate watch; this is video creation (animate), not analysis of an existing video"
+    trigger_expected: false
+
   - id: existing_html_rendered_video_analysis
     prompt: "Here is the MP4 we rendered from our HTML video project. Tell me what is shown at 0:30."
     fixtures: []

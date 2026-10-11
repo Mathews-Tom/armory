@@ -24,7 +24,7 @@ cases:
     prompt: "Render an HTML and CSS title sequence to MP4 with Hyperframes"
     fixtures: []
     rubric:
-      - "does not activate media-craft preset (deprecated); explicit Hyperframes requests route to the standalone html-video skill, not concept-to-video or remotion-video"
+      - "does not activate media-craft preset (deprecated); explicit Hyperframes requests route to the standalone html-video skill, not animate or remotion-video"
     trigger_expected: false
 
   - id: negative_plain_html_page

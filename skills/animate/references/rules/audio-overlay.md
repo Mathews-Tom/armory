@@ -66,7 +66,7 @@ ffmpeg -i video.mp4 -i voiceover.mp3 -i music.mp3 \
 
 ## Prerequisites
 
-- ffmpeg must be installed: `apt-get install -y ffmpeg` or `brew install ffmpeg`
+- ffmpeg and ffprobe must already be installed (macOS: `brew install ffmpeg`; Debian/Ubuntu: `sudo apt-get install ffmpeg`); ask the user before installing system packages
 - Verify: `ffmpeg -version`
 - `scripts/add_audio.py` wraps ffmpeg with a simpler CLI interface for common use cases
 - Use raw ffmpeg for multi-track mixing or advanced filter graphs

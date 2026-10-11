@@ -2,7 +2,7 @@
 name: skill-library
 description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update, and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory search", "/library list", "package catalog".'
 metadata:
-  version: 2.0.1
+  version: 2.0.2
   category: operations
   tags: [armory, catalog, install, package-management, discovery]
   difficulty: beginner

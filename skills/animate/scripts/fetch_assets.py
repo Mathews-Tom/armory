@@ -1,4 +1,4 @@
-"""Phase 4 — Pluggable asset sourcing for concept-to-video storyboards.
+"""Phase 4 — Pluggable asset sourcing for animate storyboards.
 
 Adapters: local (directory of SVGs/PNGs/JPGs), iconfinder (API-key gated),
 none (text-only mode). Reads storyboard JSON, resolves each scene's assets,

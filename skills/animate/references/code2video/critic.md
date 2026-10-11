@@ -1,7 +1,7 @@
 # Critic Prompt Template
 
 Adapted from Code2Video `prompts/stage4.py` (commit `f579f1e`).
-Variable names rewritten for Armory's concept-to-video schema.
+Variable names rewritten for the animate storyboard schema (see PROVENANCE.md).
 
 ---
 

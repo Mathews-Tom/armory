@@ -5,9 +5,13 @@ Customize STAGES to match your pipeline. Each stage has a name and color.
 Run with: manim -ql data_flow_template.py DataFlowScene
 
 Config:
-    STAGES      — list of (name, color) tuples for each pipeline stage
+    STAGES      — list of (name, color) tuples for each pipeline stage (2-5)
     TITLE       — title shown at the top
     ARROW_COLOR — color for connecting arrows
+    FINAL_HOLD  — seconds to hold the last frame (0.5-30)
+
+Every animation pins its run_time, so total duration is deterministic:
+    3.2 + 1.3 * len(STAGES) + FINAL_HOLD  seconds
 """
 
 from manim import *
@@ -24,22 +28,29 @@ STAGES: list[tuple[str, ManimColor]] = [
 ]
 
 ARROW_COLOR = WHITE
+FINAL_HOLD = 2.0
+# ───────────────────────────────────────────────────────────────────────────
+
 BOX_WIDTH = 1.9
 BOX_HEIGHT = 1.0
-# ───────────────────────────────────────────────────────────────────────────
 
 
 class DataFlowScene(Scene):
     def construct(self) -> None:
         # Title
         title = Text(TITLE, font_size=52, weight=BOLD)
-        self.play(Write(title))
+        if title.width > 12:
+            title.scale_to_fit_width(12)
+        self.play(Write(title), run_time=1)
         self.wait(0.5)
-        self.play(title.animate.to_edge(UP))
+        self.play(title.animate.to_edge(UP), run_time=1)
 
         # Build stage boxes
         boxes = VGroup()
         for name, color in STAGES:
+            label = Text(name, font_size=26, color=color)
+            if label.width > BOX_WIDTH - 0.2:
+                label.scale_to_fit_width(BOX_WIDTH - 0.2)
             box = VGroup(
                 RoundedRectangle(
                     corner_radius=0.2,
@@ -48,7 +59,7 @@ class DataFlowScene(Scene):
                     color=color,
                     fill_opacity=0.2,
                 ),
-                Text(name, font_size=26, color=color),
+                label,
             )
             boxes.add(box)
 
@@ -84,4 +95,4 @@ class DataFlowScene(Scene):
                 run_time=0.2,
             )
 
-        self.wait(2)
+        self.wait(FINAL_HOLD)

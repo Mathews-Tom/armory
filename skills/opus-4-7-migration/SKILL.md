@@ -2,7 +2,7 @@
 name: opus-4-7-migration
 description: 'Scan a repository for Opus-4.6-era patterns that break or degrade on Opus 4.7 — fixed-budget Extended Thinking parameters, retired model ID aliases, and prompts that assumed verbose default output or eager sub-agent delegation. Produces a categorized report with file:line references and migration actions. Triggers on: "opus 4.7 migration", "migrate to opus 4.7", "audit for opus 4.7", "opus 4.6 to 4.7", "scan for budget_tokens", "find retired model IDs", "adapt repo to opus 4.7". NOT for implementing migrations — this skill identifies candidates.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: review
   tags: [opus-4-7, migration, audit, model-refresh, budget-tokens]
   difficulty: intermediate

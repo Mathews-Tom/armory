@@ -1,5 +1,9 @@
 # Changelog — Route
 
+## 1.1.1
+
+- Rename-only consumer migration: `concept-to-video` is now `animate` (2.0.0, no alias) in routing tables and evals. Analysis still routes to `watch` before creation, and an explicit engine request outranks content type.
+
 ## 1.1.0
 
 - Add routing for videos authored as HTML and CSS and rendered with Hyperframes to `html-video`.

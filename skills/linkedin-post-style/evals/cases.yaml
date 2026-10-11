@@ -113,7 +113,7 @@ cases:
     fixtures: []
     rubric:
       - "Writes the post in the author's voice first, using the 5-act structure"
-      - "Routes the video to html-video because Hyperframes was named explicitly, not to concept-to-video or remotion-video"
+      - "Routes the video to html-video because Hyperframes was named explicitly, not to animate or remotion-video"
       - "Treats the subject as temporal (behavior change over time) and keeps the video optional rather than required"
       - "Does not claim the video was rendered or that any toolchain was installed"
     trigger_expected: true
@@ -130,7 +130,7 @@ cases:
     fixtures: []
     rubric:
       - "Produces only the post text and does not invoke or recommend any visual companion skill"
-      - "Does not mention html-video, concept-to-video, remotion-video, md-to-pdf or concept-to-image as required steps"
+      - "Does not mention html-video, animate, remotion-video, md-to-pdf or concept-to-image as required steps"
       - "Preserves the 14 minute and 6 minute figures"
     trigger_expected: true
     assertions:

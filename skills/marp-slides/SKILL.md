@@ -2,7 +2,7 @@
 name: marp-slides
 description: 'Author MARP markdown slide decks exportable to PDF, PPTX, and HTML via marp-cli. Covers Marpit directives, custom CSS themes, SVG chart recipes, and dashboard components. Triggers on: "marp", "marp deck", "markdown slides", "slides from markdown", "marp-cli", "pdf from markdown", "pptx from markdown".'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: visualization
   tags: [slides, presentation, marp, markdown, pdf, pptx]
   difficulty: intermediate
@@ -27,7 +27,7 @@ Author slide decks as plain Markdown using the MARP ecosystem (Marpit + Marp Cor
 | Reveal.js / browser-native HTML presentation with scroll nav | `html-presentation` |
 | Edit a binary `.pptx` with native PowerPoint features (animations, transitions set in PowerPoint) | `document-skills:pptx` |
 | Static poster or single-page visual | `concept-to-image` |
-| Animated explainer video | `concept-to-video` |
+| Animated Manim explainer video | `animate` |
 
 ## Step 0: Gather Requirements
 

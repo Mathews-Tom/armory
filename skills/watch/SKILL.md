@@ -1,12 +1,12 @@
 ---
 name: watch
-description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video", "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video", or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video, remotion-video, or html-video).'
+description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video", "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video", or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use animate, remotion-video, or html-video).'
 metadata:
-  version: 3.0.1
+  version: 3.0.2
   category: visualization
   tags: [video, youtube, analysis, multimodal, evidence]
   difficulty: intermediate
-  complements: [youtube-search, notebooklm, concept-to-video, remotion-video, html-video]
+  complements: [youtube-search, notebooklm, animate, remotion-video, html-video]
 ---
 
 # Watch

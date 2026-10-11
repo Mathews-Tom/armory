@@ -1,5 +1,9 @@
 # Changelog — Watch
 
+## 3.0.2
+
+- Rename the optional Manim video consumer to `animate` (2.0.0) in complements and the creation-skill exclusion text. Watch stays independently usable, analysis intent routes here before creation, and no companion is required at runtime.
+
 ## 3.0.1
 
 - Add `html-video` as an optional complement and list it among creation skills excluded from Watch. Watch stays independently usable and does not depend on it at runtime.

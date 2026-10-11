@@ -17,7 +17,7 @@ description:
 model: sonnet
 color: magenta
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   category: content
   execution_phase: on-demand
   priority: 70
@@ -26,7 +26,7 @@ metadata:
     skills:
       [
         concept-to-image,
-        concept-to-video,
+        animate,
         html-video,
         remotion-video,
         architecture-diagram,
@@ -82,7 +82,7 @@ content type and output requirements.
 | Component                    | Type  | Invoked In | Purpose                                                                    |
 | ---------------------------- | ----- | ---------- | -------------------------------------------------------------------------- |
 | concept-to-image             | skill | Phase 3    | Static image generation (PNG/SVG) for concepts, comparisons, illustrations |
-| concept-to-video             | skill | Phase 3    | Manim-based animated explainers for technical/educational content          |
+| animate             | skill | Phase 3    | Manim-based animated explainers for technical/educational content          |
 | remotion-video               | skill | Phase 3    | React-based motion graphics for branded/marketing video content            |
 | html-video                   | skill | Phase 3    | HTML/CSS-authored video rendered with Hyperframes, when explicitly requested |
 | architecture-diagram         | skill | Phase 3    | System topology, infrastructure, and architecture visualizations           |
@@ -113,7 +113,7 @@ Route to the appropriate skill based on concept type and output needs:
 | ---------------------------------------------------- | ---------------------------- | ------------------------------------------------------- |
 | System topology, infrastructure                      | architecture-diagram         | Purpose-built for component relationships; produces editable SVG with native AWS/Azure/GCP icons |
 | Static concept, comparison, illustration             | concept-to-image             | Single-frame visual with no temporal dimension          |
-| Algorithm, mathematical process, technical education | concept-to-video (Manim)     | Step-by-step animation reveals complexity incrementally |
+| Algorithm, mathematical process, technical education | animate (Manim)     | Step-by-step animation reveals complexity incrementally |
 | Branded product demo, marketing video                | remotion-video (React)       | Polished motion graphics with brand consistency         |
 | Interactive data visualization, dashboard            | static-web-artifacts-builder | User exploration requires interactivity                 |
 | Talk, pitch, walkthrough                             | html-presentation            | Sequential narrative with slide structure               |
@@ -124,9 +124,9 @@ Decision rules:
 - If the user specifies a format, use that format
 - If not specified, recommend a format with a one-line rationale before proceeding
 - Use architecture-diagram for system topologies, not concept-to-image
-- Prefer concept-to-video over remotion-video for technical/educational content when no engine is named
-- Prefer remotion-video over concept-to-video for branded/marketing content when no engine is named
-- Engine precedence for video creation: (1) an explicit engine request wins: Hyperframes or HTML/CSS video -> html-video, Manim -> concept-to-video, React or Remotion (including HTML inside a React composition) -> remotion-video; (2) otherwise content type decides as above; (3) html-video is never selected for an ordinary web page with no video output
+- Prefer animate over remotion-video for technical/educational content when no engine is named
+- Prefer remotion-video over animate for branded/marketing content when no engine is named
+- Engine precedence for video creation: (1) an explicit engine request wins: Hyperframes or HTML/CSS video -> html-video, Manim -> animate, React or Remotion (including HTML inside a React composition) -> remotion-video; (2) otherwise content type decides as above; (3) html-video is never selected for an ordinary web page with no video output
 - Existing-video analysis is not creation; point the user to watch
 - Do not force interactive format when static suffices
 - Match visual complexity to content complexity — simple concepts get simple visuals
@@ -184,10 +184,10 @@ When spawned by another agent:
 2. Do not force interactive format (HTML dashboard) when a static image suffices
 3. Match visual complexity to content complexity — a simple comparison does not need an animated video
 4. Use architecture-diagram for system topologies and infrastructure, not concept-to-image
-5. Prefer concept-to-video (Manim) over remotion-video for technical and educational content when the user names no engine
-6. Prefer remotion-video over concept-to-video for branded and marketing content when the user names no engine
+5. Prefer animate (Manim) over remotion-video for technical and educational content when the user names no engine
+6. Prefer remotion-video over animate for branded and marketing content when the user names no engine
 7. Prefer html-video over remotion-video for branded and marketing content only when the user names Hyperframes or HTML/CSS-authored video; never claim every HTML marketing video requires React
-8. An explicit engine request outranks content-type preferences: Hyperframes or HTML/CSS video routes to html-video, Manim routes to concept-to-video, React or Remotion routes to remotion-video, even when the content type (technical, marketing) would otherwise favor another engine
+8. An explicit engine request outranks content-type preferences: Hyperframes or HTML/CSS video routes to html-video, Manim routes to animate, React or Remotion routes to remotion-video, even when the content type (technical, marketing) would otherwise favor another engine
 9. An ordinary web page, dashboard, or slide deck with no video output is not html-video; HTML inside a React or Remotion composition stays remotion-video
 10. Requests to analyze an existing video are not creation; use watch, not media-producer
 11. Provide clear styling guidance (colors, layout, emphasis) to the invoked skill

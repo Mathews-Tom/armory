@@ -224,7 +224,7 @@ excluded:
     name: concept-to-image
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
-    name: concept-to-video
+    name: animate
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
     name: debug-investigator

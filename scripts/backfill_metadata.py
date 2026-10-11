@@ -98,7 +98,7 @@ TAG_RULES: dict[str, list[str]] = {
     "manuscript-review": ["manuscript", "pre-publication", "citation-hygiene", "submission"],
     "manuscript-provenance": ["provenance", "reproducibility", "computational", "verification"],
     "concept-to-image": ["image-generation", "html-to-png", "svg", "visual-design"],
-    "concept-to-video": ["video", "manim", "animation", "explainer"],
+    "animate": ["video", "manim", "animation", "explainer"],
     "remotion-video": ["video", "react", "remotion", "motion-graphics"],
     "html-presentation": ["slides", "presentation", "reveal-js", "html"],
     "static-web-artifacts-builder": ["html", "interactive", "dashboard", "svg"],
@@ -229,7 +229,7 @@ ADVANCED_PACKAGES = {
     "architecture-reviewer", "manuscript-review", "manuscript-provenance",
     "rag-auditor", "gpu-optimizer", "migration-risk-analyzer", "repo-sentinel",
     "competitive-analyzer", "idea-validator", "feasibility-assessor",
-    "qa-systematic", "remotion-video", "concept-to-video",
+    "qa-systematic", "remotion-video", "animate",
     "project-architect", "team-lead", "security-reviewer", "research-analyst",
 }
 

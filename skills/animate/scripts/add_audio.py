@@ -15,6 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _deps import MissingDependencyError, require_binary
+
 
 def build_ffmpeg_command(
     video: Path,
@@ -142,6 +144,13 @@ def main() -> None:
 
     if args.volume <= 0:
         print(f"Error: --volume must be > 0, got {args.volume}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        require_binary("ffmpeg")
+        require_binary("ffprobe")
+    except MissingDependencyError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     # Ensure output directory exists

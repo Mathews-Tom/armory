@@ -33,6 +33,25 @@ packages:
     category: development
     difficulty: intermediate
     phase: build
+  - name: animate
+    version: 2.0.0
+    description: 'Create Manim (Python) animated explainers: algorithm step-throughs, math and equation walkthroughs, pipeline
+      and data-flow diagrams, comparisons and timelines, rendered to MP4, WebM or GIF with optional audio overlay. Includes
+      a template path that renders validated config data with no model call, plus output checks (ffprobe duration, fps, dimensions,
+      full decode, sampled-frame review receipt). Use when asked to "create a video", "animate this", "make an explainer",
+      "manim animation", "animate this algorithm", or "motion graphic". NOT for HTML/CSS/GSAP or Hyperframes video, and NOT
+      for React or Remotion video.'
+    path: skills/animate
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/animate/SKILL.md
+    tags:
+    - video
+    - manim
+    - animation
+    - explainer
+    category: visualization
+    difficulty: advanced
+    complements:
+    - watch
   - name: api-docs-generator
     version: 1.1.1
     description: 'Audits and enhances FastAPI and REST API documentation: missing descriptions, response codes, examples,
@@ -291,22 +310,6 @@ packages:
     - visual-design
     category: business
     difficulty: intermediate
-  - name: concept-to-video
-    version: 1.2.0
-    description: 'Turn concepts into animated explainer videos using Manim (Python) with MP4/GIF output, audio overlay, multi-scene
-      composition. Triggers on: "create a video", "animate this", "make an explainer", "manim animation", "motion graphic".
-      NOT for React video, use remotion-video.'
-    path: skills/concept-to-video
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/concept-to-video/SKILL.md
-    tags:
-    - video
-    - manim
-    - animation
-    - explainer
-    category: visualization
-    difficulty: advanced
-    complements:
-    - watch
   - name: debug-investigator
     version: 1.1.1
     description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal
@@ -673,7 +676,7 @@ packages:
     category: visualization
     difficulty: beginner
   - name: linkedin-post-style
-    version: 1.3.0
+    version: 1.3.1
     description: 'Writes LinkedIn posts in a direct, analytical, dry-humored technical voice with visual companion guidance.
       Triggers on: "write this in my style", "draft a post", "rewrite this for LinkedIn", "post about this", "how should I
       phrase this".'
@@ -795,7 +798,7 @@ packages:
     - competitive-analyzer
     - idea-validator
   - name: marp-slides
-    version: 1.0.0
+    version: 1.0.1
     description: 'Author MARP markdown slide decks exportable to PDF, PPTX, and HTML via marp-cli. Covers Marpit directives,
       custom CSS themes, SVG chart recipes, and dashboard components. Triggers on: "marp", "marp deck", "markdown slides",
       "slides from markdown", "marp-cli", "pdf from markdown", "pptx from markdown".'
@@ -894,7 +897,7 @@ packages:
     complements:
     - watch
   - name: opus-4-7-migration
-    version: 1.0.0
+    version: 1.0.1
     description: 'Scan a repository for Opus-4.6-era patterns that break or degrade on Opus 4.7 — fixed-budget Extended Thinking
       parameters, retired model ID aliases, and prompts that assumed verbose default output or eager sub-agent delegation.
       Produces a categorized report with file:line references and migration actions. Triggers on: "opus 4.7 migration", "migrate
@@ -1130,12 +1133,11 @@ packages:
     category: development
     difficulty: beginner
   - name: remotion-video
-    version: 1.2.0
+    version: 1.2.1
     description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers
       on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with
-      voiceover". For math animations with no requested engine, use concept-to-video; explicit React/Remotion requests stay
-      here. NOT for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition
-      stays here).'
+      voiceover". For math animations with no requested engine, use animate; explicit React/Remotion requests stay here. NOT
+      for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition stays here).'
     path: skills/remotion-video
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/remotion-video/SKILL.md
     tags:
@@ -1246,7 +1248,7 @@ packages:
     difficulty: advanced
     phase: build
   - name: skill-library
-    version: 2.0.1
+    version: 2.0.2
     description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update,
       and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory
       search", "/library list", "package catalog".'
@@ -1467,17 +1469,17 @@ packages:
     complements:
     - chart-clarity
   - name: watch
-    version: 3.0.1
+    version: 3.0.2
     description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video",
       "summarize this video", "youtube transcript", "find this moment", "what happens on screen", "extract concepts from video",
-      or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use concept-to-video,
-      remotion-video, or html-video).'
+      or "video key points". NOT for finding videos by keyword (use youtube-search) or creating videos (use animate, remotion-video,
+      or html-video).'
     path: skills/watch
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/watch/SKILL.md
     complements:
     - youtube-search
     - notebooklm
-    - concept-to-video
+    - animate
     - remotion-video
     - html-video
     tags:
@@ -1613,7 +1615,7 @@ packages:
     category: research
     difficulty: intermediate
   - name: media-producer
-    version: 1.1.0
+    version: 1.1.1
     description: 'Visual and video asset creation with intelligent format routing. Analyzes concepts and automatically selects
       the optimal output format — static images, architecture diagrams, animated explainers, motion graphics, interactive
       dashboards, or slide presentations. Orchestrates specialized production skills and provides styling guidance for consistent,
@@ -2233,7 +2235,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.1.0
+    version: 1.1.1
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
@@ -2429,10 +2431,10 @@ packages:
     category: review
     difficulty: intermediate
   - name: media-craft
-    version: 1.1.1
+    version: 1.1.2
     description: 'DEPRECATED: Superseded by the media-producer agent, which orchestrates the same skills (concept-to-image,
-      concept-to-video, remotion-video, html-presentation, static-web-artifacts-builder, architecture-diagram) with intelligent
-      format routing based on content type. Use media-producer agent instead.'
+      animate, remotion-video, html-presentation, static-web-artifacts-builder, architecture-diagram) with intelligent format
+      routing based on content type. Use media-producer agent instead.'
     path: presets/media-craft
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/media-craft/PRESET.md
     tags:
