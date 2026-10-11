@@ -72,7 +72,7 @@ MODEL = model_for("reasoner")
 
 **Problem:** Model identifiers scattered across source files require a multi-file edit every time the model version changes. The armory convention is "model refs in config files only."
 
-**Action:** Centralize model IDs in a single `config.toml` (or language equivalent) and import from there. See `skills/concept-to-video/config.toml` and `scripts/_config.py` for a reference implementation.
+**Action:** Centralize model IDs in a single `config.toml` (or language equivalent) and import from there. See `skills/animate/config.toml` and `scripts/_config.py` for a reference implementation.
 
 Exceptions that do NOT need migration:
 

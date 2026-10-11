@@ -15,7 +15,7 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 
 | Upstream                                 | Repo                                                                                                          | License                   | Used by (armory skill)               |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------ |
-| **Manim** (3Blue1Brown / ManimCommunity) | [3b1b/manim](https://github.com/3b1b/manim) / [ManimCommunity/manim](https://github.com/ManimCommunity/manim) | MIT                       | `concept-to-video`                   |
+| **Manim** (3Blue1Brown / ManimCommunity) | [3b1b/manim](https://github.com/3b1b/manim) / [ManimCommunity/manim](https://github.com/ManimCommunity/manim) | MIT                       | `animate`                            |
 | **Hyperframes** (HeyGen)                 | [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes)                                          | Apache-2.0                | `html-video`                         |
 | **Remotion**                             | [remotion-dev/remotion](https://github.com/remotion-dev/remotion)                                             | Custom (Remotion License) | `remotion-video`                     |
 | **MarkItDown** (Microsoft)               | [microsoft/markitdown](https://github.com/microsoft/markitdown)                                               | MIT                       | `to-markdown`                        |
@@ -42,18 +42,18 @@ Tools, libraries, and projects that armory packages wrap, depend on, or were ins
 
 Records of upstream content that was copied or adapted directly into armory skills, with pinned commits and re-sync policies. Each record documents exactly what was taken, what was reimplemented from paper descriptions, and what was skipped.
 
-### Code2Video — used by `concept-to-video`
+### Code2Video — used by `animate`
 
 **Paper:** [Code2Video: A Code-Centric Paradigm for Educational Video Generation](https://arxiv.org/abs/2510.01174)
 **Authors:** Anno Yanzhe Chen et al., Show Lab, National University of Singapore
 **Venue:** NeurIPS 2025 Workshop on Deep Learning for Code (DL4C)
 **Upstream repo:** [showlab/Code2Video](https://github.com/showlab/Code2Video)
-**License:** MIT (text preserved at `skills/concept-to-video/references/code2video/LICENSE`)
+**License:** MIT (text preserved at `skills/animate/references/code2video/LICENSE`)
 **Pinned commit:** `f579f1e527f9d6684eb581853f8739b6b39f2914`
 
 **What we vendored (prompt logic only — no code):**
 
-The three prompt templates in `skills/concept-to-video/references/code2video/` are adapted from the following upstream files, with variable names and output schemas rewritten for armory's `concept-to-video` schema:
+The three prompt templates in `skills/animate/references/code2video/` are adapted from the following upstream files, with variable names and output schemas rewritten for armory's `animate` schema:
 
 | Armory file  | Upstream source(s)                       |
 |--------------|------------------------------------------|
@@ -66,7 +66,7 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 **What we reimplemented (described in paper, no code copied):**
 
 - **Auto-fix loop** (paper §3.3): captures `manim render` stderr, extracts offending line range, calls the coder fixup prompt, patches the scene file in-place, retries up to N times. Lives in `scripts/render_video.py`, uses Python `subprocess`.
-- **VLM critic loop** (paper §3.4): samples rendered frames, sends to a vision model with the critic prompt, receives anchor-based layout patches, re-renders. Calls Claude vision or Gemini via the existing Anthropic SDK — not Code2Video's custom wrapper.
+- **VLM critic loop** (paper §3.4): samples rendered frames, sends them through the Anthropic Messages API with the critic prompt, receives anchor-based layout patches, and re-renders. This opt-in path uses the Anthropic SDK, not Code2Video's custom wrapper.
 
 **What we skipped:**
 

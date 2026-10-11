@@ -15,7 +15,7 @@ cases:
     rubric:
       - "activates media-producer agent"
       - "classifies concept as technical/educational"
-      - "routes to concept-to-video (Manim) over remotion-video"
+      - "routes to animate (Manim) over remotion-video"
       - "includes step-by-step breakdown in skill invocation"
     trigger_expected: true
 
@@ -42,7 +42,7 @@ cases:
     fixtures: []
     rubric:
       - "activates media-producer agent"
-      - "routes to remotion-video over concept-to-video for branded content"
+      - "routes to remotion-video over animate for branded content"
       - "passes brand styling guidance to the skill"
     trigger_expected: true
 
@@ -73,7 +73,7 @@ cases:
     rubric:
       - "activates media-producer agent"
       - "routes to html-video because the user explicitly named Hyperframes/HTML video, even though the content is technical"
-      - "does not route to concept-to-video on content type alone, and does not route to architecture-diagram (a video was requested)"
+      - "does not route to animate on content type alone, and does not route to architecture-diagram (a video was requested)"
       - "passes layout, color, and timing guidance to the skill"
     trigger_expected: true
 
@@ -82,7 +82,7 @@ cases:
     fixtures: []
     rubric:
       - "activates media-producer agent"
-      - "routes to concept-to-video (Manim) because the engine was named explicitly, overriding the default preference of remotion-video for marketing content"
+      - "routes to animate (Manim) because the engine was named explicitly, overriding the default preference of remotion-video for marketing content"
       - "does not route to html-video or remotion-video"
     trigger_expected: true
 

@@ -57,7 +57,7 @@ cases:
     prompt: "Animate a math proof step by step showing the derivation of Euler's identity"
     fixtures: []
     rubric:
-      - "mathematical proof animation is concept-to-video/Manim territory, not Remotion"
+      - "mathematical proof animation is animate/Manim territory, not Remotion"
     trigger_expected: false
 
   - id: negative_static_product_image

@@ -1,4 +1,4 @@
-"""Load model identifiers for the concept-to-video pipeline from config.toml."""
+"""Load model identifiers for the animate pipeline from config.toml."""
 
 from __future__ import annotations
 

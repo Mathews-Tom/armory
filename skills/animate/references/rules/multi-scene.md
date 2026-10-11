@@ -49,10 +49,10 @@ class SummaryScene(Scene):
 ## Rendering each scene
 
 ```bash
-# Render each scene class separately
-python3 scripts/render_video.py scene.py IntroScene --quality low --format mp4
-python3 scripts/render_video.py scene.py AlgorithmScene --quality low --format mp4
-python3 scripts/render_video.py scene.py SummaryScene --quality low --format mp4
+# Render each scene class separately with the provisioned animate environment
+"$ANIMATE_ENV/bin/python" "$SKILL_DIR/scripts/render_video.py" scene.py IntroScene --quality low --format mp4
+"$ANIMATE_ENV/bin/python" "$SKILL_DIR/scripts/render_video.py" scene.py AlgorithmScene --quality low --format mp4
+"$ANIMATE_ENV/bin/python" "$SKILL_DIR/scripts/render_video.py" scene.py SummaryScene --quality low --format mp4
 ```
 
 ## Concatenating with ffmpeg

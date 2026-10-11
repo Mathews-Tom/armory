@@ -45,18 +45,114 @@ cases:
         target: "(Arrow|arrow|flow|animate)"
         weight: 0.6
 
+  - id: template_config_no_model_render
+    prompt: "Animate our RAG pipeline as a video: stages Ingest, Embed, Index, Retrieve, Generate. I already know the labels, so don't spend any model calls on planning or fixing."
+    fixtures: []
+    rubric:
+      - "writes a data_flow config with the five stages and runs scripts/build_scene.py, not plan_storyboard.py"
+      - "does not use --max-fix-attempts above 0 or critic_pass.py"
+      - "reports the plan duration and the verification.json result separately from the render"
+      - "states that frames are pending review and that metadata checks do not prove the layout reads well"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "build_scene\\.py"
+        weight: 1.0
+      - type: matches_regex
+        target: "(data_flow|stages)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(verification\\.json|verify_video\\.py)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(review-receipt|pending|attest)"
+        weight: 0.7
+
+  - id: template_config_rejects_bad_data
+    prompt: "Build a timeline video from this config: one event, 2024 'Launch', and a field named colour set to red."
+    fixtures: []
+    rubric:
+      - "does not render a video from the bad config"
+      - "reports that a timeline needs 2-8 events and that colour is an unknown field (the field is color, upper-case name)"
+      - "asks for or proposes a corrected config instead of silently dropping the field or padding events"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(unknown field|2-8|invalid scene config)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(color|COLOR)"
+        weight: 0.6
+
+  - id: output_check_without_vision_model
+    prompt: "I have final.mp4 from a Manim render. Confirm it is 1080p60 and about 11.7 seconds, and give me frames to look over. I can't use a vision model here."
+    fixtures: []
+    rubric:
+      - "runs verify_video.py check with expected duration, fps, width and height"
+      - "runs verify_video.py sample to produce frames and a receipt with review.status pending"
+      - "does not claim layout or legibility is verified by the metadata check"
+      - "records a verdict only through verify_video.py attest after a person has looked at the frames"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "verify_video\\.py"
+        weight: 1.0
+      - type: matches_regex
+        target: "(--expect-duration|--plan)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(sample|review-receipt)"
+        weight: 0.8
+
+  - id: isolated_setup_on_macos
+    prompt: "Set up Manim on my Mac so I can render animations. Don't mess with my system Python."
+    fixtures: []
+    rubric:
+      - "uses uv venv plus uv pip install into an isolated environment, not pip --break-system-packages"
+      - "checks for ffmpeg and asks before running brew install for missing system packages"
+      - "does not install anything as a side effect of rendering"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "uv (venv|pip)"
+        weight: 1.0
+      - type: not_contains
+        target: "--break-system-packages"
+        weight: 1.0
+
   - id: negative_branded_product_demo
     prompt: "Create a branded product demo video with our company logo and music"
     fixtures: []
     rubric:
-      - "branded product demos with logos and music are remotion-video territory, not concept-to-video"
+      - "branded product demos with logos and music are React/Remotion-style video work, not Manim technical explainers"
+    trigger_expected: false
+
+  - id: negative_react_component_video
+    prompt: "Build a Remotion video from our React components with props-driven scenes"
+    fixtures: []
+    rubric:
+      - "React or Remotion compositions are excluded; this package renders Manim Python scenes only"
+    trigger_expected: false
+
+  - id: negative_html_hyperframes_composition
+    prompt: "Make an HTML and GSAP video composition with Hyperframes, using CSS animation and a timeline of clips"
+    fixtures: []
+    rubric:
+      - "HTML, CSS, GSAP and Hyperframes compositions are excluded; this package renders Manim Python scenes only"
+    trigger_expected: false
+
+  - id: negative_existing_video_analysis
+    prompt: "Summarize this YouTube video and find the moment where the speaker shows the architecture slide"
+    fixtures: []
+    rubric:
+      - "analysing an existing video is not animation generation"
     trigger_expected: false
 
   - id: negative_static_infographic
     prompt: "Make a static infographic about our tech stack"
     fixtures: []
     rubric:
-      - "static images are outside concept-to-video scope which produces animated video output"
+      - "static images are outside the scope of this package, which produces animated video output"
     trigger_expected: false
 
   - id: autofix_recovery_name_error

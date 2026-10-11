@@ -65,9 +65,9 @@ Render a numbered markdown table with columns: `#`, `Skill`, `Catalog`, `Install
 ```text
 | # | Skill                  | Catalog | Installed | Status           |
 |---|------------------------|---------|-----------|------------------|
-| 1 | architecture-reviewer  | 1.1.0   | 1.0.0     | update available |
-| 2 | code-refiner           | 1.1.0   | 1.1.0     | current          |
-| 3 | concept-to-video       | 1.1.0   | —         | not installed    |
+| 1 | animate                | 2.0.0   | —         | not installed    |
+| 2 | architecture-reviewer  | 1.1.0   | 1.0.0     | update available |
+| 3 | code-refiner           | 1.1.0   | 1.1.0     | current          |
 ```
 
 After the table, print a summary line:

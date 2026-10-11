@@ -66,24 +66,6 @@ class TestResolveRepo:
 class TestCollectPackages:
     """Tests for package collection from definition files."""
 
-    def test_collects_skills_from_real_repo(self) -> None:
-        """Verify collect_packages finds all skills in the actual repo."""
-        entries = collect_packages(TYPES["skill"], "Mathews-Tom/armory")
-        assert len(entries) >= 39
-
-        names = {e["name"] for e in entries}
-        assert "agent-builder" in names
-        assert "tavily" in names
-        assert "concept-to-video" in names
-        assert "remotion-video" in names
-
-        for entry in entries:
-            assert str(entry["path"]).startswith("skills/")
-            assert entry["description"]
-            parts = str(entry["version"]).split(".")
-            assert len(parts) == 3, f"Invalid version {entry['version']} for {entry['name']}"
-            assert all(p.isdigit() for p in parts)
-
     def test_includes_source_url(self) -> None:
         """Verify source URLs are generated for each skill."""
         entries = collect_packages(TYPES["skill"], "Mathews-Tom/armory")

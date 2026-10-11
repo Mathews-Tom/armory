@@ -63,7 +63,7 @@ profiles:
         - html-presentation
         - md-to-pdf
         - concept-to-image
-        - concept-to-video
+        - animate
         - html-video
       agents:
         - content-strategist

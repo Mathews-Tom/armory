@@ -23,6 +23,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from _deps import require_binary, require_manim
+
 QUALITY_MAP = {
     "low": ("-ql", "480p15"),
     "medium": ("-qm", "720p30"),
@@ -34,7 +36,6 @@ FORMAT_MAP = {
     "mp4": "--format=mp4",
     "gif": "--format=gif",
     "webm": "--format=webm",
-    "png": "--format=png",  # renders each frame as PNG sequence
 }
 
 _MAX_FIX_ATTEMPTS_HARD_CAP = 3
@@ -50,47 +51,40 @@ _EXCEPTION_CLASS_RE = re.compile(
 
 
 def find_rendered_file(
-    media_dir: Path, scene_name: str, quality_dir: str, fmt: str
+    media_dir: Path,
+    scene_name: str,
+    quality_dir: str,
+    fmt: str,
+    *,
+    source_stem: str,
+    manim_version: str,
 ) -> Path | None:
-    """
-    Locate the rendered file in Manim's nested output structure.
-    Manim outputs to: media/videos/<script_name>/<quality_dir>/<SceneName>.<ext>
-    """
-    ext = fmt if fmt != "png" else "mp4"  # png sequence still gets combined
-
-    # Search all video subdirs for the scene
-    for video_dir in media_dir.rglob(quality_dir):
-        candidate = video_dir / f"{scene_name}.{ext}"
-        if candidate.exists():
-            return candidate
-
-    # Fallback: search by scene name anywhere under media
-    for match in media_dir.rglob(f"{scene_name}.{ext}"):
-        return match
-
-    # GIF fallback: manim sometimes puts gifs in a different subdir
-    if fmt == "gif":
-        for match in media_dir.rglob(f"{scene_name}.gif"):
-            return match
-
-    return None
+    """Locate only the requested source, quality and native output filename."""
+    filename = (
+        f"{scene_name}_ManimCE_v{manim_version}.gif"
+        if fmt == "gif"
+        else f"{scene_name}.{fmt}"
+    )
+    candidate = media_dir / "videos" / source_stem / quality_dir / filename
+    return candidate if candidate.is_file() else None
 
 
-def ensure_manim_installed() -> bool:
-    """Check if manim is importable."""
-    try:
-        result = subprocess.run(
-            [sys.executable, "-c", "import manim; print(manim.__version__)"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode == 0:
-            print(f"Manim version: {result.stdout.strip()}")
-            return True
-    except Exception:
-        pass
-    return False
+def get_manim_version() -> str:
+    """Return the actual version, preserving import and execution diagnostics."""
+    require_manim()
+    result = subprocess.run(
+        [sys.executable, "-c", "import manim; print(manim.__version__)"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Manim import failed:\n{result.stderr or result.stdout}")
+    version = result.stdout.strip()
+    if not version:
+        raise RuntimeError("Manim import returned no version")
+    print(f"Manim version: {version}")
+    return version
 
 
 def parse_offending_lines(
@@ -283,11 +277,19 @@ def main() -> None:
         print(f"ERROR: Scene file not found: {scene_path}", file=sys.stderr)
         sys.exit(1)
 
-    if not ensure_manim_installed():
-        print(
-            "ERROR: Manim is not installed. Run: pip install manim --break-system-packages",
-            file=sys.stderr,
-        )
+    output_path = Path(args.output).resolve() if args.output else None
+    if output_path is not None and (
+        output_path == scene_path
+        or output_path.is_dir()
+        or output_path.suffix.lower() != f".{args.fmt}"
+    ):
+        parser.error("output must be a matching-format file distinct from the scene")
+
+    try:
+        manim_version = get_manim_version()
+        require_binary("ffmpeg")
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
 
     quality_flag, quality_dir = QUALITY_MAP[args.quality]
@@ -301,6 +303,7 @@ def main() -> None:
         "-m",
         "manim",
         "render",
+        "--silent",  # Disable only Manim's PyPI version-notification request.
         quality_flag,
         format_flag,
         f"--media_dir={media_dir}",
@@ -322,7 +325,14 @@ def main() -> None:
         sys.exit(result.returncode)
 
     # Find the rendered file
-    rendered = find_rendered_file(media_dir, args.scene_name, quality_dir, args.fmt)
+    rendered = find_rendered_file(
+        media_dir,
+        args.scene_name,
+        quality_dir,
+        args.fmt,
+        source_stem=scene_path.stem,
+        manim_version=manim_version,
+    )
 
     if not rendered:
         print(
@@ -337,10 +347,10 @@ def main() -> None:
         sys.exit(1)
 
     # Copy to output location if specified
-    if args.output:
-        output_path = Path(args.output).resolve()
+    if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(rendered, output_path)
+        if output_path != rendered.resolve():
+            shutil.copy2(rendered, output_path)
         final_path = output_path
     else:
         final_path = rendered

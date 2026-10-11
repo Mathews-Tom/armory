@@ -1,4 +1,4 @@
-"""Unit tests for critic_pass.py — VLM critic pass for concept-to-video."""
+"""Unit tests for critic_pass.py — VLM critic pass for animate."""
 
 from __future__ import annotations
 

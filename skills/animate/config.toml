@@ -1,4 +1,4 @@
-# Model configuration for the concept-to-video pipeline.
+# Model configuration for the opt-in animate planner, fixup and critic stages.
 #
 # Per armory convention, model identifiers live in config files rather than
 # source code so a single edit here retargets every pipeline stage.
