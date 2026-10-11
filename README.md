@@ -205,7 +205,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 
 | Skill                                              | Description                                                                                                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [humanize](skills/humanize/)                       | Detect and remove AI-generated writing patterns — 24 lexical patterns + 12 statistical signals, 6 domain profiles, 5-phase pipeline with semantic preservation      |
+| [humanize](skills/humanize/)                       | Prose editing with deterministic Markdown-aware scanning, selected mechanical cleanup, and preservation checks; contextual rewriting and voice matching remain judgment tasks |
 | [linkedin-post-style](skills/linkedin-post-style/) | Write LinkedIn posts in a specific technical voice with visual companion support — carousels via md-to-pdf, images via concept-to-image, video via concept-to-video |
 
 ### Skills — Skill Evolution (EvoSkills)

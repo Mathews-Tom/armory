@@ -183,6 +183,8 @@ The pinned commit governs which draw.io geometry is converted. Rebuild a provide
 
 **Re-sync policy:** The source is a living page. When refreshing the pattern list, diff against the recorded revision date. Patterns the source retires or demotes move to `skills/humanize/references/historical-patterns.md` rather than being silently dropped — evals must never assert on a retired pattern.
 
+**Humanizer comparison:** [blader/humanizer](https://github.com/blader/humanizer), MIT, reviewed at commit `225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8` (v3.1.0). Its workflow informed the comparison with the existing package; no upstream code, prose, or examples were copied. The deterministic prose tools are original Armory implementations. The standalone package carries its own source and limitations record.
+
 ## Conceptual Inspiration
 
 | Concept                                        | Source                                                                                                                  | Used by                                  |
@@ -209,5 +211,5 @@ The pinned commit governs which draw.io geometry is converted. Rebuild a provide
 ## Notes
 
 - Remotion's license has commercial use restrictions. Lightpanda is AGPL-3.0 — armory wraps these as skills without distributing their binaries.
-- Skills that are pure prompt engineering (e.g., `humanize`, `code-refiner`, `architecture-reviewer`) have no upstream library dependency. `humanize`'s pattern taxonomy derives from the Wikipedia source recorded under Vendoring Records.
+- `humanize` ships standard-library prose tools and contextual editing guidance, without an upstream Python library dependency. Its pattern taxonomy derives from the Wikipedia source recorded under Vendoring Records. Other prompt-only packages include `code-refiner` and `architecture-reviewer`.
 - The `immune` skill's Cheatsheet/Immune pattern draws from Stephanie Forrest's original Artificial Immune Systems research and aligns with Memento-Skills' stateful-prompt concept (arXiv 2603.18743) — cheatsheet entries act as positive-pattern memory, antibodies as negative-pattern memory.

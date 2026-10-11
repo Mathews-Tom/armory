@@ -378,7 +378,7 @@ After:
 
 **Watch for:** citation artifacts leaked from chat interfaces — `:contentReference[oaicite:0]{index=0}`, `turn0search0`, `[cite: 3]`, `[span_1](start_span)`; tracking parameters like `utm_source=chatgpt.com` in URLs; placeholder text ("[Insert name here]", "TODO: add example" in shipped prose); Markdown headings that skip levels; Markdown syntax in venues that don't render it.
 
-**Problem:** These are mechanical fingerprints, not style. In file mode, strip citation artifacts and tracking parameters, fill or flag placeholders (never invent content for them), and fix heading levels. Highest-confidence signals in this document — but always verify a URL still works after removing parameters.
+**Problem:** These are mechanical fingerprints, not style. Remove unambiguous chat citation artifacts outside protected content, flag placeholders without inventing replacements, and review heading levels. Preserve URLs and link targets exactly, including tracking parameters: changing them can break signatures or alter the destination. URL normalization is a separate, explicitly authorized task, not a prose cleanup step.
 
 ---
 
