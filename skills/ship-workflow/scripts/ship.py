@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reconcile an existing PR through authorized landing and safe cleanup."""
+"""Ship local work or an existing PR through publication, landing and safe cleanup."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -31,13 +32,46 @@ from changeset import (
     compile_draft,
     load_draft,
     load_gates,
+    load_plan,
     parse_plan,
     take_inventory,
 )
 from git_ops import GitError, GitRepository, parse_remote_identity
 from github_ops import GitHub, ProviderError
-from lifecycle import EXIT_CODES, Endpoint, execute, inspection, load_policy
+from lifecycle import EXIT_CODES, Endpoint, load_decision
+from publish import Request, preview, ship
 from state_store import Receipt, ReceiptInputError, StateError, Store, validate_run_id
+
+
+def run_namespace(record: Receipt) -> tuple[str, str] | None:
+    """The provider base namespace a saved run is bound to, if any."""
+    if record.target is not None:
+        return record.host, record.repo.lower()
+    if record.publication is not None:
+        return record.publication.host, record.publication.base_repo.lower()
+    return None
+
+
+def run_branches(record: Receipt) -> set[str]:
+    branches: set[str] = set()
+    if record.target is not None:
+        branches.add(record.head_ref)
+    if record.publication is not None:
+        branches.add(record.publication.head_ref)
+    if record.changeset is not None:
+        branches.add(record.changeset.branch)
+    return branches
+
+
+def matches_pr(record: Receipt, number: int) -> bool:
+    """A bound target is authoritative; otherwise only a confirmed own creation."""
+    if record.target is not None:
+        return record.number == number
+    publication = record.publication
+    create = None if publication is None else publication.create
+    return (
+        create is not None and create.outcome == "CONFIRMED" and create.number == number
+    )
 
 
 def repository_selector(value: str) -> tuple[str, str]:
@@ -161,30 +195,51 @@ def main() -> int:
     parser.add_argument(
         "--gates", type=Path, help="explicit source-backed gate decision packet"
     )
+    parser.add_argument("--branch", help="local feature branch to publish and ship")
+    parser.add_argument(
+        "--plan", type=Path, help="snapshot-bound commit plan to execute first"
+    )
+    parser.add_argument(
+        "--head-repo", help="head namespace OWNER/REPO when it differs (fork)"
+    )
+    parser.add_argument("--title", help="title of a PR this run creates")
+    parser.add_argument("--body-file", type=Path, help="body of a PR this run creates")
     args = parser.parse_args()
     if args.inventory or args.draft is not None:
         if args.inventory and args.draft is not None:
             parser.error("choose one of --inventory or --draft")
         if (
-            args.pr is not None
-            or args.resume is not None
-            or args.until is not None
-            or args.policy is not None
+            any(
+                value is not None
+                for value in (
+                    args.pr,
+                    args.resume,
+                    args.until,
+                    args.policy,
+                    args.branch,
+                    args.plan,
+                    args.head_repo,
+                    args.title,
+                    args.body_file,
+                )
+            )
             or args.dry_run
         ):
-            parser.error(
-                "--inventory and --draft select no PR, run, endpoint or policy"
-            )
+            parser.error("--inventory and --draft select no target, run or endpoint")
         if args.draft is not None and args.gates is None:
             parser.error("--draft requires the --gates decision packet")
         return planning(args.draft, args.gates)
-    if args.gates is not None:
-        parser.error("--gates is only used with --draft")
-    if args.pr is None and args.resume is None:
-        parser.error("provide --pr or --resume")
+    if args.pr is not None and args.branch is not None:
+        parser.error("--pr and --branch are mutually exclusive selectors")
+    if (args.title is None) != (args.body_file is None):
+        parser.error("--title and --body-file are given together")
     try:
-        policy = load_policy(args.policy.resolve()) if args.policy else None
-    except (ValueError, TypeError, OSError) as error:
+        policy = load_decision(args.policy.resolve()) if args.policy else None
+        plan = load_plan(args.plan.resolve()) if args.plan else None
+        gates = load_gates(args.gates.resolve()) if args.gates else None
+        body = args.body_file.resolve().read_bytes() if args.body_file else None
+        head_repo = repository_selector(args.head_repo)[1] if args.head_repo else None
+    except (PlanError, ValueError, TypeError, OSError) as error:
         print(
             json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
         )
@@ -199,12 +254,11 @@ def main() -> int:
                 candidates = tuple(
                     record
                     for record in store.list_runs()
-                    if record.target is not None
-                    and (args.pr is None or record.number == args.pr)
+                    if (args.pr is None or matches_pr(record, args.pr))
+                    and (args.branch is None or args.branch in run_branches(record))
                     and (
                         selected is None
-                        or (record.host, record.repo.lower())
-                        == (selected[0], selected[1].lower())
+                        or run_namespace(record) == (selected[0], selected[1].lower())
                     )
                 )
                 pending = tuple(
@@ -226,23 +280,30 @@ def main() -> int:
                             "missing receipt: provide --pr, --repo and --until to reconstruct scope"
                         ) from None
             if receipt is not None:
-                if receipt.target is None:
-                    raise ReceiptInputError(
-                        "saved run has no provider-confirmed PR target to resume"
-                    )
-                if args.pr is not None and args.pr != receipt.number:
+                if args.pr is not None and not matches_pr(receipt, args.pr):
                     raise ReceiptInputError("--pr does not match the saved run")
-                if selected is not None and (selected[0], selected[1].lower()) != (
-                    receipt.host,
-                    receipt.repo.lower(),
-                ):
-                    raise ReceiptInputError("--repo does not match the saved run")
-                selected = (receipt.host, receipt.repo)
+                if args.branch is not None and args.branch not in run_branches(receipt):
+                    raise ReceiptInputError("--branch does not match the saved run")
+                namespace = run_namespace(receipt)
+                if namespace is not None:
+                    if (
+                        selected is not None
+                        and (
+                            selected[0],
+                            selected[1].lower(),
+                        )
+                        != namespace
+                    ):
+                        raise ReceiptInputError("--repo does not match the saved run")
+                    if receipt.target is not None:
+                        selected = (receipt.host, receipt.repo)
+                    elif receipt.publication is not None:
+                        selected = (
+                            receipt.publication.host,
+                            receipt.publication.base_repo,
+                        )
         if selected is None:
             selected = infer_repository(git)
-        number = receipt.number if receipt is not None else args.pr
-        if number is None:
-            raise ReceiptInputError("no unambiguous existing PR is selected")
         endpoint: Endpoint
         if args.until is not None:
             endpoint = args.until
@@ -251,20 +312,33 @@ def main() -> int:
         else:
             endpoint = "clean"
         provider = GitHub(*selected, deadline=time.monotonic() + args.wait_timeout)
+        request = Request(
+            host=selected[0],
+            base_repo=selected[1],
+            head_repo=head_repo,
+            number=args.pr,
+            branch=args.branch,
+            endpoint=endpoint,
+            plan=plan,
+            gates=gates,
+            decision=policy,
+            title=args.title,
+            body=body,
+            wait_timeout=args.wait_timeout,
+        )
         if args.dry_run:
-            result = inspection(git, provider, number, endpoint, policy)
+            if receipt is not None and receipt.target is not None and plan is None:
+                request = replace(request, number=receipt.number)
+            elif receipt is not None and receipt.publication is not None:
+                request = replace(
+                    request,
+                    branch=receipt.publication.head_ref,
+                    head_repo=receipt.publication.head_repo,
+                )
+            result = preview(git, provider, request)
             code = 0
         else:
-            result, code = execute(
-                git,
-                provider,
-                number,
-                endpoint,
-                policy,
-                args.wait_timeout,
-                store,
-                receipt,
-            )
+            result, code = ship(git, provider, store, request, receipt)
     except (ReceiptInputError, ValueError, TypeError) as error:
         print(
             json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
@@ -282,6 +356,21 @@ def main() -> int:
             )
         )
         return 130
+    except ChangesetStop as stop:
+        print(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": stop.status,
+                    "blocker": str(stop),
+                    "details": stop.details,
+                    "next_action": stop.next_action,
+                },
+                ensure_ascii=True,
+                sort_keys=True,
+            )
+        )
+        return EXIT_CODES[stop.status]
     except (GitError, ProviderError, StateError, OSError) as error:
         status = error.kind if isinstance(error, ProviderError) else "BLOCKED"
         print(json.dumps({"schema_version": 1, "status": status, "error": str(error)}))

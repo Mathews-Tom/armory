@@ -95,30 +95,139 @@ def _strings(
     return result
 
 
-def load_policy(path: Path) -> Policy:
-    """Load only an explicitly supplied packet; reject ambiguous/unknown inputs."""
+_DECISION_FIELDS = {
+    "sources",
+    "expected_checks",
+    "merge_method",
+    "post_merge_commands",
+    "allowed_skips",
+    "head_only_checks",
+    "protected_refs",
+    "ci_free",
+}
+_OID_PATTERN = r"(?:[a-f0-9]{40}|[a-f0-9]{64})"
+
+
+@dataclass(frozen=True)
+class Decision:
+    """The revision-free part of a source-backed lifecycle decision."""
+
+    sources: tuple[str, ...]
+    expected_checks: tuple[str, ...]
+    merge_method: str
+    post_merge_commands: tuple[tuple[str, ...], ...]
+    allowed_skips: tuple[str, ...]
+    head_only_checks: tuple[str, ...]
+    protected_refs: tuple[str, ...]
+    ci_free: bool
+
+    def bound(self, head_sha: str, base_sha: str) -> Policy:
+        return Policy(
+            self.sources,
+            self.expected_checks,
+            self.merge_method,
+            self.post_merge_commands,
+            head_sha,
+            base_sha,
+            self.allowed_skips,
+            self.head_only_checks,
+            self.protected_refs,
+            self.ci_free,
+        )
+
+
+@dataclass(frozen=True)
+class Binding:
+    """Schema 2 decision bound to receipt-proven publication, not literal revisions.
+
+    ``plan`` binds the head produced by executing exactly that commit plan and its
+    base; ``head``/``base_ref``/``base_oid`` bind already-existing local commits.
+    The bound :class:`Policy` is formed only from confirmed facts.
+    """
+
+    decision: Decision
+    plan: str | None
+    head: str | None
+    base_ref: str | None
+    base_oid: str | None
+
+    @property
+    def fingerprint(self) -> str:
+        return hashlib.sha256(
+            json.dumps(asdict(self), sort_keys=True, ensure_ascii=True).encode()
+        ).hexdigest()
+
+    def bind(self, head_sha: str, base_sha: str) -> Policy:
+        return self.decision.bound(head_sha, base_sha)
+
+
+def _decision_json(path: Path) -> dict[str, object]:
     raw: object = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or any(not isinstance(k, str) for k in raw):
         raise ValueError("policy must be a JSON object")
-    allowed = {
-        "schema_version",
-        "sources",
-        "expected_checks",
-        "merge_method",
-        "post_merge_commands",
-        "allowed_skips",
-        "head_only_checks",
-        "protected_refs",
-        "ci_free",
-        "head_sha",
-        "base_sha",
-    }
+    return cast("dict[str, object]", raw)
+
+
+def load_decision(path: Path) -> Policy | Binding:
+    """Load a schema 1 revision-bound or schema 2 publication-bound decision."""
+    raw = _decision_json(path)
+    if type(raw.get("schema_version")) is not int or raw.get("schema_version") != 2:
+        return load_policy(path)
+    if set(raw) - _DECISION_FIELDS - {"schema_version", "binding"}:
+        raise ValueError("unsupported policy schema or unknown fields")
+    binding = raw.get("binding")
+    if not isinstance(binding, dict) or any(not isinstance(k, str) for k in binding):
+        raise ValueError("binding must name a plan or an explicit head and base")
+    decision = _parse_decision(raw)
+    if set(binding) == {"plan"}:
+        plan = binding["plan"]
+        if not isinstance(plan, str) or re.fullmatch(r"[0-9a-f]{64}", plan) is None:
+            raise ValueError("binding.plan must be a commit-plan identity")
+        return Binding(decision, plan, None, None, None)
+    if set(binding) != {"head", "base"}:
+        raise ValueError("binding must name a plan or an explicit head and base")
+    base = binding["base"]
+    if not isinstance(base, dict) or set(base) != {"ref", "oid"}:
+        raise ValueError("binding.base needs exactly ref and oid")
+    head, base_ref, base_oid = binding["head"], base["ref"], base["oid"]
+    if (
+        not isinstance(head, str)
+        or not isinstance(base_oid, str)
+        or re.fullmatch(_OID_PATTERN, head) is None
+        or re.fullmatch(_OID_PATTERN, base_oid) is None
+    ):
+        raise ValueError("binding head and base must be full commit identities")
+    if (
+        not isinstance(base_ref, str)
+        or not base_ref
+        or base_ref.startswith(("-", "refs/"))
+    ):
+        raise ValueError("binding.base.ref must be a short branch name")
+    return Binding(decision, None, head, base_ref, base_oid)
+
+
+def load_policy(path: Path) -> Policy:
+    """Load only an explicitly supplied packet; reject ambiguous/unknown inputs."""
+    raw = _decision_json(path)
+    allowed = _DECISION_FIELDS | {"schema_version", "head_sha", "base_sha"}
     if (
         set(raw) - allowed
         or type(raw.get("schema_version")) is not int
         or raw.get("schema_version") != 1
     ):
         raise ValueError("unsupported policy schema or unknown fields")
+    revisions = [raw.get(field) for field in ("head_sha", "base_sha")]
+    if any(
+        not isinstance(sha, str) or re.fullmatch(_OID_PATTERN, sha) is None
+        for sha in revisions
+    ):
+        raise ValueError(
+            "head_sha and base_sha must bind full observed commit identities"
+        )
+    return _parse_decision(raw).bound(str(revisions[0]), str(revisions[1]))
+
+
+def _parse_decision(raw: dict[str, object]) -> Decision:
     sources = _strings(raw.get("sources"), "sources", empty=False)
     expected = _strings(raw.get("expected_checks"), "expected_checks")
     skips = _strings(raw.get("allowed_skips", []), "allowed_skips")
@@ -141,26 +250,8 @@ def load_policy(path: Path) -> Policy:
         _strings(command, "command argv", empty=False, unique=False)
         for command in commands
     )
-    revisions = [raw.get(field) for field in ("head_sha", "base_sha")]
-    if any(
-        not isinstance(sha, str)
-        or re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", sha) is None
-        for sha in revisions
-    ):
-        raise ValueError(
-            "head_sha and base_sha must bind full observed commit identities"
-        )
-    return Policy(
-        sources,
-        expected,
-        str(method),
-        argv,
-        str(revisions[0]),
-        str(revisions[1]),
-        skips,
-        head_only,
-        protected,
-        ci_free,
+    return Decision(
+        sources, expected, str(method), argv, skips, head_only, protected, ci_free
     )
 
 
@@ -252,6 +343,7 @@ def evaluate(observation: Observation, policy: Policy | None) -> Gate:
     ]
     if unresolved_checkout and any(
         check.base_sha is None
+        and check.status == "completed"
         and (
             check.name not in policy.head_only_checks
             or observation.require_current_base
@@ -459,6 +551,7 @@ def code_identity() -> str:
         "ship.py",
         "lifecycle.py",
         "changeset.py",
+        "publish.py",
         "git_ops.py",
         "github_ops.py",
         "state_store.py",
@@ -715,6 +808,8 @@ class _Execution:
                     "reconcile the original provider outcome before changing the head",
                 )
             record.policy_identity = self.policy.fingerprint if self.policy else None
+            if record.publication is not None and self.policy is not None:
+                record.publication.decision_identity = self.policy.fingerprint
             record.validation_sha = None
             record.validation_policy = None
             record.code_identity = self.code
@@ -1835,6 +1930,12 @@ class _Execution:
     def run(self) -> tuple[dict[str, object], int]:
         try:
             pr = self._read()
+            if self.endpoint == "pr" and pr.state == "CLOSED":
+                raise _Stop(
+                    "NEEDS_JUDGMENT",
+                    f"PR {pr.number} is closed without a confirmed merge",
+                    "explicitly choose whether to reopen that PR or publish a replacement",
+                )
             if self.endpoint == "pr" and self.receipt is None:
                 return self._finish("COMPLETE", None, "none", save=False)
             self._initialize(pr)

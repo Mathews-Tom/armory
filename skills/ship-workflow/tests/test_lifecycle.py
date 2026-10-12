@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 from github_ops import Check, Observation, PullRequest, Repository
-from lifecycle import Policy, evaluate, evidence_identity, load_policy
+from lifecycle import (
+    Binding,
+    Policy,
+    evaluate,
+    evidence_identity,
+    load_decision,
+    load_policy,
+)
 
 HEAD = "a" * 40
 BASE = "b" * 40
@@ -286,3 +293,149 @@ def test_checkout_proof_failure_requires_judgment_without_an_explicit_head_only_
         evaluate(current, replace(policy(), head_only_checks=("tests",))).status
         == "READY"
     )
+
+
+def test_pending_integration_waits_beside_a_tolerated_unverified_head_only_check() -> (
+    None
+):
+    base = observed()
+    lint = replace(base.checks[0], name="lint", base_sha=None)
+    integration = replace(
+        base.checks[0],
+        name="integration",
+        base_sha=None,
+        status="in_progress",
+        conclusion=None,
+    )
+    current = replace(
+        base,
+        checks=(lint, integration),
+        required_checks=("lint", "integration"),
+        issues=("checkout-proof-unverified: NEEDS_JUDGMENT missing checkout commit",),
+    )
+    decision = replace(
+        policy(), expected_checks=("lint", "integration"), head_only_checks=("lint",)
+    )
+    assert evaluate(current, decision).status == "WAITING"
+
+    unproven = replace(
+        current,
+        checks=(lint, replace(integration, status="completed", conclusion="success")),
+    )
+    assert evaluate(unproven, decision).status == "NEEDS_JUDGMENT"
+
+    proven = replace(
+        current,
+        checks=(
+            lint,
+            replace(
+                integration, status="completed", conclusion="success", base_sha=BASE
+            ),
+        ),
+    )
+    assert evaluate(proven, decision).status == "READY"
+
+
+PLAN_IDENTITY = "d" * 64
+
+
+def decision_payload(binding: object) -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "sources": ["CI policy"],
+        "expected_checks": ["tests"],
+        "merge_method": "squash",
+        "post_merge_commands": [["python3", "-c", "pass"]],
+        "binding": binding,
+    }
+
+
+def test_publication_bound_decision_authorizes_only_the_bound_revisions(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "decision.json"
+    path.write_text(json.dumps(decision_payload({"plan": PLAN_IDENTITY})))
+
+    loaded = load_decision(path)
+
+    assert isinstance(loaded, Binding)
+    assert (loaded.plan, loaded.head, loaded.base_oid) == (PLAN_IDENTITY, None, None)
+    bound = loaded.bind(HEAD, BASE)
+    assert (bound.head_sha, bound.base_sha, bound.merge_method) == (
+        HEAD,
+        BASE,
+        "squash",
+    )
+    assert evaluate(observed(), bound).status == "READY"
+    moved = replace(observed(), pr=replace(observed().pr, head_sha="c" * 40))
+    assert evaluate(moved, bound).status == "NEEDS_JUDGMENT"
+
+
+def test_explicit_head_and_base_binding_is_parsed_exactly(tmp_path: Path) -> None:
+    path = tmp_path / "decision.json"
+    binding = {"head": HEAD, "base": {"ref": "main", "oid": BASE}}
+    path.write_text(json.dumps(decision_payload(binding)))
+
+    loaded = load_decision(path)
+
+    assert isinstance(loaded, Binding)
+    assert (loaded.plan, loaded.head, loaded.base_ref, loaded.base_oid) == (
+        None,
+        HEAD,
+        "main",
+        BASE,
+    )
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps(decision_payload({**binding, "head": "c" * 40})))
+    assert load_decision(other).fingerprint != loaded.fingerprint
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        pytest.param({"binding": {"plan": "short"}}, id="malformed-plan-identity"),
+        pytest.param(
+            {"binding": {"plan": PLAN_IDENTITY, "head": HEAD}}, id="plan-and-head"
+        ),
+        pytest.param({"binding": {"head": HEAD}}, id="head-without-base"),
+        pytest.param(
+            {
+                "binding": {
+                    "head": HEAD,
+                    "base": {"ref": "refs/heads/main", "oid": BASE},
+                }
+            },
+            id="base-ref-not-a-short-branch",
+        ),
+        pytest.param(
+            {"binding": {"head": "HEAD", "base": {"ref": "main", "oid": BASE}}},
+            id="symbolic-head",
+        ),
+        pytest.param({"head_sha": HEAD}, id="literal-revision-in-schema-2"),
+        pytest.param({"binding": None}, id="missing-binding"),
+    ],
+)
+def test_publication_bound_decision_rejects_ambiguous_bindings(
+    tmp_path: Path, change: dict[str, object]
+) -> None:
+    path = tmp_path / "decision.json"
+    path.write_text(json.dumps({**decision_payload({"plan": PLAN_IDENTITY}), **change}))
+
+    with pytest.raises(ValueError):
+        load_decision(path)
+
+
+def test_schema_1_packets_still_load_as_revision_bound_policies(tmp_path: Path) -> None:
+    path = tmp_path / "policy.json"
+    payload = {
+        "schema_version": 1,
+        "sources": ["CI policy"],
+        "expected_checks": ["tests"],
+        "merge_method": "merge",
+        "post_merge_commands": [],
+        "head_sha": HEAD,
+        "base_sha": BASE,
+    }
+    path.write_text(json.dumps(payload))
+
+    assert load_decision(path) == load_policy(path)

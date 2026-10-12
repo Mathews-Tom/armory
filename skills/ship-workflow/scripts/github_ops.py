@@ -3,8 +3,9 @@
 Evidence comes from the user's ``gh`` credential store; this module never reads
 or extracts tokens.  Reads are ``gh api --method GET`` requests, except
 ``queue_state``: merge-queue entries exist only in GraphQL, so it sends one
-read-only ``query`` with ``--method POST``.  The only mutation is
-``GitHub.merge`` (one ``gh pr merge`` command, described below).  Provider
+read-only ``query`` with ``--method POST``.  The mutations are
+``GitHub.merge`` (one ``gh pr merge`` command, described below) and
+``GitHub.create_pr`` (one never-retried ``POST .../pulls``).  Provider
 responses are validated at the boundary; evidence that cannot be established
 is reported through ``Observation.issues`` (or a ``ProviderError``) and never
 defaults to an empty or green answer.
@@ -82,6 +83,7 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote, urlencode, urlsplit
 
@@ -95,6 +97,7 @@ MAX_LOG_BYTES = 16 * 1024 * 1024
 NO_DEADLINE_RETRY_CAP = 60.0
 MERGE_METHODS = ("merge", "squash", "rebase")
 MERGE_TIMEOUT = 90.0
+CREATE_TIMEOUT = 60.0
 HELP_TIMEOUT = 15.0
 MIN_MUTATION_WINDOW = 10.0
 _MERGE_FLAGS = {"merge": "--merge", "squash": "--squash", "rebase": "--rebase"}
@@ -515,8 +518,19 @@ def _failure(proc: subprocess.CompletedProcess[bytes], response: _Response) -> _
     return _Failure("blocked", None, status, detail)
 
 
+def validate_pr_title(title: str) -> None:
+    """Reject invalid creation data before any intent or request is dispatched."""
+    if (
+        not isinstance(title, str)
+        or not title.strip()
+        or _CONTROL_RE.search(title)
+        or len(title) > 256
+    ):
+        raise ValueError("PR title must be one plain line of at most 256 characters")
+
+
 class GitHub:
-    """Observer for one repository on one GitHub host, plus the guarded PR merge."""
+    """Read GitHub evidence and dispatch guarded merge or creation requests."""
 
     def __init__(
         self,
@@ -751,6 +765,168 @@ class GitHub:
                 )
             result[pr.number] = pr
         return tuple(result.values())
+
+    def find_prs(
+        self, head_repo: str, head_ref: str, base_ref: str | None = None
+    ) -> tuple[PullRequest, ...]:
+        """Every PR of this base repository with exactly this head namespace/ref.
+
+        Fully paginated over all states. The provider ``head`` filter only
+        narrows the listing; every row is rechecked against the base repository,
+        head repository, head ref, optional base ref and PR URL. A row the filter
+        returned whose head repository is unreadable or whose identity contradicts
+        the request raises: incomplete evidence is never an empty answer.
+        """
+        _check_repo(head_repo)
+        branch = _branch_name(head_ref)
+        owner = head_repo.split("/", 1)[0]
+        params = {
+            "state": "all",
+            "head": f"{owner}:{branch}",
+            "sort": "created",
+            "direction": "desc",
+        }
+        if base_ref is not None:
+            params["base"] = _branch_name(base_ref)
+        op = f"find-prs:{self.full_name}:{owner}:{branch}"
+        raw = self._list(f"{_repo_path(self.full_name)}/pulls", op, params)
+        found: dict[int, PullRequest] = {}
+        for index, item in enumerate(raw):
+            pr, _ = _parse_pr(item, op, detailed=False, path=f"response[{index}]")
+            if (
+                pr.base_repo.lower() != self.full_name.lower()
+                or pr.head_ref != branch
+                or (base_ref is not None and pr.base_ref != params["base"])
+                or not _pull_url_matches(pr.url, self.host, self.full_name, pr.number)
+            ):
+                raise _malformed(op, f"response[{index}] contradicts the exact query")
+            if not pr.head_repo:
+                raise ProviderError(
+                    f"{op}: PR #{pr.number} matches the head label but its head repository is unreadable",
+                    kind="BLOCKED", operation=op, detail="pr-match-incomplete",
+                )  # fmt: skip
+            if pr.head_repo.lower() != head_repo.lower():
+                continue  # same owner, another repository: a different namespace
+            found[pr.number] = pr
+        return tuple(found.values())
+
+    def create_pr(
+        self,
+        head_repo: str,
+        head_ref: str,
+        base_ref: str,
+        title: str,
+        body_file: Path,
+    ) -> PullRequest:
+        """Create one PR with one ``gh api`` POST; never retried.
+
+        Title and body are plain data; the body is read by gh from
+        ``body_file``. ``ProviderError.uncertain`` means the request may have
+        reached GitHub: reconcile with :meth:`find_prs` before any retry.
+        ``detail == "pr-already-exists"`` is GitHub's own duplicate refusal.
+        """
+        _check_repo(head_repo)
+        branch = _branch_name(head_ref)
+        base = _branch_name(base_ref)
+        validate_pr_title(title)
+        op = f"create-pr:{self.full_name}:{head_repo}:{branch}"
+        head_owner, head_name = head_repo.split("/", 1)
+        cross = head_repo.lower() != self.full_name.lower()
+        argv = [
+            "gh", "api", "--method", "POST", "--include", "--hostname", self.host,
+            "-H", "Accept: application/vnd.github+json",
+            "-H", f"X-GitHub-Api-Version: {API_VERSION}",
+            "-f", f"title={title}",
+            "-f", f"head={head_owner}:{branch}" if cross else f"head={branch}",
+            "-f", f"base={base}",
+            "-F", f"body=@{body_file}",
+            "-F", "draft=false",
+        ]  # fmt: skip
+        if cross and head_owner.lower() == self.full_name.split("/", 1)[0].lower():
+            argv += ["-f", f"head_repo={head_name}"]
+        argv.append(f"{_repo_path(self.full_name)}/pulls")
+        remaining = self._remaining()
+        if remaining is not None and remaining < MIN_MUTATION_WINDOW:
+            raise self._waiting(
+                op,
+                "too little monitoring time remains to create the PR; nothing was dispatched",
+                detail="create-not-dispatched",
+            )
+        timeout = (
+            CREATE_TIMEOUT if remaining is None else min(CREATE_TIMEOUT, remaining)
+        )
+        unsafe = "the PR may exist; reconcile the exact head/base before any retry"
+        try:
+            proc = self._runner(argv, timeout)
+        except FileNotFoundError as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI 'gh' is not installed; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="missing-gh",
+            ) from exc  # fmt: skip
+        except subprocess.TimeoutExpired as exc:
+            raise ProviderError(
+                f"{op}: gh did not finish within {timeout:g}s; {unsafe}",
+                kind="WAITING", operation=op, uncertain=True, detail="create-uncertain-timeout",
+            ) from exc  # fmt: skip
+        except OSError as exc:
+            raise ProviderError(
+                f"{op}: running gh failed ({_clean(str(exc), 120)}); {unsafe}",
+                kind="BLOCKED", operation=op, uncertain=True, detail="create-unknown-outcome",
+            ) from exc  # fmt: skip
+        response = _split_response(proc.stdout)
+        if proc.returncode == 0 and response.status == 201:
+            try:
+                pr, _ = _parse_pr(
+                    json.loads(response.body), op, detailed=False, path="response"
+                )
+            except (ValueError, ProviderError) as exc:
+                raise ProviderError(
+                    f"{op}: the create response is unreadable; {unsafe}",
+                    kind="WAITING", operation=op, uncertain=True, detail="create-unreadable",
+                ) from exc  # fmt: skip
+            if (
+                pr.state != "OPEN"
+                or pr.base_repo.lower() != self.full_name.lower()
+                or pr.head_repo.lower() != head_repo.lower()
+                or (pr.head_ref, pr.base_ref) != (branch, base)
+                or not _pull_url_matches(pr.url, self.host, self.full_name, pr.number)
+            ):
+                raise ProviderError(
+                    f"{op}: the created PR identity contradicts the request; {unsafe}",
+                    kind="BLOCKED", operation=op, uncertain=True, detail="create-contradiction",
+                )  # fmt: skip
+            return pr
+        if proc.returncode < 0 or proc.returncode == 0:
+            raise ProviderError(
+                f"{op}: gh ended without a created PR (exit {proc.returncode}); {unsafe}",
+                kind="WAITING", operation=op, uncertain=True, detail="create-unknown-outcome",
+            )  # fmt: skip
+        failure = _failure(proc, response)
+        evidence = (
+            response.body.decode("utf-8", "replace")
+            + proc.stderr.decode("utf-8", "replace")
+        ).lower()
+        if failure.status == 422 and "pull request already exists" in evidence:
+            raise ProviderError(
+                f"{op}: GitHub reports an existing PR for this head and base",
+                kind="BLOCKED", operation=op, http_status=422, detail="pr-already-exists",
+            )  # fmt: skip
+        if failure.kind == "ratelimit":
+            raise self._waiting(
+                op,
+                f"rate limited; the PR was not created: {failure.detail}",
+                failure.status,
+            )
+        if failure.kind == "transient" or failure.status is None:
+            raise ProviderError(
+                f"{op}: {failure.detail or 'transport failure'}; {unsafe}",
+                kind="WAITING", operation=op, uncertain=True,
+                http_status=failure.status, detail="create-uncertain-transport",
+            )  # fmt: skip
+        raise ProviderError(
+            f"{op}: HTTP {failure.status} GitHub refused to create the PR: {failure.detail}",
+            kind="BLOCKED", operation=op, http_status=failure.status, detail="create-rejected",
+        )  # fmt: skip
 
     def branch_protected(self, full_name: str, ref: str) -> bool:
         """True when the branch is the default branch or any protection applies.
@@ -1503,9 +1679,12 @@ class GitHub:
                 "no workflow run is associated with the job",
             )
         if row.check.status != "completed":
-            return unproven(
-                "checkout-proof-pending",
-                "the job has not completed, so its checkout cannot be proven yet",
+            return _Context(
+                None,
+                None,
+                f"checkout-proof-pending: {label}: WAITING: the job has not "
+                "completed, so its checkout cannot be proven yet",
+                False,
             )
         try:
             job = self._object(f"{repo_path}/actions/jobs/{row.check_id}", f"{op}:job")
