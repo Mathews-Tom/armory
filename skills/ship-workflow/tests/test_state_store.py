@@ -17,9 +17,12 @@ import pytest
 from state_store import (
     TARGET_KEYS,
     ChangesetRecord,
+    CreateRecord,
     GateRow,
     GroupRecord,
     LockBusy,
+    PublicationRecord,
+    PushRecord,
     Receipt,
     ReceiptInputError,
     RefUpdate,
@@ -332,7 +335,8 @@ SCHEMA_REJECTS = [
     pytest.param(drop_key("issue"), id="missing-top-level-key"),
     pytest.param(set_key("schema_version", True), id="schema-version-bool"),
     pytest.param(set_key("schema_version", 1.0), id="schema-version-float"),
-    pytest.param(set_key("schema_version", 3), id="schema-version-future"),
+    pytest.param(set_key("schema_version", 4), id="schema-version-future"),
+    pytest.param(set_key("publication", {}), id="publication-missing-fields"),
     pytest.param(set_key("number", None), id="partial-target"),
     pytest.param(set_key("changeset", {}), id="changeset-missing-fields"),
     pytest.param(set_key("number", True), id="number-bool"),
@@ -488,8 +492,36 @@ def legacy_payload(receipt: Receipt) -> Payload:
     """The exact flat v1 journal M1 wrote for ``receipt``."""
     data = receipt.serialize()
     del data["changeset"]
+    del data["publication"]
     data["schema_version"] = 1
     return data
+
+
+def changeset_payload(receipt: Receipt) -> Payload:
+    """The exact schema 2 journal written before publication was journaled."""
+    data = receipt.serialize()
+    del data["publication"]
+    data["schema_version"] = 2
+    return data
+
+
+def publication_record(**changes: object) -> PublicationRecord:
+    record = PublicationRecord(
+        host="github.com",
+        base_repo="owner/repo",
+        base_ref="main",
+        base_oid=OID,
+        head_repo="contrib/repo",
+        head_ref="feat/topic",
+        remote="fork",
+        head=OID2,
+        validated_head=OID2,
+        push=PushRecord(None, OID2, "CONFIRMED"),
+        create=CreateRecord(
+            DIGEST, DIGEST2, "2026-10-12T00:00:00+00:00", "CONFIRMED", 7
+        ),
+    )
+    return replace(record, **changes)
 
 
 @pytest.mark.parametrize(
@@ -522,7 +554,93 @@ def test_v1_journal_migrates_exactly_and_saves_as_current_schema(
     store = Store(common)
     store.save(store.load(RUN))
     saved = json.loads((common / "armory" / "ship" / f"{RUN}.json").read_bytes())
-    assert saved == {**v1, "schema_version": 2, "changeset": None}
+    assert saved == {**v1, "schema_version": 3, "changeset": None, "publication": None}
+
+
+def test_schema_2_changeset_journal_migrates_exactly(common: Path) -> None:
+    receipt = unbound_receipt()
+    plant_payload(common, RUN, changeset_payload(receipt))
+
+    assert Store(common).load(RUN) == receipt
+    with_publication = {**changeset_payload(receipt), "publication": None}
+    with pytest.raises(ReceiptInputError):
+        Receipt.parse(with_publication)
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(
+            unbound_receipt(
+                changeset=None, publication=publication_record(create=None)
+            ),
+            id="pushed-before-pr-creation",
+        ),
+        pytest.param(
+            make_receipt(publication=publication_record()), id="bound-to-created-pr"
+        ),
+        pytest.param(
+            unbound_receipt(
+                publication=publication_record(
+                    create=CreateRecord(DIGEST, DIGEST2, "2026-10-12T00:00:00+00:00")
+                )
+            ),
+            id="pending-creation",
+        ),
+    ],
+)
+def test_publication_journals_round_trip(common: Path, receipt: Receipt) -> None:
+    Store(common).save(receipt)
+
+    assert Store(common).load(RUN) == receipt
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(
+            unbound_receipt(publication=publication_record(push=PushRecord(None, OID))),
+            id="push-of-another-head",
+        ),
+        pytest.param(
+            unbound_receipt(
+                publication=publication_record(
+                    create=CreateRecord(DIGEST, DIGEST2, "now", "CONFIRMED", None)
+                )
+            ),
+            id="confirmed-creation-without-pr",
+        ),
+        pytest.param(
+            unbound_receipt(
+                publication=publication_record(
+                    create=CreateRecord(DIGEST, DIGEST2, "now", "PENDING", 7)
+                )
+            ),
+            id="pending-creation-with-pr",
+        ),
+        pytest.param(
+            make_receipt(number=8, publication=publication_record()),
+            id="bound-to-a-different-pr-than-created",
+        ),
+        pytest.param(
+            unbound_receipt(publication=publication_record(head_repo="a/b/c")),
+            id="malformed-head-namespace",
+        ),
+        pytest.param(
+            unbound_receipt(
+                publication=publication_record(decision_identity="not-a-digest")
+            ),
+            id="malformed-decision-authority",
+        ),
+    ],
+)
+def test_inconsistent_publication_journals_are_refused(
+    common: Path, receipt: Receipt
+) -> None:
+    with pytest.raises(ReceiptInputError):
+        Store(common).save(receipt)
+
+    assert list(common.iterdir()) == []
 
 
 @pytest.mark.parametrize(
@@ -572,7 +690,10 @@ def test_pre_publication_run_keeps_only_typed_changeset_state(common: Path) -> N
         pytest.param(
             unbound_receipt(
                 changeset=changeset_record(
-                    update=None, residual_snapshot=DIGEST, confirmed=[]
+                    update=None,
+                    preserved=None,
+                    residual_snapshot=DIGEST,
+                    confirmed=[],
                 )
             ),
             id="residual-without-update",
@@ -669,7 +790,7 @@ def test_preserved_work_identity_round_trips_with_its_update(
             confirmed=[],
         )
     elif stage == "unknown-baseline":
-        record = replace(record, preserved=None)
+        record = replace(record, preserved=None)  # an update with no known baseline
     receipt = unbound_receipt(changeset=record)
 
     Store(common).save(receipt)
@@ -693,8 +814,8 @@ def test_historical_update_without_a_preserved_identity_loads_as_unknown(
     loaded = Store(common).load(RUN)
 
     assert loaded.changeset is not None and loaded.changeset.update is not None
-    assert loaded.changeset.preserved is None
-    assert path.read_bytes() == at_rest
+    assert loaded.changeset.preserved is None  # unknown: never fabricated
+    assert path.read_bytes() == at_rest  # and never rewritten by loading
     assert Receipt.parse(data) == loaded
 
 
@@ -771,6 +892,49 @@ def test_list_runs_is_sorted_and_ignores_foreign_files(common: Path) -> None:
     (common / "armory" / "ship" / f".{RUN}.stray").write_bytes(b"not a receipt")
 
     assert [receipt.run_id for receipt in Store(common).list_runs()] == [RUN, OTHER_RUN]
+
+
+def test_excluded_run_is_never_read_so_its_save_baseline_holds(common: Path) -> None:
+    controller = Store(common)
+    controller.save(make_receipt(OTHER_RUN))
+    controller.save(make_receipt(RUN))
+    held = controller.load(RUN)  # the controller's in-memory view of its own run
+    other = Store(common)
+    newer = other.load(RUN)
+    newer.next_action = "another controller's journaled intent"
+    other.save(newer)
+    path = common / "armory" / "ship" / f"{RUN}.json"
+    newer_bytes = path.read_bytes()
+
+    others = controller.list_runs(exclude=RUN)
+
+    assert [receipt.run_id for receipt in others] == [OTHER_RUN]
+    held.next_action = "overwrite from a stale view"
+    with pytest.raises(StateError):
+        controller.save(held)  # enumeration must not have adopted the newer bytes
+    assert path.read_bytes() == newer_bytes
+    reloaded = Store(common).load(RUN)
+    assert reloaded.next_action == "another controller's journaled intent"
+
+
+def test_exclusion_skips_even_an_unreadable_own_journal(common: Path) -> None:
+    Store(common).save(make_receipt(OTHER_RUN))
+    plant(common, RUN, b"{")
+
+    with pytest.raises(ReceiptInputError):
+        Store(common).list_runs()
+
+    remaining = Store(common).list_runs(exclude=RUN)
+    assert [receipt.run_id for receipt in remaining] == [OTHER_RUN]
+
+
+def test_exclusion_must_name_a_valid_run_id(common: Path) -> None:
+    Store(common).save(make_receipt())
+
+    with pytest.raises(ReceiptInputError):
+        Store(common).list_runs(exclude="../" + RUN)
+    everything = Store(common).list_runs(exclude=None)
+    assert [receipt.run_id for receipt in everything] == [RUN]
 
 
 def test_store_requires_an_existing_common_directory(tmp_path: Path) -> None:

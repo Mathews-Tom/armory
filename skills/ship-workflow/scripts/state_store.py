@@ -15,8 +15,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import cast
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _LEGACY_SCHEMA_VERSION = 1
+_CHANGESET_SCHEMA_VERSION = 2
 _RUN_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _OID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
@@ -56,7 +57,8 @@ _CHANGESET_KEYS = {
     "confirmed",
     "residual_snapshot",
 }
-# Historical receipts can lack this checkpoint; absence is unknown, not empty.
+# Journaled before an index/ref update writes; absent in historical receipts, where
+# absence means unknown (never a fabricated baseline) and is never rewritten on load.
 _CHANGESET_OPTIONAL_KEYS = {"preserved"}
 _GROUP_KEYS = {
     "id",
@@ -78,6 +80,22 @@ _UPDATE_KEYS = {
     "head_after",
     "outcome",
 }
+_PUBLICATION_KEYS = {
+    "host",
+    "base_repo",
+    "base_ref",
+    "base_oid",
+    "head_repo",
+    "head_ref",
+    "remote",
+    "head",
+    "validated_head",
+    "push",
+    "create",
+    "decision_identity",
+}
+_PUSH_KEYS = {"old", "new", "outcome"}
+_CREATE_KEYS = {"title_identity", "body_identity", "created_at", "outcome", "number"}
 _INTENT_KEYS = {
     "key",
     "kind",
@@ -323,6 +341,109 @@ class ChangesetRecord:
     preserved: str | None = None
 
 
+@dataclass
+class PushRecord:
+    """Journaled guarded push: the exact expected remote and intended head."""
+
+    old: str | None
+    new: str
+    outcome: str = "PENDING"
+
+
+@dataclass
+class CreateRecord:
+    """Journaled PR creation; content is identified by hashes, never stored."""
+
+    title_identity: str
+    body_identity: str
+    created_at: str
+    outcome: str = "PENDING"
+    number: int | None = None
+
+
+@dataclass
+class PublicationRecord:
+    """Intended head/base identities of a publication; fork namespaces stay separate."""
+
+    host: str
+    base_repo: str
+    base_ref: str
+    base_oid: str | None
+    head_repo: str
+    head_ref: str
+    remote: str
+    head: str
+    validated_head: str | None = None
+    push: PushRecord | None = None
+    create: CreateRecord | None = None
+    decision_identity: str | None = None
+
+
+def _publication(value: object) -> PublicationRecord | None:
+    if value is None:
+        return None
+    raw = _object(value, "publication")
+    if set(raw) not in (_PUBLICATION_KEYS, _PUBLICATION_KEYS - {"decision_identity"}):
+        raise ReceiptInputError("publication fields are missing or unsupported")
+    host = _text(raw["host"], "publication host")
+    base_repo = _text(raw["base_repo"], "publication base repository")
+    head_repo = _text(raw["head_repo"], "publication head repository")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]*", host) or not all(
+        _REPO_NAME.fullmatch(name) for name in (base_repo, head_repo)
+    ):
+        raise ReceiptInputError("invalid publication provider namespace")
+    head = _oid(raw["head"], "publication head")
+    push: PushRecord | None = None
+    if raw["push"] is not None:
+        row = _object(raw["push"], "publication push")
+        if set(row) != _PUSH_KEYS:
+            raise ReceiptInputError("push fields are missing or unsupported")
+        outcome = _text(row["outcome"], "push outcome")
+        if outcome not in _UPDATE_OUTCOMES:
+            raise ReceiptInputError("unsupported push outcome")
+        push = PushRecord(
+            _optional_oid(row["old"], "push old"), _oid(row["new"], "push new"), outcome
+        )
+        if push.new != head:
+            raise ReceiptInputError("the journaled push must publish the intended head")
+    create: CreateRecord | None = None
+    if raw["create"] is not None:
+        row = _object(raw["create"], "publication create")
+        if set(row) != _CREATE_KEYS:
+            raise ReceiptInputError("create fields are missing or unsupported")
+        outcome = _text(row["outcome"], "create outcome")
+        number = row["number"]
+        if outcome not in _UPDATE_OUTCOMES:
+            raise ReceiptInputError("unsupported create outcome")
+        if number is not None and (type(number) is not int or number <= 0):
+            raise ReceiptInputError("created PR number must be a positive integer")
+        if (outcome == "CONFIRMED") != (number is not None):
+            raise ReceiptInputError("exactly a confirmed creation names its PR")
+        create = CreateRecord(
+            _digest(row["title_identity"], "title identity"),
+            _digest(row["body_identity"], "body identity"),
+            _text(row["created_at"], "created_at"),
+            outcome,
+            number,
+        )
+    return PublicationRecord(
+        host=host,
+        base_repo=base_repo,
+        base_ref=_text(raw["base_ref"], "publication base ref"),
+        base_oid=_optional_oid(raw["base_oid"], "publication base oid"),
+        head_repo=head_repo,
+        head_ref=_text(raw["head_ref"], "publication head ref"),
+        remote=_text(raw["remote"], "publication remote"),
+        head=head,
+        validated_head=_optional_oid(raw["validated_head"], "validated head"),
+        push=push,
+        create=create,
+        decision_identity=_optional_digest(
+            raw.get("decision_identity"), "publication decision identity"
+        ),
+    )
+
+
 def _gate_row(value: object) -> GateRow:
     raw = _object(value, "changeset gate row")
     if set(raw) != _GATE_ROW_KEYS:
@@ -507,6 +628,7 @@ class Receipt:
     issue: str | None = None
     next_action: str = "reconcile current target facts"
     changeset: ChangesetRecord | None = None
+    publication: PublicationRecord | None = None
 
     def bound(self) -> Target:
         """The confirmed PR target; a pre-publication run has none to land."""
@@ -579,18 +701,25 @@ class Receipt:
         version = raw.get("schema_version")
         if type(version) is not int or version not in (
             _LEGACY_SCHEMA_VERSION,
+            _CHANGESET_SCHEMA_VERSION,
             SCHEMA_VERSION,
         ):
             raise ReceiptInputError("unsupported receipt schema version")
         fields = (set(cls.__dataclass_fields__) - {"target"}) | set(TARGET_KEYS)
         if version == _LEGACY_SCHEMA_VERSION:
-            # Exact v1 migration: PR-number receipts gain no changeset and must
-            # keep a complete target; nothing else is defaulted or reinterpreted.
-            if set(raw) != (fields - {"changeset"}) | {"schema_version"}:
+            # Exact v1 migration: PR-number receipts gain no changeset/publication
+            # and keep a complete target; nothing else is defaulted or reinterpreted.
+            legacy = fields - {"changeset", "publication"}
+            if set(raw) != legacy | {"schema_version"}:
                 raise ReceiptInputError("receipt fields are missing or unsupported")
             if any(raw[key] is None for key in TARGET_KEYS):
                 raise ReceiptInputError("legacy receipt must name its complete target")
-            raw = {**raw, "schema_version": SCHEMA_VERSION, "changeset": None}
+            raw = {**raw, "changeset": None}
+        if version in (_LEGACY_SCHEMA_VERSION, _CHANGESET_SCHEMA_VERSION):
+            # Schema 2 had no publication journal; nothing was ever published by it.
+            if "publication" in raw:
+                raise ReceiptInputError("receipt fields are missing or unsupported")
+            raw = {**raw, "schema_version": SCHEMA_VERSION, "publication": None}
         if set(raw) != fields | {"schema_version"}:
             raise ReceiptInputError("receipt fields are missing or unsupported")
         endpoint = _text(raw["endpoint"], "endpoint")
@@ -599,9 +728,18 @@ class Receipt:
             raise ReceiptInputError("unsupported receipt endpoint or status")
         target = _target(raw)
         changeset = _changeset(raw["changeset"])
+        publication = _publication(raw["publication"])
         verified = raw["merge_verified"]
         if not isinstance(verified, bool):
             raise ReceiptInputError("merge_verified must be a boolean")
+        created = None if publication is None else publication.create
+        if (
+            target is not None
+            and created is not None
+            and created.number is not None
+            and created.number != target.number
+        ):
+            raise ReceiptInputError("the bound target is not the PR this run created")
         if target is None:
             lifecycle = (
                 raw["merge_sha"],
@@ -610,7 +748,7 @@ class Receipt:
                 raw["evidence_identity"],
             )
             if (
-                changeset is None
+                (changeset is None and publication is None)
                 or verified
                 or any(item is not None for item in lifecycle)
                 or raw["verification"] != []
@@ -618,7 +756,8 @@ class Receipt:
                 or status == "COMPLETE"
             ):
                 raise ReceiptInputError(
-                    "a run without a confirmed PR target holds only changeset state"
+                    "a run without a confirmed PR target holds only changeset or "
+                    "publication state"
                 )
         if verified and raw["merge_sha"] is None:
             raise ReceiptInputError("verified merge needs a landing identity")
@@ -677,6 +816,7 @@ class Receipt:
             issue=_optional_text(raw["issue"], "issue"),
             next_action=_text(raw["next_action"], "next_action"),
             changeset=changeset,
+            publication=publication,
         )
 
 
@@ -750,13 +890,23 @@ class Store:
         self._loaded[run_id] = hashlib.sha256(data).hexdigest()
         return receipt
 
-    def list_runs(self) -> tuple[Receipt, ...]:
+    def list_runs(self, *, exclude: str | None = None) -> tuple[Receipt, ...]:
+        """Every saved receipt, sorted by run id, except ``exclude``.
+
+        ``exclude`` is never read. A controller holding its own run in memory must
+        not enumerate that run through :meth:`load`: loading adopts the file's
+        current bytes as the compare-and-swap baseline while the controller keeps
+        its older in-memory state, so a later save would overwrite another
+        controller's journaled intent instead of being refused.
+        """
+        if exclude is not None:
+            validate_run_id(exclude)
         if not self._directories(create=False):
             return ()
         return tuple(
             self.load(path.stem)
             for path in sorted(self.directory.iterdir())
-            if path.name.endswith(".json")
+            if path.name.endswith(".json") and path.stem != exclude
         )
 
     def save(self, receipt: Receipt) -> None:

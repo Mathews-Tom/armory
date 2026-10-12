@@ -9,7 +9,8 @@ unknown observation into an empty success.
 The mutation helpers (:meth:`GitRepository.fetch_base`,
 :meth:`~GitRepository.prepare_base_checkout`,
 :meth:`~GitRepository.delete_local_head`,
-:meth:`~GitRepository.delete_remote_head` and
+:meth:`~GitRepository.delete_remote_head`,
+:meth:`~GitRepository.push_head` and
 :meth:`~GitRepository.remove_worktree`) change exactly the one named target.
 Each re-observes the live state first and rejects with :class:`GitRefused`,
 before changing anything, when a safety precondition does not hold. They never
@@ -1316,6 +1317,99 @@ class GitRepository:
         if still is not None:
             raise GitError(
                 f"{name} still advertises {ref} after the delete was accepted",
+                uncertain=True,
+            )
+
+    def remote_head(self, remote: str, branch: str) -> str | None:
+        """What ``remote`` advertises for ``refs/heads/<branch>``; ``None`` if absent.
+
+        Reads the network. An unreachable remote or a malformed advertisement raises.
+        """
+        name = self._require_remote(remote)
+        ref = f"refs/heads/{self._validated_branch(branch)}"
+        return self._advertised_heads(name, ref).get(ref)
+
+    def push_head(
+        self, remote: str, branch: str, new_oid: str, expected_old: str | None
+    ) -> None:
+        """Publish exactly ``new_oid`` as ``refs/heads/<branch>`` on ``remote``.
+
+        The remote must still advertise ``expected_old`` (``None``: absent), and a
+        present ``expected_old`` must be an ancestor of ``new_oid``: published
+        history is only extended, never rewritten. The push carries an explicit
+        ``--force-with-lease=<ref>:<expected_old>`` (empty: must not exist), runs
+        the repository's hooks, checks submodule commits are published, and is
+        verified against the remote. A remote's default branch is refused and
+        nothing is retried. A failure whose outcome is unknown is ``uncertain``.
+        """
+        name = self._require_remote(remote)
+        short = self._validated_branch(branch)
+        new = _require_oid(new_oid, "new head")
+        ref = f"refs/heads/{short}"
+        if self.resolve_ref(new) != new:
+            raise GitRefused(f"{new} is not an available local commit")
+        if expected_old is not None:
+            old = _require_oid(expected_old, "expected remote head")
+            if self.resolve_ref(old) != old:
+                raise GitRefused(
+                    f"the published {ref} {old} is not available locally; nothing was pushed"
+                )
+            if not self.is_ancestor(old, new):
+                raise GitRefused(
+                    f"{new} does not extend the published {ref}; rewriting it is not authorized"
+                )
+        advertised = self._advertised_heads(name, ref).get(ref)
+        if advertised != expected_old:
+            raise GitRefused(
+                f"{name} {ref} is {advertised}, not the expected {expected_old}; "
+                "nothing was pushed"
+            )
+        default = self._remote_default_ref(name)
+        if default is None:
+            raise GitRefused(
+                f"{name} default branch is not observable; nothing was pushed"
+            )
+        if default == ref:
+            raise GitRefused(f"{name} {ref} is the default branch; nothing was pushed")
+        try:
+            self.run(
+                "push",
+                "--porcelain",
+                "--recurse-submodules=check",
+                f"--force-with-lease={ref}:{expected_old or ''}",
+                "--",
+                name,
+                f"{new}:{ref}",
+            )
+        except GitError as exc:
+            try:
+                observed = self._advertised_heads(name, ref).get(ref)
+            except GitError as observe_error:
+                raise GitError(
+                    "the push was dispatched but its actual outcome is unavailable",
+                    uncertain=True,
+                ) from observe_error
+            if observed == new:
+                return
+            if observed == expected_old and not exc.uncertain:
+                raise GitRefused(
+                    f"{name} refused the push of {ref}; it still advertises the "
+                    f"expected revision: {exc}"
+                ) from exc
+            raise GitError(
+                f"the push of {ref} has an unknown outcome; {name} advertises {observed}",
+                uncertain=True,
+            ) from exc
+        try:
+            published = self._advertised_heads(name, ref).get(ref)
+        except GitError as exc:
+            raise GitError(
+                f"the push was accepted but {name} {ref} could not be verified: {exc}",
+                uncertain=True,
+            ) from exc
+        if published != new:
+            raise GitError(
+                f"{name} advertises {published} for {ref} after the push was accepted",
                 uncertain=True,
             )
 

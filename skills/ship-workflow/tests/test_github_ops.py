@@ -12,6 +12,7 @@ import json
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
@@ -693,6 +694,8 @@ def test_job_record_must_match_the_checks_run_head_and_name_before_logs_are_read
 
 
 def test_job_that_has_not_completed_is_not_proven_and_logs_are_not_read() -> None:
+    from lifecycle import Policy, evaluate
+
     checks = [check_run(1000, "test", status="in_progress", conclusion=None)]
     gh, fake, _ = make(with_ci([run(10, suite=100)], checks))
     obs = gh.observe(NUMBER)
@@ -700,6 +703,16 @@ def test_job_that_has_not_completed_is_not_proven_and_logs_are_not_read() -> Non
         obs, "checkout-proof-pending"
     )
     assert fake.count(f"/repos/{REPO}/actions/jobs/1000") == 0
+    decision = Policy(
+        ("current fixture workflow",), ("test",), "squash", (), HEAD, BASE
+    )
+    assert evaluate(obs, decision).status == "WAITING"
+
+    completed = observe(with_ci([run(10, suite=100)], [check_run(1000, "test")]))
+    assert evaluate(completed, decision).status == "READY"
+    assert (
+        evaluate(_unproven("no checkout emission"), decision).status == "NEEDS_JUDGMENT"
+    )
 
 
 def test_checkout_commit_is_looked_up_once_for_many_jobs_and_logs_use_escape_flag() -> (
@@ -2792,3 +2805,274 @@ def test_graphql_http_200_rate_limit_waits_without_rejecting_queue(
     assert error.kind == "WAITING"
     assert provider.state == "OPEN" and provider.queue == "none"
     assert provider.merge_calls == [] and sleeps == []
+
+
+# --------------------------------------------------------------------------
+# Exact PR lookup and creation
+
+PULLS = f"/repos/{REPO}/pulls"
+
+
+def head_row(
+    number: int,
+    *,
+    head_repo: str | None = REPO,
+    ref: str = "feat/x",
+    state: str = "open",
+) -> dict[str, Any]:
+    row = pull(
+        number=number,
+        html_url=f"https://github.com/{REPO}/pull/{number}",
+        state=state,
+        head={
+            "sha": HEAD,
+            "ref": ref,
+            "repo": None if head_repo is None else {"full_name": head_repo},
+        },
+    )
+    row.pop("merged"), row.pop("mergeable")
+    return row
+
+
+def query_of(argv: tuple[str, ...]) -> dict[str, str]:
+    return dict(parse_qsl(urlsplit(argv[-1]).query))
+
+
+def test_find_prs_reads_every_page_of_the_exact_head_query() -> None:
+    rows = [head_row(n, state="open" if n == 1 else "closed") for n in range(1, 131)]
+    gh, fake, _ = make({PULLS: paged(rows)})
+
+    found = gh.find_prs(REPO, "refs/heads/feat/x", "main")
+
+    assert [pr.number for pr in found] == list(range(1, 131))
+    assert [pr.state for pr in found[:2]] == ["OPEN", "CLOSED"]
+    assert fake.count(PULLS) == 2
+    query = query_of(fake.argvs[0])
+    assert (query["head"], query["base"], query["state"]) == (
+        "acme:feat/x",
+        "main",
+        "all",
+    )
+
+
+def test_find_prs_keeps_a_fork_head_namespace_apart_from_the_base() -> None:
+    gh, fake, _ = make({PULLS: paged([head_row(3, head_repo="contrib/widget")])})
+
+    [pr] = gh.find_prs("contrib/widget", "feat/x")
+
+    assert (pr.number, pr.head_repo, pr.base_repo) == (3, "contrib/widget", REPO)
+    assert query_of(fake.argvs[0])["head"] == "contrib:feat/x"
+
+
+def test_find_prs_excludes_another_repository_of_the_same_owner() -> None:
+    rows = [head_row(1, head_repo="acme/other"), head_row(2)]
+    gh, _, _ = make({PULLS: paged(rows)})
+
+    assert [pr.number for pr in gh.find_prs(REPO, "feat/x")] == [2]
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        pytest.param(head_row(1, head_repo=None), id="unreadable-head-repository"),
+        pytest.param(head_row(1, ref="feat/other"), id="head-ref-contradicts-query"),
+        pytest.param(
+            {**head_row(1), "html_url": f"https://github.com/{REPO}/pull/9"},
+            id="url-of-another-pr",
+        ),
+        pytest.param(
+            {
+                **head_row(1),
+                "base": {"sha": BASE, "ref": "main", "repo": {"full_name": "x/y"}},
+            },
+            id="another-base-repository",
+        ),
+    ],
+)
+def test_find_prs_never_reads_incomplete_or_contradictory_evidence_as_absence(
+    row: dict[str, Any],
+) -> None:
+    gh, _, _ = make({PULLS: paged([row])})
+
+    with pytest.raises(ProviderError):
+        gh.find_prs(REPO, "feat/x")
+
+
+def test_find_prs_inaccessible_listing_is_an_error_not_an_empty_answer() -> None:
+    gh, _, _ = make(
+        {PULLS: Reply(status=403, body={"message": "Resource not accessible"})}
+    )
+
+    with pytest.raises(ProviderError):
+        gh.find_prs(REPO, "feat/x")
+
+
+def created(number: int = NUMBER, **over: Any) -> Reply:
+    return Reply(
+        status=201,
+        body=pull(
+            number=number, html_url=f"https://github.com/{REPO}/pull/{number}", **over
+        ),
+    )
+
+
+def body_file(tmp_path: Path) -> Path:
+    path = tmp_path / "body.md"
+    path.write_bytes(b"## Changes\n$(touch pwned) `rm -rf /`\n")
+    return path
+
+
+def test_create_pr_sends_one_post_with_plain_title_and_the_body_as_a_file(
+    tmp_path: Path,
+) -> None:
+    body = body_file(tmp_path)
+    gh, fake, _ = make({PULLS: created()})
+
+    pr = gh.create_pr(REPO, "feat/x", "main", "feat: add $(widget)", body)
+
+    assert (pr.number, pr.state, pr.head_ref, pr.base_ref) == (
+        NUMBER,
+        "OPEN",
+        "feat/x",
+        "main",
+    )
+    [argv] = fake.argvs
+    assert argv[:4] == ("gh", "api", "--method", "POST")
+    assert {
+        "title=feat: add $(widget)",
+        "head=feat/x",
+        "base=main",
+        f"body=@{body}",
+    } <= set(argv)
+    assert not any("rm -rf" in part for part in argv)
+
+
+@pytest.mark.parametrize(
+    ("head_repo", "fields"),
+    [
+        ("contrib/widget", {"head=contrib:feat/x"}),
+        ("acme/widget-fork", {"head=acme:feat/x", "head_repo=widget-fork"}),
+    ],
+)
+def test_create_pr_names_a_fork_head_namespace_explicitly(
+    tmp_path: Path, head_repo: str, fields: set[str]
+) -> None:
+    head = {"sha": HEAD, "ref": "feat/x", "repo": {"full_name": head_repo}}
+    gh, fake, _ = make({PULLS: created(head=head)})
+
+    pr = gh.create_pr(head_repo, "feat/x", "main", "feat: x", body_file(tmp_path))
+
+    assert (pr.head_repo, pr.base_repo) == (head_repo, REPO)
+    [argv] = fake.argvs
+    assert fields <= set(argv)
+
+
+def test_create_pr_duplicate_refusal_names_the_existing_pr_condition(
+    tmp_path: Path,
+) -> None:
+    duplicate = Reply(
+        status=422,
+        body={
+            "message": "Validation Failed",
+            "errors": [{"message": "A pull request already exists for acme:feat/x."}],
+        },
+    )
+    gh, fake, _ = make({PULLS: duplicate})
+
+    with pytest.raises(ProviderError) as caught:
+        gh.create_pr(REPO, "feat/x", "main", "feat: x", body_file(tmp_path))
+
+    assert (caught.value.detail, caught.value.uncertain) == ("pr-already-exists", False)
+    assert len(fake.argvs) == 1
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        pytest.param(
+            Reply(
+                status=403, body={"message": "Resource not accessible by integration"}
+            ),
+            id="permission",
+        ),
+        pytest.param(
+            Reply(
+                status=422,
+                body={
+                    "message": "Validation Failed",
+                    "errors": [{"message": "No commits between main and feat/x"}],
+                },
+            ),
+            id="validation",
+        ),
+    ],
+)
+def test_create_pr_definite_refusal_is_final_not_uncertain(
+    tmp_path: Path, reply: Reply
+) -> None:
+    gh, fake, _ = make({PULLS: reply})
+
+    with pytest.raises(ProviderError) as caught:
+        gh.create_pr(REPO, "feat/x", "main", "feat: x", body_file(tmp_path))
+
+    error = caught.value
+    assert (error.kind, error.detail, error.uncertain) == (
+        "BLOCKED",
+        "create-rejected",
+        False,
+    )
+    assert len(fake.argvs) == 1
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        pytest.param(
+            Reply(status=503, body={"message": "unavailable"}), id="transient"
+        ),
+        pytest.param(Reply(status=201, raw="{not json"), id="unreadable-created"),
+        pytest.param(
+            created(base={"sha": BASE, "ref": "develop", "repo": {"full_name": REPO}}),
+            id="created-identity-contradicts-request",
+        ),
+    ],
+)
+def test_create_pr_unknown_outcome_is_uncertain_and_never_resent(
+    tmp_path: Path, reply: Reply
+) -> None:
+    gh, fake, _ = make({PULLS: reply})
+
+    with pytest.raises(ProviderError) as caught:
+        gh.create_pr(REPO, "feat/x", "main", "feat: x", body_file(tmp_path))
+
+    assert caught.value.uncertain is True
+    assert len(fake.argvs) == 1
+
+
+def test_create_pr_timeout_is_uncertain_and_never_resent(tmp_path: Path) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def hang(argv: Sequence[str], timeout: float) -> subprocess.CompletedProcess[bytes]:
+        calls.append(tuple(argv))
+        raise subprocess.TimeoutExpired(list(argv), timeout)
+
+    gh = GitHub(
+        "github.com", REPO, runner=hang, sleep=lambda _: None, clock=lambda: 0.0
+    )
+
+    with pytest.raises(ProviderError) as caught:
+        gh.create_pr(REPO, "feat/x", "main", "feat: x", body_file(tmp_path))
+
+    assert (caught.value.kind, caught.value.uncertain) == ("WAITING", True)
+    assert len(calls) == 1
+
+
+def test_create_pr_rejects_a_multi_line_title_before_any_process(
+    tmp_path: Path,
+) -> None:
+    gh, fake, _ = make({PULLS: created()})
+
+    with pytest.raises(ValueError):
+        gh.create_pr(REPO, "feat/x", "main", "feat: x\n$(id)", body_file(tmp_path))
+
+    assert fake.argvs == []
