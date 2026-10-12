@@ -1,11 +1,13 @@
 """Provider-evidence tests driven by deterministic gh runner doubles.
 
-The fixtures model documented GitHub REST shapes; they are not vendor
-qualification of any live provider behaviour.
+The fixtures model documented GitHub REST/GraphQL shapes and documented
+``gh pr merge`` behaviour (see ``Provider``); they are not vendor qualification
+of any live provider behaviour, merge queue, auto-merge or fork permission.
 """
 
 from __future__ import annotations
 
+import itertools
 import json
 import subprocess
 from collections.abc import Callable, Sequence
@@ -38,9 +40,43 @@ class Reply:
     headers: dict[str, str] = field(default_factory=dict)
     stderr: str | None = None
     raw: str | None = None
+    exit_code: int | None = None  # gh exit status when it differs from the HTTP outcome
 
 
 Route = Reply | list[Reply] | Callable[[dict[str, str]], Reply]
+
+
+def render(argv: Sequence[str], reply: Reply) -> subprocess.CompletedProcess[bytes]:
+    text = {
+        200: "OK",
+        403: "Forbidden",
+        404: "Not Found",
+        429: "Too Many Requests",
+        503: "Service Unavailable",
+    }
+    head = "".join(f"{k}: {v}\r\n" for k, v in reply.headers.items())
+    out = f"HTTP/2.0 {reply.status} {text.get(reply.status, 'X')}\r\n{head}\r\n"
+    body = reply.raw if reply.raw is not None else json.dumps(reply.body)
+    ok = (
+        reply.exit_code == 0
+        if reply.exit_code is not None
+        else 200 <= reply.status < 300
+    )
+    err = (
+        ""
+        if ok
+        else (
+            reply.stderr
+            if reply.stderr is not None
+            else f"gh: error (HTTP {reply.status})"
+        )
+    )
+    return subprocess.CompletedProcess(
+        list(argv),
+        0 if ok else (reply.exit_code or 1),
+        (out + body).encode(),
+        err.encode(),
+    )
 
 
 class FakeGH:
@@ -70,29 +106,7 @@ class FakeGH:
             reply = route.pop(0) if len(route) > 1 else route[0]
         else:
             reply = route
-        text = {
-            200: "OK",
-            403: "Forbidden",
-            404: "Not Found",
-            429: "Too Many Requests",
-            503: "Service Unavailable",
-        }
-        head = "".join(f"{k}: {v}\r\n" for k, v in reply.headers.items())
-        out = f"HTTP/2.0 {reply.status} {text.get(reply.status, 'X')}\r\n{head}\r\n"
-        body = reply.raw if reply.raw is not None else json.dumps(reply.body)
-        ok = 200 <= reply.status < 300
-        err = (
-            ""
-            if ok
-            else (
-                reply.stderr
-                if reply.stderr is not None
-                else f"gh: error (HTTP {reply.status})"
-            )
-        )
-        return subprocess.CompletedProcess(
-            list(argv), 0 if ok else 1, (out + body).encode(), err.encode()
-        )
+        return render(argv, reply)
 
 
 def paged(rows: list[Any]) -> Callable[[dict[str, str]], Reply]:
@@ -125,7 +139,6 @@ def pull(**over: Any) -> dict[str, Any]:
         "state": "open",
         "merged": False,
         "merged_at": None,
-        "merge_commit_sha": MERGE,
         "draft": False,
         "mergeable": True,
         "user": {"login": "author"},
@@ -329,7 +342,6 @@ def test_fork_pr_resolves_head_and_base_repositories_separately() -> None:
     assert (
         obs.pr.state == "OPEN" and obs.pr.head_sha == HEAD and obs.pr.base_sha == BASE
     )
-    assert obs.pr.merge_commit_sha == MERGE and obs.pr.mergeable is True
 
 
 def test_deleted_fork_head_is_reported_not_invented() -> None:
@@ -1448,16 +1460,48 @@ def test_inaccessible_protection_evidence_is_never_unprotected(failing: str) -> 
     assert err.value.kind == "BLOCKED"
 
 
-def test_missing_branch_is_an_error_not_unprotected() -> None:
+@pytest.mark.parametrize(
+    "rules,protected", [([], False), ([{"type": "deletion"}], True)]
+)
+def test_absent_branch_requires_readable_inventory_and_current_rules(
+    rules: list[dict[str, str]],
+    protected: bool,
+) -> None:
     table = _protection_routes(
         **{
             f"/repos/{REPO}/branches/gone": Reply(
-                status=404, body={"message": "Branch not found"}
-            )
+                status=404, body={"message": "Not Found"}
+            ),
+            f"/repos/{REPO}/branches": Reply(body=[{"name": "main"}]),
+            f"/repos/{REPO}/rules/branches/gone": Reply(body=rules),
         }
     )
-    with pytest.raises(ProviderError):
+    assert make(table)[0].branch_protected(REPO, "gone") is protected
+
+
+@pytest.mark.parametrize(
+    "inventory",
+    [
+        Reply(status=403, body={"message": "Resource not accessible"}),
+        Reply(body=[{"name": "gone"}]),
+        Reply(body=[{"name": "main"}, {"name": "main"}]),
+    ],
+)
+def test_404_cannot_bypass_unknown_or_contradictory_branch_inventory(
+    inventory: Reply,
+) -> None:
+    table = _protection_routes(
+        **{
+            f"/repos/{REPO}/branches/gone": Reply(
+                status=404, body={"message": "Not Found"}
+            ),
+            f"/repos/{REPO}/branches": inventory,
+            f"/repos/{REPO}/rules/branches/gone": Reply(body=[]),
+        }
+    )
+    with pytest.raises(ProviderError) as error:
         make(table)[0].branch_protected(REPO, "gone")
+    assert error.value.kind == "BLOCKED"
 
 
 def test_branch_names_with_slashes_are_path_safe() -> None:
@@ -1548,3 +1592,1203 @@ def test_missing_live_base_identity_cannot_authorize_a_completed_job() -> None:
     table[f"/repos/{REPO}/branches/main"] = Reply(body={"protected": False})
     decision = Policy(("current workflow",), ("test",), "squash", (), HEAD, BASE)
     assert evaluate(observe(table), decision).status == "BLOCKED"
+
+
+# --------------------------------------------------------------------------
+# Existing-PR lifecycle: read_pr, base_tip, landing_reachable, merge, queue_state, merge_queue policy
+
+NEW_BASE = sha(0xC6)  # contains hex letters, so .upper() is a different string
+DROP = object()  # remove a field from a fixture payload
+
+GH_HELP = """Merge a pull request on GitHub.
+
+FLAGS
+      --admin                   Use administrator privileges to merge a pull request that does not meet requirements
+      --auto                    Automatically merge only after necessary requirements are met
+  -d, --delete-branch           Delete the local and remote branch after merge
+      --match-head-commit SHA   Commit SHA that the pull request head must match to allow merge
+  -m, --merge                   Merge the commits with the base branch
+  -r, --rebase                  Rebase the commits onto the base branch
+  -s, --squash                  Squash the commits into one commit and merge it into the base branch
+
+INHERITED FLAGS
+  -R, --repo [HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format
+"""
+OLD_GH_HELP = "\n".join(
+    line for line in GH_HELP.splitlines() if "match-head-commit" not in line
+)
+_VALUE_FLAGS = {
+    "--repo": "--repo", "-R": "--repo", "--match-head-commit": "--match-head-commit",
+    "--author-email": "--author-email", "-A": "--author-email", "--body": "--body",
+    "-b": "--body", "--body-file": "--body-file", "-F": "--body-file",
+    "--subject": "--subject", "-t": "--subject",
+}  # fmt: skip
+_BOOL_FLAGS = {
+    "--admin": "--admin", "--delete-branch": "--delete-branch", "-d": "--delete-branch",
+    "--auto": "--auto", "--disable-auto": "--disable-auto", "--merge": "--merge",
+    "-m": "--merge", "--rebase": "--rebase", "-r": "--rebase", "--squash": "--squash",
+    "-s": "--squash",
+}  # fmt: skip
+
+
+def _done(
+    argv: Sequence[str], code: int, stderr: str = ""
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.CompletedProcess(list(argv), code, b"", stderr.encode())
+
+
+class Provider:
+    """A mutable GitHub repository plus the documented contracts of ``gh api`` and ``gh pr merge``.
+
+    Merge model (gh manual): unknown flags are usage errors; ``--match-head-commit``
+    is enforced by GitHub; a merge-queue branch queues the PR (checks green) or
+    arms auto-merge (checks pending) instead of merging and only warns about a
+    strategy; ``--admin`` bypasses policy and queue; ``--auto`` arms auto-merge
+    when requirements are unmet; ``--delete-branch`` deletes the head branch;
+    an already merged or queued PR exits 0.  Every REST read must be ``GET`` and
+    the only GraphQL operation allowed is a ``query``.  Tests assert on the
+    resulting provider state, never on how the arguments were forwarded.
+    """
+
+    def __init__(self, *, head_repo: str = REPO) -> None:
+        self.state = "OPEN"  # OPEN | CLOSED | MERGED
+        self.head = HEAD
+        self.base = BASE
+        self.head_repo = head_repo
+        self.merge_sha: str | None = None
+        self.merged_via: str | None = None
+        self.queue_branch = False  # the base branch requires a merge queue
+        self.checks_green = True
+        self.queue = "none"  # none | auto | queued
+        self.entry_state = "QUEUED"
+        self.mergeable = True  # gh's pre-flight mergeability verdict
+        self.allowed = {"merge", "squash", "rebase"}
+        self.help = GH_HELP
+        self.hang = ""  # "" | before | after (effect) | oserror
+        self.fail: tuple[int, str] | None = None  # refusal/failure with no effect
+        self.gql_patch: dict[str, Any] = {}
+        self.gql_reply: Reply | None = None
+        self.rest_patch: dict[str, Any] = {}
+        self.arm_on_pull_read: int | None = None
+        self.argvs: list[tuple[str, ...]] = []
+        self.reads: list[str] = []
+        self.gql_calls: list[dict[str, str]] = []
+        self.merge_calls: list[tuple[str, ...]] = []
+        self.merge_timeouts: list[float] = []
+        self.help_calls = 0
+        self.admin_merges = 0
+        self.branch_deleted = False
+        self._pull_reads = 0
+
+    def land(self, method: str = "squash") -> None:
+        self.state = "MERGED"
+        self.merge_sha = MERGE
+        self.merged_via = method
+        self.queue = "none"
+
+    def __call__(
+        self, argv: Sequence[str], timeout: float
+    ) -> subprocess.CompletedProcess[bytes]:
+        self.argvs.append(tuple(argv))
+        if argv[:3] == ("gh", "pr", "merge"):
+            return self._merge(argv, timeout)
+        assert argv[:2] == ("gh", "api"), argv
+        if argv[-1] == "graphql":
+            return render(argv, self._graphql(argv))
+        assert argv[:4] == ("gh", "api", "--method", "GET"), "REST read must be GET"
+        return render(argv, self._rest(urlsplit(argv[-1]).path))
+
+    def _pull(self) -> dict[str, Any]:
+        merged = self.state == "MERGED"
+        head_repo = {"full_name": self.head_repo} if self.head_repo else None
+        body = pull(
+            state="open" if self.state == "OPEN" else "closed",
+            merged=merged,
+            merged_at=MERGE_DATE if merged else None,
+            head={"sha": self.head, "ref": "feat/x", "repo": head_repo},
+            base={"sha": self.base, "ref": "main", "repo": {"full_name": REPO}},
+        )
+        body["auto_merge"] = (
+            {"enabled_by": {"login": "bot"}, "merge_method": "squash",
+             "commit_title": "t", "commit_message": "m"}
+            if self.queue == "auto"
+            else None
+        )  # fmt: skip
+        for key, value in self.rest_patch.items():
+            if value is DROP:
+                body.pop(key, None)
+            else:
+                body[key] = value
+        return body
+
+    def _rest(self, path: str) -> Reply:
+        self.reads.append(path)
+        base = f"/repos/{REPO}"
+        if path == base:
+            return Reply(body={"full_name": REPO, "default_branch": "main"})
+        if path == f"{base}/pulls/{NUMBER}":
+            self._pull_reads += 1
+            if self.arm_on_pull_read == self._pull_reads:
+                self.queue = "auto"
+            return Reply(body=self._pull())
+        if path == f"{base}/branches/main":
+            return Reply(body=branch(self.base))
+        raise AssertionError(f"unrouted provider read: {path}")
+
+    def _graphql(self, argv: Sequence[str]) -> Reply:
+        assert argv[3] == "POST"
+        fields = {
+            item.partition("=")[0]: item.partition("=")[2]
+            for flag, item in itertools.pairwise(argv)
+            if flag in ("-f", "-F")
+        }
+        self.gql_calls.append(fields)
+        query = fields["query"]
+        assert query.lstrip().startswith("query") and "mutation" not in query.lower()
+        if self.gql_reply is not None:
+            return self.gql_reply
+        pr: dict[str, Any] = {
+            "number": NUMBER,
+            "state": self.state,
+            "merged": self.state == "MERGED",
+            "headRefOid": self.head,
+            "url": f"https://github.com/{REPO}/pull/{NUMBER}",
+            "headRefName": "feat/x",
+            "baseRefName": "main",
+            "mergedAt": MERGE_DATE if self.state == "MERGED" else None,
+            "mergeCommit": {"oid": self.merge_sha or MERGE}
+            if self.state == "MERGED"
+            else None,
+            "isInMergeQueue": self.queue == "queued",
+            "autoMergeRequest": {"mergeMethod": "SQUASH"}
+            if self.queue == "auto"
+            else None,
+            "mergeQueueEntry": {"state": self.entry_state, "position": 1}
+            if self.queue == "queued"
+            else None,
+        }
+        for key, value in self.gql_patch.items():
+            if value is DROP:
+                pr.pop(key, None)
+            else:
+                pr[key] = value
+        return Reply(
+            body={"data": {"repository": {"nameWithOwner": REPO, "pullRequest": pr}}}
+        )
+
+    def _merge(
+        self, argv: Sequence[str], timeout: float
+    ) -> subprocess.CompletedProcess[bytes]:
+        args = list(argv[3:])
+        if args == ["--help"]:
+            self.help_calls += 1
+            return subprocess.CompletedProcess(list(argv), 0, self.help.encode(), b"")
+        self.merge_calls.append(tuple(args))
+        self.merge_timeouts.append(timeout)
+        positional: list[str] = []
+        flags: dict[str, Any] = {}
+        index = 0
+        while index < len(args):
+            token = args[index]
+            if token in _VALUE_FLAGS:
+                if index + 1 >= len(args):
+                    return _done(argv, 1, f"flag needs an argument: {token}")
+                flags[_VALUE_FLAGS[token]] = args[index + 1]
+                index += 2
+            elif token in _BOOL_FLAGS:
+                flags[_BOOL_FLAGS[token]] = True
+                index += 1
+            elif token.startswith("-"):
+                return _done(argv, 1, f"unknown flag: {token}")
+            else:
+                positional.append(token)
+                index += 1
+        if len(positional) != 1:
+            return _done(
+                argv, 1, f"accepts at most 1 arg(s), received {len(positional)}"
+            )
+        if positional[0] != str(NUMBER) or flags.get("--repo") != f"github.com/{REPO}":
+            return _done(
+                argv,
+                1,
+                "GraphQL: Could not resolve to a PullRequest. (repository.pullRequest)",
+            )
+        if self.fail is not None:
+            return _done(argv, *self.fail)
+        if self.hang == "oserror":
+            raise OSError("exec format error")
+        if self.hang == "before":
+            raise subprocess.TimeoutExpired(list(argv), timeout)
+        chosen = [m for m in ("merge", "rebase", "squash") if flags.get(f"--{m}")]
+        admin = bool(flags.get("--admin"))
+        guard = flags.get("--match-head-commit")
+        warning = ""
+        if self.state == "MERGED" or self.queue == "queued":
+            pass  # gh: already merged / already queued; exit 0 and nothing changes
+        elif self.state == "CLOSED":
+            return _done(argv, 1, "GraphQL: Pull request is closed. (mergePullRequest)")
+        elif guard is not None and guard != self.head:
+            return _done(
+                argv,
+                1,
+                "GraphQL: Head branch was modified. Review and try the merge again. (mergePullRequest)",
+            )
+        elif self.queue_branch and not admin:
+            self.queue = "queued" if self.checks_green else "auto"
+            warning = (
+                "! The merge strategy for main is set by the merge queue"
+                if chosen
+                else ""
+            )
+        else:
+            if not chosen:
+                return _done(
+                    argv,
+                    1,
+                    "--merge, --rebase, or --squash required when not running interactively",
+                )
+            if len(chosen) > 1:
+                return _done(
+                    argv, 1, "only one of --merge, --rebase, or --squash can be enabled"
+                )
+            if flags.get("--auto") and not self.mergeable:
+                self.queue = "auto"
+            elif not self.mergeable and not admin:
+                return _done(
+                    argv,
+                    1,
+                    f"X Pull request {REPO}#{NUMBER} is not mergeable: the base branch policy prohibits the merge.\nTo use administrator privileges to immediately merge the pull request, add the `--admin` flag.",
+                )
+            elif chosen[0] not in self.allowed:
+                return _done(
+                    argv,
+                    1,
+                    f"GraphQL: {chosen[0].title()} merges are not allowed on this repository. (mergePullRequest)",
+                )
+            else:
+                self.land(chosen[0])
+                self.admin_merges += 1 if admin else 0
+                self.branch_deleted = bool(flags.get("--delete-branch"))
+        if self.hang == "after":
+            raise subprocess.TimeoutExpired(list(argv), timeout)
+        return _done(argv, 0, warning)
+
+
+def branch(tip: str, name: str = "main", url: str | None = None) -> dict[str, Any]:
+    return {
+        "name": name,
+        "protected": False,
+        "commit": {
+            "sha": tip,
+            "url": url or f"https://api.github.com/repos/{REPO}/commits/{tip}",
+        },
+    }
+
+
+def provider_gh(provider: Provider, **kwargs: Any) -> tuple[GitHub, list[float]]:
+    sleeps: list[float] = []
+    gh = GitHub(
+        "github.com",
+        REPO,
+        runner=provider,
+        sleep=sleeps.append,
+        clock=lambda: 0.0,
+        **kwargs,
+    )
+    return gh, sleeps
+
+
+def refused(call: Callable[[], Any]) -> ProviderError:
+    with pytest.raises(ProviderError) as raised:
+        call()
+    return raised.value
+
+
+# -- read_pr -----------------------------------------------------------------
+
+
+def test_read_pr_keeps_landing_facts_of_a_merged_pr_without_any_ci_evidence() -> None:
+    provider = Provider()
+    provider.land()
+    pr = provider_gh(provider)[0].read_pr(NUMBER)
+    assert (pr.state, pr.merge_commit_sha, pr.merged_at) == (
+        "MERGED",
+        MERGE,
+        MERGE_DATE,
+    )
+    # check runs, workflow runs, jobs, logs and reviews are unrouted in Provider
+    assert set(provider.reads) == {f"/repos/{REPO}", f"/repos/{REPO}/pulls/{NUMBER}"}
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"headRefOid": OTHER_HEAD},
+        {"state": "OPEN"},
+        {"baseRefName": "other"},
+        {"url": f"https://github.com/other/repo/pull/{NUMBER}"},
+        {"mergeCommit": None},
+    ],
+)
+def test_rest_merged_cannot_authorize_missing_or_mismatched_graphql_landing(
+    patch: dict[str, Any],
+) -> None:
+    provider = Provider()
+    provider.land()
+    provider.gql_patch.update(patch)
+    with pytest.raises(ProviderError):
+        provider_gh(provider)[0].read_pr(NUMBER)
+
+
+@pytest.mark.parametrize("state", ["OPEN", "MERGED", "CLOSED"])
+def test_read_pr_keeps_fork_head_and_base_namespaces_distinct(state: str) -> None:
+    provider = Provider(head_repo="fork-owner/widget")
+    provider.state = state
+    pr = provider_gh(provider)[0].read_pr(NUMBER)
+    assert (pr.state, pr.head_repo, pr.base_repo) == (state, "fork-owner/widget", REPO)
+    assert pr.head_sha == HEAD and pr.head_ref == "feat/x"
+
+
+def test_read_pr_reports_a_deleted_fork_head_instead_of_inventing_one() -> None:
+    provider = Provider(head_repo="")
+    pr = provider_gh(provider)[0].read_pr(NUMBER)
+    assert (pr.head_repo, pr.base_repo) == ("", REPO)
+
+
+def test_read_pr_reports_native_stack_membership_from_the_pr_itself() -> None:
+    plain = make(routes())[0].read_pr(NUMBER)
+    stacked = make(
+        routes()
+        | {
+            f"/repos/{REPO}/pulls/{NUMBER}": Reply(
+                body=pull(stack={"base": {}, "size": 2})
+            )
+        }
+    )[0].read_pr(NUMBER)
+    assert (plain.native, stacked.native) == (False, True)
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(number=NUMBER + 1))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(base={"sha": BASE, "ref": "main", "repo": {"full_name": "other/repo"}}))},
+        {f"/repos/{REPO}": Reply(body={"full_name": "other/renamed", "default_branch": "main"})},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(html_url=f"https://evil.example/{REPO}/pull/{NUMBER}"))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(html_url=f"https://github.com/other/repo/pull/{NUMBER}"))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(html_url=f"https://github.com/{REPO}/pull/{NUMBER + 1}"))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(head={"sha": HEAD, "ref": "x", "repo": {"full_name": "not a repo"}}))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(stack="yes"))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(state="draft"))},
+        {f"/repos/{REPO}/pulls/{NUMBER}": Reply(status=404, body={"message": "Not Found"})},
+    ],
+    ids=["number", "base-repo", "renamed-repo", "url-host", "url-repo", "url-number",
+         "head-repo-name", "stack", "state", "inaccessible"],
+)  # fmt: skip
+def test_read_pr_blocks_instead_of_answering_for_a_different_pr(
+    override: dict[str, Route],
+) -> None:
+    assert (
+        refused(lambda: make(routes() | override)[0].read_pr(NUMBER)).kind == "BLOCKED"
+    )
+
+
+@pytest.mark.parametrize("bad", [0, -1, True, "7", 7.0])
+def test_read_pr_rejects_invalid_numbers_before_any_provider_call(bad: Any) -> None:
+    gh, fake, _ = make(routes())
+    with pytest.raises(ValueError):
+        gh.read_pr(bad)
+    assert fake.argvs == []
+
+
+# -- base_tip ------------------------------------------------------------------
+
+
+def test_base_tip_reads_the_live_branch_not_cached_pull_metadata() -> None:
+    path = f"/repos/{REPO}/branches/main"
+    gh, fake, _ = make(routes() | {path: Reply(body=branch(NEW_BASE))})
+    pr = gh.read_pr(NUMBER)
+    assert pr.base_sha == BASE  # what the PR recorded
+    assert gh.base_tip(pr.base_ref) == NEW_BASE  # what the branch is now
+    assert fake.count(path) == 1
+
+
+def test_base_tip_rereads_the_branch_on_every_call() -> None:
+    path = f"/repos/{REPO}/branches/main"
+    gh, fake, _ = make(
+        routes() | {path: [Reply(body=branch(BASE)), Reply(body=branch(NEW_BASE))]}
+    )
+    assert (gh.base_tip("main"), gh.base_tip("refs/heads/main")) == (BASE, NEW_BASE)
+    assert fake.count(path) == 2
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        Reply(body=branch(NEW_BASE, name="renamed")),
+        Reply(body=branch(NEW_BASE[:12])),
+        Reply(body=branch(NEW_BASE.upper())),
+        Reply(body=branch(NEW_BASE, url=f"https://api.github.com/repos/other/repo/commits/{NEW_BASE}")),
+        Reply(body={"name": "main", "protected": False}),
+        Reply(body={"name": "main", "commit": None}),
+        Reply(status=404, body={"message": "Branch not found"}),
+        Reply(status=403, body={"message": "Forbidden"}),
+    ],
+    ids=["renamed", "abbreviated", "uppercase", "foreign-commit", "no-commit", "null-commit",
+         "missing", "forbidden"],
+)  # fmt: skip
+def test_base_tip_never_returns_a_value_it_cannot_attribute_to_the_branch(
+    reply: Reply,
+) -> None:
+    gh, _, _ = make(routes() | {f"/repos/{REPO}/branches/main": reply})
+    assert refused(lambda: gh.base_tip("main")).kind == "BLOCKED"
+
+
+def test_base_tip_is_path_safe_and_rejects_non_branch_references() -> None:
+    path = f"/repos/{REPO}/branches/feat/a%20b"
+    gh, _, _ = make({path: Reply(body=branch(NEW_BASE, name="feat/a b"))})
+    assert gh.base_tip("feat/a b") == NEW_BASE
+    for bad in ("", "refs/tags/v1", "main\nx"):
+        with pytest.raises(ValueError):
+            gh.base_tip(bad)
+
+
+# -- landing_reachable -----------------------------------------------------------
+
+LANDED, TIP = sha(0xA8), sha(0xB9)
+
+
+def compare(
+    landing: str,
+    tip: str,
+    status: str,
+    ahead: int,
+    behind: int,
+    merge_base: str,
+    **over: Any,
+) -> Reply:
+    body: dict[str, Any] = {
+        "url": f"https://api.github.com/repos/{REPO}/compare/{landing}...{tip}",
+        "html_url": f"https://github.com/{REPO}/compare/{landing}...{tip}",
+        "permalink_url": f"https://github.com/{REPO}/compare/acme:{landing}...acme:{tip}",
+        "diff_url": f"https://github.com/{REPO}/compare/{landing}...{tip}.diff",
+        "patch_url": f"https://github.com/{REPO}/compare/{landing}...{tip}.patch",
+        "status": status,
+        "ahead_by": ahead,
+        "behind_by": behind,
+        "total_commits": 0,  # deliberately unrelated to ahead_by: counts are not proof
+        "base_commit": {"sha": landing},
+        "merge_base_commit": {"sha": merge_base},
+        "commits": [],  # deliberately empty: a truncated list is not proof
+    }
+    body.update(over)
+    return Reply(body=body)
+
+
+def reach(reply: Reply, landing: str = LANDED, tip: str = TIP) -> tuple[bool, FakeGH]:
+    path = f"/repos/{REPO}/compare/{landing}...{tip}"
+    gh, fake, _ = make({path: reply})
+    return gh.landing_reachable(landing, tip), fake
+
+
+def test_landing_is_reachable_when_the_tip_is_ahead_with_the_landing_as_merge_base() -> (
+    None
+):
+    reachable, fake = reach(compare(LANDED, TIP, "ahead", 3, 0, LANDED))
+    assert reachable is True
+    assert all(argv[:4] == ("gh", "api", "--method", "GET") for argv in fake.argvs)
+
+
+def test_comparison_accepts_provider_abbreviated_permalink_only_with_full_requested_api_identity() -> (
+    None
+):
+    landing, tip = (
+        "13492a8e041a0d6a8d17e49230a58068daa26042",
+        "a82a97331213c362784aad59015bcf0bfc354bb5",
+    )
+    reply = compare(
+        landing,
+        tip,
+        "ahead",
+        2,
+        0,
+        landing,
+        permalink_url=f"https://github.com/{REPO}/compare/acme:{landing[:7]}...acme:{tip[:7]}",
+    )
+    assert reach(reply, landing, tip)[0] is True
+    reply.body["url"] = (
+        f"https://api.github.com/repos/{REPO}/compare/{landing}...{sha(99)}"
+    )
+    with pytest.raises(ProviderError):
+        reach(reply, landing, tip)
+
+
+def test_the_exact_same_commit_is_reachable_but_only_if_the_provider_has_it() -> None:
+    assert reach(compare(TIP, TIP, "identical", 0, 0, TIP), TIP, TIP)[0] is True
+    unknown = Reply(status=404, body={"message": "No commit found for SHA"})
+    assert refused(lambda: reach(unknown, TIP, TIP)).kind == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        compare(LANDED, TIP, "behind", 0, 4, TIP),
+        compare(LANDED, TIP, "diverged", 2, 3, sha(10)),
+    ],
+    ids=["tip-is-an-ancestor-of-landing", "diverged"],
+)
+def test_proven_non_ancestry_is_false_not_an_error(reply: Reply) -> None:
+    assert reach(reply)[0] is False
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        compare(LANDED, TIP, "ahead", 3, 0, sha(10)),  # merge base is not the landing
+        compare(LANDED, TIP, "ahead", 3, 1, LANDED),
+        compare(LANDED, TIP, "ahead", 0, 0, LANDED),
+        compare(LANDED, TIP, "identical", 0, 0, LANDED),  # identical needs one commit
+        compare(LANDED, TIP, "behind", 0, 2, LANDED),
+        compare(LANDED, TIP, "diverged", 1, 1, LANDED),  # diverged cannot have landing as merge base
+        compare(LANDED, TIP, "force-pushed", 1, 0, LANDED),
+        compare(LANDED, TIP, "ahead", -1, 0, LANDED),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, base_commit={"sha": sha(10)}),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, permalink_url=f"https://github.com/{REPO}/compare/acme:{LANDED}...acme:{sha(10)}"),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, permalink_url=f"https://github.com/other/repo/compare/other:{LANDED}...other:{TIP}"),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, permalink_url=f"https://evil.example/{REPO}/compare/acme:{LANDED}...acme:{TIP}"),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, merge_base_commit=None),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, merge_base_commit={"sha": "abc"}),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, ahead_by="3"),
+        compare(LANDED, TIP, "ahead", 3, 0, LANDED, permalink_url=None),
+        Reply(body=[1]),
+        Reply(raw="<html>"),
+        Reply(status=404, body={"message": "Not Found"}),
+        Reply(status=403, body={"message": "Forbidden"}),
+    ],
+    ids=["merge-base", "behind-count", "no-ahead-count", "identical-different", "behind-merge-base",
+         "diverged-merge-base", "status", "negative", "base-commit", "permalink-head", "permalink-repo",
+         "permalink-host", "no-merge-base", "short-merge-base", "string-count", "no-permalink",
+         "array", "not-json", "unknown-commit", "inaccessible"],
+)  # fmt: skip
+def test_unknown_or_contradictory_compare_evidence_fails_closed(reply: Reply) -> None:
+    assert refused(lambda: reach(reply)).kind == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "bad", ["main", LANDED[:12], LANDED.upper(), LANDED + "\n", "-" + LANDED[1:]]
+)
+def test_landing_reachable_rejects_non_object_ids_before_any_provider_call(
+    bad: str,
+) -> None:
+    gh, fake, _ = make({})
+    for landing, tip in ((bad, TIP), (LANDED, bad)):
+        with pytest.raises(ValueError):
+            gh.landing_reachable(landing, tip)
+    assert fake.argvs == []
+
+
+def test_landing_reachable_compares_in_the_current_base_repository() -> None:
+    path = f"/repos/upstream/widget/compare/{LANDED}...{TIP}"
+    reply = compare(
+        LANDED, TIP, "ahead", 1, 0, LANDED,
+        permalink_url=f"https://github.com/upstream/widget/compare/upstream:{LANDED}...upstream:{TIP}",
+        url=f"https://api.github.com/repos/upstream/widget/compare/{LANDED}...{TIP}",
+    )  # fmt: skip
+    gh = GitHub("github.com", "upstream/widget", runner=FakeGH({path: reply}))
+    assert gh.landing_reachable(LANDED, TIP) is True
+
+
+# -- merge ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["merge", "squash", "rebase"])
+def test_merge_at_the_verified_head_lands_through_the_requested_method_only(
+    method: str,
+) -> None:
+    provider = Provider()
+    gh, _ = provider_gh(provider)
+    assert gh.merge(NUMBER, HEAD, method) is None
+    pr = gh.read_pr(NUMBER)
+    assert (pr.state, pr.merge_commit_sha, provider.merged_via) == (
+        "MERGED",
+        MERGE,
+        method,
+    )
+    assert provider.admin_merges == 0 and provider.branch_deleted is False
+
+
+def test_merge_for_a_moved_head_is_refused_by_github_and_changes_nothing() -> None:
+    provider = Provider()
+    provider.head = OTHER_HEAD  # pushed after the controller verified HEAD
+    gh, sleeps = provider_gh(provider)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert (err.kind, err.detail, err.uncertain) == (
+        "WAITING",
+        "merge-head-changed",
+        False,
+    )
+    assert provider.state == "OPEN" and provider.merged_via is None
+    assert len(provider.merge_calls) == 1 and sleeps == []
+
+
+def test_merge_never_bypasses_unmet_policy_arms_auto_merge_or_deletes_branches() -> (
+    None
+):
+    provider = Provider()
+    provider.mergeable = False
+    gh, _ = provider_gh(provider)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert (err.kind, err.detail, err.uncertain) == (
+        "BLOCKED",
+        "merge-not-mergeable",
+        False,
+    )
+    # --admin would have merged, --auto would have armed auto-merge
+    assert (provider.state, provider.queue) == ("OPEN", "none")
+    assert provider.admin_merges == 0 and provider.branch_deleted is False
+
+
+def test_merge_never_bypasses_a_merge_queue_with_administrator_privileges() -> None:
+    provider = Provider()
+    provider.queue_branch = True
+    gh, _ = provider_gh(provider)
+    gh.merge(NUMBER, HEAD, "squash")
+    assert provider.state == "OPEN" and provider.admin_merges == 0
+    assert provider.queue == "queued"
+
+
+def test_merge_method_disabled_by_the_repository_is_a_definite_refusal() -> None:
+    provider = Provider()
+    provider.allowed = {"squash"}
+    err = refused(lambda: provider_gh(provider)[0].merge(NUMBER, HEAD, "merge"))
+    assert (err.kind, err.detail, err.uncertain) == ("BLOCKED", "merge-rejected", False)
+    assert provider.state == "OPEN"
+
+
+def test_merge_without_head_guard_support_is_blocked_and_never_run_unguarded() -> None:
+    provider = Provider()
+    provider.help = OLD_GH_HELP
+    gh, _ = provider_gh(provider)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert (err.kind, err.detail, err.uncertain) == (
+        "BLOCKED",
+        "merge-capability-missing",
+        False,
+    )
+    assert "--match-head-commit" in str(err)
+    assert provider.merge_calls == [] and provider.state == "OPEN"
+
+
+def test_merge_capability_is_probed_once_per_instance() -> None:
+    provider = Provider()
+    gh, _ = provider_gh(provider)
+    gh.merge(NUMBER, HEAD, "squash")
+    gh.merge(NUMBER, HEAD, "squash")  # already merged: gh exits 0, nothing changes
+    assert provider.help_calls == 1 and provider.merged_via == "squash"
+
+
+@pytest.mark.parametrize(
+    ("fail", "kind", "detail", "status"),
+    [
+        ((1, "unknown flag: --match-head-commit"), "BLOCKED", "merge-usage-error", None),
+        ((4, "To get started with GitHub CLI, please run:  gh auth login"), "BLOCKED", "merge-unauthenticated", 401),
+        ((1, "HTTP 403: Resource not accessible by integration (https://api.github.com/graphql)"), "BLOCKED", "merge-rejected", 403),
+        ((1, "HTTP 403: API rate limit exceeded for user ID 1."), "WAITING", "merge-rate-limited", None),
+        ((1, "GraphQL: Base branch was modified. Review and try the merge again. (mergePullRequest)"), "WAITING", "merge-base-changed", None),
+        ((1, "GraphQL: Pull request is closed. (mergePullRequest)"), "BLOCKED", "merge-rejected", None),
+    ],
+    ids=["usage", "unauthenticated", "forbidden", "rate-limited", "base-moved", "refused"],
+)  # fmt: skip
+def test_recognised_refusals_are_certain_and_never_retried(
+    fail: tuple[int, str], kind: str, detail: str, status: int | None
+) -> None:
+    provider = Provider()
+    provider.fail = fail
+    gh, sleeps = provider_gh(provider)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert (err.kind, err.detail, err.uncertain, err.http_status) == (
+        kind,
+        detail,
+        False,
+        status,
+    )
+    assert provider.state == "OPEN" and len(provider.merge_calls) == 1 and sleeps == []
+
+
+@pytest.mark.parametrize(
+    ("setup", "effect"),
+    [
+        ({"hang": "after"}, "MERGED"),
+        ({"hang": "before"}, "OPEN"),
+        ({"hang": "oserror"}, "OPEN"),
+        ({"fail": (-9, "")}, "OPEN"),
+        ({"fail": (1, "gh: something odd happened")}, "OPEN"),
+        ({"fail": (1, "HTTP 502: Bad Gateway (https://api.github.com/graphql)")}, "OPEN"),
+        ({"fail": (1, 'Post "https://api.github.com/graphql": EOF')}, "OPEN"),
+        ({"fail": (1, 'Post "https://api.github.com/graphql": net/http: TLS handshake timeout')}, "OPEN"),
+        ({"fail": (1, "GraphQL: Something went wrong while executing your query. (mergePullRequest)")}, "OPEN"),
+    ],
+    ids=["timeout-after-effect", "timeout-before-effect", "spawn-failure", "signal", "unrecognised",
+         "bad-gateway", "eof", "tls-timeout", "graphql-internal"],
+)  # fmt: skip
+def test_possibly_dispatched_outcomes_are_uncertain_and_never_retried(
+    setup: dict[str, Any], effect: str
+) -> None:
+    provider = Provider()
+    for key, value in setup.items():
+        setattr(provider, key, value)
+    gh, sleeps = provider_gh(provider)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert err.uncertain is True and "do not retry" in str(err)
+    assert len(provider.merge_calls) == 1 and sleeps == []  # no blind second dispatch
+    # classification is independent of whether the mutation took effect; the
+    # caller reconciles from the provider
+    assert gh.read_pr(NUMBER).state == provider.state == effect
+
+
+def test_merge_errors_redact_credentials_and_never_echo_response_bodies() -> None:
+    provider = Provider()
+    provider.fail = (
+        1,
+        "Bearer ghp_abcdefghijklmnop1234\n" + "private-response-body " * 300,
+    )
+    err = refused(lambda: provider_gh(provider)[0].merge(NUMBER, HEAD, "squash"))
+    shown = f"{err} {err.detail}"
+    assert (
+        "ghp_" not in shown
+        and "private-response-body private-response-body" not in shown
+    )
+    assert len(shown) < 700
+
+
+def test_merge_is_bounded_by_the_monitoring_deadline() -> None:
+    provider = Provider()
+    provider_gh(provider, deadline=30.0)[0].merge(NUMBER, HEAD, "squash")
+    assert provider.merge_timeouts == [30.0]
+    other = Provider()
+    provider_gh(other)[0].merge(NUMBER, HEAD, "squash")
+    assert 0 < other.merge_timeouts[0] <= github_ops.MERGE_TIMEOUT
+
+
+def test_merge_is_not_started_without_time_to_finish() -> None:
+    provider = Provider()
+    gh, _ = provider_gh(provider, deadline=5.0)
+    err = refused(lambda: gh.merge(NUMBER, HEAD, "squash"))
+    assert (err.kind, err.detail, err.uncertain) == (
+        "WAITING",
+        "merge-not-dispatched",
+        False,
+    )
+    assert provider.merge_calls == [] and provider.state == "OPEN"
+    expired = Provider()
+    err = refused(
+        lambda: provider_gh(expired, deadline=0.0)[0].merge(NUMBER, HEAD, "squash")
+    )
+    assert (
+        err.uncertain is False and expired.help_calls == 0 and expired.merge_calls == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("number", "head", "method"),
+    [
+        (0, HEAD, "squash"), (True, HEAD, "squash"), ("7", HEAD, "squash"),
+        (NUMBER, HEAD[:12], "squash"), (NUMBER, "A" * 40, "squash"), (NUMBER, HEAD + "\n", "squash"),
+        (NUMBER, "--admin", "squash"), (NUMBER, "main", "squash"),
+        (NUMBER, HEAD, "admin"), (NUMBER, HEAD, "squash --admin"), (NUMBER, HEAD, "fast-forward"),
+        (NUMBER, HEAD, ""), (NUMBER, HEAD, "SQUASH"),
+    ],
+)  # fmt: skip
+def test_merge_inputs_are_validated_before_any_process_starts(
+    number: Any, head: str, method: str
+) -> None:
+    provider = Provider()
+    gh, _ = provider_gh(provider)
+    with pytest.raises(ValueError):
+        gh.merge(number, head, method)
+    assert provider.argvs == []
+
+
+def test_trailing_newlines_do_not_pass_repository_or_host_validation() -> None:
+    with pytest.raises(ValueError):
+        GitHub("github.com", "acme/widget\n")
+    with pytest.raises(ValueError):
+        GitHub("github.com\n", REPO)
+
+
+@pytest.mark.parametrize(
+    ("checks_green", "queued"), [(True, "QUEUED"), (False, "AUTO_MERGE")]
+)
+def test_merge_queue_acceptance_is_waiting_not_merged(
+    checks_green: bool, queued: str
+) -> None:
+    provider = Provider()
+    provider.queue_branch, provider.checks_green = True, checks_green
+    gh, _ = provider_gh(provider)
+    assert gh.merge(NUMBER, HEAD, "squash") is None  # the command was accepted ...
+    assert gh.read_pr(NUMBER).state == "OPEN"  # ... nothing is merged yet
+    assert gh.queue_state(NUMBER, HEAD) == queued
+    provider.land()  # the queue (or auto-merge) completes later
+    assert gh.read_pr(NUMBER).state == "MERGED"
+    err = refused(lambda: gh.queue_state(NUMBER, HEAD))  # never IDLE once merged
+    assert (err.kind, err.detail) == ("WAITING", "state-changed")
+
+
+# -- queue_state ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "entry", ["QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"]
+)
+def test_a_merge_queue_entry_is_queued_whatever_its_progress(entry: str) -> None:
+    provider = Provider()
+    provider.queue, provider.entry_state = "queued", entry
+    assert provider_gh(provider)[0].queue_state(NUMBER, HEAD) == "QUEUED"
+
+
+def test_armed_auto_merge_without_an_entry_is_auto_merge() -> None:
+    provider = Provider()
+    provider.queue = "auto"
+    assert provider_gh(provider)[0].queue_state(NUMBER, HEAD) == "AUTO_MERGE"
+
+
+def test_idle_needs_graphql_and_rest_to_agree_before_and_after_the_read() -> None:
+    provider = Provider()
+    assert provider_gh(provider)[0].queue_state(NUMBER, HEAD) == "IDLE"
+    assert (
+        provider.reads.count(f"/repos/{REPO}/pulls/{NUMBER}") == 2
+        and len(provider.gql_calls) == 1
+    )
+
+
+def test_auto_merge_armed_during_the_read_is_not_idle() -> None:
+    provider = Provider()
+    provider.arm_on_pull_read = 2  # armed between the GraphQL read and the REST recheck
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert (err.kind, err.detail) == ("WAITING", "queue-sources-disagree")
+
+
+@pytest.mark.parametrize(
+    ("queue", "patch"),
+    [
+        ("auto", {"autoMergeRequest": None}),
+        ("none", {"autoMergeRequest": {"mergeMethod": "SQUASH"}}),
+    ],
+    ids=["rest-only", "graphql-only"],
+)
+def test_sources_that_disagree_about_auto_merge_are_never_idle(
+    queue: str, patch: dict[str, Any]
+) -> None:
+    provider = Provider()
+    provider.queue, provider.gql_patch = queue, patch
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert (err.kind, err.detail) == ("WAITING", "queue-sources-disagree")
+
+
+@pytest.mark.parametrize("where", ["rest", "graphql"])
+def test_head_drift_is_waiting_never_idle_or_queued(where: str) -> None:
+    provider = Provider()
+    provider.queue = "queued"
+    if where == "rest":
+        provider.head = OTHER_HEAD
+    else:
+        provider.gql_patch = {"headRefOid": OTHER_HEAD}
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert (err.kind, err.detail) == ("WAITING", "head-changed")
+    if where == "rest":
+        assert provider.gql_calls == []  # stopped before asking for queue evidence
+
+
+@pytest.mark.parametrize("state", ["MERGED", "CLOSED"])
+def test_a_pr_that_is_no_longer_open_is_never_idle(state: str) -> None:
+    provider = Provider()
+    provider.state = state
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert (err.kind, err.detail) == ("WAITING", "state-changed")
+    racing = Provider()  # REST still open, GraphQL already merged
+    racing.gql_patch = {"state": "MERGED", "merged": True}
+    err = refused(lambda: provider_gh(racing)[0].queue_state(NUMBER, HEAD))
+    assert (err.kind, err.detail) == ("WAITING", "state-changed")
+
+
+_FORBIDDEN = Reply(
+    status=200, exit_code=1, stderr="gh: Resource not accessible by integration",
+    body={"data": {"repository": None}, "errors": [{"type": "FORBIDDEN", "message": "Resource not accessible by integration"}]},
+)  # fmt: skip
+_PARTIAL = Reply(
+    body={
+        "data": {"repository": {"nameWithOwner": REPO, "pullRequest": {
+            "number": NUMBER, "state": "OPEN", "merged": False, "headRefOid": HEAD,
+            "isInMergeQueue": False, "autoMergeRequest": None, "mergeQueueEntry": None}}},
+        "errors": [{"type": "FORBIDDEN", "path": ["repository", "pullRequest", "mergeQueueEntry"],
+                    "message": "Resource not accessible by integration"}],
+    }
+)  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    ("reply", "patch"),
+    [
+        (_FORBIDDEN, {}),
+        (_PARTIAL, {}),
+        (Reply(body={"data": {"repository": None}}), {}),
+        (Reply(body={"data": {"repository": {"nameWithOwner": REPO, "pullRequest": None}}}), {}),
+        (Reply(body={"data": {"repository": {"nameWithOwner": "other/repo", "pullRequest": {}}}}), {}),
+        (Reply(body={"data": None}), {}),
+        (Reply(body=[1]), {}),
+        (Reply(raw="<html>"), {}),
+        (None, {"mergeQueueEntry": DROP}),
+        (None, {"autoMergeRequest": DROP}),
+        (None, {"isInMergeQueue": DROP}),
+        (None, {"mergeQueueEntry": {"state": "FUTURE", "position": 1}, "isInMergeQueue": True}),
+        (None, {"mergeQueueEntry": {"state": "QUEUED"}, "isInMergeQueue": True}),
+        (None, {"isInMergeQueue": True}),
+        (None, {"mergeQueueEntry": {"state": "QUEUED", "position": 1}}),
+        (None, {"number": NUMBER + 1}),
+        (None, {"headRefOid": "abc"}),
+        (None, {"state": "SOMETHING"}),
+        (None, {"merged": True}),
+        (None, {"autoMergeRequest": {"mergeMethod": "FAST_FORWARD"}}),
+    ],
+    ids=["forbidden", "partial-with-errors", "repository-null", "pull-request-null", "other-repository",
+         "data-null", "array", "not-json", "no-entry-field", "no-auto-field", "no-queue-flag",
+         "unknown-entry-state", "entry-without-position", "queue-flag-without-entry",
+         "entry-without-queue-flag", "other-number", "bad-head", "unknown-state", "merged-contradiction",
+         "unknown-merge-method"],
+)  # fmt: skip
+def test_missing_partial_or_unsupported_queue_evidence_is_an_error_never_idle(
+    reply: Reply | None, patch: dict[str, Any]
+) -> None:
+    provider = Provider()
+    provider.gql_reply, provider.gql_patch = reply, patch
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert err.kind == "BLOCKED"
+
+
+def test_graphql_errors_reported_with_a_success_exit_are_still_incomplete_evidence() -> (
+    None
+):
+    provider = Provider()
+    provider.gql_reply = Reply(body=_PARTIAL.body, exit_code=0)
+    err = refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD))
+    assert err.kind == "BLOCKED"
+
+
+def test_rest_without_the_auto_merge_property_is_not_read_as_no_auto_merge() -> None:
+    provider = Provider()
+    provider.rest_patch = {"auto_merge": DROP}
+    assert (
+        refused(lambda: provider_gh(provider)[0].queue_state(NUMBER, HEAD)).kind
+        == "BLOCKED"
+    )
+
+
+def test_a_graphql_outage_is_waiting_after_bounded_read_retries() -> None:
+    provider = Provider()
+    provider.gql_reply = Reply(status=503, body={"message": "Service Unavailable"})
+    gh, sleeps = provider_gh(provider)
+    err = refused(lambda: gh.queue_state(NUMBER, HEAD))
+    assert err.kind == "WAITING" and err.uncertain is False
+    assert len(provider.gql_calls) == github_ops.MAX_ATTEMPTS and sleeps == [1.0, 2.0]
+
+
+def test_queue_state_only_reads_and_never_touches_the_merge_command() -> None:
+    provider = Provider()
+    provider.queue = "queued"
+    gh, _ = provider_gh(provider)
+    assert gh.queue_state(NUMBER, HEAD) == "QUEUED"
+    assert not any(argv[:2] == ("gh", "pr") for argv in provider.argvs)
+    posts = [argv for argv in provider.argvs if argv[3] == "POST"]
+    assert len(posts) == 1 and "--input" not in posts[0] and "-X" not in posts[0]
+    assert provider.gql_calls[0]["number"] == str(NUMBER)
+    assert provider.merge_calls == [] and provider.state == "OPEN"
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        (0, HEAD),
+        (True, HEAD),
+        (NUMBER, HEAD[:12]),
+        (NUMBER, "main"),
+        (NUMBER, HEAD + "\n"),
+    ],
+)
+def test_queue_state_rejects_invalid_inputs_before_any_provider_call(
+    bad: tuple[Any, str],
+) -> None:
+    provider = Provider()
+    with pytest.raises(ValueError):
+        provider_gh(provider)[0].queue_state(*bad)
+    assert provider.argvs == []
+
+
+# -- merge_queue policy ----------------------------------------------------------
+
+
+def _queue_rule(method: Any = "SQUASH", **over: Any) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "check_response_timeout_minutes": 60,
+        "grouping_strategy": "ALLGREEN",
+        "max_entries_to_build": 5,
+        "max_entries_to_merge": 5,
+        "merge_method": method,
+        "min_entries_to_merge": 1,
+        "min_entries_to_merge_wait_minutes": 5,
+    }
+    params.update(over)
+    return {"type": "merge_queue", "parameters": params}
+
+
+def _queue_observation(*rules: dict[str, Any]) -> Observation:
+    return observe(routes() | {f"/repos/{REPO}/rules/branches/main": _ruleset(*rules)})
+
+
+def test_branches_without_a_queue_rule_do_not_require_a_queue() -> None:
+    obs = observe(routes())
+    assert obs.queue_required is False and obs.policy_known is True
+
+
+@pytest.mark.parametrize(
+    ("method", "allowed"), [("SQUASH", ("squash",)), ("MERGE", ("merge",))]
+)
+def test_a_queue_rule_requires_the_queue_and_pins_its_merge_method(
+    method: str, allowed: tuple[str, ...]
+) -> None:
+    obs = _queue_observation(_queue_rule(method))
+    assert obs.queue_required is True and obs.policy_known is True
+    assert (
+        obs.repo.allowed_merge_methods == allowed
+    )  # repository enables merge + squash
+
+
+def test_a_queue_method_the_repository_disables_leaves_no_permitted_method() -> None:
+    obs = _queue_observation(
+        _queue_rule("REBASE")
+    )  # routes(): rebase merges are disabled
+    assert obs.queue_required is True and obs.repo.allowed_merge_methods == ()
+    assert has_issue(obs, "no-merge-method")
+
+
+def test_queue_method_is_intersected_with_other_method_rules() -> None:
+    obs = _queue_observation(
+        {"type": "pull_request", "parameters": {"required_approving_review_count": 0, "allowed_merge_methods": ["merge", "rebase"]}},
+        _queue_rule("SQUASH"),
+    )  # fmt: skip
+    assert obs.queue_required is True and obs.repo.allowed_merge_methods == ()
+    conflicting = _queue_observation(_queue_rule("SQUASH"), _queue_rule("MERGE"))
+    assert conflicting.repo.allowed_merge_methods == ()
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        {"type": "merge_queue"},
+        {"type": "merge_queue", "parameters": {}},
+        _queue_rule("FAST_FORWARD"),
+        _queue_rule("squash"),
+        _queue_rule(None),
+        {"type": "merge_queue", "parameters": {"merge_method": ["SQUASH"]}},
+    ],
+    ids=[
+        "no-parameters",
+        "empty-parameters",
+        "unknown-method",
+        "lowercase-method",
+        "null-method",
+        "wrong-type",
+    ],
+)
+def test_a_queue_whose_method_cannot_be_read_blocks_instead_of_assuming_one(
+    rule: dict[str, Any],
+) -> None:
+    obs = _queue_observation(rule)
+    assert obs.queue_required is True and obs.policy_known is False
+
+
+def test_other_unsupported_rules_still_fail_closed_next_to_a_queue_rule() -> None:
+    obs = _queue_observation(
+        _queue_rule("SQUASH"), {"type": "workflows", "parameters": {"workflows": []}}
+    )
+    assert obs.queue_required is True and obs.policy_known is False
+    assert has_issue(obs, "unevaluated-policy")
+
+
+def test_unreadable_rules_make_queue_required_a_lower_bound_not_a_denial() -> None:
+    obs = observe(
+        routes()
+        | {
+            f"/repos/{REPO}/rules/branches/main": Reply(
+                status=404, body={"message": "Not Found"}
+            )
+        }
+    )
+    assert (obs.queue_required, obs.policy_known) == (False, False)
+
+
+@pytest.mark.parametrize(
+    ("queue_method", "decision_method", "status"),
+    [
+        ("SQUASH", "squash", "READY"),
+        ("MERGE", "squash", "BLOCKED"),
+        ("SQUASH", "merge", "BLOCKED"),
+        ("REBASE", "rebase", "BLOCKED"),
+    ],
+)
+def test_permission_to_land_follows_the_queues_configured_method(
+    queue_method: str, decision_method: str, status: str
+) -> None:
+    from lifecycle import Policy, evaluate
+
+    report = check_run(1000, "test")
+    report["app"]["id"] = 42
+    table = with_ci([run(10, suite=100)], [report])
+    table[f"/repos/{REPO}/rules/branches/main"] = _ruleset(
+        {"type": "required_status_checks", "parameters": {
+            "required_status_checks": [{"context": "test", "integration_id": 42}],
+            "strict_required_status_checks_policy": False}},
+        _queue_rule(queue_method),
+    )  # fmt: skip
+    decision = Policy(
+        ("current workflow and provider policy",),
+        ("test",),
+        decision_method,
+        (),
+        HEAD,
+        BASE,
+    )
+    obs = observe(table)
+    assert obs.queue_required is True
+    assert evaluate(obs, decision).status == status
+
+
+def test_inflight_transport_invalid_argument_is_not_certain_usage_failure() -> None:
+    provider = Provider()
+    provider.fail = (
+        1,
+        'Post "https://api.github.com/graphql": write tcp 10.0.0.2:51234->140.82.112.6:443: write: invalid argument',
+    )
+    error = refused(lambda: provider_gh(provider)[0].merge(NUMBER, HEAD, "squash"))
+    assert error.uncertain is True
+    assert len(provider.merge_calls) == 1
+
+
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_graphql_http_200_rate_limit_waits_without_rejecting_queue(
+    exit_code: int,
+) -> None:
+    provider = Provider()
+    provider.gql_reply = Reply(
+        status=200,
+        exit_code=exit_code,
+        headers={"x-ratelimit-remaining": "0"},
+        stderr="gh: API rate limit exceeded for user ID 1.",
+        body={
+            "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]
+        },
+    )
+    gh, sleeps = provider_gh(provider)
+    error = refused(lambda: gh.queue_state(NUMBER, HEAD))
+    assert error.kind == "WAITING"
+    assert provider.state == "OPEN" and provider.queue == "none"
+    assert provider.merge_calls == [] and sleeps == []
