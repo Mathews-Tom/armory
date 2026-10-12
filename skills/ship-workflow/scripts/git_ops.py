@@ -1,4 +1,4 @@
-"""Read-only Git inspection for the ship-workflow skill.
+"""Git inspection and guarded mutation primitives for the ship-workflow skill.
 
 Every command is an argv-vector ``git`` subprocess with an explicit working
 directory, a deadline, ``GIT_OPTIONAL_LOCKS=0`` and no repository-redirecting
@@ -6,20 +6,37 @@ environment. Inspection never fetches, prunes, locks or writes. Anything that
 cannot be established raises :class:`GitError`; no method turns a failed or
 unknown observation into an empty success.
 
+The mutation helpers (:meth:`GitRepository.fetch_base`,
+:meth:`~GitRepository.prepare_base_checkout`,
+:meth:`~GitRepository.delete_local_head`,
+:meth:`~GitRepository.delete_remote_head` and
+:meth:`~GitRepository.remove_worktree`) change exactly the one named target.
+Each re-observes the live state first and rejects with :class:`GitRefused`,
+before changing anything, when a safety precondition does not hold. They never
+force, never use ``--force``/raw deletion/blanket prune, never disable hooks and
+never retry. A failure after a command was dispatched whose outcome is unknown
+carries ``uncertain=True``; the caller must reobserve instead of repeating it.
+
 Repository text (remote URLs, branch names, paths, command output) is data.
 Remote URLs are stripped of credentials before they leave this module.
 """
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import os
 import re
+import shlex
 import signal
 import stat
 import subprocess
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 DEFAULT_TIMEOUT = 60.0
 
@@ -44,6 +61,7 @@ _WEB_SCHEMES = frozenset({"http", "https", "git"})
 _REDIRECTING_ENV = frozenset(
     {
         "GIT_DIR",
+        "GIT_CONFIG",
         "GIT_WORK_TREE",
         "GIT_INDEX_FILE",
         "GIT_COMMON_DIR",
@@ -53,14 +71,46 @@ _REDIRECTING_ENV = frozenset(
         "GIT_PREFIX",
         "GIT_QUARANTINE_PATH",
         "GIT_CEILING_DIRECTORIES",
+        "GIT_DIFF_OPTS",
     }
 )
+
+# Config keys that, supplied through the environment, would let a caller (or a
+# parent Git process) select a different checkout or pull in a foreign file.
+_REDIRECTING_CONFIG_KEYS = frozenset({"core.worktree", "core.bare", "include.path"})
+_MAX_CONFIG_ENV_ENTRIES = 4096
 
 _HASH_CHUNK = 1 << 20
 
 
 class GitError(RuntimeError):
-    """A Git observation failed or could not be established."""
+    """A Git observation or mutation failed or could not be established.
+
+    ``uncertain`` is true only when a mutating command may have been dispatched
+    and its outcome is unknown (deadline, or the post-condition did not hold).
+    The caller must reobserve the actual state and never repeat the mutation.
+    """
+
+    def __init__(self, message: str, *, uncertain: bool = False) -> None:
+        super().__init__(message)
+        self.uncertain = uncertain
+
+
+class GitRefused(GitError):
+    """A safety precondition rejected a mutation before anything was changed."""
+
+
+@dataclass(frozen=True)
+class Activity:
+    """Whether any observable process is using a worktree.
+
+    ``ACTIVE`` is a proven conflict and always wins. ``INACTIVE`` means the
+    working-directory inventory is complete. Open files or editor buffers are
+    not inventoried. ``UNKNOWN`` is never treated as inactive.
+    """
+
+    status: Literal["ACTIVE", "INACTIVE", "UNKNOWN"]
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -200,10 +250,72 @@ def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
         pass
 
 
+def _redirecting_config_key(key: str) -> bool:
+    name = key.lower()
+    if name in _REDIRECTING_CONFIG_KEYS:
+        return True
+    return name.startswith("includeif.") and name.endswith(".path")
+
+
+def _strip_redirecting_config(env: dict[str, str]) -> None:
+    """Drop repository-redirecting keys from the environment-supplied config.
+
+    Covers ``GIT_CONFIG_PARAMETERS`` (what ``git -c`` exports to child processes)
+    and ``GIT_CONFIG_COUNT``/``GIT_CONFIG_KEY_n``/``GIT_CONFIG_VALUE_n``. Every
+    other entry (credential helpers, URL rewrites, ...) is left exactly as it was;
+    an environment that cannot be parsed is rejected rather than guessed at.
+    """
+    parameters = env.get("GIT_CONFIG_PARAMETERS")
+    if parameters is not None:
+        try:
+            entries = shlex.split(parameters)
+        except ValueError:
+            raise GitError("GIT_CONFIG_PARAMETERS is malformed") from None
+        kept = [
+            entry
+            for entry in entries
+            if not _redirecting_config_key(entry.partition("=")[0])
+        ]
+        if len(kept) != len(entries):
+            if kept:
+                env["GIT_CONFIG_PARAMETERS"] = " ".join(shlex.quote(e) for e in kept)
+            else:
+                del env["GIT_CONFIG_PARAMETERS"]
+    raw_count = env.get("GIT_CONFIG_COUNT")
+    if raw_count is None:
+        return
+    if not (raw_count.isascii() and raw_count.isdigit()):
+        raise GitError("GIT_CONFIG_COUNT is not a count")
+    count = int(raw_count)
+    if count > _MAX_CONFIG_ENV_ENTRIES:
+        raise GitError("GIT_CONFIG_COUNT is implausibly large")
+    pairs: list[tuple[str, str]] = []
+    for index in range(count):
+        key = env.get(f"GIT_CONFIG_KEY_{index}")
+        value = env.get(f"GIT_CONFIG_VALUE_{index}")
+        if key is None or value is None:
+            raise GitError(f"GIT_CONFIG_COUNT names the missing entry {index}")
+        pairs.append((key, value))
+    kept_pairs = [pair for pair in pairs if not _redirecting_config_key(pair[0])]
+    if len(kept_pairs) == len(pairs):
+        return
+    for index in range(count):
+        del env[f"GIT_CONFIG_KEY_{index}"]
+        del env[f"GIT_CONFIG_VALUE_{index}"]
+    if not kept_pairs:
+        del env["GIT_CONFIG_COUNT"]
+        return
+    env["GIT_CONFIG_COUNT"] = str(len(kept_pairs))
+    for index, (key, value) in enumerate(kept_pairs):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+
+
 def _git_env() -> dict[str, str]:
     env = {
         key: value for key, value in os.environ.items() if key not in _REDIRECTING_ENV
     }
+    _strip_redirecting_config(env)
     env["GIT_OPTIONAL_LOCKS"] = "0"
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["LC_ALL"] = "C"
@@ -332,7 +444,7 @@ def _length_prefixed(value: bytes) -> bytes:
 
 
 class GitRepository:
-    """Read-only inspection of the repository containing ``path``."""
+    """Inspection and guarded mutation of the repository containing ``path``."""
 
     def __init__(self, path: Path, *, timeout: float = DEFAULT_TIMEOUT) -> None:
         if not timeout > 0:
@@ -340,8 +452,17 @@ class GitRepository:
         self.path = Path(os.path.abspath(path))
         self.timeout = timeout
 
-    def run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
-        """Run ``git *args`` in ``self.path`` with a deadline and no optional locks."""
+    def run(
+        self,
+        *args: str,
+        check: bool = True,
+        input_bytes: bytes | None = None,
+    ) -> subprocess.CompletedProcess[bytes]:
+        """Run ``git *args`` in ``self.path`` with a deadline and no optional locks.
+
+        ``input_bytes`` is written to the command's standard input; otherwise stdin
+        is closed. A deadline raises an ``uncertain`` :class:`GitError`.
+        """
         if not args:
             raise GitError("git requires arguments")
         for arg in args:
@@ -353,7 +474,7 @@ class GitRepository:
                 argv,
                 cwd=self.path,
                 env=_git_env(),
-                stdin=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL if input_bytes is None else subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 start_new_session=True,
@@ -362,12 +483,15 @@ class GitRepository:
             raise GitError(f"cannot run git in {self.path}: {exc.strerror}") from exc
         with process:
             try:
-                stdout, stderr = process.communicate(timeout=self.timeout)
+                stdout, stderr = process.communicate(
+                    input=input_bytes, timeout=self.timeout
+                )
             except subprocess.TimeoutExpired:
                 _kill_process_group(process)
                 process.communicate()
                 raise GitError(
-                    f"git {_describe(args)} exceeded its {self.timeout:g}s deadline"
+                    f"git {_describe(args)} exceeded its {self.timeout:g}s deadline",
+                    uncertain=True,
                 ) from None
             except BaseException:
                 _kill_process_group(process)
@@ -379,6 +503,16 @@ class GitRepository:
                 f"git {_describe(args)} failed (exit {result.returncode}): {message[:500]}"
             )
         return result
+
+    def execution_environment(self) -> dict[str, str]:
+        """A fresh copy of the exact environment every Git command here runs under.
+
+        It is the caller's environment minus the variables that would redirect Git
+        away from the repository chosen by the working directory, with prompts and
+        optional locks disabled. It can hold the caller's credentials: use it to
+        launch subprocesses, never to record or print.
+        """
+        return _git_env()
 
     # -- refs ---------------------------------------------------------------
 
@@ -598,6 +732,7 @@ class GitRepository:
             self.run("rev-parse", "--path-format=absolute", "--git-common-dir").stdout
         )
         git_dir = _path_from_output(self.run("rev-parse", "--absolute-git-dir").stdout)
+        _verify_selected_checkout(self.path, root, common_dir, git_dir)
         top = GitRepository(root, timeout=self.timeout)
 
         first = top._observe()
@@ -690,6 +825,727 @@ class GitRepository:
             content.append((entry.path, identity))
         return content
 
+    # -- branch inventories -------------------------------------------------
+
+    def local_heads(self) -> dict[str, str]:
+        """Every local branch as ``{"refs/heads/<name>": commit_oid}``.
+
+        The inventory is exact or it raises: a broken ref, a branch that does not
+        name a commit, a malformed record or a duplicate is never skipped.
+        """
+        result = self.run(
+            "for-each-ref",
+            "--format=%(refname)%00%(objectname)%00%(objecttype)",
+            "refs/heads/",
+        )
+        if result.stderr.strip():
+            stderr = redact_credentials(
+                result.stderr.decode("utf-8", "replace").strip()
+            )
+            raise GitError(f"git could not read every local branch: {stderr[:500]}")
+        heads: dict[str, str] = {}
+        for line in result.stdout.split(b"\n"):
+            if not line:
+                continue
+            fields = os.fsdecode(line).split("\0")
+            if len(fields) != 3:
+                raise GitError("malformed local branch record from git")
+            name, oid, kind = fields
+            _check_head_name(name)
+            if _OID_RE.fullmatch(oid) is None or kind != "commit":
+                raise GitError(f"{name} does not name a commit")
+            if name in heads:
+                raise GitError(f"{name} is listed more than once")
+            heads[name] = oid
+        return heads
+
+    def remote_heads(self, remote: str) -> dict[str, str]:
+        """Branches ``remote`` advertises as ``{"refs/heads/<name>": oid}``.
+
+        Reads the network, bounded by the command deadline. An unreachable remote,
+        a malformed or a duplicated advertisement raises; an empty mapping means
+        the remote answered and has no branches.
+        """
+        return self._advertised_heads(self._require_remote(remote))
+
+    def _advertised_heads(self, remote: str, *patterns: str) -> dict[str, str]:
+        raw = self.run("ls-remote", "--heads", "--", remote, *patterns).stdout
+        if raw and not raw.endswith(b"\n"):
+            raise GitError("unterminated ls-remote output")
+        heads: dict[str, str] = {}
+        for line in raw.split(b"\n")[:-1]:
+            oid_raw, tab, name_raw = line.partition(b"\t")
+            oid = oid_raw.decode("ascii", "replace")
+            if not tab or b"\t" in name_raw or _OID_RE.fullmatch(oid) is None:
+                raise GitError("malformed ls-remote record")
+            name = os.fsdecode(name_raw)
+            _check_head_name(name)
+            if name in heads:
+                raise GitError(f"the remote advertises {name} more than once")
+            heads[name] = oid
+        return heads
+
+    def _remote_default_ref(self, remote: str) -> str | None:
+        """The full ref the remote's ``HEAD`` points at, when it reports one."""
+        raw = self.run("ls-remote", "--symref", "--", remote, "HEAD").stdout
+        for line in raw.split(b"\n"):
+            if line.startswith(b"ref: "):
+                target, tab, what = line[len(b"ref: ") :].partition(b"\t")
+                if tab and what == b"HEAD":
+                    return os.fsdecode(target)
+        return None
+
+    def _require_remote(self, remote: str) -> str:
+        """``remote`` must be the exact name of a configured remote, never a URL."""
+        if (
+            not isinstance(remote, str)
+            or not remote
+            or remote.startswith("-")
+            or "\0" in remote
+        ):
+            raise GitRefused("remote must be the name of a configured remote")
+        names = {
+            os.fsdecode(line) for line in self.run("remote").stdout.split(b"\n") if line
+        }
+        if remote not in names:
+            raise GitRefused(f"{remote!r} is not a configured remote")
+        return remote
+
+    def _validated_branch(self, branch: str) -> str:
+        """``branch`` must be a short branch name that Git accepts."""
+        if (
+            not isinstance(branch, str)
+            or not branch
+            or branch.startswith("-")
+            or branch == "HEAD"
+        ):
+            raise GitRefused("branch must be a short branch name")
+        try:
+            self._validate_full_ref(f"refs/heads/{branch}")
+        except GitError as exc:
+            raise GitRefused(f"unusable branch name: {exc}") from exc
+        return branch
+
+    def _common_dir(self) -> Path:
+        return _path_from_output(
+            self.run("rev-parse", "--path-format=absolute", "--git-common-dir").stdout
+        )
+
+    def _git_dir(self) -> Path:
+        return _path_from_output(self.run("rev-parse", "--absolute-git-dir").stdout)
+
+    def _head_record(self, ref: str) -> tuple[str, str, str] | None:
+        """``(oid, object type, symref target)`` of one exact local ref."""
+        result = self.run(
+            "for-each-ref",
+            "--format=%(refname)%00%(objectname)%00%(objecttype)%00%(symref)",
+            ref,
+        )
+        found: tuple[str, str, str] | None = None
+        for line in result.stdout.split(b"\n"):
+            if not line:
+                continue
+            fields = os.fsdecode(line).split("\0")
+            if len(fields) != 4:
+                raise GitError("malformed ref record from git")
+            if fields[0] != ref:
+                continue
+            if found is not None or _OID_RE.fullmatch(fields[1]) is None:
+                raise GitError(f"{ref} could not be read exactly")
+            found = (fields[1], fields[2], fields[3])
+        if found is None and result.stderr.strip():
+            stderr = redact_credentials(
+                result.stderr.decode("utf-8", "replace").strip()
+            )
+            raise GitError(f"git could not read {ref}: {stderr[:500]}")
+        return found
+
+    def _remote_default_branches(self) -> set[str]:
+        """Current advertised default names; cached origin/HEAD is not authority."""
+        names: set[str] = set()
+        for raw in self.run("remote").stdout.splitlines():
+            remote = self._require_remote(os.fsdecode(raw))
+            ref = self._remote_default_ref(remote)
+            if ref is None:
+                raise GitRefused(f"{remote} default branch is not observable; kept")
+            names.add(ref.removeprefix("refs/heads/"))
+        return names
+
+    def _branch_in_use(self, branch: str) -> str | None:
+        """Why ``refs/heads/<branch>`` must not be deleted now, or ``None``."""
+        ref = f"refs/heads/{branch}"
+        for entry in self._worktrees():
+            if entry.branch == branch:
+                return f"checked out in the worktree {entry.path}"
+        for gitdir in _worktree_git_dirs(self._common_dir()):
+            if {ref, branch} & _operation_branches(gitdir):
+                where = os.fsdecode(gitdir)
+                return f"the branch of a rebase or bisect in progress under {where}"
+        common_head = self.run(
+            f"--git-dir={self._common_dir()}",
+            "symbolic-ref",
+            "--quiet",
+            "HEAD",
+            check=False,
+        )
+        if common_head.returncode not in (0, 1):
+            raise GitError("common-directory HEAD identity is unavailable")
+        if common_head.stdout.rstrip(b"\n") == ref.encode():
+            return "the common-directory primary/default HEAD"
+        if branch in self._remote_default_branches():
+            return "the default branch of a remote"
+        return None
+
+    def branch_upstream(self, branch: str) -> tuple[str, str] | None:
+        """The configured upstream of local ``branch``: ``(remote, "refs/heads/<name>")``.
+
+        Read-only. ``remote`` is the alias of a configured remote and the ref is the
+        full branch ref on that remote, so it need not equal the local name (fork
+        and upstream namespaces can differ). ``None`` means exactly that no remote
+        upstream is configured: neither ``branch.<name>.remote`` nor ``.merge`` is
+        set, or the upstream is a local branch (``remote = .``). A half-configured,
+        repeated, non-branch or unknown-remote upstream, or one that Git's own
+        resolution reads differently, raises: it is never reported as ``None``. A
+        missing or unusable ``branch`` is refused.
+        """
+        name = self._validated_branch(branch)
+        ref = f"refs/heads/{name}"
+        if self._head_record(ref) is None:
+            raise GitRefused(f"{ref} does not exist")
+        remotes = self._config_values(f"branch.{name}.remote")
+        merges = self._config_values(f"branch.{name}.merge")
+        if not remotes and not merges:
+            return None
+        if len(remotes) != 1 or len(merges) != 1:
+            raise GitError(f"the upstream configuration of {ref} is incomplete")
+        remote, merge = remotes[0], merges[0]
+        prefix = "refs/heads/"
+        if not merge.startswith(prefix) or len(merge) == len(prefix):
+            raise GitError(f"the upstream of {ref} is not a branch ref")
+        self._validate_full_ref(merge)
+        if remote == ".":
+            return None
+        try:
+            self._require_remote(remote)
+        except GitRefused as exc:
+            raise GitError(f"the upstream remote of {ref} is unusable: {exc}") from exc
+        listing = self.run(
+            "for-each-ref",
+            "--format=%(refname)%00%(upstream:remotename)%00%(upstream:remoteref)",
+            ref,
+        ).stdout
+        resolved: tuple[str, str] | None = None
+        for line in listing.split(b"\n"):
+            if not line:
+                continue
+            fields = os.fsdecode(line).split("\0")
+            if len(fields) != 3:
+                raise GitError("malformed upstream record from git")
+            if fields[0] == ref:
+                resolved = (fields[1], fields[2])
+        if resolved != (remote, merge):
+            raise GitError(
+                f"git resolves the upstream of {ref} differently from its "
+                "branch configuration"
+            )
+        return remote, merge
+
+    def _config_values(self, key: str) -> list[str]:
+        """Every repository-local value of ``key``; ``[]`` only when it is unset."""
+        result = self.run("config", "--local", "-z", "--get-all", key, check=False)
+        if result.returncode == 1 and not result.stderr.strip():
+            return []
+        if result.returncode != 0:
+            stderr = redact_credentials(result.stderr.decode("utf-8", "replace"))
+            raise GitError(
+                f"git could not read {key}: exit {result.returncode}: "
+                f"{stderr.strip()[:300]}"
+            )
+        if not result.stdout.endswith(b"\0"):
+            raise GitError(f"unterminated git config output for {key}")
+        return [os.fsdecode(item) for item in result.stdout.split(b"\0")[:-1]]
+
+    # -- guarded mutations --------------------------------------------------
+
+    def fetch_base(self, remote: str, base_branch: str, expected_sha: str) -> str:
+        """Fetch only ``base_branch`` from ``remote`` and return its verified tip.
+
+        The remote must still advertise exactly ``expected_sha`` (the provider's
+        tip) before anything is fetched, and the fetched remote-tracking ref must
+        equal it afterwards. Only ``refs/remotes/<remote>/<base_branch>`` is
+        written: no tags, no prune, no submodule recursion, no other ref and no
+        ``FETCH_HEAD``.
+        """
+        name = self._require_remote(remote)
+        branch = self._validated_branch(base_branch)
+        expected = _require_oid(expected_sha, "expected base SHA")
+        source = f"refs/heads/{branch}"
+        tracking = f"refs/remotes/{name}/{branch}"
+        advertised = self._advertised_heads(name, source).get(source)
+        if advertised is None:
+            raise GitRefused(f"{name} does not advertise {source}")
+        if advertised != expected:
+            raise GitRefused(
+                f"{name} {source} is {advertised}, not the expected {expected}; "
+                "nothing was fetched"
+            )
+        self.run(
+            "-c",
+            "fetch.writeCommitGraph=false",
+            "fetch",
+            "--no-tags",
+            "--no-prune",
+            "--no-recurse-submodules",
+            "--no-write-fetch-head",
+            "--no-auto-gc",
+            "--no-auto-maintenance",
+            "--",
+            name,
+            f"+{source}:{tracking}",
+        )
+        fetched = self.resolve_ref(tracking)
+        if fetched != expected:
+            raise GitError(
+                f"after the fetch {tracking} is {fetched}, not the expected {expected}",
+                uncertain=True,
+            )
+        return expected
+
+    def prepare_base_checkout(
+        self, base_branch: str, base_tip: str, expected_snapshot: Snapshot
+    ) -> Snapshot:
+        """Leave this checkout clean on ``base_branch`` fast-forwarded to ``base_tip``.
+
+        ``self`` must be the explicitly selected retained checkout (the existing
+        worktree of the base when it is checked out elsewhere), and it must still
+        be exactly ``expected_snapshot``. Refused, with nothing changed, when the
+        checkout is dirty, conflicted, mid-operation or locked; when the base is
+        checked out in a different worktree or does not exist locally; or when
+        the local base holds commits that are not on ``base_tip`` (it is
+        preserved, never reset). Switching and fast-forwarding use Git's normal
+        hooks with automatic stashing and ignored-file overwrite disabled and
+        never force; any collision stops with the checkout unchanged by the step
+        that failed.
+        """
+        branch = self._validated_branch(base_branch)
+        tip = _require_oid(base_tip, "base tip")
+        if not isinstance(expected_snapshot, Snapshot):
+            raise GitRefused(
+                "the observed snapshot of the retained checkout is required"
+            )
+        current = self.snapshot()
+        same_root = _real(current.root) == _real(expected_snapshot.root)
+        same_common = _real(current.common_dir) == _real(expected_snapshot.common_dir)
+        if not (same_root and same_common):
+            raise GitRefused("this is not the checkout that was observed")
+        if current.fingerprint != expected_snapshot.fingerprint:
+            raise GitRefused("the retained checkout changed since it was observed")
+        if current.dirty:
+            raise GitRefused("the retained checkout has uncommitted changes")
+        if current.conflicts:
+            raise GitRefused("the retained checkout has unmerged paths")
+        if current.operations:
+            raise GitRefused(
+                f"the retained checkout has {', '.join(current.operations)} in progress"
+            )
+        mine = _worktree_entry(current.worktrees, current.root)
+        if mine is None:
+            raise GitRefused("the retained checkout is not in the worktree inventory")
+        if mine.locked or mine.prunable:
+            raise GitRefused("the retained checkout is locked or prunable")
+        ref = f"refs/heads/{branch}"
+        for entry in current.worktrees:
+            if entry.branch == branch and _real(entry.path) != _real(current.root):
+                raise GitRefused(
+                    f"{ref} is checked out in {entry.path}; use that retained checkout"
+                )
+        if self.resolve_ref(tip) != tip:
+            raise GitRefused("the base tip is not an available commit; fetch it first")
+        record = self._head_record(ref)
+        if record is None:
+            raise GitRefused(f"local {ref} does not exist and is not created here")
+        local, kind, symref = record
+        if symref or kind != "commit":
+            raise GitRefused(f"local {ref} is not a plain branch")
+        if local != tip and not self.is_ancestor(local, tip):
+            raise GitRefused(
+                f"local {ref} has commits that are not on the base tip; left untouched"
+            )
+
+        top = GitRepository(current.root, timeout=self.timeout)
+        if current.branch != branch:
+            try:
+                top.run(
+                    "-c",
+                    "submodule.recurse=false",
+                    "switch",
+                    "--no-guess",
+                    "--no-recurse-submodules",
+                    "--no-overwrite-ignore",
+                    branch,
+                )
+            except GitError as exc:
+                raise GitError(
+                    f"could not switch to {branch}: {exc}", uncertain=exc.uncertain
+                ) from exc
+        if local != tip:
+            try:
+                top.run(
+                    "-c",
+                    "submodule.recurse=false",
+                    "merge",
+                    "--ff-only",
+                    "--no-autostash",
+                    "--no-overwrite-ignore",
+                    "--no-edit",
+                    tip,
+                )
+            except GitError as exc:
+                raise GitError(
+                    f"could not fast-forward {branch} to {tip}; the checkout may now "
+                    f"be on {branch} at its previous tip: {exc}",
+                    uncertain=exc.uncertain,
+                ) from exc
+        final = top.snapshot()
+        if (
+            final.branch != branch
+            or final.head != tip
+            or final.dirty
+            or final.conflicts
+            or final.operations
+        ):
+            raise GitError(
+                f"the retained checkout is not clean on {branch} at {tip} afterwards",
+                uncertain=True,
+            )
+        return final
+
+    def delete_local_head(self, branch: str, expected_oid: str) -> None:
+        """Delete local branch ``branch`` only while it is exactly ``expected_oid``.
+
+        ``branch`` is the short name. Refused when the branch is checked out in any
+        worktree, is held by a rebase or bisect in progress, is a remote's default
+        branch, is symbolic, or no longer holds ``expected_oid``. The deletion is
+        an atomic compare-and-swap (``update-ref -d <ref> <old>``), so a ref that
+        moves between the check and the delete survives.
+        """
+        name = self._validated_branch(branch)
+        expected = _require_oid(expected_oid, "expected branch OID")
+        ref = f"refs/heads/{name}"
+        record = self._head_record(ref)
+        if record is None:
+            raise GitRefused(f"{ref} does not exist")
+        oid, kind, symref = record
+        if symref or kind != "commit":
+            raise GitRefused(f"{ref} is not a plain branch; kept")
+        if oid != expected:
+            raise GitRefused(f"{ref} is {oid}, not the expected {expected}; kept")
+        reason = self._branch_in_use(name)
+        if reason is not None:
+            raise GitRefused(f"{ref} is {reason}; kept")
+        self.run("update-ref", "-d", "--no-deref", ref, expected)
+        if self._head_record(ref) is not None:
+            raise GitError(f"{ref} still exists after its deletion", uncertain=True)
+        removed = self.run(
+            "config", "--local", "--remove-section", f"branch.{name}", check=False
+        )
+        if removed.returncode != 0 and not (
+            removed.returncode == 128 and b"no such section" in removed.stderr
+        ):
+            stderr = redact_credentials(removed.stderr.decode("utf-8", "replace"))
+            raise GitError(
+                f"{ref} was deleted but its branch configuration remains: "
+                f"{stderr.strip()[:300]}"
+            )
+
+    def delete_remote_head(self, remote: str, branch: str, expected_oid: str) -> None:
+        """Delete ``branch`` on ``remote`` only while it is exactly ``expected_oid``.
+
+        The push carries an explicit ``--force-with-lease=<ref>:<expected_oid>``
+        so the server rejects the deletion of a ref that moved, and the absence
+        is verified against the remote afterwards. A remote's default branch is
+        refused. Hooks run normally; nothing is retried.
+        """
+        name = self._require_remote(remote)
+        short = self._validated_branch(branch)
+        expected = _require_oid(expected_oid, "expected branch OID")
+        ref = f"refs/heads/{short}"
+        advertised = self._advertised_heads(name, ref).get(ref)
+        if advertised is None:
+            raise GitRefused(f"{name} does not advertise {ref}")
+        if advertised != expected:
+            raise GitRefused(
+                f"{name} {ref} is {advertised}, not the expected {expected}; kept"
+            )
+        default = self._remote_default_ref(name)
+        if default is None:
+            raise GitRefused(f"{name} default branch is not observable; kept")
+        if default == ref:
+            raise GitRefused(f"{name} {ref} is the default branch; kept")
+        try:
+            self.run(
+                "push",
+                "--porcelain",
+                "--no-recurse-submodules",
+                f"--force-with-lease={ref}:{expected}",
+                "--",
+                name,
+                f":{ref}",
+            )
+        except GitError as exc:
+            try:
+                observed = self._advertised_heads(name, ref).get(ref)
+            except GitError as observe_error:
+                raise GitError(
+                    "remote delete was dispatched but its actual outcome is unavailable",
+                    uncertain=True,
+                ) from observe_error
+            if observed is None:
+                return
+            raise GitError(
+                f"remote delete response failed and {name} {ref} remains; reconcile before retry",
+                uncertain=True,
+            ) from exc
+        try:
+            still = self._advertised_heads(name, ref).get(ref)
+        except GitError as exc:
+            raise GitError(
+                f"the delete was sent but {name} {ref} could not be verified: {exc}",
+                uncertain=True,
+            ) from exc
+        if still is not None:
+            raise GitError(
+                f"{name} still advertises {ref} after the delete was accepted",
+                uncertain=True,
+            )
+
+    def remove_worktree(
+        self, path: Path, expected_head: str, expected_branch: str | None
+    ) -> None:
+        """Remove one linked worktree through ``git worktree remove`` (never forced).
+
+        Refused, with nothing changed, unless the worktree belongs to this
+        repository's common directory, is a linked worktree (not the main
+        checkout) that does not contain the checkout this instance was opened on
+        or the process's working directory, is not locked or missing, is exactly
+        at ``expected_head`` on ``expected_branch`` (``None`` for detached), has no
+        staged, unstaged, untracked, conflicted, in-progress or *ignored* files and
+        no Git lock, and :func:`worktree_activity` reports it ``INACTIVE``. Every
+        proof is taken twice immediately before the removal; any difference refuses.
+        """
+        head = _require_oid(expected_head, "expected worktree HEAD")
+        branch = (
+            None if expected_branch is None else self._validated_branch(expected_branch)
+        )
+        target = _real(path)
+        entry = next(
+            (item for item in self._worktrees() if _real(item.path) == target), None
+        )
+        if entry is None:
+            raise GitRefused(f"{path} is not a worktree of this repository")
+        first = self._prove_worktree_removable(entry, head, branch)
+        if self._prove_worktree_removable(entry, head, branch) != first:
+            raise GitRefused(f"{entry.path} changed while it was being inspected")
+        try:
+            self.run("worktree", "remove", "--", str(entry.path))
+        except GitError as exc:
+            raise GitError(
+                f"git worktree remove failed; the tree may be partly removed: {exc}",
+                uncertain=True,
+            ) from exc
+        if os.path.lexists(entry.path) or any(
+            _real(item.path) == target for item in self._worktrees()
+        ):
+            raise GitError(
+                f"{entry.path} is still present after its removal", uncertain=True
+            )
+
+    def _prove_worktree_removable(
+        self, entry: Worktree, head: str, branch: str | None
+    ) -> str:
+        """Return the checkout's fingerprint when every removal proof holds."""
+        where = entry.path
+        if entry.prunable:
+            raise GitRefused(f"{where} is missing; stale metadata is not removed here")
+        if entry.locked:
+            raise GitRefused(f"{where} is locked; kept")
+        if entry.head != head or entry.branch != branch:
+            raise GitRefused(f"{where} is not at the expected head and branch; kept")
+        real = _real(where)
+        try:
+            invoking = (self.path, Path(os.getcwd()))
+        except OSError as exc:
+            raise GitRefused(
+                f"the invoking directory cannot be determined ({exc.strerror}); kept"
+            ) from exc
+        for protected in invoking:
+            if _within(_real(protected), real):
+                raise GitRefused(f"{where} contains the invoking checkout; kept")
+        top = GitRepository(where, timeout=self.timeout)
+        common = top._common_dir()
+        if _real(common) != _real(self._common_dir()):
+            raise GitRefused(f"{where} belongs to a different repository; kept")
+        gitdir = top._git_dir()
+        if _real(gitdir) == _real(common):
+            raise GitRefused(f"{where} is the main checkout; kept")
+        observed = top.snapshot()
+        if _real(observed.root) != real:
+            raise GitRefused(f"{where} is not the root of its checkout; kept")
+        if observed.head != head or observed.branch != branch:
+            raise GitRefused(f"{where} is not at the expected head and branch; kept")
+        if observed.dirty or observed.conflicts or observed.operations:
+            raise GitRefused(f"{where} has uncommitted or in-progress work; kept")
+        ignored = top._ignored_entries()
+        if ignored:
+            shown = ", ".join(repr(name) for name in ignored[:3])
+            raise GitRefused(
+                f"{where} holds {len(ignored)} ignored path(s) ({shown}); kept"
+            )
+        locks = [
+            os.path.join(os.fsencode(gitdir), b"index.lock"),
+            os.path.join(os.fsencode(gitdir), b"HEAD.lock"),
+        ]
+        if branch is not None:
+            ref_lock = os.fsencode(f"refs/heads/{branch}.lock")
+            locks.append(os.path.join(os.fsencode(common), ref_lock))
+        for lock in locks:
+            if _lstat_or_none(lock) is not None:
+                raise GitRefused(f"{where} has a Git lock ({os.fsdecode(lock)}); kept")
+        activity = worktree_activity(where)
+        if activity.status != "INACTIVE":
+            raise GitRefused(f"{where} is not provably idle ({activity.reason}); kept")
+        return observed.fingerprint
+
+    def _ignored_entries(self) -> tuple[str, ...]:
+        """Ignored paths in this checkout (directories collapse to ``dir/``)."""
+        raw = self.run(
+            "status",
+            "--porcelain=v2",
+            "-z",
+            "--untracked-files=normal",
+            "--ignored=traditional",
+            "--no-renames",
+            "--ignore-submodules=none",
+        ).stdout
+        if raw and not raw.endswith(b"\0"):
+            raise GitError("unterminated git status output")
+        tokens = raw.split(b"\0")[:-1]
+        return tuple(os.fsdecode(token[2:]) for token in tokens if token[:2] == b"! ")
+
+    # -- landing proof ------------------------------------------------------
+
+    def pr_head(self, remote: str, number: int) -> str | None:
+        """Read GitHub's read-only PR head ref in the actual base namespace.
+
+        None means the exact advertised PR ref is absent, not a landed-head
+        proof. Malformed, contradictory or inaccessible evidence raises.
+        """
+        if type(number) is not int or number <= 0:
+            raise ValueError("PR number must be a positive integer")
+        name = self._require_remote(remote)
+        ref = f"refs/pull/{number}/head"
+        raw = self.run("ls-remote", "--refs", "--", name, ref).stdout
+        rows = [line.split(b"\t") for line in raw.splitlines() if line]
+        if not rows:
+            return None
+        if len(rows) != 1 or len(rows[0]) != 2 or rows[0][1] != ref.encode():
+            raise GitError("PR head advertisement is contradictory")
+        oid = rows[0][0].decode("ascii", "replace")
+        if _OID_RE.fullmatch(oid) is None:
+            raise GitError("PR head advertisement has an invalid object identity")
+        return oid
+
+    def whole_change_landed(
+        self, candidate_head: str, landing: str, base_tip: str
+    ) -> bool:
+        """Whether the candidate's entire net change is part of the landing.
+
+        ``True`` requires ``landing`` to be reachable from ``base_tip`` and either
+        the candidate to be an ancestor of ``landing`` (merge/fast-forward), or the
+        candidate's complete tree delta against its fork point to have exactly
+        the same paths, modes and full before/after blob identities as the delta
+        the landing itself introduced: one squash commit, or the same number
+        of linear commits as the candidate for a rebase landing. A candidate with
+        added work, a partial inclusion, a net-empty change or an ambiguous fork
+        point is ``False``; ``git cherry`` is never the proof. Nothing is
+        written. Unknown or non-commit revisions raise.
+        """
+        candidate = self._require_commit(candidate_head, "candidate head")
+        landed = self._require_commit(landing, "landing commit")
+        tip = self._require_commit(base_tip, "base tip")
+        if not self.is_ancestor(landed, tip):
+            return False
+        if self.is_ancestor(candidate, landed):
+            return True
+        bases = self.run("merge-base", "--all", candidate, landed, check=False)
+        if bases.returncode == 1:
+            return False
+        if bases.returncode != 0:
+            raise GitError("git merge-base failed")
+        forks = [line for line in bases.stdout.split(b"\n") if line]
+        if len(forks) != 1:
+            return False
+        fork = forks[0].decode("ascii", "replace")
+        if _OID_RE.fullmatch(fork) is None:
+            raise GitError("git returned an invalid merge base")
+        wanted = self._net_change_identity(fork, candidate)
+        if wanted is None:
+            return False
+        count_raw = self.run(
+            "rev-list", "--count", "--no-merges", f"{fork}..{candidate}"
+        ).stdout
+        try:
+            count = int(count_raw)
+        except ValueError:
+            raise GitError("git returned an invalid commit count") from None
+        for width in sorted({1, count}):
+            if width < 1:
+                continue
+            parent = self._landing_parent(landed, width)
+            if (
+                parent is not None
+                and self._net_change_identity(parent, landed) == wanted
+            ):
+                return True
+        return False
+
+    def _require_commit(self, oid: str, what: str) -> str:
+        value = _require_oid(oid, what)
+        if self.resolve_ref(value) != value:
+            raise GitError(f"{what} {value} is not an available commit")
+        return value
+
+    def _landing_parent(self, landing: str, width: int) -> str | None:
+        """Parent of the ``width``-th first-parent commit back, if all are linear."""
+        raw = self.run(
+            "rev-list", "--first-parent", "--parents", "-n", str(width), landing
+        ).stdout
+        rows = [line.split() for line in raw.split(b"\n") if line]
+        if len(rows) != width or any(len(row) != 2 for row in rows):
+            return None
+        parent = rows[-1][1].decode("ascii", "replace")
+        return parent if _OID_RE.fullmatch(parent) else None
+
+    def _net_change_identity(self, old: str, new: str) -> str | None:
+        """Exact path/mode/blob identity of the complete net delta; None if empty."""
+        diff = self.run(
+            "diff-tree",
+            "-r",
+            "--raw",
+            "--no-abbrev",
+            "--no-commit-id",
+            "-z",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-renames",
+            "--ignore-submodules=none",
+            old,
+            new,
+        ).stdout
+        if not diff:
+            return None
+        return hashlib.sha256(diff).hexdigest()
+
 
 def _lower_identity(identity: tuple[str, str] | None) -> tuple[str, str] | None:
     return None if identity is None else (identity[0], identity[1].lower())
@@ -751,3 +1607,428 @@ def _operations(git_dir: Path) -> tuple[str, ...]:
         if present(marker):
             found.add(name)
     return tuple(sorted(found))
+
+
+def _verify_selected_checkout(
+    requested: Path, root: Path, common_dir: Path, git_dir: Path
+) -> None:
+    """Prove Git selected the checkout that really contains ``requested``.
+
+    Repository configuration (``core.worktree``) or an inherited setting can make
+    Git report another repository's work tree. The reported root must contain the
+    requested directory, the git directory must live in the common directory, and
+    the root's ``.git`` must lead back to that git directory.
+    """
+    if not _within(_real(requested), _real(root)):
+        raise GitError(
+            f"git selected the work tree {root}, which does not contain {requested}"
+        )
+    if not _within(_real(git_dir), _real(common_dir)):
+        raise GitError("git selected a git directory outside its common directory")
+    link = os.path.join(os.fsencode(root), b".git")
+    found = _lstat_or_none(link)
+    if found is None:
+        raise GitError(f"the selected work tree {root} has no .git link")
+    if stat.S_ISDIR(found.st_mode):
+        target = os.fsdecode(link)
+    else:
+        text = _read_small(link)
+        if text is None or not text.startswith("gitdir:"):
+            raise GitError(f"the .git file of {root} is not a gitdir link")
+        target = os.path.join(root, text[len("gitdir:") :].strip())
+    if _real(target) != _real(git_dir):
+        raise GitError(
+            f"the work tree {root} does not lead to the selected git directory"
+        )
+
+
+def _real(path: str | os.PathLike[str]) -> str:
+    return os.path.realpath(path)
+
+
+def _within(path: str, root: str) -> bool:
+    """True when real path ``path`` is ``root`` or lies below it."""
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def _require_oid(value: object, what: str) -> str:
+    if not isinstance(value, str) or _OID_RE.fullmatch(value) is None:
+        raise GitRefused(f"{what} must be a full lowercase object id")
+    return value
+
+
+def _check_head_name(name: str) -> None:
+    prefix = "refs/heads/"
+    if not name.startswith(prefix) or len(name) == len(prefix):
+        raise GitError(f"unexpected ref {name!r} in a branch inventory")
+
+
+def _worktree_entry(worktrees: Sequence[Worktree], root: Path) -> Worktree | None:
+    wanted = _real(root)
+    for entry in worktrees:
+        if _real(entry.path) == wanted:
+            return entry
+    return None
+
+
+def _worktree_git_dirs(common: Path) -> list[bytes]:
+    """The common directory (main checkout) plus every linked worktree's admin dir."""
+    base = os.fsencode(common)
+    dirs = [base]
+    try:
+        with os.scandir(os.path.join(base, b"worktrees")) as entries:
+            admin = [e.path for e in entries if e.is_dir(follow_symlinks=False)]
+        dirs.extend(sorted(admin))
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise GitError(f"cannot list linked worktree metadata: {exc.strerror}") from exc
+    return dirs
+
+
+def _read_small(path: bytes) -> str | None:
+    try:
+        with open(path, "rb") as handle:
+            return os.fsdecode(handle.read(4096)).strip()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise GitError(f"cannot read {os.fsdecode(path)!r}: {exc.strerror}") from exc
+
+
+def _operation_branches(gitdir: bytes) -> set[str]:
+    """Branch names/refs a rebase or bisect in progress under ``gitdir`` restores."""
+    held: set[str] = set()
+    for name in (b"rebase-merge", b"rebase-apply"):
+        directory = os.path.join(gitdir, name)
+        if _lstat_or_none(directory) is None:
+            continue
+        head_name = _read_small(os.path.join(directory, b"head-name"))
+        if head_name is None:
+            if _lstat_or_none(os.path.join(directory, b"applying")) is not None:
+                continue  # git am: HEAD itself already names the branch
+            raise GitError(
+                f"cannot tell which branch the operation in {os.fsdecode(directory)!r} "
+                "will restore"
+            )
+        held.add(head_name)
+    start = _read_small(os.path.join(gitdir, b"BISECT_START"))
+    if start is not None:
+        held.add(start)
+    return held
+
+
+# -- worktree activity ----------------------------------------------------------
+
+_PROC_ALL_PIDS = 1
+_PROC_PIDVNODEPATHINFO = 9
+_VNODEPATHINFO_SIZE = 2352
+_LIBPROC = "/usr/lib/libproc.dylib"
+_PS_DEADLINE = 10.0
+
+
+class _VInfoStat(ctypes.Structure):
+    _fields_ = [
+        ("vst_dev", ctypes.c_uint32),
+        ("vst_mode", ctypes.c_uint16),
+        ("vst_nlink", ctypes.c_uint16),
+        ("vst_ino", ctypes.c_uint64),
+        ("vst_uid", ctypes.c_uint32),
+        ("vst_gid", ctypes.c_uint32),
+        ("vst_atime", ctypes.c_int64),
+        ("vst_atimensec", ctypes.c_int64),
+        ("vst_mtime", ctypes.c_int64),
+        ("vst_mtimensec", ctypes.c_int64),
+        ("vst_ctime", ctypes.c_int64),
+        ("vst_ctimensec", ctypes.c_int64),
+        ("vst_birthtime", ctypes.c_int64),
+        ("vst_birthtimensec", ctypes.c_int64),
+        ("vst_size", ctypes.c_int64),
+        ("vst_blocks", ctypes.c_int64),
+        ("vst_blksize", ctypes.c_int32),
+        ("vst_flags", ctypes.c_uint32),
+        ("vst_gen", ctypes.c_uint32),
+        ("vst_rdev", ctypes.c_uint32),
+        ("vst_qspare", ctypes.c_int64 * 2),
+    ]
+
+
+class _VInfo(ctypes.Structure):
+    _fields_ = [
+        ("vi_stat", _VInfoStat),
+        ("vi_type", ctypes.c_int),
+        ("vi_pad", ctypes.c_int),
+        ("vi_fsid", ctypes.c_int32 * 2),
+    ]
+
+
+class _VInfoPath(ctypes.Structure):
+    _fields_ = [("vip_vi", _VInfo), ("vip_path", ctypes.c_char * 1024)]
+
+
+class _VnodePathInfo(ctypes.Structure):
+    """``struct proc_vnodepathinfo``: the current and root directory of a process."""
+
+    _fields_ = [("pvi_cdir", _VInfoPath), ("pvi_rdir", _VInfoPath)]
+
+
+@dataclass(frozen=True)
+class _ProcessScan:
+    """What one pass over the process table could and could not observe."""
+
+    source: str
+    cwds: tuple[tuple[int, str], ...]
+    foreign: int  # other-user processes whose working directory the OS withholds
+    gaps: tuple[str, ...]  # reasons the inventory cannot be trusted as complete
+
+
+def _process_owners() -> dict[int, int]:
+    """``pid -> effective uid`` for every process, from ``ps``."""
+    try:
+        result = subprocess.run(
+            ["ps", "-axo", "pid=,uid="],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=_PS_DEADLINE,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise GitError(f"cannot run ps: {exc}") from exc
+    if result.returncode != 0:
+        raise GitError(f"ps failed (exit {result.returncode})")
+    owners: dict[int, int] = {}
+    for line in result.stdout.decode("ascii", "replace").splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        numeric = all(item.isascii() and item.isdigit() for item in fields)
+        if len(fields) != 2 or not numeric:
+            raise GitError("unparseable ps output")
+        owners[int(fields[0])] = int(fields[1])
+    return owners
+
+
+def _scan_libproc() -> _ProcessScan:
+    """macOS: every process's current directory through ``proc_pidinfo``."""
+    if ctypes.sizeof(_VnodePathInfo) != _VNODEPATHINFO_SIZE:
+        raise GitError("unexpected libproc structure layout")
+    try:
+        lib = ctypes.CDLL(_LIBPROC, use_errno=True)
+        list_pids = lib.proc_listpids
+        pid_info = lib.proc_pidinfo
+    except (OSError, AttributeError) as exc:
+        raise GitError(f"cannot load libproc: {exc}") from exc
+    list_pids.argtypes = [
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    list_pids.restype = ctypes.c_int
+    pid_info.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint64,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    pid_info.restype = ctypes.c_int
+
+    needed: int = list_pids(_PROC_ALL_PIDS, 0, None, 0)
+    if needed <= 0:
+        raise GitError("proc_listpids reported no processes")
+    capacity = needed * 2 + 4096
+    for _ in range(4):
+        buffer = (ctypes.c_int32 * (capacity // 4))()
+        filled: int = list_pids(_PROC_ALL_PIDS, 0, buffer, ctypes.sizeof(buffer))
+        if filled <= 0:
+            raise GitError("proc_listpids failed")
+        if filled < ctypes.sizeof(buffer):
+            break  # the list did not fill the buffer: it is not truncated
+        capacity *= 2
+    else:
+        raise GitError("the process list kept growing; the inventory is incomplete")
+    pids = [buffer[index] for index in range(filled // 4) if buffer[index] > 0]
+
+    cwds: list[tuple[int, str]] = []
+    denied: list[int] = []
+    gaps: list[str] = []
+    for pid in pids:
+        info = _VnodePathInfo()
+        ctypes.set_errno(0)
+        written: int = pid_info(
+            pid, _PROC_PIDVNODEPATHINFO, 0, ctypes.byref(info), ctypes.sizeof(info)
+        )
+        if written == ctypes.sizeof(info):
+            raw = bytes(info.pvi_cdir.vip_path)
+            if raw:
+                cwds.append((pid, os.fsdecode(raw)))
+            else:
+                gaps.append(f"pid {pid}: no working directory path")
+            continue
+        code = ctypes.get_errno()
+        if code == errno.ESRCH:
+            continue  # exited, or a zombie, which holds no working directory
+        if code in (errno.EPERM, errno.EACCES):
+            denied.append(pid)
+        else:
+            gaps.append(f"pid {pid}: libproc error {code}")
+
+    foreign = 0
+    if denied:
+        try:
+            owners = _process_owners()
+        except GitError as exc:
+            gaps.append(
+                f"{len(denied)} processes withheld their working directory and their "
+                f"owner could not be established: {exc}"
+            )
+        else:
+            me = os.geteuid()
+            for pid in denied:
+                owner = owners.get(pid)
+                if owner is None:
+                    continue  # exited since
+                if owner == me:
+                    gaps.append(
+                        f"pid {pid}: a process of this user withheld its directory"
+                    )
+                else:
+                    foreign += 1
+    if os.getpid() not in {pid for pid, _ in cwds}:
+        gaps.append("this process is missing from the inventory")
+    return _ProcessScan("libproc", tuple(cwds), foreign, tuple(gaps))
+
+
+def _scan_procfs() -> _ProcessScan:
+    """Linux: every process's current directory through ``/proc/<pid>/cwd``."""
+    try:
+        names = os.listdir("/proc")
+    except OSError as exc:
+        raise GitError(f"cannot list /proc: {exc.strerror}") from exc
+    me = os.geteuid()
+    cwds: list[tuple[int, str]] = []
+    gaps: list[str] = []
+    foreign = 0
+    for name in names:
+        if not (name.isascii() and name.isdigit()):
+            continue
+        pid = int(name)
+        try:
+            cwds.append((pid, os.readlink(f"/proc/{name}/cwd")))
+        except (FileNotFoundError, ProcessLookupError, NotADirectoryError):
+            continue  # exited, or a zombie
+        except PermissionError:
+            try:
+                owner = os.stat(f"/proc/{name}").st_uid
+            except OSError:
+                continue
+            if owner == me:
+                gaps.append(f"pid {pid}: a process of this user withheld its directory")
+            else:
+                foreign += 1
+        except OSError as exc:
+            gaps.append(f"pid {pid}: {exc.strerror}")
+    if os.getpid() not in {pid for pid, _ in cwds}:
+        gaps.append("this process is missing from the inventory")
+    return _ProcessScan("procfs", tuple(cwds), foreign, tuple(gaps))
+
+
+def _scan_processes() -> _ProcessScan:
+    if sys.platform == "darwin":
+        return _scan_libproc()
+    if sys.platform.startswith("linux"):
+        return _scan_procfs()
+    raise GitError(f"process inspection is not implemented on {sys.platform}")
+
+
+def _inside_tree(cwd: str, root: tuple[int, int]) -> bool | None:
+    """Whether ``cwd`` is the tree with device/inode ``root`` or below it.
+
+    Identity, not spelling: case-insensitive, normalising and symlinked paths
+    still match. ``None`` when ``cwd`` cannot be resolved from here (deleted, or
+    in another mount namespace); other filesystem errors propagate.
+    """
+    current = cwd
+    unresolved = False
+    while True:
+        try:
+            st = os.stat(current)
+        except (FileNotFoundError, NotADirectoryError):
+            return None
+        except PermissionError:
+            unresolved = True
+            parent = os.path.dirname(current)
+            if parent == current:
+                return None
+            current = parent
+            continue
+        if (st.st_dev, st.st_ino) == root:
+            return True
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None if unresolved else False
+        current = parent
+
+
+def worktree_activity(path: Path | str) -> Activity:
+    """Whether any process has its working directory inside the tree at ``path``.
+
+    Observation is real, not inferred: ``proc_pidinfo`` through ``libproc`` on
+    macOS and ``/proc/<pid>/cwd`` on Linux. ``ACTIVE`` (a process is inside)
+    always wins. ``UNKNOWN`` when the tree cannot be examined, the platform is
+    unsupported, the inventory is unavailable/truncated, any live process
+    withholds its directory, or a directory cannot be resolved. INACTIVE
+    requires a complete working-directory inventory. This boundary does not
+    inventory open files, executables, or unsaved editor buffers.
+    """
+    try:
+        root = os.stat(_real(path))
+    except OSError as exc:
+        return Activity("UNKNOWN", f"cannot examine {path}: {exc.strerror}")
+    if not stat.S_ISDIR(root.st_mode):
+        return Activity("UNKNOWN", f"{path} is not a directory")
+    try:
+        scan = _scan_processes()
+    except (GitError, OSError) as exc:
+        return Activity("UNKNOWN", f"the process inventory is unavailable: {exc}")
+
+    identity = (root.st_dev, root.st_ino)
+    verdicts: dict[str, bool | None] = {}
+    inside: list[int] = []
+    unresolved = 0
+    gaps = list(scan.gaps)
+    for pid, cwd in scan.cwds:
+        if cwd not in verdicts:
+            try:
+                verdicts[cwd] = _inside_tree(cwd, identity)
+            except OSError as exc:
+                verdicts[cwd] = None
+                gaps.append(f"pid {pid}: cannot resolve {cwd!r}: {exc.strerror}")
+        verdict = verdicts[cwd]
+        if verdict:
+            inside.append(pid)
+        elif verdict is None:
+            unresolved += 1
+    if scan.foreign:
+        gaps.append(f"{scan.foreign} other-user process directories are withheld")
+    if unresolved:
+        gaps.append(f"{unresolved} process directories cannot be resolved")
+    if inside:
+        extra = f" and {len(inside) - 1} more" if len(inside) > 1 else ""
+        return Activity(
+            "ACTIVE",
+            f"pid {inside[0]}{extra} has its working directory inside this tree",
+        )
+    if gaps:
+        shown = "; ".join(gaps[:3])
+        more = f" (+{len(gaps) - 3} more)" if len(gaps) > 3 else ""
+        return Activity(
+            "UNKNOWN", f"the process inventory is incomplete: {shown}{more}"
+        )
+    return Activity(
+        "INACTIVE",
+        f"no process in the complete {scan.source} inventory of {len(scan.cwds)} "
+        "has its working directory inside this tree; open files, executables and "
+        "editor buffers are not inventoried (only working directories are observed)",
+    )

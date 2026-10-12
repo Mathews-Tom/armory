@@ -1,10 +1,13 @@
-"""Read-only GitHub provider evidence for the ship workflow.
+"""GitHub provider evidence and the single guarded merge mutation for the ship workflow.
 
-Everything here is an inspection: it issues ``gh api --method GET`` requests
-through the user's ``gh`` credential store and never extracts tokens or
-performs a write.  Provider responses are validated at the boundary; evidence
-that cannot be established is reported through ``Observation.issues`` (or a
-``ProviderError``) and never defaults to an empty or green answer.
+Evidence comes from the user's ``gh`` credential store; this module never reads
+or extracts tokens.  Reads are ``gh api --method GET`` requests, except
+``queue_state``: merge-queue entries exist only in GraphQL, so it sends one
+read-only ``query`` with ``--method POST``.  The only mutation is
+``GitHub.merge`` (one ``gh pr merge`` command, described below).  Provider
+responses are validated at the boundary; evidence that cannot be established
+is reported through ``Observation.issues`` (or a ``ProviderError``) and never
+defaults to an empty or green answer.
 
 Conventions the gate engine relies on
 -------------------------------------
@@ -32,6 +35,41 @@ Conventions the gate engine relies on
 * ``PullRequest.head_repo == ""`` means the provider reports no head
   repository (for example a deleted fork).
 * ``GitHub(deadline=...)`` is an absolute ``time.monotonic()`` value.
+* ``read_pr`` returns identity, state and landing facts of one PR without
+  reading checks, runs or reviews, so a merged PR (CI long expired) or an
+  interrupted run keeps its facts.  ``base_tip`` reads the live branch commit,
+  never PR or run metadata.
+* ``Observation.queue_required`` is true when a readable, applicable ruleset
+  ``merge_queue`` rule exists.  The queue's own ``merge_method`` then replaces
+  the free choice of method: ``Repository.allowed_merge_methods`` is narrowed
+  to it (and, as for every rule, to the repository's enabled methods).  With
+  ``policy_known=False`` it is a lower bound only.  Classic branch protection's
+  "require merge queue" setting is not exposed by the REST endpoints read
+  here; such a queue is discovered only when ``queue_state`` reports it after
+  a merge request.
+* ``merge`` dispatches exactly one ``gh pr merge <n> --repo <host>/<repo>
+  --match-head-commit <sha> --<method>``: never ``--admin``, ``--delete-branch``,
+  ``--auto`` or an unguarded fallback, and it is never retried.  Success only
+  means gh accepted the command (a PR that was queued, armed for auto-merge or
+  already merged also exits 0); callers poll ``read_pr`` until ``MERGED``.
+  ``ProviderError.uncertain`` is true whenever the command may have reached
+  GitHub with an unknown result (timeout, transport failure, signal,
+  unrecognised failure); every other failure is a definite refusal or the
+  command was never dispatched.  Stale head/base refusals are ``WAITING``.
+* ``queue_state`` answers only for the expected head: ``QUEUED`` (a merge-queue
+  entry exists), ``AUTO_MERGE`` (auto-merge is armed, no entry yet) or ``IDLE``
+  (GraphQL and REST agree that neither exists).  Head drift, a PR that is no
+  longer open, disagreeing sources, or any missing/partial/unreadable evidence
+  raises ``ProviderError``; it is never ``IDLE``.  ``IDLE`` read right after an
+  accepted command can still be replication lag, so it is not proof that the
+  command was ignored.
+* ``landing_reachable(landing, base_tip)`` is a read-only proof from the
+  compare metadata of ``landing...base_tip`` in the base repository: ``True``
+  only for status ``ahead``/``identical`` with a merge base equal to
+  ``landing`` and a permalink naming exactly those two commits; proven
+  non-ancestry (``behind``/``diverged``) is ``False``.  Unknown commits,
+  inaccessible repositories and malformed or self-contradicting metadata raise
+  ``ProviderError``.  The (truncated) commit list and counts are never proof.
 """
 
 from __future__ import annotations
@@ -45,7 +83,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Literal
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 API_VERSION = "2026-03-10"
 PER_PAGE = 100
@@ -56,6 +94,11 @@ CALL_TIMEOUT = 60.0
 MAX_LOG_BYTES = 16 * 1024 * 1024
 NO_DEADLINE_RETRY_CAP = 60.0
 MERGE_METHODS = ("merge", "squash", "rebase")
+MERGE_TIMEOUT = 90.0
+HELP_TIMEOUT = 15.0
+MIN_MUTATION_WINDOW = 10.0
+_MERGE_FLAGS = {"merge": "--merge", "squash": "--squash", "rebase": "--rebase"}
+_REQUIRED_MERGE_FLAGS = ("--match-head-commit", "--repo", *_MERGE_FLAGS.values())
 
 _HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9._-]+$")
@@ -74,6 +117,30 @@ _NETWORK_RE = re.compile(
 )
 _PR_EVENT_PREFIX = "pull_request"
 _ACTIONS_APP = "github-actions"
+
+# Classification of a failed ``gh pr merge``: only a positively recognised
+# refusal or pre-dispatch failure is "certain"; anything else may have reached GitHub.
+_FLAG_ERROR_RE = re.compile(
+    r"^unknown (?:shorthand )?flag: |^flag needs an argument: |"
+    r'^invalid argument "[^\n]*" for "-|^accepts at most \d+ arg|'
+    r"^argument required when using |^specify only one of --|^only one of --merge|"
+    r"^--merge, --rebase, or --squash required",
+    re.IGNORECASE | re.MULTILINE,
+)
+_AUTH_RE = re.compile(
+    r"gh auth login|not logged in|bad credentials|\bHTTP 401\b", re.IGNORECASE
+)
+_NOT_MERGEABLE_RE = re.compile(r"\bis not mergeable\b", re.IGNORECASE)
+_HEAD_MOVED_RE = re.compile(r"head branch was modified", re.IGNORECASE)
+_BASE_MOVED_RE = re.compile(r"base branch was modified", re.IGNORECASE)
+_RATE_LIMIT_RE = re.compile(r"\bHTTP 429\b|rate limit|abuse detection", re.IGNORECASE)
+_AMBIGUOUS_RE = re.compile(
+    r"timeout|timed out|something went wrong|\bHTTP 5\d\d\b|connection (?:reset|refused|closed)|\bEOF\b|"
+    r"tls handshake|temporary failure|no such host|network is unreachable|broken pipe|"
+    r"try again later|service unavailable|bad gateway|gateway",
+    re.IGNORECASE,
+)
+_REJECTED_RE = re.compile(r"\bGraphQL:|\bHTTP (?:400|403|404|405|409|410|422)\b")
 
 #: Rules that do not gate a pull-request merge decision made from this observation.
 _IGNORED_RULES = frozenset(
@@ -96,9 +163,37 @@ _IGNORED_RULES = frozenset(
 
 Runner = Callable[[Sequence[str], float], "subprocess.CompletedProcess[bytes]"]
 
+QueueState = Literal["QUEUED", "AUTO_MERGE", "IDLE"]
+
+#: ``merge_method`` values of a ruleset ``merge_queue`` rule / GraphQL merge-method enums.
+MERGE_QUEUE_METHODS = ("MERGE", "SQUASH", "REBASE")
+
+_QUEUE_ENTRY_STATES = frozenset(
+    {"QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"}
+)
+#: Read-only GraphQL ``query`` (never a mutation); fields per the public GitHub GraphQL schema.
+_QUEUE_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){"
+    "repository(owner:$owner,name:$name){nameWithOwner "
+    "pullRequest(number:$number){number state merged headRefOid isInMergeQueue "
+    "autoMergeRequest{mergeMethod} mergeQueueEntry{state position}}}}"
+)
+_LANDING_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){"
+    "repository(owner:$owner,name:$name){nameWithOwner "
+    "pullRequest(number:$number){number state merged url headRefOid headRefName "
+    "baseRefName mergedAt mergeCommit{oid}}}}"
+)
+
 
 class ProviderError(RuntimeError):
-    """A provider read could not produce trustworthy evidence."""
+    """A provider read produced no trustworthy evidence, or a mutation did not complete.
+
+    ``uncertain`` is true only for a mutation that may have reached GitHub with
+    an unknown result; such an error must be reconciled against actual provider
+    state and never answered by repeating the mutation.  ``detail`` is a short
+    machine code (for example ``merge-head-changed``) or a redacted provider message.
+    """
 
     def __init__(
         self,
@@ -172,6 +267,7 @@ class Observation:
     issues: tuple[str, ...]
     require_current_base: bool = False
     required_apps: tuple[tuple[str, int], ...] = ()
+    queue_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -386,14 +482,28 @@ def _failure(proc: subprocess.CompletedProcess[bytes], response: _Response) -> _
         detail = stderr
     detail = _clean(detail)
     lowered = detail.lower()
+    graphql_limited = (
+        isinstance(payload, dict)
+        and isinstance(payload.get("errors"), list)
+        and any(
+            isinstance(error, dict)
+            and (
+                error.get("type") == "RATE_LIMITED"
+                or isinstance(error.get("message"), str)
+                and _RATE_LIMIT_RE.search(error["message"]) is not None
+            )
+            for error in payload["errors"]
+        )
+    )
     retry_after = _retry_after(response.headers.get("retry-after"))
     limited = status == 429 or (
-        status == 403
+        status in (200, 403)
         and (
             response.headers.get("x-ratelimit-remaining") == "0"
             or retry_after is not None
             or "rate limit" in lowered
             or "abuse" in lowered
+            or graphql_limited
         )
     )
     if limited:
@@ -406,7 +516,7 @@ def _failure(proc: subprocess.CompletedProcess[bytes], response: _Response) -> _
 
 
 class GitHub:
-    """Read-only observer for one repository on one GitHub host."""
+    """Observer for one repository on one GitHub host, plus the guarded PR merge."""
 
     def __init__(
         self,
@@ -418,7 +528,7 @@ class GitHub:
         sleep: Callable[[float], None] | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
-        if not _HOST_RE.match(host):
+        if not _HOST_RE.fullmatch(host):
             raise ValueError(f"invalid GitHub host: {_clean(host, 80)!r}")
         _check_repo(full_name)
         self.host = host
@@ -428,6 +538,7 @@ class GitHub:
         self._sleep: Callable[[float], None] = sleep or time.sleep
         self._clock: Callable[[], float] = clock or time.monotonic
         self._retries: list[RetryRecord] = []
+        self._merge_capable = False
 
     @property
     def retries(self) -> tuple[RetryRecord, ...]:
@@ -439,10 +550,14 @@ class GitHub:
         return None if self.deadline is None else self.deadline - self._clock()
 
     def _waiting(
-        self, op: str, message: str, status: int | None = None
+        self, op: str, message: str, status: int | None = None, detail: str = ""
     ) -> ProviderError:
         return ProviderError(
-            f"{op}: {message}", kind="WAITING", operation=op, http_status=status
+            f"{op}: {message}",
+            kind="WAITING",
+            operation=op,
+            http_status=status,
+            detail=detail,
         )
 
     def _get(self, path: str, op: str) -> tuple[Any, dict[str, str]]:
@@ -476,6 +591,10 @@ class GitHub:
             "-H", f"X-GitHub-Api-Version: {API_VERSION}",
             path,
         )  # fmt: skip
+        return self._dispatch(argv, op)
+
+    def _dispatch(self, argv: Sequence[str], op: str) -> _Response:
+        """Run one read-only ``gh api`` call, retrying transient failures within the deadline."""
         attempt = 0
         while True:
             attempt += 1
@@ -636,18 +755,33 @@ class GitHub:
     def branch_protected(self, full_name: str, ref: str) -> bool:
         """True when the branch is the default branch or any protection applies.
 
-        Missing, inaccessible or unreadable protection evidence raises; it is
-        never reported as unprotected.
+        A missing branch is accepted only after the readable, fully paginated
+        branch inventory independently confirms absence. Rules remain required.
         """
         _check_repo(full_name)
         branch = _branch_name(ref)
         op = f"branch-protected:{full_name}:{branch}"
         repo = self._object(_repo_path(full_name), f"{op}:repository")
+        if repo.text("full_name").lower() != full_name.lower():
+            raise _malformed(op, "protection repository identity does not match")
         if repo.text("default_branch") == branch:
             return True
-        if self._object(
-            f"{_repo_path(full_name)}/branches/{_ref_path(branch)}", f"{op}:branch"
-        ).flag("protected"):
+        path = f"{_repo_path(full_name)}/branches/{_ref_path(branch)}"
+        try:
+            protected = self._object(path, f"{op}:branch").flag("protected")
+        except ProviderError as error:
+            if error.http_status != 404:
+                raise
+            inventory = self._list(f"{_repo_path(full_name)}/branches", f"{op}:absence")
+            names = [item.text("name") for item in _objects(inventory, op, "branches")]
+            if branch in names or len(names) != len(set(names)):
+                raise _malformed(
+                    op, "branch absence inventory is contradictory"
+                ) from error
+            protected = (
+                False  # No current branch entity; active rules are still read below.
+            )
+        if protected:
             return True
         rules = self._list(
             f"{_repo_path(full_name)}/rules/branches/{_ref_path(branch)}", f"{op}:rules"
@@ -656,8 +790,7 @@ class GitHub:
         return bool(rules)
 
     def observe(self, number: int) -> Observation:
-        if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
-            raise ValueError("pull request number must be a positive integer")
+        _check_number(number)
         op = f"observe:{self.full_name}#{number}"
         repo_path = _repo_path(self.full_name)
         issues: list[str] = []
@@ -729,6 +862,7 @@ class GitHub:
                     op, "the live base ref changed during observation; observe again"
                 )
 
+        pr = self._with_landing(pr)
         return Observation(
             repo=Repository(canonical, self.host, default_branch, methods),
             pr=pr,
@@ -741,7 +875,395 @@ class GitHub:
             issues=tuple(dict.fromkeys(issues)),
             require_current_base=policy.require_current_base,
             required_apps=tuple(sorted(policy.required_apps)),
+            queue_required=policy.queue_required,
         )
+
+    # -- existing-PR facts, queue state and the guarded merge ----------------
+
+    def read_pr(self, number: int) -> PullRequest:
+        """Identity, state and landing facts of one existing PR; reads no CI evidence.
+
+        REST API 2026-03-10 omits the legacy merge field. A MERGED PR is
+        bound to GraphQL mergeCommit.oid and matching namespace/head/ref/state.
+        base_sha records the PR base; base_tip reads the live branch.
+        """
+        _check_number(number)
+        op = f"read-pr:{self.full_name}#{number}"
+        repo_path = _repo_path(self.full_name)
+        canonical = self._object(repo_path, f"{op}:repository").text("full_name")
+        if canonical.lower() != self.full_name.lower():
+            raise ProviderError(
+                f"{op}: provider resolved the repository as {_clean(canonical, 120)}, not {self.full_name}",
+                kind="BLOCKED", operation=op, detail="identity-mismatch",
+            )  # fmt: skip
+        pr, _ = _parse_pr(
+            self._get(f"{repo_path}/pulls/{number}", f"{op}:pull")[0],
+            f"{op}:pull", detailed=True, path="response",
+        )  # fmt: skip
+        if pr.number != number or pr.base_repo.lower() != canonical.lower():
+            raise _malformed(
+                f"{op}:pull", "pull request identity does not match the request"
+            )
+        if pr.head_repo and not _REPO_RE.fullmatch(pr.head_repo):
+            raise _malformed(
+                f"{op}:pull", "head repository is not a valid repository name"
+            )
+        if not _pull_url_matches(pr.url, self.host, canonical, number):
+            raise _malformed(
+                f"{op}:pull",
+                "pull request URL does not name the requested host, repository and number",
+            )
+        return self._with_landing(pr)
+
+    def base_tip(self, base_ref: str) -> str:
+        """Commit the live ``base_ref`` branch points to now (never cached PR or run metadata)."""
+        branch = _branch_name(base_ref)
+        op = f"base-tip:{self.full_name}:{branch}"
+        reply = self._object(
+            f"{_repo_path(self.full_name)}/branches/{_ref_path(branch)}", op
+        )
+        if reply.text("name") != branch:
+            raise ProviderError(
+                f"{op}: provider resolved the branch as {_clean(reply.text('name'), 80)}, not {branch}",
+                kind="BLOCKED", operation=op, detail="identity-mismatch",
+            )  # fmt: skip
+        commit = reply.obj("commit")
+        tip = commit.sha("sha")
+        url = commit.opt_text("url")
+        if url is not None and not urlsplit(url).path.lower().endswith(
+            f"/repos/{self.full_name}/commits/{tip}".lower()
+        ):
+            raise ProviderError(
+                f"{op}: the branch commit belongs to a different repository",
+                kind="BLOCKED", operation=op, detail="identity-mismatch",
+            )  # fmt: skip
+        return tip
+
+    def landing_reachable(self, landing: str, base_tip: str) -> bool:
+        """Whether commit ``landing`` is ``base_tip`` or one of its ancestors in this repository.
+
+        ``True`` is proven by the merge base of ``landing...base_tip`` being
+        ``landing`` with status ``ahead``/``identical``; ``behind``/``diverged``
+        is a proven ``False``.  Everything else (unknown commit, no access,
+        unsupported or contradictory metadata) raises ``ProviderError``.
+        """
+        _check_sha(landing, "landing")
+        _check_sha(base_tip, "base tip")
+        op = f"landing-reachable:{self.full_name}:{landing[:12]}...{base_tip[:12]}"
+        reply = self._object(
+            f"{_repo_path(self.full_name)}/compare/{landing}...{base_tip}?per_page=1&page=1",
+            op,
+        )
+        owner = self.full_name.split("/", 1)[0]
+        link = urlsplit(reply.text("permalink_url"))
+        prefix = f"/{self.full_name}/compare/{owner}:"
+        suffix = (
+            link.path[len(prefix) :]
+            if link.path.lower().startswith(prefix.lower())
+            else ""
+        )
+        halves = suffix.lower().split(f"...{owner.lower()}:")
+        api = urlsplit(reply.text("url"))
+        api_host = "api.github.com" if self.host == "github.com" else self.host
+        api_prefix = "" if self.host == "github.com" else "/api/v3"
+        api_path = f"{api_prefix}/repos/{self.full_name}/compare/{landing}...{base_tip}"
+        if (
+            link.scheme != "https"
+            or link.netloc.lower() != self.host.lower()
+            or link.query
+            or link.fragment
+            or len(halves) != 2
+            or any(not re.fullmatch(r"[0-9a-f]{7,64}", part) for part in halves)
+            or not landing.startswith(halves[0])
+            or not base_tip.startswith(halves[1])
+            or api.scheme != "https"
+            or api.netloc.lower() != api_host.lower()
+            or api.path.lower() != api_path.lower()
+            or api.query
+            or api.fragment
+        ):
+            raise _malformed(
+                op, "compare metadata does not name the requested full commits"
+            )
+        if reply.obj("base_commit").sha("sha") != landing:
+            raise _malformed(
+                op, "compare base commit is not the requested landing commit"
+            )
+        merge_base = reply.obj("merge_base_commit").sha("sha")
+        ahead, behind = reply.integer("ahead_by"), reply.integer("behind_by")
+        verdicts = {
+            "identical": (
+                ahead == 0 and behind == 0 and landing == base_tip == merge_base,
+                True,
+            ),
+            "ahead": (
+                ahead > 0
+                and behind == 0
+                and landing != base_tip
+                and merge_base == landing,
+                True,
+            ),
+            "behind": (
+                behind > 0
+                and ahead == 0
+                and landing != base_tip
+                and merge_base == base_tip,
+                False,
+            ),
+            "diverged": (
+                ahead > 0 and behind > 0 and merge_base not in (landing, base_tip),
+                False,
+            ),
+        }
+        verdict = verdicts.get(reply.text("status"))
+        if verdict is None or not verdict[0]:
+            raise _malformed(
+                op, "compare status, counts and merge base contradict each other"
+            )
+        return verdict[1]
+
+    def _with_landing(self, pr: PullRequest) -> PullRequest:
+        if pr.state != "MERGED":
+            return pr
+        op = f"landing:{self.full_name}#{pr.number}"
+        pull = self._graphql_pull(pr.number, _LANDING_QUERY, op)
+        if (
+            pull.text("state") != pr.state
+            or not pull.flag("merged")
+            or pull.sha("headRefOid") != pr.head_sha
+            or pull.text("headRefName") != pr.head_ref
+            or pull.text("baseRefName") != pr.base_ref
+            or pull.text("url") != pr.url
+            or pull.text("mergedAt") != pr.merged_at
+        ):
+            raise self._waiting(
+                op, "REST and GraphQL landing identities disagree; observe again"
+            )
+        return replace(pr, merge_commit_sha=pull.obj("mergeCommit").sha("oid"))
+
+    def _graphql_pull(self, number: int, query: str, op: str) -> _Obj:
+        owner, name = self.full_name.split("/", 1)
+        response = self._dispatch(
+            (
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                "--include",
+                "--hostname",
+                self.host,
+                "-f",
+                f"query={query}",
+                "-f",
+                f"owner={owner}",
+                "-f",
+                f"name={name}",
+                "-F",
+                f"number={number}",
+                "graphql",
+            ),
+            op,
+        )
+        try:
+            payload = json.loads(response.body)
+        except ValueError as exc:
+            raise _malformed(op, "response body is not JSON") from exc
+        top = _Obj.of(payload, op, "response")
+        if top.has("errors") and top.arr("errors"):
+            errors = top.objs("errors")
+            if any(
+                error.opt_text("type") == "RATE_LIMITED"
+                or _RATE_LIMIT_RE.search(error.opt_text("message") or "")
+                for error in errors
+            ):
+                raise self._waiting(
+                    op,
+                    "GraphQL rate limit; resume when the budget recovers",
+                    200,
+                    "graphql-rate-limited",
+                )
+            raise ProviderError(
+                f"{op}: GitHub did not return complete GraphQL evidence",
+                kind="BLOCKED",
+                operation=op,
+                detail="graphql-evidence-unavailable",
+            )
+        repository = top.obj("data").obj("repository")
+        if repository.text("nameWithOwner").lower() != self.full_name.lower():
+            raise _malformed(op, "GraphQL repository identity does not match")
+        pull = repository.obj("pullRequest")
+        if pull.integer("number") != number:
+            raise _malformed(op, "GraphQL PR number does not match")
+        return pull
+
+    def queue_state(self, number: int, expected_head: str) -> QueueState:
+        """Merge-queue/auto-merge state of the open PR whose head is ``expected_head``."""
+        _check_number(number)
+        _check_sha(expected_head, "expected head")
+        op = f"queue-state:{self.full_name}#{number}"
+        gop = f"{op}:graphql"
+        rest_auto = self._rest_auto_merge(number, expected_head, f"{op}:pull")
+        pull = self._graphql_pull(number, _QUEUE_QUERY, gop)
+        state = pull.text("state")
+        if state not in ("OPEN", "CLOSED", "MERGED") or pull.flag("merged") != (
+            state == "MERGED"
+        ):
+            raise _malformed(
+                gop, "pull request state is unsupported or contradicts merged"
+            )
+        head = pull.sha("headRefOid")
+        in_queue = pull.flag("isInMergeQueue")
+        if not (pull.has("mergeQueueEntry") and pull.has("autoMergeRequest")):
+            raise _malformed(gop, "queue fields are missing from the response")
+        entry = pull.opt_obj("mergeQueueEntry")
+        if entry is not None:
+            entry.integer("position")
+            if entry.text("state") not in _QUEUE_ENTRY_STATES:
+                raise _malformed(gop, "merge queue entry state is unsupported")
+        auto = pull.opt_obj("autoMergeRequest")
+        if auto is not None and auto.text("mergeMethod") not in MERGE_QUEUE_METHODS:
+            raise _malformed(gop, "auto-merge method is unsupported")
+        if in_queue != (entry is not None):
+            raise _malformed(gop, "isInMergeQueue contradicts mergeQueueEntry")
+        self._require_unchanged(gop, state, head, expected_head)
+        if entry is not None:
+            return "QUEUED"
+        if auto is not None or rest_auto:
+            if (auto is not None) != rest_auto:
+                raise self._waiting(
+                    op,
+                    "GraphQL and REST disagree about auto-merge; read the queue state again",
+                    detail="queue-sources-disagree",
+                )
+            return "AUTO_MERGE"
+        if self._rest_auto_merge(number, expected_head, f"{op}:pull-recheck"):
+            raise self._waiting(
+                op,
+                "auto-merge appeared while the queue state was read; read it again",
+                detail="queue-sources-disagree",
+            )
+        return "IDLE"
+
+    def _rest_auto_merge(self, number: int, expected_head: str, op: str) -> bool:
+        """Whether REST shows auto-merge armed; the PR must be open at ``expected_head``."""
+        raw = self._get(f"{_repo_path(self.full_name)}/pulls/{number}", op)[0]
+        pr, _ = _parse_pr(raw, op, detailed=True, path="response")
+        if pr.number != number or pr.base_repo.lower() != self.full_name.lower():
+            raise _malformed(op, "pull request identity does not match the request")
+        self._require_unchanged(op, pr.state, pr.head_sha, expected_head)
+        body = _Obj.of(raw, op, "response")
+        if not body.has("auto_merge"):
+            raise _malformed(op, "response.auto_merge is missing")
+        return body.opt_obj("auto_merge") is not None
+
+    def _require_unchanged(
+        self, op: str, state: str, head: str, expected_head: str
+    ) -> None:
+        if state != "OPEN":
+            raise self._waiting(
+                op,
+                f"the pull request is {state}, not open; read its state again",
+                detail="state-changed",
+            )
+        if head != expected_head:
+            raise self._waiting(
+                op,
+                f"the pull request head is {head[:12]}, not the expected {expected_head[:12]}; observe again",
+                detail="head-changed",
+            )
+
+    def merge(self, number: int, expected_head: str, method: str) -> None:
+        """Request a merge of PR ``number`` guarded by ``expected_head`` (never retried).
+
+        Returns when gh accepted the command; that is not a merge.  On a
+        merge-queue branch gh queues the PR or arms auto-merge (the queue picks
+        the method); an already merged or queued PR also exits 0.  Callers
+        reconcile with ``read_pr`` / ``queue_state`` after every outcome,
+        including ``ProviderError(uncertain=True)``.
+        """
+        _check_number(number)
+        _check_sha(expected_head, "expected head")
+        if method not in MERGE_METHODS:
+            raise ValueError(f"unsupported merge method: {_clean(str(method), 40)!r}")
+        op = f"merge:{self.full_name}#{number}"
+        self._require_merge_capability(op)
+        remaining = self._remaining()
+        if remaining is not None and remaining < MIN_MUTATION_WINDOW:
+            raise self._waiting(
+                op,
+                f"fewer than {MIN_MUTATION_WINDOW:g}s remain before the monitoring deadline, too little to run the merge to completion; nothing was dispatched",
+                detail="merge-not-dispatched",
+            )
+        timeout = MERGE_TIMEOUT if remaining is None else min(MERGE_TIMEOUT, remaining)
+        argv = (
+            "gh", "pr", "merge", str(number),
+            "--repo", f"{self.host}/{self.full_name}",
+            "--match-head-commit", expected_head,
+            _MERGE_FLAGS[method],
+        )  # fmt: skip
+        try:
+            proc = self._runner(argv, timeout)
+        except FileNotFoundError as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI 'gh' is not installed; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="missing-gh",
+            ) from exc  # fmt: skip
+        except subprocess.TimeoutExpired as exc:
+            raise ProviderError(
+                f"{op}: gh did not finish within {timeout:g}s; the merge may have been accepted, so do not retry it; read the pull request state",
+                kind="WAITING", operation=op, uncertain=True, detail="merge-uncertain-timeout",
+            ) from exc  # fmt: skip
+        except OSError as exc:
+            raise ProviderError(
+                f"{op}: running gh failed ({_clean(str(exc), 120)}); the merge may have been dispatched, so do not retry it; read the pull request state",
+                kind="BLOCKED", operation=op, uncertain=True, detail="merge-unknown-outcome",
+            ) from exc  # fmt: skip
+        if proc.returncode != 0:
+            raise _merge_failure(
+                op, proc.returncode, proc.stderr.decode("utf-8", "replace")
+            )
+
+    def _require_merge_capability(self, op: str) -> None:
+        """Prove, once, that the installed gh offers every flag the guarded merge needs."""
+        if self._merge_capable:
+            return
+        remaining = self._remaining()
+        if remaining is not None and remaining <= 0:
+            raise self._waiting(
+                op,
+                "monitoring deadline reached before the merge capability was verified; nothing was dispatched",
+                detail="merge-not-dispatched",
+            )
+        timeout = HELP_TIMEOUT if remaining is None else min(HELP_TIMEOUT, remaining)
+        try:
+            proc = self._runner(("gh", "pr", "merge", "--help"), timeout)
+        except FileNotFoundError as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI 'gh' is not installed; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="missing-gh",
+            ) from exc  # fmt: skip
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI merge capability could not be verified; nothing was dispatched",
+                kind="WAITING", operation=op, detail="merge-capability-unverified",
+            ) from exc  # fmt: skip
+        text = (
+            proc.stdout.decode("utf-8", "replace")
+            + "\n"
+            + proc.stderr.decode("utf-8", "replace")
+        )
+        missing = [
+            flag
+            for flag in _REQUIRED_MERGE_FLAGS
+            if not re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", text)
+        ]
+        if proc.returncode != 0 or missing:
+            raise ProviderError(
+                f"{op}: the installed GitHub CLI cannot run a head-guarded merge "
+                f"({', '.join(missing) or f'help exited {proc.returncode}'}); upgrade gh; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="merge-capability-missing",
+            )  # fmt: skip
+        self._merge_capable = True
 
     # -- policy ------------------------------------------------------------
 
@@ -1262,8 +1784,107 @@ class GitHub:
 # Parsing helpers
 
 
+def _check_number(number: int) -> None:
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise ValueError("pull request number must be a positive integer")
+
+
+def _check_sha(value: str, what: str) -> None:
+    if not isinstance(value, str) or not _SHA_RE.fullmatch(value):
+        raise ValueError(f"{what} must be a full lowercase object id")
+
+
+def _pull_url_matches(url: str, host: str, repo: str, number: int) -> bool:
+    parts = urlsplit(url)
+    return (
+        parts.scheme in ("http", "https")
+        and parts.netloc.lower() == host.lower()
+        and parts.path.lower() == f"/{repo}/pull/{number}".lower()
+    )
+
+
+def _merge_failure(op: str, returncode: int, stderr: str) -> ProviderError:
+    """Classify a failed ``gh pr merge``: certain refusal / never dispatched, or uncertain."""
+    text = _ANSI_RE.sub("", stderr)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    def pick(pattern: re.Pattern[str]) -> str:
+        line = next(
+            (ln for ln in lines if pattern.search(ln)), lines[0] if lines else ""
+        )
+        return _clean(line, 160)
+
+    def fail(
+        kind: Literal["BLOCKED", "WAITING"],
+        code: str,
+        message: str,
+        *,
+        uncertain: bool = False,
+        status: int | None = None,
+    ) -> ProviderError:
+        return ProviderError(
+            f"{op}: {message}", kind=kind, operation=op, uncertain=uncertain,
+            http_status=status, detail=code,
+        )  # fmt: skip
+
+    unsafe = "the merge may have been dispatched, so do not retry it; read the pull request state"
+    if returncode < 0:
+        return fail(
+            "WAITING", "merge-uncertain-signal",
+            f"gh was terminated by signal {-returncode}; {unsafe}", uncertain=True,
+        )  # fmt: skip
+    if _HEAD_MOVED_RE.search(text):
+        return fail(
+            "WAITING", "merge-head-changed",
+            "GitHub refused the merge: the pull request head no longer matches the verified head; nothing was merged; observe again",
+        )  # fmt: skip
+    if _BASE_MOVED_RE.search(text):
+        return fail(
+            "WAITING", "merge-base-changed",
+            "GitHub refused the merge: the base branch moved; nothing was merged; observe again",
+        )  # fmt: skip
+    if _FLAG_ERROR_RE.search(text):
+        return fail(
+            "BLOCKED", "merge-usage-error",
+            f"gh rejected the merge command before contacting GitHub: {pick(_FLAG_ERROR_RE)}",
+        )  # fmt: skip
+    if _AUTH_RE.search(text):
+        return fail(
+            "BLOCKED", "merge-unauthenticated",
+            "authentication failed; run `gh auth login`; the merge was not accepted", status=401,
+        )  # fmt: skip
+    if _NOT_MERGEABLE_RE.search(text):
+        return fail(
+            "BLOCKED", "merge-not-mergeable",
+            f"gh found the pull request not mergeable and did not request the merge: {pick(_NOT_MERGEABLE_RE)}",
+        )  # fmt: skip
+    if _RATE_LIMIT_RE.search(text):
+        return fail(
+            "WAITING", "merge-rate-limited",
+            "GitHub rate-limited the request; the merge was not accepted; wait before resuming",
+        )  # fmt: skip
+    if _AMBIGUOUS_RE.search(text):
+        return fail(
+            "WAITING", "merge-uncertain-transport",
+            f"gh reported a transport or server failure ({pick(_AMBIGUOUS_RE)}); {unsafe}",
+            uncertain=True,
+        )  # fmt: skip
+    if _REJECTED_RE.search(text):
+        found = _STATUS_RE.search(text)
+        return fail(
+            "BLOCKED", "merge-rejected",
+            f"GitHub refused the merge: {pick(_REJECTED_RE)}",
+            status=int(found.group(1)) if found else None,
+        )  # fmt: skip
+    return fail(
+        "BLOCKED", "merge-unknown-outcome",
+        f"gh exited {returncode} with an unrecognised failure ({pick(_REJECTED_RE)}); {unsafe}",
+        uncertain=True,
+    )  # fmt: skip
+
+
 def _check_repo(full_name: str) -> None:
-    if not _REPO_RE.match(full_name) or ".." in full_name:
+    if not _REPO_RE.fullmatch(full_name) or ".." in full_name:
         raise ValueError(f"invalid repository name: {_clean(full_name, 80)!r}")
 
 
@@ -1323,7 +1944,7 @@ def _parse_pr(
         base_sha=base.sha("sha"),
         base_ref=base.text("ref"),
         base_repo=base.obj("repo").text("full_name"),
-        merge_commit_sha=o.opt_sha("merge_commit_sha"),
+        merge_commit_sha=None,
         merged_at=merged_at,
         draft=o.flag("draft"),
         mergeable=o.opt_flag("mergeable") if detailed else None,
@@ -1571,6 +2192,7 @@ class _Policy:
         self.required_apps: set[tuple[str, int]] = set()
         self.required_approvals = 0
         self.require_current_base = False
+        self.queue_required = False
         self.allowed_methods: set[str] | None = None
         self.dropped_methods: set[str] = set()
 
@@ -1632,6 +2254,17 @@ class _Policy:
             self.dropped_methods.add("merge")
         elif kind == "required_signatures":
             self.dropped_methods.add("rebase")
+        elif kind == "merge_queue":
+            self.queue_required = True
+            method = params.opt_text("merge_method") if params is not None else None
+            if method is not None and method in MERGE_QUEUE_METHODS:
+                self._restrict({method.lower()})
+            else:
+                self._unevaluated(
+                    issues,
+                    label,
+                    "a merge-queue merge method this observation cannot read",
+                )
         elif kind not in _IGNORED_RULES:
             self._unevaluated(issues, label, "a gate that is not modelled")
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect an existing PR without local writes or provider mutations."""
+"""Reconcile an existing PR through authorized landing and safe cleanup."""
 
 from __future__ import annotations
 
@@ -9,13 +9,26 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
 # Suppress package cache writes before importing the installed local modules.
 sys.dont_write_bytecode = True
+if sys.version_info < (3, 12):  # noqa: UP036 -- installed entrypoints run outside project constraints
+    print(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "BLOCKED",
+                "blocker": "Python 3.12 or newer is required",
+            }
+        )
+    )
+    raise SystemExit(5)
 
 from git_ops import GitError, GitRepository, parse_remote_identity
 from github_ops import GitHub, ProviderError
-from lifecycle import Endpoint, inspection, load_policy
+from lifecycle import EXIT_CODES, Endpoint, execute, inspection, load_policy
+from state_store import Receipt, ReceiptInputError, StateError, Store, validate_run_id
 
 
 def repository_selector(value: str) -> tuple[str, str]:
@@ -55,18 +68,26 @@ def positive_number(value: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pr", required=True, type=positive_number)
+    parser.add_argument("--pr", type=positive_number)
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const="unique",
+        metavar="RUN_ID",
+        help="resume one explicit or unambiguous saved run",
+    )
     parser.add_argument(
         "--repo", help="actual PR base repository, optionally prefixed by host"
     )
-    parser.add_argument("--until", choices=("pr", "merged", "clean"), default="clean")
+    parser.add_argument("--until", choices=("pr", "merged", "clean"))
     parser.add_argument(
         "--policy", type=Path, help="explicit source-backed decision packet"
     )
     parser.add_argument("--wait-timeout", type=positive_number, default=1800)
-    parser.add_argument("--dry-run", action="store_true", required=True)
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    endpoint: Endpoint = args.until
+    if args.pr is None and args.resume is None:
+        parser.error("provide --pr or --resume")
     try:
         policy = load_policy(args.policy.resolve()) if args.policy else None
     except (ValueError, TypeError, OSError) as error:
@@ -76,22 +97,98 @@ def main() -> int:
         return 2
     try:
         git = GitRepository(Path.cwd())
-        host, name = (
-            repository_selector(args.repo) if args.repo else infer_repository(git)
-        )
-        provider = GitHub(host, name, deadline=time.monotonic() + args.wait_timeout)
-        result = inspection(git, provider, args.pr, endpoint, policy)
-    except (ValueError, OSError) as error:
+        store = Store(git.snapshot().common_dir)
+        receipt: Receipt | None = None
+        selected = repository_selector(args.repo) if args.repo else None
+        if args.resume is not None:
+            if args.resume == "unique":
+                candidates = tuple(
+                    record
+                    for record in store.list_runs()
+                    if (args.pr is None or record.number == args.pr)
+                    and (
+                        selected is None
+                        or (record.host, record.repo.lower())
+                        == (selected[0], selected[1].lower())
+                    )
+                )
+                pending = tuple(
+                    record for record in candidates if record.status != "COMPLETE"
+                )
+                choices = pending if pending else candidates
+                if len(choices) != 1:
+                    raise ReceiptInputError(
+                        "saved target is missing or ambiguous; provide a run id"
+                    )
+                receipt = choices[0]
+            else:
+                validate_run_id(args.resume)
+                try:
+                    receipt = store.load(args.resume)
+                except FileNotFoundError:
+                    if args.pr is None or args.until is None:
+                        raise ReceiptInputError(
+                            "missing receipt: provide --pr, --repo and --until to reconstruct scope"
+                        ) from None
+            if receipt is not None:
+                if args.pr is not None and args.pr != receipt.number:
+                    raise ReceiptInputError("--pr does not match the saved run")
+                if selected is not None and (selected[0], selected[1].lower()) != (
+                    receipt.host,
+                    receipt.repo.lower(),
+                ):
+                    raise ReceiptInputError("--repo does not match the saved run")
+                selected = (receipt.host, receipt.repo)
+        if selected is None:
+            selected = infer_repository(git)
+        number = receipt.number if receipt is not None else args.pr
+        if number is None:
+            raise ReceiptInputError("no unambiguous existing PR is selected")
+        endpoint: Endpoint
+        if args.until is not None:
+            endpoint = args.until
+        elif receipt is not None:
+            endpoint = cast(Endpoint, receipt.endpoint)
+        else:
+            endpoint = "clean"
+        provider = GitHub(*selected, deadline=time.monotonic() + args.wait_timeout)
+        if args.dry_run:
+            result = inspection(git, provider, number, endpoint, policy)
+            code = 0
+        else:
+            result, code = execute(
+                git,
+                provider,
+                number,
+                endpoint,
+                policy,
+                args.wait_timeout,
+                store,
+                receipt,
+            )
+    except (ReceiptInputError, ValueError, TypeError) as error:
         print(
             json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
         )
         return 2
-    except (GitError, ProviderError) as error:
+    except KeyboardInterrupt:
+        print(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": "WAITING",
+                    "cancelled": True,
+                    "next_action": "repeat the explicit selector",
+                }
+            )
+        )
+        return 130
+    except (GitError, ProviderError, StateError, OSError) as error:
         status = error.kind if isinstance(error, ProviderError) else "BLOCKED"
         print(json.dumps({"schema_version": 1, "status": status, "error": str(error)}))
-        return 3 if status == "WAITING" else 5
+        return EXIT_CODES[status]
     print(json.dumps(result, ensure_ascii=True, sort_keys=True))
-    return 0
+    return code
 
 
 if __name__ == "__main__":
