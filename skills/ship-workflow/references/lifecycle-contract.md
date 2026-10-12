@@ -2,7 +2,7 @@
 
 ## Development surface
 
-The integration-branch executable `scripts/ship.py` reconciles an existing ordinary PR through current gates, guarded landing, configured post-merge acceptance, and proof-based cleanup. It does not create branches, commits, or PRs. The existing advertised skill workflow remains unchanged until the complete command/caller cutover.
+The integration-branch executable `scripts/ship.py` reconciles an existing ordinary PR through current gates, guarded landing, configured post-merge acceptance, and proof-based cleanup. Its `--inventory` and `--draft` planning surfaces and the changeset execution API are specified in [commit-planning.md](commit-planning.md); this lifecycle entrypoint itself does not create branches, commits, or PRs. The existing advertised skill workflow remains unchanged until the complete command/caller cutover.
 
 ```bash
 uv run --no-project --python 3.12 python /absolute/installed/ship-workflow/scripts/ship.py --pr 123 --repo owner/repo --dry-run

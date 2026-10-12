@@ -15,12 +15,69 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import cast
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+_LEGACY_SCHEMA_VERSION = 1
 _RUN_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _OID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 _STATUSES = {"COMPLETE", "WAITING", "NEEDS_JUDGMENT", "BLOCKED"}
 _ENDPOINTS = {"pr", "merged", "clean"}
+_REPO_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
+_GROUP_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+_GATE_NAME = re.compile(r"@?[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+# Flat top-level keys that hold the confirmed PR target; all null before binding.
+TARGET_KEYS = (
+    "host",
+    "repo",
+    "number",
+    "head_sha",
+    "base_sha",
+    "head_ref",
+    "head_repo",
+    "base_ref",
+)
+CHANGESET_MODES = ("current", "switch", "transplant")
+_GROUP_OUTCOMES = {"PENDING", "VALIDATED", "FAILED"}
+_GATE_OUTCOMES = {"PASSED", "FAILED", "TIMED_OUT"}
+_UPDATE_OUTCOMES = {"PENDING", "CONFIRMED", "REJECTED"}
+_CHANGESET_KEYS = {
+    "plan_identity",
+    "gates_identity",
+    "source_snapshot",
+    "source_head",
+    "source_branch",
+    "source_index",
+    "base_ref",
+    "base_oid",
+    "branch",
+    "mode",
+    "groups",
+    "update",
+    "confirmed",
+    "residual_snapshot",
+}
+# Historical receipts can lack this checkpoint; absence is unknown, not empty.
+_CHANGESET_OPTIONAL_KEYS = {"preserved"}
+_GROUP_KEYS = {
+    "id",
+    "parent",
+    "tree",
+    "message_identity",
+    "commit",
+    "outcome",
+    "gates",
+}
+_GATE_ROW_KEYS = {"name", "identity", "outcome", "returncode"}
+_UPDATE_KEYS = {
+    "ref",
+    "old",
+    "new",
+    "index_before",
+    "index_after",
+    "head_before",
+    "head_after",
+    "outcome",
+}
 _INTENT_KEYS = {
     "key",
     "kind",
@@ -195,20 +252,247 @@ def _rows(value: object, label: str, allowed: set[str]) -> list[dict[str, object
 
 
 @dataclass
-class Receipt:
-    run_id: str
+class Target:
+    """The provider-confirmed PR a run lands; head/base revisions are refreshed."""
+
     host: str
     repo: str
     number: int
-    endpoint: str
-    code_identity: str
-    policy_identity: str | None
-    inventory_identity: str
     head_sha: str
     base_sha: str
     head_ref: str
     head_repo: str
     base_ref: str
+
+
+@dataclass
+class GateRow:
+    """Sanitized outcome of one gate command on one new commit (no raw output)."""
+
+    name: str
+    identity: str
+    outcome: str
+    returncode: int | None
+
+
+@dataclass
+class GroupRecord:
+    """One planned logical commit: its exact parent/tree/message and validation."""
+
+    id: str
+    parent: str
+    tree: str
+    message_identity: str
+    commit: str | None = None
+    outcome: str = "PENDING"
+    gates: list[GateRow] = field(default_factory=list)
+
+
+@dataclass
+class RefUpdate:
+    """Journaled index and branch movement that publishes validated commits locally."""
+
+    ref: str
+    old: str | None
+    new: str
+    index_before: str
+    index_after: str
+    head_before: str | None
+    head_after: str | None
+    outcome: str = "PENDING"
+
+
+@dataclass
+class ChangesetRecord:
+    """Snapshot-bound commit-plan execution state, recorded before each mutation."""
+
+    plan_identity: str
+    gates_identity: str
+    source_snapshot: str
+    source_head: str
+    source_branch: str | None
+    source_index: str
+    base_ref: str
+    base_oid: str
+    branch: str
+    mode: str
+    groups: list[GroupRecord] = field(default_factory=list)
+    update: RefUpdate | None = None
+    confirmed: list[str] = field(default_factory=list)
+    residual_snapshot: str | None = None
+    preserved: str | None = None
+
+
+def _gate_row(value: object) -> GateRow:
+    raw = _object(value, "changeset gate row")
+    if set(raw) != _GATE_ROW_KEYS:
+        raise ReceiptInputError("changeset gate fields are missing or unsupported")
+    name = _text(raw["name"], "gate name")
+    if not _GATE_NAME.fullmatch(name):
+        raise ReceiptInputError("gate name is not a supported identifier")
+    outcome = _text(raw["outcome"], "gate outcome")
+    returncode = raw["returncode"]
+    if outcome not in _GATE_OUTCOMES:
+        raise ReceiptInputError("unsupported gate outcome")
+    if returncode is not None and type(returncode) is not int:
+        raise ReceiptInputError("gate returncode must be an integer or null")
+    if (outcome == "PASSED") != (returncode == 0):
+        raise ReceiptInputError("only a zero exit is a passed gate")
+    if outcome == "TIMED_OUT" and returncode is not None:
+        raise ReceiptInputError("timed-out gate has no completed exit")
+    if outcome == "FAILED" and returncode is None:
+        raise ReceiptInputError("failed gate needs its nonzero exit")
+    return GateRow(name, _digest(raw["identity"], "gate identity"), outcome, returncode)
+
+
+def _group_record(value: object) -> GroupRecord:
+    raw = _object(value, "changeset group")
+    if set(raw) != _GROUP_KEYS:
+        raise ReceiptInputError("changeset group fields are missing or unsupported")
+    group_id = _text(raw["id"], "group id")
+    if not _GROUP_ID.fullmatch(group_id):
+        raise ReceiptInputError("group id is not a supported identifier")
+    outcome = _text(raw["outcome"], "group outcome")
+    if outcome not in _GROUP_OUTCOMES:
+        raise ReceiptInputError("unsupported group outcome")
+    if not isinstance(raw["gates"], list):
+        raise ReceiptInputError("group gates must be an explicit list")
+    gates = [_gate_row(row) for row in raw["gates"]]
+    commit = _optional_oid(raw["commit"], "group commit")
+    if outcome == "VALIDATED" and (
+        commit is None or not gates or any(row.outcome != "PASSED" for row in gates)
+    ):
+        raise ReceiptInputError("a validated group needs its commit and passed gates")
+    return GroupRecord(
+        group_id,
+        _oid(raw["parent"], "group parent"),
+        _oid(raw["tree"], "group tree"),
+        _digest(raw["message_identity"], "group message identity"),
+        commit,
+        outcome,
+        gates,
+    )
+
+
+def _ref_update(value: object) -> RefUpdate:
+    raw = _object(value, "changeset update")
+    if set(raw) != _UPDATE_KEYS:
+        raise ReceiptInputError("changeset update fields are missing or unsupported")
+    ref = _text(raw["ref"], "update ref")
+    if not ref.startswith("refs/heads/") or len(ref) == len("refs/heads/"):
+        raise ReceiptInputError("update ref must be a full local branch ref")
+    outcome = _text(raw["outcome"], "update outcome")
+    if outcome not in _UPDATE_OUTCOMES:
+        raise ReceiptInputError("unsupported update outcome")
+    return RefUpdate(
+        ref,
+        _optional_oid(raw["old"], "update old"),
+        _oid(raw["new"], "update new"),
+        _digest(raw["index_before"], "index_before"),
+        _digest(raw["index_after"], "index_after"),
+        _optional_text(raw["head_before"], "head_before"),
+        _optional_text(raw["head_after"], "head_after"),
+        outcome,
+    )
+
+
+def _changeset(value: object) -> ChangesetRecord | None:
+    if value is None:
+        return None
+    raw = _object(value, "changeset")
+    keys = set(raw)
+    if not _CHANGESET_KEYS <= keys <= _CHANGESET_KEYS | _CHANGESET_OPTIONAL_KEYS:
+        raise ReceiptInputError("changeset fields are missing or unsupported")
+    mode = _text(raw["mode"], "changeset mode")
+    if mode not in CHANGESET_MODES:
+        raise ReceiptInputError("unsupported changeset placement mode")
+    if not isinstance(raw["groups"], list) or not isinstance(raw["confirmed"], list):
+        raise ReceiptInputError("changeset groups/confirmed must be explicit lists")
+    groups = [_group_record(group) for group in raw["groups"]]
+    if len({group.id for group in groups}) != len(groups):
+        raise ReceiptInputError("changeset group ids must be unique")
+    update = None if raw["update"] is None else _ref_update(raw["update"])
+    confirmed = [_oid(oid, "confirmed commit") for oid in raw["confirmed"]]
+    residual = _optional_digest(raw["residual_snapshot"], "residual_snapshot")
+    preserved = _optional_digest(raw.get("preserved"), "preserved")
+    if preserved is not None and update is None:
+        raise ReceiptInputError(
+            "a preserved-work identity belongs to a journaled update"
+        )
+    if update is not None:
+        commits = [group.commit for group in groups]
+        if (
+            not groups
+            or any(group.outcome != "VALIDATED" for group in groups)
+            or commits[-1] != update.new
+        ):
+            raise ReceiptInputError(
+                "a journaled update must publish exactly the validated group chain"
+            )
+    confirmed_update = update is not None and update.outcome == "CONFIRMED"
+    if confirmed_update != (residual is not None):
+        raise ReceiptInputError(
+            "residual snapshot is recorded exactly when the update is confirmed"
+        )
+    if confirmed_update and not set(
+        cast("list[str]", [group.commit for group in groups])
+    ) <= set(confirmed):
+        raise ReceiptInputError("confirmed commits must include the published groups")
+    return ChangesetRecord(
+        plan_identity=_digest(raw["plan_identity"], "plan_identity"),
+        gates_identity=_digest(raw["gates_identity"], "gates_identity"),
+        source_snapshot=_digest(raw["source_snapshot"], "source_snapshot"),
+        source_head=_oid(raw["source_head"], "source_head"),
+        source_branch=_optional_text(raw["source_branch"], "source_branch"),
+        source_index=_digest(raw["source_index"], "source_index"),
+        base_ref=_text(raw["base_ref"], "base_ref"),
+        base_oid=_oid(raw["base_oid"], "base_oid"),
+        branch=_text(raw["branch"], "branch"),
+        mode=mode,
+        groups=groups,
+        update=update,
+        confirmed=confirmed,
+        residual_snapshot=residual,
+        preserved=preserved,
+    )
+
+
+def _target(raw: dict[str, object]) -> Target | None:
+    values = [raw[key] for key in TARGET_KEYS]
+    if all(value is None for value in values):
+        return None
+    number = raw["number"]
+    if type(number) is not int or number <= 0:
+        raise ReceiptInputError("receipt PR number must be a positive integer")
+    host = _text(raw["host"], "host")
+    repo = _text(raw["repo"], "repo")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]*", host) or not _REPO_NAME.fullmatch(repo):
+        raise ReceiptInputError("invalid receipt provider namespace")
+    head_repo = raw["head_repo"]
+    if not isinstance(head_repo, str) or "\x00" in head_repo:
+        raise ReceiptInputError("head repository must be a NUL-free string")
+    if head_repo and not _REPO_NAME.fullmatch(head_repo):
+        raise ReceiptInputError("invalid receipt head namespace")
+    return Target(
+        host=host,
+        repo=repo,
+        number=number,
+        head_sha=_oid(raw["head_sha"], "head_sha"),
+        base_sha=_oid(raw["base_sha"], "base_sha"),
+        head_ref=_text(raw["head_ref"], "head_ref"),
+        head_repo=head_repo,
+        base_ref=_text(raw["base_ref"], "base_ref"),
+    )
+
+
+@dataclass
+class Receipt:
+    run_id: str
+    endpoint: str
+    code_identity: str
+    policy_identity: str | None
+    inventory_identity: str
+    target: Target | None
     status: str = "WAITING"
     evidence_identity: str | None = None
     merge_sha: str | None = None
@@ -222,44 +506,120 @@ class Receipt:
     )
     issue: str | None = None
     next_action: str = "reconcile current target facts"
+    changeset: ChangesetRecord | None = None
+
+    def bound(self) -> Target:
+        """The confirmed PR target; a pre-publication run has none to land."""
+        if self.target is None:
+            raise StateError("run has no provider-confirmed PR target yet")
+        return self.target
+
+    @property
+    def host(self) -> str:
+        return self.bound().host
+
+    @property
+    def repo(self) -> str:
+        return self.bound().repo
+
+    @property
+    def number(self) -> int:
+        return self.bound().number
+
+    @property
+    def head_sha(self) -> str:
+        return self.bound().head_sha
+
+    @head_sha.setter
+    def head_sha(self, value: str) -> None:
+        self.bound().head_sha = value
+
+    @property
+    def base_sha(self) -> str:
+        return self.bound().base_sha
+
+    @base_sha.setter
+    def base_sha(self, value: str) -> None:
+        self.bound().base_sha = value
+
+    @property
+    def head_ref(self) -> str:
+        return self.bound().head_ref
+
+    @head_ref.setter
+    def head_ref(self, value: str) -> None:
+        self.bound().head_ref = value
+
+    @property
+    def head_repo(self) -> str:
+        return self.bound().head_repo
+
+    @head_repo.setter
+    def head_repo(self, value: str) -> None:
+        self.bound().head_repo = value
+
+    @property
+    def base_ref(self) -> str:
+        return self.bound().base_ref
+
+    @base_ref.setter
+    def base_ref(self, value: str) -> None:
+        self.bound().base_ref = value
 
     def serialize(self) -> dict[str, object]:
-        return {"schema_version": SCHEMA_VERSION, **asdict(self)}
+        data = asdict(self)
+        target = data.pop("target")
+        for key in TARGET_KEYS:
+            data[key] = None if target is None else target[key]
+        return {"schema_version": SCHEMA_VERSION, **data}
 
     @classmethod
     def parse(cls, value: object) -> Receipt:
         raw = _object(value, "receipt")
-        names = set(cls.__dataclass_fields__) | {"schema_version"}
-        if set(raw) != names:
-            raise ReceiptInputError("receipt fields are missing or unsupported")
-        if (
-            type(raw["schema_version"]) is not int
-            or raw["schema_version"] != SCHEMA_VERSION
+        version = raw.get("schema_version")
+        if type(version) is not int or version not in (
+            _LEGACY_SCHEMA_VERSION,
+            SCHEMA_VERSION,
         ):
             raise ReceiptInputError("unsupported receipt schema version")
-        number = raw["number"]
-        if type(number) is not int or number <= 0:
-            raise ReceiptInputError("receipt PR number must be a positive integer")
+        fields = (set(cls.__dataclass_fields__) - {"target"}) | set(TARGET_KEYS)
+        if version == _LEGACY_SCHEMA_VERSION:
+            # Exact v1 migration: PR-number receipts gain no changeset and must
+            # keep a complete target; nothing else is defaulted or reinterpreted.
+            if set(raw) != (fields - {"changeset"}) | {"schema_version"}:
+                raise ReceiptInputError("receipt fields are missing or unsupported")
+            if any(raw[key] is None for key in TARGET_KEYS):
+                raise ReceiptInputError("legacy receipt must name its complete target")
+            raw = {**raw, "schema_version": SCHEMA_VERSION, "changeset": None}
+        if set(raw) != fields | {"schema_version"}:
+            raise ReceiptInputError("receipt fields are missing or unsupported")
         endpoint = _text(raw["endpoint"], "endpoint")
         status = _text(raw["status"], "status")
         if endpoint not in _ENDPOINTS or status not in _STATUSES:
             raise ReceiptInputError("unsupported receipt endpoint or status")
-        host = _text(raw["host"], "host")
-        repo = _text(raw["repo"], "repo")
-        if not re.fullmatch(r"[a-z0-9][a-z0-9.-]*", host) or not re.fullmatch(
-            r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*", repo
-        ):
-            raise ReceiptInputError("invalid receipt provider namespace")
+        target = _target(raw)
+        changeset = _changeset(raw["changeset"])
         verified = raw["merge_verified"]
         if not isinstance(verified, bool):
             raise ReceiptInputError("merge_verified must be a boolean")
-        head_repo = raw["head_repo"]
-        if not isinstance(head_repo, str) or "\x00" in head_repo:
-            raise ReceiptInputError("head repository must be a NUL-free string")
-        if head_repo and not re.fullmatch(
-            r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*", head_repo
-        ):
-            raise ReceiptInputError("invalid receipt head namespace")
+        if target is None:
+            lifecycle = (
+                raw["merge_sha"],
+                raw["validation_sha"],
+                raw["validation_policy"],
+                raw["evidence_identity"],
+            )
+            if (
+                changeset is None
+                or verified
+                or any(item is not None for item in lifecycle)
+                or raw["verification"] != []
+                or raw["intents"] != []
+                or status == "COMPLETE"
+            ):
+                raise ReceiptInputError(
+                    "a run without a confirmed PR target holds only changeset state"
+                )
         if verified and raw["merge_sha"] is None:
             raise ReceiptInputError("verified merge needs a landing identity")
         if raw["validation_sha"] is not None and (
@@ -289,20 +649,15 @@ class Receipt:
             raise ReceiptInputError(
                 "cleanup completion cannot retain failed required actions"
             )
+        if target is None and any(cleanup[key] != [] for key in cleanup):
+            raise ReceiptInputError("a run without a PR target has no cleanup facts")
         return cls(
             run_id=validate_run_id(_text(raw["run_id"], "run_id")),
-            host=host,
-            repo=repo,
-            number=number,
             endpoint=endpoint,
             code_identity=_digest(raw["code_identity"], "code_identity"),
             policy_identity=_optional_digest(raw["policy_identity"], "policy_identity"),
             inventory_identity=_digest(raw["inventory_identity"], "inventory_identity"),
-            head_sha=_oid(raw["head_sha"], "head_sha"),
-            base_sha=_oid(raw["base_sha"], "base_sha"),
-            head_ref=_text(raw["head_ref"], "head_ref"),
-            head_repo=head_repo,
-            base_ref=_text(raw["base_ref"], "base_ref"),
+            target=target,
             status=status,
             evidence_identity=_optional_digest(
                 raw["evidence_identity"], "evidence_identity"
@@ -321,6 +676,7 @@ class Receipt:
             },
             issue=_optional_text(raw["issue"], "issue"),
             next_action=_text(raw["next_action"], "next_action"),
+            changeset=changeset,
         )
 
 
