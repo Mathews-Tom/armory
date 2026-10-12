@@ -25,6 +25,15 @@ if sys.version_info < (3, 12):  # noqa: UP036 -- installed entrypoints run outsi
     )
     raise SystemExit(5)
 
+from changeset import (
+    ChangesetStop,
+    PlanError,
+    compile_draft,
+    load_draft,
+    load_gates,
+    parse_plan,
+    take_inventory,
+)
 from git_ops import GitError, GitRepository, parse_remote_identity
 from github_ops import GitHub, ProviderError
 from lifecycle import EXIT_CODES, Endpoint, execute, inspection, load_policy
@@ -66,6 +75,60 @@ def positive_number(value: str) -> int:
     return parsed
 
 
+def planning(draft: Path | None, gates_path: Path | None) -> int:
+    """Read-only inventory, or explicit object authoring for a grouping draft."""
+    try:
+        git = GitRepository(Path.cwd())
+        if draft is None:
+            payload: dict[str, object] = {
+                "schema_version": 1,
+                "status": "PLANNED",
+                "inventory": take_inventory(git).to_json(),
+                "mutation_performed": False,
+            }
+        else:
+            if gates_path is None:
+                raise PlanError("a draft needs its gate decision packet")
+            plan = compile_draft(
+                git, load_draft(draft.resolve()), load_gates(gates_path.resolve())
+            )
+            payload = {
+                "schema_version": 1,
+                "status": "PLANNED",
+                "plan": plan,
+                "plan_identity": parse_plan(plan).identity,
+                "objects_written": True,
+                "mutation_performed": False,
+            }
+    except (PlanError, ValueError, TypeError) as error:
+        print(
+            json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
+        )
+        return 2
+    except ChangesetStop as stop:
+        print(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "status": stop.status,
+                    "blocker": str(stop),
+                    "details": stop.details,
+                    "next_action": stop.next_action,
+                },
+                ensure_ascii=True,
+                sort_keys=True,
+            )
+        )
+        return EXIT_CODES[stop.status]
+    except (GitError, OSError) as error:
+        print(
+            json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
+        )
+        return 5
+    print(json.dumps(payload, ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pr", type=positive_number)
@@ -85,7 +148,38 @@ def main() -> int:
     )
     parser.add_argument("--wait-timeout", type=positive_number, default=1800)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--inventory",
+        action="store_true",
+        help="print the read-only change inventory of the current checkout",
+    )
+    parser.add_argument(
+        "--draft",
+        type=Path,
+        help="compile a grouping draft into a commit plan (writes Git objects only)",
+    )
+    parser.add_argument(
+        "--gates", type=Path, help="explicit source-backed gate decision packet"
+    )
     args = parser.parse_args()
+    if args.inventory or args.draft is not None:
+        if args.inventory and args.draft is not None:
+            parser.error("choose one of --inventory or --draft")
+        if (
+            args.pr is not None
+            or args.resume is not None
+            or args.until is not None
+            or args.policy is not None
+            or args.dry_run
+        ):
+            parser.error(
+                "--inventory and --draft select no PR, run, endpoint or policy"
+            )
+        if args.draft is not None and args.gates is None:
+            parser.error("--draft requires the --gates decision packet")
+        return planning(args.draft, args.gates)
+    if args.gates is not None:
+        parser.error("--gates is only used with --draft")
     if args.pr is None and args.resume is None:
         parser.error("provide --pr or --resume")
     try:
@@ -105,7 +199,8 @@ def main() -> int:
                 candidates = tuple(
                     record
                     for record in store.list_runs()
-                    if (args.pr is None or record.number == args.pr)
+                    if record.target is not None
+                    and (args.pr is None or record.number == args.pr)
                     and (
                         selected is None
                         or (record.host, record.repo.lower())
@@ -131,6 +226,10 @@ def main() -> int:
                             "missing receipt: provide --pr, --repo and --until to reconstruct scope"
                         ) from None
             if receipt is not None:
+                if receipt.target is None:
+                    raise ReceiptInputError(
+                        "saved run has no provider-confirmed PR target to resume"
+                    )
                 if args.pr is not None and args.pr != receipt.number:
                     raise ReceiptInputError("--pr does not match the saved run")
                 if selected is not None and (selected[0], selected[1].lower()) != (

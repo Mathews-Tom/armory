@@ -27,7 +27,14 @@ from git_ops import (
     worktree_activity,
 )
 from github_ops import GitHub, Observation, ProviderError, PullRequest
-from state_store import LockBusy, Receipt, ReceiptInputError, StateError, Store
+from state_store import (
+    LockBusy,
+    Receipt,
+    ReceiptInputError,
+    StateError,
+    Store,
+    Target,
+)
 
 Status = Literal["PLANNED", "COMPLETE", "WAITING", "NEEDS_JUDGMENT", "BLOCKED"]
 Endpoint = Literal["pr", "merged", "clean"]
@@ -451,6 +458,7 @@ def code_identity() -> str:
     for name in (
         "ship.py",
         "lifecycle.py",
+        "changeset.py",
         "git_ops.py",
         "github_ops.py",
         "state_store.py",
@@ -620,18 +628,20 @@ class _Execution:
         if self.receipt is None:
             self.receipt = Receipt(
                 uuid.uuid4().hex,
-                self.provider.host,
-                pr.base_repo,
-                self.number,
                 self.endpoint,
                 self.code,
                 self.policy.fingerprint if self.policy else None,
                 self.initial.fingerprint,
-                pr.head_sha,
-                pr.base_sha,
-                pr.head_ref,
-                pr.head_repo,
-                pr.base_ref,
+                Target(
+                    self.provider.host,
+                    pr.base_repo,
+                    self.number,
+                    pr.head_sha,
+                    pr.base_sha,
+                    pr.head_ref,
+                    pr.head_repo,
+                    pr.base_ref,
+                ),
             )
             self._facts(pr)
             with self.store.mutation_lock():
@@ -1896,6 +1906,10 @@ def execute(
     store: Store,
     receipt: Receipt | None = None,
 ) -> tuple[dict[str, object], int]:
+    if receipt is not None and receipt.target is None:
+        raise ReceiptInputError(
+            "saved run has no provider-confirmed PR target; publish its changeset first"
+        )
     return _Execution(
         git, provider, number, endpoint, policy, wait_timeout, store, receipt
     ).run()

@@ -15,11 +15,17 @@ from typing import cast
 
 import pytest
 from state_store import (
+    TARGET_KEYS,
+    ChangesetRecord,
+    GateRow,
+    GroupRecord,
     LockBusy,
     Receipt,
     ReceiptInputError,
+    RefUpdate,
     StateError,
     Store,
+    Target,
     validate_run_id,
 )
 
@@ -68,22 +74,83 @@ def common(tmp_path: Path) -> Path:
 
 
 def make_receipt(run_id: str = RUN, **changes: object) -> Receipt:
-    base = Receipt(
-        run_id=run_id,
+    target = Target(
         host="github.com",
         repo="owner/repo",
         number=7,
-        endpoint="pr",
-        code_identity=DIGEST,
-        policy_identity=None,
-        inventory_identity=DIGEST2,
         head_sha=OID,
         base_sha=OID2,
         head_ref="feature",
         head_repo="owner/repo",
         base_ref="main",
     )
-    return replace(base, **changes)
+    target_changes = {
+        key: value for key, value in changes.items() if key in TARGET_KEYS
+    }
+    base = Receipt(
+        run_id=run_id,
+        endpoint="pr",
+        code_identity=DIGEST,
+        policy_identity=None,
+        inventory_identity=DIGEST2,
+        target=replace(target, **target_changes),
+    )
+    return replace(
+        base, **{key: value for key, value in changes.items() if key not in TARGET_KEYS}
+    )
+
+
+def changeset_record(**changes: object) -> ChangesetRecord:
+    group = GroupRecord(
+        id="g1",
+        parent=OID,
+        tree=OID2,
+        message_identity=DIGEST,
+        commit=OID2,
+        outcome="VALIDATED",
+        gates=[GateRow("@secret-scan", DIGEST2, "PASSED", 0)],
+    )
+    record = ChangesetRecord(
+        plan_identity=DIGEST,
+        gates_identity=DIGEST2,
+        source_snapshot=DIGEST,
+        source_head=OID,
+        source_branch="main",
+        source_index=DIGEST2,
+        base_ref="main",
+        base_oid=OID,
+        branch="feat/topic",
+        mode="switch",
+        groups=[group],
+        update=RefUpdate(
+            ref="refs/heads/feat/topic",
+            old=None,
+            new=OID2,
+            index_before=DIGEST,
+            index_after=DIGEST2,
+            head_before="refs/heads/main",
+            head_after="refs/heads/feat/topic",
+            outcome="CONFIRMED",
+        ),
+        confirmed=[OID2],
+        residual_snapshot=DIGEST,
+        preserved=DIGEST,
+    )
+    return replace(record, **changes)
+
+
+def unbound_receipt(run_id: str = RUN, **changes: object) -> Receipt:
+    receipt = Receipt(
+        run_id=run_id,
+        endpoint="clean",
+        code_identity=DIGEST,
+        policy_identity=None,
+        inventory_identity=DIGEST2,
+        target=None,
+        next_action="publish the confirmed commits",
+        changeset=changeset_record(),
+    )
+    return replace(receipt, **changes)
 
 
 def verification_row() -> dict[str, object]:
@@ -265,7 +332,9 @@ SCHEMA_REJECTS = [
     pytest.param(drop_key("issue"), id="missing-top-level-key"),
     pytest.param(set_key("schema_version", True), id="schema-version-bool"),
     pytest.param(set_key("schema_version", 1.0), id="schema-version-float"),
-    pytest.param(set_key("schema_version", 2), id="schema-version-future"),
+    pytest.param(set_key("schema_version", 3), id="schema-version-future"),
+    pytest.param(set_key("number", None), id="partial-target"),
+    pytest.param(set_key("changeset", {}), id="changeset-missing-fields"),
     pytest.param(set_key("number", True), id="number-bool"),
     pytest.param(set_key("number", 0), id="number-zero"),
     pytest.param(set_key("number", "7"), id="number-string"),
@@ -413,6 +482,220 @@ def test_consistent_receipts_are_accepted(receipt: Receipt, common: Path) -> Non
     store.save(receipt)
 
     assert Store(common).load(RUN) == receipt
+
+
+def legacy_payload(receipt: Receipt) -> Payload:
+    """The exact flat v1 journal M1 wrote for ``receipt``."""
+    data = receipt.serialize()
+    del data["changeset"]
+    data["schema_version"] = 1
+    return data
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(full_receipt(), id="completed-clean"),
+        pytest.param(
+            make_receipt(
+                endpoint="merged",
+                policy_identity=DIGEST,
+                intents=[intent_row()],
+                issue="merge outcome unknown",
+                next_action="reconcile the original merge",
+            ),
+            id="pending-merge-uncertainty",
+        ),
+        pytest.param(make_receipt(head_repo=""), id="deleted-fork-head"),
+    ],
+)
+def test_v1_journal_migrates_exactly_and_saves_as_current_schema(
+    common: Path, receipt: Receipt
+) -> None:
+    v1 = legacy_payload(receipt)
+    plant_payload(common, RUN, v1)
+
+    loaded = Store(common).load(RUN)
+
+    assert loaded == receipt
+    assert loaded.changeset is None and loaded.target == receipt.target
+    store = Store(common)
+    store.save(store.load(RUN))
+    saved = json.loads((common / "armory" / "ship" / f"{RUN}.json").read_bytes())
+    assert saved == {**v1, "schema_version": 2, "changeset": None}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        pytest.param(set_key("changeset", None), id="v1-with-v2-key"),
+        pytest.param(set_key("number", None), id="v1-without-pr-number"),
+        pytest.param(set_key("head_sha", None), id="v1-without-head"),
+    ],
+)
+def test_v1_journal_is_not_reinterpreted_or_defaulted(
+    change: Callable[[Payload], None],
+) -> None:
+    data = legacy_payload(full_receipt())
+    change(data)
+
+    with pytest.raises(ReceiptInputError):
+        Receipt.parse(data)
+
+
+def test_pre_publication_run_keeps_only_typed_changeset_state(common: Path) -> None:
+    receipt = unbound_receipt()
+    Store(common).save(receipt)
+
+    loaded = Store(common).load(RUN)
+
+    assert loaded == receipt and loaded.target is None
+    data = payload(receipt)
+    assert all(data[key] is None for key in TARGET_KEYS)
+    with pytest.raises(StateError):
+        _ = loaded.number
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(unbound_receipt(status="COMPLETE"), id="complete-without-pr"),
+        pytest.param(unbound_receipt(merge_sha=OID), id="landing-without-pr"),
+        pytest.param(
+            unbound_receipt(intents=[intent_row()]), id="merge-intent-without-pr"
+        ),
+        pytest.param(unbound_receipt(changeset=None), id="no-target-no-changeset"),
+        pytest.param(
+            unbound_receipt(changeset=changeset_record(residual_snapshot=None)),
+            id="confirmed-update-without-residual",
+        ),
+        pytest.param(
+            unbound_receipt(
+                changeset=changeset_record(
+                    update=None, residual_snapshot=DIGEST, confirmed=[]
+                )
+            ),
+            id="residual-without-update",
+        ),
+        pytest.param(
+            unbound_receipt(
+                changeset=changeset_record(
+                    groups=[GroupRecord("g1", OID, OID2, DIGEST, None, "VALIDATED", [])]
+                )
+            ),
+            id="validated-without-commit-or-gates",
+        ),
+        pytest.param(
+            unbound_receipt(
+                changeset=changeset_record(
+                    groups=[
+                        GroupRecord(
+                            "g1",
+                            OID,
+                            OID2,
+                            DIGEST,
+                            OID,
+                            "VALIDATED",
+                            [GateRow("unit", DIGEST, "PASSED", 0)],
+                        )
+                    ]
+                )
+            ),
+            id="update-not-the-validated-chain",
+        ),
+        pytest.param(
+            unbound_receipt(
+                changeset=changeset_record(
+                    groups=[
+                        GroupRecord(
+                            "g1",
+                            OID,
+                            OID2,
+                            DIGEST,
+                            OID2,
+                            "VALIDATED",
+                            [GateRow("unit", DIGEST, "PASSED", 3)],
+                        )
+                    ]
+                )
+            ),
+            id="passed-gate-with-nonzero-exit",
+        ),
+        pytest.param(
+            unbound_receipt(changeset=changeset_record(mode="rebase")),
+            id="unsupported-placement-mode",
+        ),
+        pytest.param(
+            unbound_receipt(
+                changeset=changeset_record(
+                    update=None, residual_snapshot=None, confirmed=[]
+                )
+            ),
+            id="preserved-work-identity-without-update",
+        ),
+        pytest.param(
+            unbound_receipt(changeset=changeset_record(preserved="not-a-digest")),
+            id="preserved-work-identity-not-a-digest",
+        ),
+    ],
+)
+def test_inconsistent_changeset_journals_are_refused(
+    common: Path, receipt: Receipt
+) -> None:
+    with pytest.raises(ReceiptInputError):
+        Store(common).save(receipt)
+
+    assert list(common.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "stage",
+    ["before-update", "pending-update", "confirmed-update", "unknown-baseline"],
+)
+def test_preserved_work_identity_round_trips_with_its_update(
+    common: Path, stage: str
+) -> None:
+    record = changeset_record()
+    if stage == "before-update":
+        record = replace(
+            record, update=None, preserved=None, residual_snapshot=None, confirmed=[]
+        )
+    elif stage == "pending-update":
+        assert record.update is not None
+        record = replace(
+            record,
+            update=replace(record.update, outcome="PENDING"),
+            residual_snapshot=None,
+            confirmed=[],
+        )
+    elif stage == "unknown-baseline":
+        record = replace(record, preserved=None)
+    receipt = unbound_receipt(changeset=record)
+
+    Store(common).save(receipt)
+
+    loaded = Store(common).load(RUN)
+    assert loaded == receipt
+    assert loaded.changeset is not None
+    assert loaded.changeset.preserved == record.preserved
+    saved = cast("dict[str, object]", payload(receipt)["changeset"])
+    assert saved["preserved"] == record.preserved
+
+
+def test_historical_update_without_a_preserved_identity_loads_as_unknown(
+    common: Path,
+) -> None:
+    data = payload(unbound_receipt(changeset=changeset_record()))
+    cast("dict[str, object]", data["changeset"]).pop("preserved")
+    path = plant_payload(common, RUN, data)
+    at_rest = path.read_bytes()
+
+    loaded = Store(common).load(RUN)
+
+    assert loaded.changeset is not None and loaded.changeset.update is not None
+    assert loaded.changeset.preserved is None
+    assert path.read_bytes() == at_rest
+    assert Receipt.parse(data) == loaded
 
 
 @pytest.mark.parametrize(
