@@ -218,6 +218,7 @@ class AdapterGenerator(ABC):
         self.output_dir = output_dir
         self.dry_run = dry_run
         self._files_written: list[Path] = []
+        self._files_pruned: list[Path] = []
 
     def _write(self, path: Path, content: str) -> None:
         """Write content to path (or log in dry-run mode)."""
@@ -239,13 +240,42 @@ class AdapterGenerator(ABC):
             shutil.rmtree(dst)
         shutil.copytree(src, dst)
 
+    def _remove(self, path: Path) -> None:
+        """Remove a stale generated file or directory (or log in dry-run mode)."""
+        self._files_pruned.append(path)
+        if self.dry_run:
+            print(f"  [dry-run] remove {path.relative_to(REPO_ROOT)}")
+            return
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    def _prune_archived_skills(self, directory: Path, suffix: str = "") -> None:
+        """Remove generated output belonging to explicitly archived skills."""
+        archive_dir = REPO_ROOT / "archive" / "skills"
+        for definition in sorted(archive_dir.glob("*/SKILL.md")):
+            path = directory / f"{definition.parent.name}{suffix}"
+            generated_file = path if suffix else path / "SKILL.md"
+            if path.exists() and generated_file not in self._files_written:
+                self._remove(path)
+
     @abstractmethod
     def generate(self, packages: dict[str, list[PackageContent]]) -> None:
         """Generate platform-specific output from loaded packages."""
 
+    def prune_stale(self) -> None:
+        """Remove output from earlier runs for explicitly archived skills.
+
+        Aggregate adapters overwrite their indexes and need no pruning.
+        """
+
     def report(self) -> str:
         """Return summary of files written."""
-        return f"{self.platform}: {len(self._files_written)} files"
+        summary = f"{self.platform}: {len(self._files_written)} files"
+        if self._files_pruned:
+            summary += f", {len(self._files_pruned)} stale removed"
+        return summary
 
     def validate(self) -> list[str]:
         """Validate generated output. Returns list of error messages."""
@@ -293,6 +323,9 @@ class CursorAdapter(AdapterGenerator):
                     f"  cursor: skipped {count} {skipped_type}(s) (no equivalent)",
                     file=sys.stderr,
                 )
+
+    def prune_stale(self) -> None:
+        self._prune_archived_skills(self.output_dir / ".cursor" / "rules", ".mdc")
 
     def _build_mdc(self, pkg: PackageContent, *, always_apply: bool) -> str:
         """Build .mdc file content with YAML frontmatter + body."""
@@ -552,6 +585,9 @@ class GeminiAdapter(AdapterGenerator):
                 file=sys.stderr,
             )
 
+    def prune_stale(self) -> None:
+        self._prune_archived_skills(self.output_dir / ".gemini" / "skills")
+
     def _generate_skill(self, skill_dir: Path, pkg: PackageContent) -> None:
         """Generate a Gemini skill directory (SKILL.md + references/)."""
         # Build cleaned frontmatter (remove Claude-specific fields)
@@ -742,6 +778,9 @@ def main() -> int:
         adapter = adapter_cls(platform_dir, dry_run=args.dry_run)
         print(f"\n{'[dry-run] ' if args.dry_run else ''}Generating {platform}...")
         adapter.generate(packages)
+        # Partial runs (--type) leave other types unwritten; never prune on them.
+        if not args.types:
+            adapter.prune_stale()
         print(f"  {adapter.report()}")
         adapters.append(adapter)
 

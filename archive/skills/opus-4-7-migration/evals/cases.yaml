@@ -1,0 +1,23 @@
+cases:
+  - id: deprecated_opus_migration_request
+    prompt: "We're upgrading our agent stack to Opus 4.7 — scan the repo for anything that will break or degrade."
+    fixtures: []
+    rubric:
+      - "does not activate opus-4-7-migration because the skill is deprecated and archived"
+      - "handles the migration request without treating the archived scanner as an active skill"
+    trigger_expected: false
+
+  - id: deprecated_budget_tokens_audit
+    prompt: "Find budget_tokens calls in our Anthropic SDK code."
+    fixtures: []
+    rubric:
+      - "does not activate opus-4-7-migration because the skill is deprecated and archived"
+      - "inspects the code and current API contract without relying on archived migration guidance"
+    trigger_expected: false
+
+  - id: negative_general_code_review
+    prompt: "Review my latest pull request for code quality issues."
+    fixtures: []
+    rubric:
+      - "general code review is handled by pr-review, not the archived migration scanner"
+    trigger_expected: false
