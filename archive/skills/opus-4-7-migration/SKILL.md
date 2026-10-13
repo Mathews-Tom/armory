@@ -1,8 +1,9 @@
 ---
 name: opus-4-7-migration
-description: 'Scan a repository for Opus-4.6-era patterns that break or degrade on Opus 4.7 — fixed-budget Extended Thinking parameters, retired model ID aliases, and prompts that assumed verbose default output or eager sub-agent delegation. Produces a categorized report with file:line references and migration actions. Triggers on: "opus 4.7 migration", "migrate to opus 4.7", "audit for opus 4.7", "opus 4.6 to 4.7", "scan for budget_tokens", "find retired model IDs", "adapt repo to opus 4.7". NOT for implementing migrations — this skill identifies candidates.'
+description: 'DEPRECATED: The Opus 4.7 migration scanner is retired from the active skill catalog. Retained for archival reference only; not available through standard package discovery or installation.'
 metadata:
-  version: 1.0.1
+  version: 1.1.0
+  status: deprecated
   category: review
   tags: [opus-4-7, migration, audit, model-refresh, budget-tokens]
   difficulty: intermediate
@@ -10,6 +11,8 @@ metadata:
 ---
 
 # Opus 4.7 Migration Scanner
+
+> **DEPRECATED** — Retired from the active skill catalog. This package is retained under `archive/skills/opus-4-7-migration/` for historical reference only and receives no further updates. The scanner and migration guidance below describe its archived behavior, not a maintained migration workflow.
 
 Identify patterns in a repository that break or silently degrade when the Anthropic platform routes to Opus 4.7. Produces a categorized report with file:line references so a maintainer can plan a scoped migration PR rather than chasing symptoms after the fact.
 

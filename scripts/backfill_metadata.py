@@ -104,11 +104,9 @@ TAG_RULES: dict[str, list[str]] = {
     "static-web-artifacts-builder": ["html", "interactive", "dashboard", "svg"],
     "humanize": ["writing", "ai-detection", "natural-language", "rewriting"],
     "linkedin-post-style": ["linkedin", "social-media", "writing", "content"],
-    "doc-condenser": ["documentation", "summarization", "technical-writing", "conciseness"],
     "to-markdown": ["conversion", "markdown", "document-ingestion", "pdf"],
     "md-to-pdf": ["pdf", "markdown", "mermaid", "latex"],
     "gpu-optimizer": ["gpu", "cuda", "vram", "pytorch"],
-    "regex-builder": ["regex", "pattern-matching", "testing", "validation"],
     "filesystem": ["files", "directories", "search", "navigation"],
     "github": ["github", "cli", "issues", "pull-requests"],
     "agent-builder": ["agent-sdk", "headless", "automation", "mcp"],
@@ -117,7 +115,6 @@ TAG_RULES: dict[str, list[str]] = {
     "rag-auditor": ["rag", "retrieval", "hallucination", "grounding"],
     "repo-sentinel": ["security", "public-repo", "secret-scanning", "audit"],
     "qa-systematic": ["qa", "testing", "browser", "regression"],
-    "sequential-thinking": ["reasoning", "chain-of-thought", "analysis", "problem-solving"],
     "tavily": ["web-search", "research", "real-time", "ai-optimized"],
     "web-fetch": ["http", "curl", "api", "web-content"],
     "lightpanda-browser": ["browser", "headless", "scraping", "lightweight"],
@@ -219,7 +216,7 @@ def generate_tags(name: str, pkg_type: str, meta: dict[str, Any]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 BEGINNER_PACKAGES = {
-    "filesystem", "regex-builder", "web-fetch", "to-markdown", "doc-condenser",
+    "filesystem", "web-fetch", "to-markdown",
     "tavily", "lightpanda-browser", "youtube-search", "arxiv-search",
     "commit-standards", "test-standards", "security-standards",
     "cost-tracker", "git-protection", "pre-edit-backup",

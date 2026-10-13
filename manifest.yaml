@@ -382,19 +382,6 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
-  - name: doc-condenser
-    version: 1.1.1
-    description: 'DEPRECATED: The base model handles document condensation and summarization natively at high quality. This
-      skill no longer provides meaningful uplift. Retained for reference only.'
-    path: skills/doc-condenser
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/doc-condenser/SKILL.md
-    tags:
-    - documentation
-    - summarization
-    - technical-writing
-    - conciseness
-    category: review
-    difficulty: beginner
   - name: engineering-retro
     version: 1.0.1
     description: 'Git-based engineering retrospective analyzing commits, PRs, and velocity over configurable windows with
@@ -896,24 +883,6 @@ packages:
     difficulty: intermediate
     complements:
     - watch
-  - name: opus-4-7-migration
-    version: 1.0.1
-    description: 'Scan a repository for Opus-4.6-era patterns that break or degrade on Opus 4.7 — fixed-budget Extended Thinking
-      parameters, retired model ID aliases, and prompts that assumed verbose default output or eager sub-agent delegation.
-      Produces a categorized report with file:line references and migration actions. Triggers on: "opus 4.7 migration", "migrate
-      to opus 4.7", "audit for opus 4.7", "opus 4.6 to 4.7", "scan for budget_tokens", "find retired model IDs", "adapt repo
-      to opus 4.7". NOT for implementing migrations — this skill identifies candidates.'
-    path: skills/opus-4-7-migration
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/opus-4-7-migration/SKILL.md
-    tags:
-    - opus-4-7
-    - migration
-    - audit
-    - model-refresh
-    - budget-tokens
-    category: review
-    difficulty: intermediate
-    phase: review
   - name: package-evaluator
     version: 1.3.1
     description: 'Evaluates Claude Code package quality across 6 dimensions for all 7 package types, producing scored audit
@@ -1119,19 +1088,6 @@ packages:
     category: review
     difficulty: advanced
     phase: build
-  - name: regex-builder
-    version: 1.1.1
-    description: 'DEPRECATED: The base model generates, explains, and tests regex patterns natively with high accuracy. This
-      skill no longer provides meaningful uplift. Retained for reference only.'
-    path: skills/regex-builder
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/regex-builder/SKILL.md
-    tags:
-    - regex
-    - pattern-matching
-    - testing
-    - validation
-    category: development
-    difficulty: beginner
   - name: remotion-video
     version: 1.2.1
     description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers
@@ -1200,20 +1156,6 @@ packages:
     complements:
     - citation-audit
     - literature-review
-  - name: sequential-thinking
-    version: 1.1.1
-    description: 'DEPRECATED: Opus 4.7''s adaptive thinking covers most cases natively. Structured, reflective problem-solving
-      through sequential chain-of-thought reasoning that replaced the Sequential Thinking MCP server. Retained as a reference
-      pattern when deterministic, reviewable reasoning traces are required regardless of the model''s adaptive-thinking choice.'
-    path: skills/sequential-thinking
-    source: https://github.com/Mathews-Tom/armory/blob/main/skills/sequential-thinking/SKILL.md
-    tags:
-    - reasoning
-    - chain-of-thought
-    - analysis
-    - problem-solving
-    category: development
-    difficulty: intermediate
   - name: ship-workflow
     version: 1.0.1
     description: 'Automated release pipeline: merges main, runs tests, pre-landing review, version bump, changelog, bisectable

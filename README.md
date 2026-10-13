@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 143](https://img.shields.io/badge/packages-143-informational)](manifest.yaml)
+[![packages: 142](https://img.shields.io/badge/packages-142-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -139,7 +139,6 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [manuscript-review](skills/manuscript-review/)         | Pre-publication manuscript audit with 24 diagnostic dimensions, citation hygiene, and cross-element coherence                                       |
 | [manuscript-provenance](skills/manuscript-provenance/) | Computational provenance audit verifying every number, table, and figure in a manuscript traces back to code                                        |
 | [manuscript-typography](skills/manuscript-typography/) | Academic typography audit — booktabs, captions, units, references, page layout, visual hierarchy, and LaTeX polish                                  |
-| [opus-4-7-migration](skills/opus-4-7-migration/)       | Repository scanner for Opus 4.7 migration issues — fixed thinking budgets, retired model aliases, and stale prompt assumptions                     |
 | [repo-sentinel](skills/repo-sentinel/)                 | Security audit and enforcement for public repos — 12 attack surfaces, pre-release readiness, history scrubbing, CI gates                            |
 | [package-evaluator](skills/package-evaluator/)         | Evaluate package quality across 6 weighted dimensions with type-specific signals — frontmatter, triggers, structure, depth, consistency, compliance |
 | [devils-advocate](skills/devils-advocate/)             | Challenges AI-generated plans, code, designs, and decisions — pre-mortem, inversion, Socratic questioning with steel-manning and clear verdicts     |
@@ -219,15 +218,16 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 
 > _Research lineage:_ the EvoSkills pipeline (arXiv 2604.01687) handles offline co-evolutionary refinement. The `immune` skill together with armory's auto-memory system implements the **stateful-prompt** concept from Memento-Skills (arXiv 2603.18743) — the read-write reflective loop for continual learning without parameter updates.
 
-### Skills — Deprecated
+### Skills — Deprecated (Archived)
 
-Skills below are superseded by base model capabilities. They remain installable but receive no further updates.
+Skills below are superseded by base model capabilities or retired migration guidance. Their source is retained for reference under `archive/skills/`, outside the active `skills/` tree. They are excluded from standard discovery, installation, the manifest, and generated adapters, and receive no further updates.
 
-| Skill                                              | Reason                                           |
-| -------------------------------------------------- | ------------------------------------------------ |
-| [doc-condenser](skills/doc-condenser/)             | Base model handles summarization natively        |
-| [regex-builder](skills/regex-builder/)             | Base model generates regex at equivalent quality |
-| [sequential-thinking](skills/sequential-thinking/) | Base model handles chain-of-thought natively     |
+| Skill                                                      | Reason                                                       |
+| ---------------------------------------------------------- | ------------------------------------------------------------ |
+| [doc-condenser](archive/skills/doc-condenser/)             | Base model handles summarization natively                    |
+| [regex-builder](archive/skills/regex-builder/)             | Base model generates regex at equivalent quality             |
+| [sequential-thinking](archive/skills/sequential-thinking/) | Base model handles chain-of-thought natively                 |
+| [opus-4-7-migration](archive/skills/opus-4-7-migration/)   | Opus 4.7 migration guidance deprecated; no longer maintained |
 
 ## Rules
 
@@ -430,7 +430,7 @@ Every package is evaluated against 6 shared dimensions using the [package-evalua
 
 ## Eval Coverage
 
-Every package has eval cases in `{type}/<name>/evals/cases.yaml` — positive triggers (should activate) and negative triggers (should not). Deprecated packages enforce 0 positive + 2 negative cases.
+Every active package has eval cases in `{type}/<name>/evals/cases.yaml` — positive triggers (should activate) and negative triggers (should not). Deprecated skill evals retain no positive cases and at least two negative cases; the skills live under `archive/skills/<name>/`, outside the active tree. Deprecated presets remain under `presets/`.
 
 **Validation:**
 
@@ -480,7 +480,7 @@ uv run scripts/validate_agentskills.py           # Warnings only (default)
 uv run scripts/validate_agentskills.py --strict   # Extra fields are errors
 ```
 
-All 76 skills pass with 0 errors. The validator checks the 6-field frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
+The validator checks the 6-field frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
 
 ---
 

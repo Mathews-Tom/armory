@@ -443,6 +443,8 @@ cases:
 | Active       | 1+ (recommended: 2+)                    | 2+                                       |
 | Deprecated   | 0 (must be zero)                        | 2+                                       |
 
+**Deprecating a skill:** Set `metadata.status: deprecated`, then move the package from `skills/<name>/` to `archive/skills/<name>/` (no deprecated skill may remain under `skills/`). Archived skills are retained for reference only and are excluded from discovery, installation, the manifest, and adapters. After moving, regenerate the manifest and adapters and move its row in `README.md` to the "Skills — Deprecated (Archived)" table with an `archive/skills/` link.
+
 **Guidelines:**
 
 - Positive cases should use natural language a real user would type

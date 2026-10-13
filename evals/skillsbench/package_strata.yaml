@@ -239,9 +239,6 @@ excluded:
     name: devils-advocate
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
-    name: doc-condenser
-    rationale: Deprecated packages are excluded from effectiveness sampling.
-  - package_type: skill
     name: engineering-retro
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
@@ -329,9 +326,6 @@ excluded:
     name: notebooklm
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
-    name: opus-4-7-migration
-    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
-  - package_type: skill
     name: package-evaluator
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
@@ -365,9 +359,6 @@ excluded:
     name: rag-auditor
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
-    name: regex-builder
-    rationale: Deprecated packages are excluded from effectiveness sampling.
-  - package_type: skill
     name: remotion-video
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
@@ -379,9 +370,6 @@ excluded:
   - package_type: skill
     name: research-critique
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
-  - package_type: skill
-    name: sequential-thinking
-    rationale: Deprecated packages are excluded from effectiveness sampling.
   - package_type: skill
     name: ship-workflow
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.

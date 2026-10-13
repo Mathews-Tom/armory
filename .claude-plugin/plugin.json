@@ -1,7 +1,7 @@
 {
   "name": "armory",
   "version": "0.2.1",
-  "description": "Production-grade skills, agents, hooks, rules, and commands for Claude Code — 110 packages across 7 types",
+  "description": "Production-grade skills, agents, hooks, rules, commands, utilities, and presets for Claude Code",
   "author": {
     "name": "Mathews-Tom",
     "url": "https://github.com/Mathews-Tom"
