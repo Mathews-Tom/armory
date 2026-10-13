@@ -370,7 +370,7 @@ def test_pr_for_other_base_repository_blocks() -> None:
 
 
 @pytest.mark.parametrize(
-    ("stack", "native"),
+    ("stack", "identity"),
     [
         (
             {
@@ -380,25 +380,47 @@ def test_pr_for_other_base_repository_blocks() -> None:
                 "id": 9,
                 "number": 4,
             },
-            True,
+            (True, 4, 2, 3, "main"),
         ),
-        (None, False),
+        (None, (False, None, None, None, None)),
     ],
 )
-def test_native_membership_comes_from_the_pr_stack_property(
-    stack: dict[str, Any] | None, native: bool
+def test_native_membership_and_identity_come_from_the_pr_stack_property(
+    stack: dict[str, Any] | None, identity: tuple[Any, ...]
 ) -> None:
     body = pull(**({"stack": stack} if stack is not None else {}))
     obs = observe(routes() | {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=body)})
-    assert obs.pr.native is native
+    pr = obs.pr
+    assert (
+        pr.native,
+        pr.native_stack_number,
+        pr.native_stack_position,
+        pr.native_stack_size,
+        pr.native_stack_base,
+    ) == identity
 
 
-def test_malformed_stack_property_is_rejected_not_read_as_native() -> None:
+@pytest.mark.parametrize(
+    "stack",
+    [
+        "yes",
+        {"size": 2},
+        {"base": "main", "number": 4},
+        {"base": {"ref": "main"}, "number": "4"},
+        {"base": {"ref": "main"}, "number": True},
+        {"base": {"ref": "main"}, "number": 4, "position": 0, "size": 2},
+        {"base": {"ref": "main"}, "number": 4, "position": 3, "size": 2},
+        {"base": {"ref": ""}, "number": 4},
+        {"base": {"ref": "main", "sha": "abc"}, "number": 4},
+    ],
+)
+def test_malformed_stack_property_is_rejected_not_read_as_unknown(stack: Any) -> None:
     with pytest.raises(ProviderError) as err:
         observe(
-            routes() | {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(stack="yes"))}
+            routes() | {f"/repos/{REPO}/pulls/{NUMBER}": Reply(body=pull(stack=stack))}
         )
-    assert err.value.kind == "BLOCKED" and "stack" in str(err.value)
+    assert (err.value.kind, err.value.detail) == ("BLOCKED", "malformed")
+    assert "stack" in str(err.value)
 
 
 def test_list_prs_carries_native_membership_and_states() -> None:
@@ -1968,7 +1990,7 @@ def test_read_pr_reports_a_deleted_fork_head_instead_of_inventing_one() -> None:
     assert (pr.head_repo, pr.base_repo) == ("", REPO)
 
 
-def test_read_pr_reports_native_stack_membership_from_the_pr_itself() -> None:
+def test_read_pr_keeps_missing_native_stack_identity_explicitly_unknown() -> None:
     plain = make(routes())[0].read_pr(NUMBER)
     stacked = make(
         routes()
@@ -1979,6 +2001,12 @@ def test_read_pr_reports_native_stack_membership_from_the_pr_itself() -> None:
         }
     )[0].read_pr(NUMBER)
     assert (plain.native, stacked.native) == (False, True)
+    assert (
+        stacked.native_stack_number,
+        stacked.native_stack_position,
+        stacked.native_stack_size,
+        stacked.native_stack_base,
+    ) == (None, None, 2, None)
 
 
 @pytest.mark.parametrize(
@@ -3076,3 +3104,803 @@ def test_create_pr_rejects_a_multi_line_title_before_any_process(
         gh.create_pr(REPO, "feat/x", "main", "feat: x\n$(id)", body_file(tmp_path))
 
     assert fake.argvs == []
+
+
+# --------------------------------------------------------------------------
+# Native stacks and asynchronous merge requests
+
+STACK = 12
+TRUNK = "qual/trunk"
+UUID = "6aa849f9-5647-4c96-a58d-8019d8830a2c"
+OTHER_UUID = "c1e61598-c685-45a7-85e2-b03b271a6950"
+API = "https://api.github.com"
+NATIVE_LANDED = {4: "3071156d680bc71a453c6218db381349365fc2d4",
+          5: "648f5b07c0efd27488c3d7ea661b3520fc3d6162"}  # fmt: skip
+
+
+@dataclass
+class Member:
+    number: int
+    head: str
+    head_ref: str
+    base_ref: str
+    state: str = "OPEN"  # OPEN | MERGED
+    landing: str | None = None
+    head_repo: str = REPO
+    stack: dict[str, Any] | None = field(default_factory=dict)  # None: no stack
+
+
+@dataclass(frozen=True)
+class Operation:
+    """One async merge GitHub accepted: the open native prefix it merges."""
+
+    uuid: str
+    action: str
+    method: str  # "default" when the request named none
+    scope: tuple[int, ...]
+    bypass_rules: bool = False
+
+
+QUEUE_CUSTOM_PARAMS = (
+    "Custom merge params (merge_method, commit_title, commit_message) are "
+    "not supported with the merge_queue merge action."
+)
+HEAD_MODIFIED = "Head branch was modified. Review and try the merge again."
+
+
+def refusal(status: int, message: str) -> Reply:
+    return Reply(status, {"message": message}, stderr=f"gh: {message} (HTTP {status})")
+
+
+class NativeProvider:
+    """Stateful double of one native stack, its member PRs and async merge requests.
+
+    Shapes follow the REST ``stacks``, ``pulls`` and ``merge-async`` responses.
+    Landing changes PR facts only; the async request status is a separate
+    resource that changes independently, as GitHub reports them.
+    """
+
+    def __init__(self, count: int = 3, first: int = 4) -> None:
+        self.members: dict[int, Member] = {}
+        below = TRUNK
+        for offset in range(count):
+            number = first + offset
+            ref = f"stack/layer{offset + 1}"
+            self.members[number] = Member(number, sha(0x100 + number), ref, below)
+            below = ref
+        self.order: list[int] = list(self.members)  # the stack listing order
+        self.after_first_stack_read: Callable[[], None] | None = None
+        self.queue_method: str | None = None  # ruleset merge-queue method on TRUNK
+        self.rules_reply: Reply | None = None
+        self.listing_patch: dict[str, Any] = {}
+        self.put_replies: list[Reply] = []
+        self.put_raises: BaseException | None = None
+        self.status_replies: list[Reply] = []
+        self.request_status = "pending"
+        self.request_landing: str | None = None
+        self.request_message: str | None = None  # GitHub's reason for "failed"
+        self.puts: list[dict[str, str]] = []  # every PUT received, for counting
+        self.operations: list[Operation] = []  # accepted async merges
+        self.paths: list[str] = []
+        self.timeouts: list[float] = []
+        self.stack_reads = 0
+
+    def land(self, *numbers: int) -> None:
+        """Members land; the provider retargets the lowest open member to the trunk."""
+        for number in numbers:
+            member = self.members[number]
+            member.state, member.landing = "MERGED", NATIVE_LANDED[number]
+        remaining = [m for m in self.members.values() if m.state == "OPEN"]
+        if remaining:
+            remaining[0].base_ref = TRUNK
+
+    def __call__(
+        self, argv: Sequence[str], timeout: float
+    ) -> subprocess.CompletedProcess[bytes]:
+        self.timeouts.append(timeout)
+        if argv[-1] == "graphql":
+            return render(argv, self._landing(argv))
+        method = argv[list(argv).index("--method") + 1]
+        path = urlsplit(argv[-1]).path
+        self.paths.append(f"{method} {path}")
+        if method == "PUT":
+            return self._put(argv, path)
+        assert method == "GET", argv
+        return render(argv, self._get(path))
+
+    def _put(
+        self, argv: Sequence[str], path: str
+    ) -> subprocess.CompletedProcess[bytes]:
+        """Validate and accept one request as GitHub does; refusals accept nothing.
+
+        The accepted operation covers every open member from the stack bottom
+        up to the selected PR; members above it are not part of it.
+        """
+        assert path.endswith("/merge-async"), path
+        fields = {
+            name: value
+            for flag, item in itertools.pairwise(argv)
+            if flag in ("-f", "-F")
+            for name, _, value in [item.partition("=")]
+        }
+        self.puts.append(fields)
+        if self.put_raises is not None:
+            raise self.put_raises
+        if self.put_replies:
+            return render(argv, self.put_replies.pop(0))
+        number = int(path.rsplit("/", 2)[1])
+        selected = self.members[number]
+        action = fields["merge_action"]
+        custom = {"merge_method", "commit_title", "commit_message"} & fields.keys()
+        if action == "merge_queue" and custom:
+            return render(argv, refusal(422, QUEUE_CUSTOM_PARAMS))
+        if fields.get("sha", selected.head) != selected.head:
+            return render(argv, refusal(409, HEAD_MODIFIED))
+        bottom_up = list(self.members)
+        operation = Operation(
+            uuid=UUID,
+            action=action,
+            method=fields.get("merge_method", "default"),
+            scope=tuple(
+                n
+                for n in bottom_up[: bottom_up.index(number) + 1]
+                if self.members[n].state == "OPEN"
+            ),
+            bypass_rules=fields.get("bypass_rules") == "true",
+        )
+        self.operations.append(operation)
+        details = {
+            "message": "Merge request enqueued.",
+            "uuid": operation.uuid,
+            "merge_method": operation.method,
+            "merge_action": operation.action,
+            "expected_head_sha": selected.head,
+            "bypass_rules": operation.bypass_rules,
+        }
+        return render(argv, Reply(202, {"status": "pending", "details": details}))
+
+    def _get(self, path: str) -> Reply:
+        base = f"/repos/{REPO}"
+        if path == base:
+            return Reply(body={"full_name": REPO, "default_branch": "main",
+                               "allow_merge_commit": True, "allow_squash_merge": True,
+                               "allow_rebase_merge": True})  # fmt: skip
+        if path == f"{base}/stacks/{STACK}":
+            self.stack_reads += 1
+            body = self._listing()
+            if self.stack_reads == 1 and self.after_first_stack_read is not None:
+                self.after_first_stack_read()
+            return Reply(body=body)
+        if "/merge-async/" in path:
+            if self.status_replies:
+                return self.status_replies.pop(0)
+            message = self.request_message
+            if message is None:
+                message = f"request is {self.request_status}"
+            details: dict[str, Any] = {"message": message}
+            if self.request_landing is not None:
+                details["sha"] = self.request_landing
+            return Reply(body={"status": self.request_status, "details": details})
+        if path.startswith(f"{base}/pulls/"):
+            return Reply(body=self._pull(self.members[int(path.rsplit("/", 1)[1])]))
+        if path == f"{base}/branches/{TRUNK}":
+            return Reply(body=branch(BASE, TRUNK))
+        if path == f"{base}/rules/branches/{TRUNK}":
+            if self.rules_reply is not None:
+                return self.rules_reply
+            params = {"merge_method": self.queue_method}
+            queue = {"type": "merge_queue", "parameters": params}
+            return Reply(body=[queue] if self.queue_method else [])
+        raise AssertionError(f"unrouted provider read: {path}")
+
+    def _pull(self, member: Member) -> dict[str, Any]:
+        merged = member.state == "MERGED"
+        body = pull(
+            number=member.number,
+            html_url=f"https://github.com/{REPO}/pull/{member.number}",
+            state="closed" if merged else "open",
+            merged=merged,
+            merged_at=MERGE_DATE if merged else None,
+            head={"sha": member.head, "ref": member.head_ref,
+                  "repo": {"full_name": member.head_repo}},
+            base={"sha": BASE, "ref": member.base_ref, "repo": {"full_name": REPO}},
+        )  # fmt: skip
+        if member.stack is not None:
+            body["stack"] = {
+                "id": 2043368,
+                "number": STACK,
+                "position": list(self.members).index(member.number) + 1,
+                "size": len(self.members),
+                "base": {"ref": TRUNK, "sha": BASE},
+            } | member.stack
+        return body
+
+    def _listing(self) -> dict[str, Any]:
+        def entry(member: Member) -> dict[str, Any]:
+            merged = member.state == "MERGED"
+            return {
+                "url": f"{API}/repos/{REPO}/pulls/{member.number}",
+                "number": member.number,
+                "head": {"ref": member.head_ref, "sha": member.head,
+                         "repo": {"url": f"{API}/repos/{member.head_repo}"}},
+                "base": {"ref": member.base_ref, "sha": BASE,
+                         "repo": {"url": f"{API}/repos/{REPO}"}},
+                "state": "closed" if merged else "open",
+                "merged_at": MERGE_DATE if merged else None,
+            }  # fmt: skip
+
+        return {
+            "id": 2043368,
+            "number": STACK,
+            "url": f"{API}/repos/{REPO}/stacks/{STACK}",
+            "base": {"ref": TRUNK},
+            "open": True,
+            "pull_requests": [entry(self.members[n]) for n in self.order],
+        } | self.listing_patch
+
+    def _landing(self, argv: Sequence[str]) -> Reply:
+        fields = {
+            item.partition("=")[0]: item.partition("=")[2]
+            for flag, item in itertools.pairwise(argv)
+            if flag in ("-f", "-F")
+        }
+        member = self.members[int(fields["number"])]
+        assert member.state == "MERGED", "landing facts are read only for merged PRs"
+        pr = {"number": member.number, "state": "MERGED", "merged": True,
+              "url": f"https://github.com/{REPO}/pull/{member.number}",
+              "headRefOid": member.head, "headRefName": member.head_ref,
+              "baseRefName": member.base_ref, "mergedAt": MERGE_DATE,
+              "mergeCommit": {"oid": member.landing}}  # fmt: skip
+        repository = {"nameWithOwner": REPO, "pullRequest": pr}
+        return Reply(body={"data": {"repository": repository}})
+
+
+def native_gh(provider: NativeProvider, **kwargs: Any) -> tuple[GitHub, list[float]]:
+    sleeps: list[float] = []
+    gh = GitHub(
+        "github.com", REPO, runner=provider, sleep=sleeps.append, clock=lambda: 0.0,
+        **kwargs,
+    )  # fmt: skip
+    return gh, sleeps
+
+
+def outcome(error: ProviderError) -> tuple[str, str]:
+    return error.kind, error.detail
+
+
+def test_read_native_stack_returns_members_bottom_up_from_authoritative_reads() -> None:
+    provider = NativeProvider()
+
+    stack = native_gh(provider)[0].read_native_stack(STACK)
+
+    assert (stack.number, stack.base_ref) == (STACK, TRUNK)
+    assert [(m.number, m.head_sha, m.base_ref, m.state) for m in stack.members] == [
+        (4, sha(0x104), TRUNK, "OPEN"),
+        (5, sha(0x105), "stack/layer1", "OPEN"),
+        (6, sha(0x106), "stack/layer2", "OPEN"),
+    ]
+    assert [m.native_stack_position for m in stack.members] == [1, 2, 3]
+    assert all(f"GET /repos/{REPO}/pulls/{n}" in provider.paths for n in (4, 5, 6))
+    assert provider.stack_reads == 2
+
+
+def test_read_native_stack_keeps_merged_members_with_their_landing_facts() -> None:
+    provider = NativeProvider()
+    provider.land(4, 5)
+
+    stack = native_gh(provider)[0].read_native_stack(STACK)
+
+    facts = [(m.number, m.state, m.merge_commit_sha, m.base_ref) for m in stack.members]
+    assert facts == [
+        (4, "MERGED", NATIVE_LANDED[4], TRUNK),
+        (5, "MERGED", NATIVE_LANDED[5], "stack/layer1"),
+        (6, "OPEN", None, TRUNK),
+    ]
+
+
+def _misorder(p: NativeProvider) -> None:
+    p.order = [5, 4, 6]
+
+
+def _duplicate(p: NativeProvider) -> None:
+    p.order = [4, 4, 5, 6]
+
+
+def _short_listing(p: NativeProvider) -> None:
+    p.order = [4, 5]
+
+
+def _foreign_head(p: NativeProvider) -> None:
+    p.members[5].head_repo = "fork-owner/widget"
+
+
+def _wrong_size(p: NativeProvider) -> None:
+    p.members[6].stack = {"size": 4}
+
+
+def _other_stack(p: NativeProvider) -> None:
+    p.members[5].stack = {"number": STACK + 1}
+
+
+def _other_trunk(p: NativeProvider) -> None:
+    p.members[4].stack = {"base": {"ref": "main"}}
+
+
+def _not_native(p: NativeProvider) -> None:
+    p.members[6].stack = None
+
+
+def _broken_chain(p: NativeProvider) -> None:
+    p.members[6].base_ref = "unrelated"
+
+
+def _merged_above_open(p: NativeProvider) -> None:
+    p.members[5].state, p.members[5].landing = "MERGED", NATIVE_LANDED[5]
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [_misorder, _duplicate, _short_listing, _foreign_head, _wrong_size, _other_stack,
+     _other_trunk, _not_native, _broken_chain, _merged_above_open],
+)  # fmt: skip
+def test_read_native_stack_rejects_inconsistent_membership(
+    corrupt: Callable[[NativeProvider], None],
+) -> None:
+    provider = NativeProvider()
+    corrupt(provider)
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].read_native_stack(STACK)
+
+    assert outcome(caught.value) == ("BLOCKED", "native-stack-mismatch")
+
+
+@pytest.mark.parametrize(
+    "listing",
+    [
+        {"number": STACK + 1, "url": f"{API}/repos/{REPO}/stacks/{STACK + 1}"},
+        {"url": f"{API}/repos/other/repo/stacks/{STACK}"},
+        {"pull_requests": []},
+    ],
+)
+def test_read_native_stack_rejects_a_listing_for_another_stack_or_none(
+    listing: dict[str, Any],
+) -> None:
+    provider = NativeProvider()
+    provider.listing_patch = listing
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].read_native_stack(STACK)
+
+    assert outcome(caught.value) == ("BLOCKED", "native-stack-mismatch")
+
+
+def test_read_native_stack_rejects_membership_that_moves_between_reads() -> None:
+    provider = NativeProvider(count=4)
+    provider.order = [4, 5, 6]
+    provider.members[7].stack = {"size": 3}
+
+    def grow() -> None:
+        provider.order = [4, 5, 6, 7]
+
+    provider.after_first_stack_read = grow
+    for member in (4, 5, 6):
+        provider.members[member].stack = {"size": 3}
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].read_native_stack(STACK)
+
+    assert outcome(caught.value) == ("WAITING", "native-stack-changed")
+
+
+def test_read_native_stack_rejects_a_head_pushed_after_the_listing() -> None:
+    provider = NativeProvider()
+
+    def push() -> None:
+        provider.members[5].head = OTHER_HEAD
+
+    provider.after_first_stack_read = push
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].read_native_stack(STACK)
+
+    assert outcome(caught.value) == ("WAITING", "native-stack-changed")
+
+
+def test_native_trunk_policy_routes_by_the_stack_base_queue_rules() -> None:
+    provider = NativeProvider()
+    provider.queue_method = "SQUASH"
+    gh, _ = native_gh(provider)
+    stack = gh.read_native_stack(STACK)
+    provider.paths.clear()
+
+    policy = gh.native_trunk_policy(stack)
+
+    assert (policy.trunk, policy.action) == (TRUNK, "merge_queue")
+    assert policy.methods == ("squash",)
+    branch_reads = [p for p in provider.paths if "/branches/" in p]
+    assert branch_reads and all(TRUNK in p for p in branch_reads)
+
+
+def test_native_trunk_policy_is_direct_only_when_fully_known() -> None:
+    provider = NativeProvider()
+    gh, _ = native_gh(provider)
+    stack = gh.read_native_stack(STACK)
+    direct = gh.native_trunk_policy(stack)
+    provider.rules_reply = Reply(403, {"message": "Resource not accessible"})
+
+    unknown = gh.native_trunk_policy(stack)
+
+    assert (direct.action, direct.methods, direct.policy_known) == (
+        "direct_merge", ("merge", "squash", "rebase"), True,
+    )  # fmt: skip
+    assert (unknown.action, unknown.policy_known) == (None, False)
+
+
+def test_start_native_merge_direct_merges_the_prefix_up_to_the_selected_pr() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    gh, sleeps = native_gh(provider)
+
+    result = gh.start_native_merge(5, head, "squash", "direct_merge")
+
+    assert provider.operations == [Operation(UUID, "direct_merge", "squash", (4, 5))]
+    assert (result.status, result.uuid, result.expected_head_sha, result.sha) == (
+        "pending", UUID, head, None,
+    )  # fmt: skip
+    assert sleeps == []
+
+
+def test_start_native_merge_queue_is_accepted_by_the_strict_provider() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    gh, _ = native_gh(provider)
+
+    with pytest.raises(ValueError):
+        gh.start_native_merge(5, head, "squash", "merge_queue")
+    assert provider.puts == []
+
+    result = gh.start_native_merge(5, head, None, "merge_queue")
+
+    assert provider.operations == [Operation(UUID, "merge_queue", "default", (4, 5))]
+    assert (result.status, result.uuid, result.expected_head_sha) == (
+        "pending", UUID, head,
+    )  # fmt: skip
+
+
+def test_start_native_merge_excludes_members_that_already_landed() -> None:
+    provider = NativeProvider()
+    provider.land(4)
+    gh, _ = native_gh(provider)
+
+    gh.start_native_merge(6, provider.members[6].head, "merge", "direct_merge")
+
+    assert provider.operations == [Operation(UUID, "direct_merge", "merge", (5, 6))]
+
+
+@pytest.mark.parametrize(
+    ("method", "action"), [("squash", "direct_merge"), (None, "merge_queue")]
+)
+def test_start_native_merge_head_pushed_after_the_snapshot_is_refused(
+    method: str | None, action: str
+) -> None:
+    provider = NativeProvider()
+    expected_head = provider.members[5].head
+    gh, sleeps = native_gh(provider)
+    provider.members[5].head = OTHER_HEAD  # pushed before the request is sent
+
+    with pytest.raises(ProviderError) as caught:
+        gh.start_native_merge(5, expected_head, method, action)
+
+    assert outcome(caught.value) == ("WAITING", "native-merge-head-changed")
+    assert caught.value.uncertain is False
+    assert provider.operations == []
+    assert (len(provider.puts), sleeps) == (1, [])
+
+
+@pytest.mark.parametrize(
+    ("method", "action"),
+    [("squash", "merge_queue"), (None, "direct_merge"), ("fast-forward", "direct_merge"),
+     ("fast-forward", "default"), (None, "merge")],
+)  # fmt: skip
+def test_start_native_merge_rejects_inexact_options_before_any_dispatch(
+    method: str | None, action: str
+) -> None:
+    provider = NativeProvider()
+    gh, _ = native_gh(provider)
+
+    with pytest.raises(ValueError):
+        gh.start_native_merge(5, provider.members[5].head, method, action)
+
+    assert provider.paths == []
+
+
+def test_start_native_merge_definite_422_refusal_is_not_uncertain() -> None:
+    provider = NativeProvider()
+    provider.put_replies = [refusal(422, QUEUE_CUSTOM_PARAMS)]
+    gh, _ = native_gh(provider)
+
+    with pytest.raises(ProviderError) as caught:
+        gh.start_native_merge(5, provider.members[5].head, None, "merge_queue")
+
+    error = caught.value
+    assert (error.kind, error.uncertain, error.http_status, error.detail) == (
+        "BLOCKED", False, 422, "native-merge-rejected",
+    )  # fmt: skip
+    assert len(provider.puts) == 1
+
+
+def test_start_native_merge_409_surfaces_the_existing_request_identity() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    existing = {"status": "pending", "details": {
+        "message": "A merge request is already in progress.", "uuid": OTHER_UUID,
+        "merge_method": "merge", "merge_action": "direct_merge",
+        "expected_head_sha": head, "bypass_rules": False}}  # fmt: skip
+    provider.put_replies = [Reply(409, existing)]
+
+    with pytest.raises(github_ops.NativeMergeInProgress) as caught:
+        native_gh(provider)[0].start_native_merge(5, head, "squash", "direct_merge")
+
+    error = caught.value
+    assert (error.kind, error.uncertain, error.http_status) == ("WAITING", False, 409)
+    assert (error.existing.uuid, error.existing.status) == (OTHER_UUID, "pending")
+    assert len(provider.puts) == 1
+
+
+def test_start_native_merge_default_without_method_lets_github_choose() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    gh, _ = native_gh(provider)
+
+    result = gh.start_native_merge(5, head, None, "default")
+
+    assert provider.operations == [Operation(UUID, "default", "default", (4, 5))]
+    assert (result.status, result.uuid, result.expected_head_sha) == (
+        "pending", UUID, head,
+    )  # fmt: skip
+
+
+def test_start_native_merge_default_with_method_merges_with_that_method() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    gh, _ = native_gh(provider)
+
+    result = gh.start_native_merge(5, head, "squash", "default")
+
+    assert provider.operations == [Operation(UUID, "default", "squash", (4, 5))]
+    assert (result.status, result.uuid) == ("pending", UUID)
+
+
+def test_start_native_merge_default_with_a_contradicting_echo_is_uncertain() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    provider.put_replies = [Reply(202, {"status": "pending", "details": {
+        "message": "m", "uuid": UUID, "merge_action": "merge_queue",
+        "merge_method": "default", "expected_head_sha": head,
+        "bypass_rules": False}})]  # fmt: skip
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].start_native_merge(5, head, None, "default")
+
+    assert outcome(caught.value) == ("BLOCKED", "native-merge-contradiction")
+    assert caught.value.uncertain is True
+    assert len(provider.puts) == 1
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"status": "merged", "details": {"message": "Pull request already merged.",
+                                          "sha": NATIVE_LANDED[5]}},
+         ("merged", None, NATIVE_LANDED[5], None, "Pull request already merged.")),
+        ({"status": "enqueued", "details": {"message": "Already in the merge queue."}},
+         ("enqueued", None, None, None, "Already in the merge queue.")),
+        ({"status": "failed", "details": {"message": "Merge conflict."}},
+         ("failed", None, None, None, "Merge conflict.")),
+    ],
+)  # fmt: skip
+def test_start_native_merge_immediate_reply_is_a_result_without_a_new_request(
+    body: dict[str, Any], expected: tuple[str | None, ...]
+) -> None:
+    provider = NativeProvider()
+    provider.put_replies = [Reply(200, body)]
+    gh, sleeps = native_gh(provider)
+
+    result = gh.start_native_merge(5, provider.members[5].head, None, "merge_queue")
+
+    observed = (result.status, result.uuid, result.sha, result.expected_head_sha,
+                result.message)  # fmt: skip
+    assert observed == expected
+    assert (provider.paths, sleeps) == ([f"PUT /repos/{REPO}/pulls/5/merge-async"], [])
+
+
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [(400, "Pull request is not ready to merge."), (404, "Not Found")],
+)
+def test_start_native_merge_not_ready_or_missing_pr_is_a_definite_refusal(
+    status: int, message: str
+) -> None:
+    provider = NativeProvider()
+    provider.put_replies = [refusal(status, message)]
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].start_native_merge(
+            5, provider.members[5].head, "squash", "direct_merge"
+        )
+
+    error = caught.value
+    assert (error.kind, error.uncertain, error.http_status, error.detail) == (
+        "BLOCKED", False, status, "native-merge-rejected",
+    )  # fmt: skip
+    assert len(provider.puts) == 1
+
+
+@pytest.mark.parametrize(
+    ("raises", "reply"),
+    [
+        (subprocess.TimeoutExpired(["gh"], 1.0), None),
+        (OSError("broken pipe"), None),
+        (None, Reply(502, {"message": "Bad Gateway"})),
+        (None, Reply(500, raw="", stderr="")),
+        (None, Reply(202, raw="not json")),
+        (None, Reply(202, {"status": "pending", "details": {"message": "m"}})),
+        (None, Reply(202, {"status": "pending", "details": {
+            "message": "m", "uuid": UUID, "merge_action": "merge_queue",
+            "expected_head_sha": OTHER_HEAD, "bypass_rules": False}})),
+        (None, Reply(202, {"status": "pending", "details": {
+            "message": "m", "uuid": UUID, "merge_action": "merge_queue",
+            "merge_method": "squash", "expected_head_sha": sha(0x105),
+            "bypass_rules": False}})),
+        (None, Reply(202, {"status": "pending", "details": {
+            "message": "m", "uuid": UUID, "merge_action": "merge_queue",
+            "expected_head_sha": sha(0x105), "bypass_rules": True}})),
+    ],
+)  # fmt: skip
+def test_start_native_merge_unknown_outcome_is_uncertain_and_never_resent(
+    raises: BaseException | None, reply: Reply | None
+) -> None:
+    provider = NativeProvider()
+    provider.put_raises = raises
+    provider.put_replies = [reply] if reply is not None else []
+    gh, sleeps = native_gh(provider)
+
+    with pytest.raises(ProviderError) as caught:
+        gh.start_native_merge(5, provider.members[5].head, None, "merge_queue")
+
+    assert caught.value.uncertain is True
+    assert not isinstance(caught.value, github_ops.NativeMergeInProgress)
+    assert (len(provider.puts), sleeps) == (1, [])
+
+
+def test_start_native_merge_honours_the_absolute_monitoring_deadline() -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    late, _ = native_gh(provider, deadline=5.0)
+
+    with pytest.raises(ProviderError) as caught:
+        late.start_native_merge(5, head, None, "merge_queue")
+
+    assert (caught.value.kind, caught.value.uncertain, caught.value.detail) == (
+        "WAITING", False, "native-merge-not-dispatched",
+    )  # fmt: skip
+    assert (provider.puts, provider.operations) == ([], [])
+    in_time, _ = native_gh(provider, deadline=30.0)
+    in_time.start_native_merge(5, head, None, "merge_queue")
+    assert provider.timeouts == [30.0]
+    assert provider.operations == [Operation(UUID, "merge_queue", "default", (4, 5))]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"status": "queued", "details": {"message": "m"}},
+        {"status": "merged", "details": {"message": "m"}},
+        {"status": "enqueued", "details": {"message": "m", "sha": NATIVE_LANDED[5]}},
+        {"status": "enqueued", "details": {"message": "m", "uuid": OTHER_UUID}},
+        {"status": "enqueued", "details": {"message": "m", "uuid": UUID.upper()}},
+        {"status": "merged", "details": {"message": "m", "sha": "abc"}},
+        {"status": "failed", "details": {"message": "m", "sha": NATIVE_LANDED[5]}},
+        {"status": "failed"},
+        {"status": "enqueued"},
+    ],
+)
+def test_read_native_merge_rejects_malformed_or_unknown_status(
+    body: dict[str, Any],
+) -> None:
+    provider = NativeProvider()
+    provider.status_replies = [Reply(body=body)]
+
+    with pytest.raises(ProviderError) as caught:
+        native_gh(provider)[0].read_native_merge(5, UUID)
+
+    assert outcome(caught.value) == ("BLOCKED", "malformed")
+
+
+def test_failed_native_request_is_a_result_with_the_reason_and_no_retry() -> None:
+    provider = NativeProvider()
+    gh, sleeps = native_gh(provider)
+    head = provider.members[5].head
+    started = gh.start_native_merge(5, head, "squash", "direct_merge")
+    provider.request_status = "failed"
+    provider.request_message = 'Required status check "ci" is failing.'
+
+    failed = gh.read_native_merge(5, started.uuid or "")
+    pr = gh.read_pr(5)
+
+    assert (failed.status, failed.uuid, failed.sha) == ("failed", UUID, None)
+    assert (pr.state, pr.head_sha) == ("OPEN", head)
+    assert (len(provider.puts), sleeps) == (1, [])
+
+
+def test_read_native_merge_unknown_or_expired_request_is_blocked_not_merged() -> None:
+    provider = NativeProvider()
+    provider.status_replies = [
+        Reply(404, {"message": "Not Found"}, stderr="gh: Not Found (HTTP 404)")
+    ]
+    gh, sleeps = native_gh(provider)
+
+    with pytest.raises(ProviderError) as caught:
+        gh.read_native_merge(5, UUID)
+
+    error = caught.value
+    assert (error.kind, error.uncertain, error.http_status, error.detail) == (
+        "BLOCKED", False, 404, "native-merge-request-unknown",
+    )  # fmt: skip
+    assert sleeps == []
+
+
+def test_read_native_merge_rejects_a_malformed_request_id_before_reading() -> None:
+    provider = NativeProvider()
+
+    with pytest.raises(ValueError):
+        native_gh(provider)[0].read_native_merge(5, "../../pulls/5")
+
+    assert provider.paths == []
+
+
+def test_read_native_merge_retries_reads_by_the_read_convention() -> None:
+    provider = NativeProvider()
+    provider.status_replies = [Reply(503, {"message": "unavailable"})]
+    provider.request_status = "enqueued"
+    gh, sleeps = native_gh(provider)
+
+    result = gh.read_native_merge(5, UUID)
+
+    assert (result.status, result.uuid, sleeps) == ("enqueued", UUID, [1.0])
+
+
+def test_queued_native_request_stays_enqueued_while_members_land() -> None:
+    provider = NativeProvider()
+    gh, _ = native_gh(provider)
+    head = gh.read_native_stack(STACK).members[1].head_sha
+    started = gh.start_native_merge(5, head, None, "merge_queue")
+    provider.request_status = "enqueued"
+    queued = gh.read_native_merge(5, started.uuid or "")
+
+    provider.land(4, 5)
+    after = gh.read_native_merge(5, started.uuid or "")
+    stack = gh.read_native_stack(STACK)
+
+    statuses = (started.status, queued.status, after.status)
+    assert statuses == ("pending", "enqueued", "enqueued")
+    assert (queued.sha, after.sha) == (None, None)
+    assert [(m.number, m.state, m.merge_commit_sha) for m in stack.members] == [
+        (4, "MERGED", NATIVE_LANDED[4]), (5, "MERGED", NATIVE_LANDED[5]), (6, "OPEN", None),
+    ]  # fmt: skip
+
+
+def test_direct_native_request_reports_the_selected_landing_only() -> None:
+    provider = NativeProvider()
+    gh, _ = native_gh(provider)
+    head = provider.members[5].head
+    started = gh.start_native_merge(5, head, "merge", "direct_merge")
+
+    provider.land(4, 5)
+    provider.request_status, provider.request_landing = "merged", NATIVE_LANDED[5]
+    result = gh.read_native_merge(5, started.uuid or "")
+    lower = gh.read_pr(4)
+
+    assert (result.status, result.sha) == ("merged", NATIVE_LANDED[5])
+    assert (lower.state, lower.merge_commit_sha) == ("MERGED", NATIVE_LANDED[4])

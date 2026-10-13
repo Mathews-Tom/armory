@@ -1,10 +1,11 @@
-"""GitHub provider evidence and the single guarded merge mutation for the ship workflow.
+"""GitHub provider evidence and the guarded merge mutations for the ship workflow.
 
 Evidence comes from the user's ``gh`` credential store; this module never reads
 or extracts tokens.  Reads are ``gh api --method GET`` requests, except
 ``queue_state``: merge-queue entries exist only in GraphQL, so it sends one
 read-only ``query`` with ``--method POST``.  The mutations are
-``GitHub.merge`` (one ``gh pr merge`` command, described below) and
+``GitHub.merge`` (one ``gh pr merge`` command, described below),
+``GitHub.start_native_merge`` (one never-retried ``PUT .../merge-async``) and
 ``GitHub.create_pr`` (one never-retried ``POST .../pulls``).  Provider
 responses are validated at the boundary; evidence that cannot be established
 is reported through ``Observation.issues`` (or a ``ProviderError``) and never
@@ -73,6 +74,63 @@ Conventions the gate engine relies on
   non-ancestry (``behind``/``diverged``) is ``False``.  Unknown commits,
   inaccessible repositories and malformed or self-contradicting metadata raise
   ``ProviderError``.  The (truncated) commit list and counts are never proof.
+
+Native stacks
+-------------
+* ``PullRequest.native`` is true exactly when the PR carries a provider
+  ``stack`` object.  ``native_stack_number``, ``native_stack_position``
+  (1-based, bottom up), ``native_stack_size`` and ``native_stack_base`` (the
+  stack's ``base.ref``) copy that object; a field the provider omits is None,
+  an explicit unknown that never makes the PR a manual-stack member.  A
+  present but malformed or self-contradicting field raises ``ProviderError``.
+* ``read_native_stack(n)`` reads ``GET .../stacks/<n>``, then ``read_pr`` for
+  every listed member, then the stack again.  Members are returned bottom to
+  top, each an authoritative PR read (a MERGED member keeps its landing facts).
+  Every member must be in this repository, listed once, carry exactly the
+  stack's number, its own position, the member count as size and the stack
+  base, and chain on the member below (or, OPEN above only MERGED members, on
+  the stack base).  Any contradiction is ``BLOCKED`` (``native-stack-mismatch``);
+  membership, heads or states that move between the reads are ``WAITING``
+  (``native-stack-changed``).
+* ``native_trunk_policy(stack)`` evaluates the rules of the stack base (the
+  trunk whose rules govern the whole stack), never a member's own base branch.
+  ``action`` is ``merge_queue`` when an applicable ruleset merge queue exists,
+  ``direct_merge`` when the policy is fully known without one, and None when
+  it is unknown; None is blocked, never a licence to merge directly.  A queue
+  that only classic branch protection requires is not visible here (see
+  ``queue_required`` above).
+* ``start_native_merge(n, expected_head, method, action)`` dispatches exactly
+  one ``PUT .../pulls/<n>/merge-async`` with ``sha=<expected_head>``,
+  ``merge_action=<action>`` and ``bypass_rules=false``.  ``direct_merge``
+  requires an explicit ``merge_method``; ``merge_queue`` sends no
+  ``merge_method``, ``commit_title`` or ``commit_message`` (GitHub refuses
+  them with 422 and the queue rules pick the method).  ``default`` queues when
+  a queue applies to the base and merges directly otherwise; it sends
+  ``merge_method`` only when one is given, and a given method is refused (422)
+  when a queue applies.  ``default`` without a method guarantees no method,
+  so callers routing from ``native_trunk_policy`` send its explicit action.
+  The request merges the prefix of open members ending at ``n``, but ``sha``
+  guards only PR ``n``'s head: lower members are not individually guarded, so
+  callers verify them immediately before dispatch and verify every landing
+  afterwards.  There is no implicit action change, no fallback to a
+  synchronous merge and no retry.  A ``pending`` reply (a new request) must
+  carry a UUID and echo the head, action, method (``default`` when none was
+  sent) and ``bypass_rules=false`` exactly, or it is uncertain.  A 2xx
+  ``merged`` or ``enqueued`` reply means the PR was already merged or already
+  queued (no new request, normally no UUID) and a 2xx ``failed`` reply is
+  returned as read.  400 (closed or draft PR), 403, 404 and 422 are definite
+  refusals.  Uncertainty follows ``merge``; a 409 naming an existing request
+  raises ``NativeMergeInProgress`` carrying that request, whose options may
+  differ from the ones sent.
+* ``read_native_merge(n, uuid)`` reads ``GET .../pulls/<n>/merge-async/<uuid>``.
+  Statuses are ``pending``, ``enqueued``, ``merged`` (with the selected PR's
+  merge commit ``sha``) and ``failed`` (GitHub's reason in ``message``);
+  anything else is a malformed response.  ``enqueued`` is terminal for the
+  request and is not a merge: it stays ``enqueued`` after queue groups land the
+  PRs.  ``failed`` is a result, not an error or a retry signal.  Results are
+  kept for 24 hours; a 404 (expired or unknown request) is ``BLOCKED``
+  ``native-merge-request-unknown`` and never implies a merge.  Even ``merged``
+  is no per-member proof; only ``read_pr`` facts prove that a member landed.
 """
 
 from __future__ import annotations
@@ -104,6 +162,13 @@ HELP_TIMEOUT = 15.0
 MIN_MUTATION_WINDOW = 10.0
 _MERGE_FLAGS = {"merge": "--merge", "squash": "--squash", "rebase": "--rebase"}
 _REQUIRED_MERGE_FLAGS = ("--match-head-commit", "--repo", *_MERGE_FLAGS.values())
+#: ``merge_action`` values of ``PUT .../merge-async``; ``default`` queues when a
+#: merge queue applies to the base and merges directly otherwise.
+NATIVE_MERGE_ACTIONS = ("default", "direct_merge", "merge_queue")
+#: Documented ``merge-async`` request statuses; ``enqueued`` is not a merge and
+#: ``failed`` is a reported outcome, not an error.
+NATIVE_MERGE_STATUSES = ("pending", "enqueued", "merged", "failed")
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 _HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$")
 _REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9._-]+$")
@@ -242,6 +307,61 @@ class PullRequest:
     draft: bool
     mergeable: bool | None
     native: bool
+    native_stack_number: int | None = None
+    native_stack_position: int | None = None
+    native_stack_size: int | None = None
+    native_stack_base: str | None = None
+
+
+@dataclass(frozen=True)
+class NativeStack:
+    number: int
+    base_ref: str
+    members: tuple[PullRequest, ...]  # bottom to top
+
+
+@dataclass(frozen=True)
+class NativeMergeResult:
+    """One ``merge-async`` request status; never evidence that any member landed.
+
+    ``sha`` is set only for ``merged``; ``message`` is GitHub's (for ``failed``,
+    the reason).  ``uuid`` is None for an immediate already-merged/queued reply.
+    """
+
+    status: str
+    uuid: str | None
+    message: str
+    sha: str | None
+    expected_head_sha: str | None
+
+
+@dataclass(frozen=True)
+class NativeTrunkPolicy:
+    trunk: str
+    action: str | None
+    methods: tuple[str, ...]
+    policy_known: bool
+    issues: tuple[str, ...]
+
+
+class NativeMergeInProgress(ProviderError):
+    """GitHub refused (409) because an async merge request already exists.
+
+    ``existing`` is that request as GitHub reported it; reconcile its options
+    with ``read_native_merge`` before treating the PR as handled.
+    """
+
+    def __init__(
+        self, message: str, *, operation: str, existing: NativeMergeResult
+    ) -> None:
+        super().__init__(
+            message,
+            kind="WAITING",
+            operation=operation,
+            http_status=409,
+            detail="native-merge-in-progress",
+        )
+        self.existing = existing
 
 
 @dataclass(frozen=True)
@@ -1594,6 +1714,197 @@ class GitHub:
             )  # fmt: skip
         self._merge_capable = True
 
+    # -- native stacks -----------------------------------------------------
+
+    def read_native_stack(self, number: int) -> NativeStack:
+        """Native stack ``number`` with every member read authoritatively, bottom to top."""
+        _check_number(number)
+        op = f"native-stack:{self.full_name}#{number}"
+        path = f"{_repo_path(self.full_name)}/stacks/{number}"
+        listing = _parse_stack_listing(
+            self._get(path, f"{op}:stack")[0], f"{op}:stack", self.full_name, number
+        )
+        members = tuple(self.read_pr(entry.number) for entry in listing.entries)
+        self._verify_stack_members(op, listing, members)
+        again = _parse_stack_listing(
+            self._get(path, f"{op}:stack-recheck")[0],
+            f"{op}:stack-recheck", self.full_name, number,
+        )  # fmt: skip
+        if again != listing:
+            raise self._waiting(
+                op,
+                "the native stack membership, heads or states changed while it was read; read it again",
+                detail="native-stack-changed",
+            )
+        return NativeStack(number, listing.base_ref, members)
+
+    def _verify_stack_members(
+        self, op: str, listing: _StackListing, members: tuple[PullRequest, ...]
+    ) -> None:
+        size = len(listing.entries)
+        for index, (entry, pr) in enumerate(zip(listing.entries, members, strict=True)):
+            label = f"member #{pr.number}"
+            if (pr.head_sha, pr.state) != (entry.head_sha, entry.state):
+                raise self._waiting(
+                    op,
+                    f"{label} changed between the stack read and its pull request read; read it again",
+                    detail="native-stack-changed",
+                )
+            if pr.head_repo.lower() != self.full_name.lower():
+                raise _stack_mismatch(op, f"{label} head is not in {self.full_name}")
+            identity = (
+                pr.native_stack_number,
+                pr.native_stack_position,
+                pr.native_stack_size,
+                pr.native_stack_base,
+            )
+            expected = (listing.number, index + 1, size, listing.base_ref)
+            if not pr.native or identity != expected:
+                raise _stack_mismatch(
+                    op,
+                    f"{label} reports stack (number, position, size, base) {identity}, not {expected}",
+                )
+            lower = members[:index]
+            bases = {lower[-1].head_ref} if lower else {listing.base_ref}
+            if pr.state == "OPEN" and all(m.state == "MERGED" for m in lower):
+                bases.add(listing.base_ref)
+            if pr.base_ref not in bases:
+                raise _stack_mismatch(
+                    op, f"{label} is based on {pr.base_ref}, not on the member below it"
+                )
+            if pr.state == "MERGED" and any(m.state != "MERGED" for m in lower):
+                raise _stack_mismatch(op, f"{label} is merged above an unmerged member")
+
+    def native_trunk_policy(self, stack: NativeStack) -> NativeTrunkPolicy:
+        """Merge routing evidence of the stack base, whose rules govern every member."""
+        op = f"native-policy:{self.full_name}#{stack.number}"
+        repo_obj = self._object(_repo_path(self.full_name), f"{op}:repository")
+        canonical = repo_obj.text("full_name")
+        if canonical.lower() != self.full_name.lower():
+            raise ProviderError(
+                f"{op}: provider resolved the repository as {_clean(canonical, 120)}, not {self.full_name}",
+                kind="BLOCKED", operation=op, detail="identity-mismatch",
+            )  # fmt: skip
+        issues: list[str] = []
+        policy = self._policy(_branch_name(stack.base_ref), op, issues)
+        methods = _merge_methods(repo_obj, policy, issues)
+        if policy.queue_required:
+            action: str | None = "merge_queue"
+        elif policy.known:
+            action = "direct_merge"
+        else:
+            action = None
+        return NativeTrunkPolicy(
+            trunk=stack.base_ref,
+            action=action,
+            methods=methods,
+            policy_known=policy.known,
+            issues=tuple(dict.fromkeys(issues)),
+        )
+
+    def start_native_merge(
+        self, number: int, expected_head: str, method: str | None, action: str
+    ) -> NativeMergeResult:
+        """Request one async merge of the native prefix ending at PR ``number`` (never retried).
+
+        ``expected_head`` guards PR ``number`` only.  A new request is returned
+        ``pending`` with its UUID; a ``merged`` or ``enqueued`` result without
+        one means the PR was already merged or already queued, and ``failed``
+        carries GitHub's reason.  Reconcile every outcome, including
+        ``ProviderError(uncertain=True)``, with ``read_native_merge`` and
+        ``read_pr`` and never by sending the request again.
+        """
+        _check_number(number)
+        _check_sha(expected_head, "expected head")
+        if action not in NATIVE_MERGE_ACTIONS:
+            raise ValueError(
+                f"unsupported native merge action: {_clean(str(action), 40)!r}"
+            )
+        if action == "merge_queue" and method is not None:
+            raise ValueError(
+                "a merge_queue request takes no merge method; the queue rules select it"
+            )
+        if (action == "direct_merge" or method is not None) and (
+            method not in MERGE_METHODS
+        ):
+            raise ValueError(f"unsupported merge method: {_clean(str(method), 40)!r}")
+        op = f"native-merge:{self.full_name}#{number}"
+        argv = [
+            "gh", "api", "--method", "PUT", "--include", "--hostname", self.host,
+            "-H", "Accept: application/vnd.github+json",
+            "-H", f"X-GitHub-Api-Version: {API_VERSION}",
+            "-f", f"sha={expected_head}",
+            "-f", f"merge_action={action}",
+            "-F", "bypass_rules=false",
+        ]  # fmt: skip
+        if method is not None:
+            argv += ["-f", f"merge_method={method}"]
+        argv.append(f"{_repo_path(self.full_name)}/pulls/{number}/merge-async")
+        remaining = self._remaining()
+        if remaining is not None and remaining < MIN_MUTATION_WINDOW:
+            raise self._waiting(
+                op,
+                f"fewer than {MIN_MUTATION_WINDOW:g}s remain before the monitoring deadline; nothing was dispatched",
+                detail="native-merge-not-dispatched",
+            )
+        timeout = MERGE_TIMEOUT if remaining is None else min(MERGE_TIMEOUT, remaining)
+        unsafe = "the async merge may have been accepted, so do not retry it; read the pull requests and any request status"
+        try:
+            proc = self._runner(argv, timeout)
+        except FileNotFoundError as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI 'gh' is not installed; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="missing-gh",
+            ) from exc  # fmt: skip
+        except subprocess.TimeoutExpired as exc:
+            raise ProviderError(
+                f"{op}: gh did not finish within {timeout:g}s; {unsafe}",
+                kind="WAITING", operation=op, uncertain=True, detail="native-merge-uncertain-timeout",
+            ) from exc  # fmt: skip
+        except OSError as exc:
+            raise ProviderError(
+                f"{op}: running gh failed ({_clean(str(exc), 120)}); {unsafe}",
+                kind="BLOCKED", operation=op, uncertain=True, detail="native-merge-unknown-outcome",
+            ) from exc  # fmt: skip
+        response = _split_response(proc.stdout)
+        if (
+            proc.returncode == 0
+            and response.status is not None
+            and 200 <= response.status < 300
+        ):
+            return _accepted_native_merge(
+                op, response, expected_head, method, action, unsafe
+            )
+        if proc.returncode <= 0:
+            raise ProviderError(
+                f"{op}: gh ended without an accepted request (exit {proc.returncode}); {unsafe}",
+                kind="WAITING", operation=op, uncertain=True, detail="native-merge-unknown-outcome",
+            )  # fmt: skip
+        raise _native_merge_failure(op, proc, response, unsafe)
+
+    def read_native_merge(self, number: int, uuid: str) -> NativeMergeResult:
+        """Status of async merge request ``uuid`` of PR ``number``; ``enqueued`` is not merged."""
+        _check_number(number)
+        if not isinstance(uuid, str) or not _UUID_RE.fullmatch(uuid):
+            raise ValueError("async merge request id must be a lowercase UUID")
+        op = f"native-merge-status:{self.full_name}#{number}"
+        path = f"{_repo_path(self.full_name)}/pulls/{number}/merge-async/{uuid}"
+        try:
+            raw = self._get(path, op)[0]
+        except ProviderError as exc:
+            if exc.http_status != 404:
+                raise
+            raise ProviderError(
+                f"{op}: GitHub does not know async merge request {uuid} (results expire after 24 hours, "
+                "or the request or pull request is not accessible); it is not evidence of a merge; "
+                "reconcile from read_pr facts",
+                kind="BLOCKED", operation=op, http_status=404, detail="native-merge-request-unknown",
+            ) from exc  # fmt: skip
+        result, _ = _parse_native_result(raw, op)
+        if result.uuid is not None and result.uuid != uuid:
+            raise _malformed(op, "response.details.uuid does not echo the requested id")
+        return replace(result, uuid=uuid)
+
     # -- policy ------------------------------------------------------------
 
     def _guard(self, issues: list[str], code: str, action: Callable[[], None]) -> bool:
@@ -2215,6 +2526,123 @@ def _merge_failure(op: str, returncode: int, stderr: str) -> ProviderError:
     )  # fmt: skip
 
 
+def _accepted_native_merge(
+    op: str,
+    response: _Response,
+    expected_head: str,
+    method: str | None,
+    action: str,
+    unsafe: str,
+) -> NativeMergeResult:
+    """Bind a 2xx ``merge-async`` reply to the exact request that was sent.
+
+    Only ``pending`` (a new request) must echo the UUID, head, action, method and
+    ``bypass_rules=false``; ``merged``/``enqueued``/``failed`` are returned as read.
+    """
+    try:
+        result, details = _parse_native_result(json.loads(response.body), op)
+        echo = (
+            details.opt_text("merge_action"),
+            details.opt_text("merge_method"),
+            details.opt_flag("bypass_rules"),
+        )
+    except (ValueError, ProviderError) as exc:
+        raise ProviderError(
+            f"{op}: the async merge response is unreadable; {unsafe}",
+            kind="WAITING", operation=op, uncertain=True, detail="native-merge-unreadable",
+        ) from exc  # fmt: skip
+    if result.status != "pending":
+        # 200 for a PR already merged or already queued (no new request), or failed.
+        return result
+    # GitHub echoes the method as "default" when none was sent.
+    methods: set[str | None] = {method} if method is not None else {None, "default"}
+    if (
+        result.uuid is None
+        or result.expected_head_sha != expected_head
+        or echo[0] != action
+        or echo[1] not in methods
+        or echo[2] is not False
+    ):
+        raise ProviderError(
+            f"{op}: the accepted async merge request contradicts the request sent; {unsafe}",
+            kind="BLOCKED", operation=op, uncertain=True, detail="native-merge-contradiction",
+        )  # fmt: skip
+    return result
+
+
+def _native_merge_failure(
+    op: str,
+    proc: subprocess.CompletedProcess[bytes],
+    response: _Response,
+    unsafe: str,
+) -> ProviderError:
+    """Classify a failed ``merge-async`` PUT: definite refusal, known request, or uncertain."""
+    failure = _failure(proc, response)
+    evidence = (
+        response.body.decode("utf-8", "replace")
+        + "\n"
+        + proc.stderr.decode("utf-8", "replace")
+    )
+
+    def fail(
+        kind: Literal["BLOCKED", "WAITING"],
+        code: str,
+        message: str,
+        *,
+        uncertain: bool = False,
+    ) -> ProviderError:
+        return ProviderError(
+            f"{op}: {message}", kind=kind, operation=op, uncertain=uncertain,
+            http_status=failure.status, detail=code,
+        )  # fmt: skip
+
+    if failure.status == 409:
+        try:
+            existing, _ = _parse_native_result(json.loads(response.body), op)
+        except (ValueError, ProviderError):
+            existing = None
+        if existing is not None and existing.uuid is not None:
+            return NativeMergeInProgress(
+                f"{op}: GitHub already has async merge request {existing.uuid}; nothing new was "
+                "requested; reconcile its options with read_native_merge",
+                operation=op, existing=existing,
+            )  # fmt: skip
+    if failure.status in (409, 422) and _HEAD_MOVED_RE.search(evidence):
+        return fail(
+            "WAITING", "native-merge-head-changed",
+            "GitHub refused the async merge: the pull request head no longer matches the expected head; nothing was merged; observe again",
+        )  # fmt: skip
+    if failure.status in (409, 422) and _BASE_MOVED_RE.search(evidence):
+        return fail(
+            "WAITING", "native-merge-base-changed",
+            "GitHub refused the async merge: the base branch moved; nothing was merged; observe again",
+        )  # fmt: skip
+    if failure.kind == "ratelimit":
+        return fail(
+            "WAITING", "native-merge-rate-limited",
+            f"GitHub rate-limited the request; the async merge was not accepted: {failure.detail}",
+        )  # fmt: skip
+    if failure.status == 401:
+        return fail(
+            "BLOCKED", "native-merge-unauthenticated",
+            "authentication failed; run `gh auth login`; the async merge was not accepted",
+        )  # fmt: skip
+    if failure.kind == "transient" or failure.status is None:
+        return fail(
+            "WAITING", "native-merge-uncertain-transport",
+            f"{failure.detail or 'transport failure'}; {unsafe}", uncertain=True,
+        )  # fmt: skip
+    if 400 <= failure.status < 500:
+        return fail(
+            "BLOCKED", "native-merge-rejected",
+            f"HTTP {failure.status} GitHub refused the async merge: {failure.detail}",
+        )  # fmt: skip
+    return fail(
+        "BLOCKED", "native-merge-unknown-outcome",
+        f"HTTP {failure.status} unrecognised failure; {unsafe}", uncertain=True,
+    )  # fmt: skip
+
+
 def _check_repo(full_name: str) -> None:
     if not _REPO_RE.fullmatch(full_name) or ".." in full_name:
         raise ValueError(f"invalid repository name: {_clean(full_name, 80)!r}")
@@ -2261,10 +2689,11 @@ def _parse_pr(
     base = o.obj("base")
     head_repo = head.opt_obj("repo")
     stack = o.opt_obj("stack")
-    if stack is not None:
-        stack.obj("base")
-        for key in ("size", "position", "id", "number"):
-            stack.opt_integer(key)
+    stack_number, stack_position, stack_size, stack_base = (
+        _stack_identity(stack, op, f"{path}.stack")
+        if stack is not None
+        else (None, None, None, None)
+    )
     user = o.opt_obj("user")
     pr = PullRequest(
         number=o.integer("number"),
@@ -2281,8 +2710,132 @@ def _parse_pr(
         draft=o.flag("draft"),
         mergeable=o.opt_flag("mergeable") if detailed else None,
         native=stack is not None,
+        native_stack_number=stack_number,
+        native_stack_position=stack_position,
+        native_stack_size=stack_size,
+        native_stack_base=stack_base,
     )
     return pr, user.text("login") if user is not None else ""
+
+
+def _stack_identity(
+    stack: _Obj, op: str, path: str
+) -> tuple[int | None, int | None, int | None, str | None]:
+    """``(number, position, size, base ref)`` of a PR ``stack`` object; absent is None."""
+    base = stack.obj("base")
+    base.opt_sha("sha")
+    ref = base.opt_text("ref")
+    if ref is not None and (not ref or _CONTROL_RE.search(ref)):
+        raise _malformed(op, f"{path}.base.ref is not a branch name")
+    stack.opt_integer("id")
+    number, position, size = (
+        stack.opt_integer(key) for key in ("number", "position", "size")
+    )
+    for key, value in (("number", number), ("position", position), ("size", size)):
+        if value is not None and value <= 0:
+            raise _malformed(op, f"{path}.{key} is not a positive integer")
+    if position is not None and size is not None and position > size:
+        raise _malformed(op, f"{path}.position exceeds {path}.size")
+    return number, position, size, ref
+
+
+@dataclass(frozen=True)
+class _StackEntry:
+    number: int
+    head_sha: str
+    state: str
+
+
+@dataclass(frozen=True)
+class _StackListing:
+    number: int
+    base_ref: str
+    entries: tuple[_StackEntry, ...]
+
+
+def _stack_mismatch(op: str, detail: str) -> ProviderError:
+    return ProviderError(
+        f"{op}: native stack evidence is inconsistent: {_clean(detail)}",
+        kind="BLOCKED",
+        operation=op,
+        detail="native-stack-mismatch",
+    )
+
+
+def _api_url_names(url: str, full_name: str, suffix: str) -> bool:
+    """Whether an API ``url`` names ``/repos/<full_name><suffix>`` (case-insensitively)."""
+    return urlsplit(url).path.lower().endswith(f"/repos/{full_name}{suffix}".lower())
+
+
+def _parse_stack_listing(
+    raw: Any, op: str, full_name: str, number: int
+) -> _StackListing:
+    """``GET .../stacks/<n>``: identity, base and the ordered, unique, same-repository members."""
+    o = _Obj.of(raw, op, "response")
+    if o.integer("number") != number or not _api_url_names(
+        o.text("url"), full_name, f"/stacks/{number}"
+    ):
+        raise _stack_mismatch(
+            op, f"the response does not describe stack {number} of {full_name}"
+        )
+    base_ref = o.obj("base").text("ref")
+    if not base_ref or _CONTROL_RE.search(base_ref):
+        raise _malformed(op, "response.base.ref is not a branch name")
+    entries: list[_StackEntry] = []
+    for index, item in enumerate(o.objs("pull_requests")):
+        where = f"response.pull_requests[{index}]"
+        member = item.integer("number")
+        if member <= 0:
+            raise _malformed(op, f"{where}.number is not positive")
+        if any(entry.number == member for entry in entries):
+            raise _stack_mismatch(op, f"pull request #{member} is listed twice")
+        head = item.obj("head")
+        urls = (
+            (item.text("url"), f"/pulls/{member}"),
+            (head.obj("repo").text("url"), ""),
+            (item.obj("base").obj("repo").text("url"), ""),
+        )
+        if not all(_api_url_names(url, full_name, suffix) for url, suffix in urls):
+            raise _stack_mismatch(
+                op, f"member #{member} is not a pull request of {full_name}"
+            )
+        provider_state = item.text("state")
+        merged_at = item.opt_text("merged_at")
+        if provider_state == "open" and merged_at is None:
+            state = "OPEN"
+        elif provider_state == "closed":
+            state = "MERGED" if merged_at is not None else "CLOSED"
+        else:
+            raise _malformed(op, f"{where}.state is not a pull request state")
+        entries.append(_StackEntry(member, head.sha("sha"), state))
+    if not entries:
+        raise _stack_mismatch(op, f"stack {number} lists no pull requests")
+    return _StackListing(number, base_ref, tuple(entries))
+
+
+def _parse_native_result(raw: Any, op: str) -> tuple[NativeMergeResult, _Obj]:
+    """Strict ``merge-async`` status body; returns the result and its ``details`` object."""
+    top = _Obj.of(raw, op, "response")
+    status = top.text("status")
+    if status not in NATIVE_MERGE_STATUSES:
+        raise _malformed(
+            op, f"response.status has unsupported value {_clean(status, 30)!r}"
+        )
+    details = top.obj("details")
+    uuid = details.opt_text("uuid")
+    if uuid is not None and not _UUID_RE.fullmatch(uuid):
+        raise _malformed(op, "response.details.uuid is not a lowercase UUID")
+    landed = details.opt_sha("sha")
+    if (status == "merged") != (landed is not None):
+        raise _malformed(op, "response.details.sha contradicts response.status")
+    result = NativeMergeResult(
+        status=status,
+        uuid=uuid,
+        message=_clean(details.text("message")),
+        sha=landed,
+        expected_head_sha=details.opt_sha("expected_head_sha"),
+    )
+    return result, details
 
 
 @dataclass(frozen=True)
