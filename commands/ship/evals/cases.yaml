@@ -1,0 +1,106 @@
+cases:
+  - id: slash_ship_existing_pr_until_merged
+    prompt: "/ship --pr 123 --until merged"
+    fixtures: []
+    rubric:
+      - "activates the ship command"
+      - "loads the registered ship-workflow skill and runs its executable from the reported base directory"
+      - "keeps the merged endpoint: lands and verifies PR 123 without deleting its branch"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--pr 123"
+        weight: 1.0
+      - type: matches_regex
+        target: "--until merged"
+        weight: 1.0
+      - type: not_contains
+        target: "--delete-branch"
+        weight: 1.0
+      - type: not_contains
+        target: "--admin"
+        weight: 1.0
+
+  - id: slash_ship_dry_run_is_read_only
+    prompt: "/ship --dry-run"
+    fixtures: []
+    rubric:
+      - "activates the ship command"
+      - "maps --dry-run to the executable's read-only inspection and relays a PLANNED result"
+      - "performs no commit, push, merge or cleanup"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "ship\\.py[^\\n]*--dry-run"
+        weight: 1.0
+      - type: matches_regex
+        target: "PLANNED"
+        weight: 0.8
+      - type: not_contains
+        target: "git push"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: slash_ship_missing_companion_blocks
+    prompt: "/ship --pr 12. The ship-workflow skill is not installed in this client, but there is an Armory checkout in ~/src/armory."
+    fixtures: []
+    rubric:
+      - "activates the ship command"
+      - "stops BLOCKED naming the missing skills/ship-workflow package"
+      - "does not run a script from the source checkout, install the package or continue with hand-run git/gh steps"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "BLOCKED"
+        weight: 1.0
+      - type: matches_regex
+        target: "skills/ship-workflow"
+        weight: 1.0
+      - type: not_contains
+        target: "~/src/armory/skills/ship-workflow/scripts"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 0.9
+
+  - id: slash_ship_unsupported_stage_override
+    prompt: "/ship --pr 7 --from merged --admin"
+    fixtures: []
+    rubric:
+      - "activates the ship command"
+      - "rejects the unsupported stage and protection overrides with an explicit diagnostic"
+      - "runs nothing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "unsupported"
+        weight: 1.0
+      - type: not_contains
+        target: "ship.py --pr 7"
+        weight: 1.0
+
+  - id: negative_deploy
+    prompt: "Deploy the current build to production."
+    fixtures: []
+    rubric:
+      - "deployment is outside the ship command"
+      - "does not activate the ship command"
+    trigger_expected: false
+
+  - id: negative_release_tag
+    prompt: "Bump the version to 2.1.0, update the changelog and tag the release."
+    fixtures: []
+    rubric:
+      - "release preparation belongs to an explicit release owner"
+      - "does not activate the ship command"
+    trigger_expected: false
+
+  - id: negative_stack_split
+    prompt: "/stack-pr split --source feat/parser-system --base main feat/parser-core feat/parser-cli"
+    fixtures: []
+    rubric:
+      - "stack creation and splitting belong to the stack-pr command"
+      - "does not activate the ship command"
+    trigger_expected: false

@@ -4,7 +4,7 @@ cases:
     fixtures: []
     rubric:
       - "activates stack-workflow preset"
-      - "includes stacked-prs skill and stack-pr command"
+      - "includes stacked-prs topology policy, ship-workflow lifecycle execution and the stack-pr command"
       - "includes stack-guard and git-protection hooks"
     trigger_expected: true
     assertions:
@@ -16,6 +16,19 @@ cases:
         weight: 0.8
       - type: matches_regex
         target: "stack-guard|git-protection"
+        weight: 0.8
+
+  - id: installed_stack_lifecycle_owner
+    prompt: "Install the stack workflow bundle so /stack-pr merge and cleanup can finish our explicitly reviewed selection."
+    fixtures: []
+    rubric:
+      - "bundles ship-workflow alongside stacked-prs rather than relying on command dependency metadata to install it"
+      - "keeps topology and provenance decisions with stacked-prs and delegates landing and cleanup to the ship-workflow controller"
+      - "installation alone does not merge, delete refs or widen a narrower endpoint"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "ship-workflow"
         weight: 0.8
 
   - id: enable_stack_guard

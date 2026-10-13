@@ -1,16 +1,17 @@
 ---
 name: stack-workflow
 type: preset
-description: 'Bundles stacked pull request workflow packages for teams that regularly ship dependent PR chains. Triggers on: "stack workflow preset", "install stacked PR workflow", "stacked PR team setup", "enable stack guard", "stack-pr preset", "stacked branch workflow". Use this preset when a project wants the stacked-prs skill, /stack-pr command, stack-guard hook, git-protection hook, and PR review packages installed as one workflow.'
+description: 'Bundles stacked pull request workflow packages for teams that regularly ship dependent PR chains. Triggers on: "stack workflow preset", "install stacked PR workflow", "stacked PR team setup", "enable stack guard", "stack-pr preset", "stacked branch workflow". Installs stacked-prs topology policy, ship-workflow lifecycle execution, /stack-pr, stack-guard, git-protection and PR review packages as one workflow.'
 packages:
   - skills/stacked-prs
+  - skills/ship-workflow
   - commands/stack-pr
   - hooks/git-protection
   - hooks/stack-guard
   - skills/pre-landing-review
   - skills/pr-review
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   category: development
   tags: [git, pull-requests, stacked-prs, preset]
   difficulty: advanced
@@ -19,6 +20,7 @@ preset:
   packages:
     skills:
       - { name: stacked-prs }
+      - { name: ship-workflow }
       - { name: pre-landing-review }
       - { name: pr-review }
     commands:
@@ -30,13 +32,14 @@ preset:
 
 # Stack Workflow
 
-Installs the packages needed for repeated stacked PR work: stack modeling, slash-command dispatch, force-push protection, stack-specific warnings, and review gates.
+Installs the packages needed for repeated stacked PR work: stack modeling, slash-command dispatch, guarded lifecycle execution, force-push protection, stack-specific warnings, and review gates.
 
 ## Included Packages
 
 | Type | Package | Role |
 | --- | --- | --- |
-| Skill | stacked-prs | Inspect, publish, sync, validate, split, merge, and clean stacks |
+| Skill | stacked-prs | Inspect, publish, sync, validate and split stacks; author topology/provenance policy for lifecycle execution |
+| Skill | ship-workflow | Execute explicit selected stacks through current gates, guarded landing, post-merge acceptance and proof-based cleanup |
 | Command | stack-pr | Provides `/stack-pr` command syntax |
 | Hook | git-protection | Blocks broadly destructive Git operations |
 | Hook | stack-guard | Blocks plain force pushes and warns on stack topology risks |
@@ -51,7 +54,7 @@ Installs the packages needed for repeated stacked PR work: stack modeling, slash
 4. Let `stack-guard` warn when commands conflict with `.stack-prs.yaml`.
 5. Use `pr-review` on individual PR diffs.
 6. Use `pre-landing-review` before merging each stack slice.
-7. Merge root to leaf and clean up confirmed merged branches.
+7. Pass the explicitly reviewed selection to `ship-workflow` through `/stack-pr merge` or `/stack-pr cleanup`; the controller owns parent-first landing and proof-based cleanup. A narrower request keeps its endpoint, and installing the preset grants no mutation authority.
 
 ## When To Use
 
