@@ -59,12 +59,26 @@ composition:
   orchestration:
     build_pipeline:
       description: >
-        Full project lifecycle from idea to deployment.
-        Sequential with conditional gates.
+        Full project lifecycle from idea to an open pull request.
+        Sequential with conditional gates. After the sequence, a PASS from
+        codebase-auditor and a GO from full-stack-builder hand the work to the
+        ship-workflow skill (not an agent) with endpoint pr. The pipeline never
+        includes release-captain; release preparation is release_pipeline.
       sequence:
         - project-architect
         - project-planner
         - full-stack-builder
+        - codebase-auditor
+
+    release_pipeline:
+      description: >
+        Explicit release preparation only. Requires release authority, a
+        source-backed release target, and a named base branch; without all
+        three the pipeline does not run. release-captain edits the authorized
+        version and changelog artifacts and publishes the release-preparation
+        PR through ship-workflow with endpoint pr. It does not merge, tag, or
+        publish.
+      sequence:
         - codebase-auditor
         - release-captain
 

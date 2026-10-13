@@ -98,6 +98,9 @@ excluded:
     name: security-scan
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
   - package_type: command
+    name: ship
+    rationale: Excluded from the frozen one-package command stratum; the shipping cutover does not add a pre-registered corpus task or change the population.
+  - package_type: command
     name: tdd
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
   - package_type: hook

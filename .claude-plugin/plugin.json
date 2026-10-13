@@ -65,6 +65,9 @@
     "security-scan": {
       "source": "./commands/security-scan/COMMAND.md"
     },
+    "ship": {
+      "source": "./commands/ship/COMMAND.md"
+    },
     "stack-pr": {
       "source": "./commands/stack-pr/COMMAND.md"
     },

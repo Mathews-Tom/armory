@@ -36,8 +36,33 @@ cases:
     prompt: "find the right skill for creating a release with changelog"
     fixtures: []
     rubric:
-      - "recommends release-captain agent or ship-workflow skill"
+      - "recommends release-captain agent as primary for explicit release preparation"
       - "mentions changelog-composer as complement"
+      - "does not recommend ordinary ship-workflow shipping as the owner of version or changelog changes"
+    trigger_expected: true
+
+  - id: route_full_ship
+    prompt: "/route I want to finish this branch: get CI green, merge the PR, and clean up the branch"
+    fixtures: []
+    rubric:
+      - "recommends the /ship command backed by the ship-workflow skill"
+      - "does not recommend release-captain or any version or changelog change"
+    trigger_expected: true
+
+  - id: route_open_pr_only
+    prompt: "/route which package should just open a PR for my branch?"
+    fixtures: []
+    rubric:
+      - "recommends ship-workflow with endpoint pr"
+      - "states that the route grants no merge, branch cleanup, or release authority"
+    trigger_expected: true
+
+  - id: route_stack_topology
+    prompt: "/route my stacked PR chain needs a child rebased and retargeted after its parent changed"
+    fixtures: []
+    rubric:
+      - "recommends stacked-prs skill as primary, with /stack-pr as the command surface"
+      - "does not recommend release-captain or a full ship-workflow landing for a topology repair"
     trigger_expected: true
 
   - id: negative_direct_task

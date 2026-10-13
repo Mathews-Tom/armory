@@ -845,7 +845,7 @@ packages:
     difficulty: advanced
     phase: review
   - name: milestone-runner
-    version: 1.5.0
+    version: 1.6.0
     description: Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run
       independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design.
       Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.
@@ -1157,17 +1157,21 @@ packages:
     - citation-audit
     - literature-review
   - name: ship-workflow
-    version: 1.0.1
-    description: 'Automated release pipeline: merges main, runs tests, pre-landing review, version bump, changelog, bisectable
-      commits, and PR creation. Triggers on: "ship it", "release this", "prepare for release", "open a PR", "push and PR",
-      "land this", "/ship-workflow".'
+    version: 2.0.0
+    description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature
+      branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work
+      as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the
+      supported path and cleans up only proven-stale branches and worktrees. Stops at the requested endpoint and never bumps
+      versions, edits changelogs, tags or publishes. Triggers on: "ship it", "ship this", "open a PR", "push and PR", "land
+      this PR", "merge PR and clean up", "check CI on my PR", "resume the ship run", "/ship-workflow".'
     path: skills/ship-workflow
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/ship-workflow/SKILL.md
     tags:
-    - release
-    - ci-cd
+    - shipping
     - pull-request
-    - changelog
+    - ci-cd
+    - merge
+    - cleanup
     category: review
     difficulty: intermediate
     phase: ship
@@ -1220,12 +1224,13 @@ packages:
     difficulty: intermediate
     phase: build
   - name: stacked-prs
-    version: 0.3.0
+    version: 0.4.0
     description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create
       stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs",
       "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use
-      when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization,
-      merge order, cleanup, and optional GitHub-native stack support.'
+      when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization
+      and optional GitHub-native stack support, or when an existing stack needs its topology, provenance and native membership
+      resolved before its landing and cleanup are delegated to the ship-workflow lifecycle.'
     path: skills/stacked-prs
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/stacked-prs/SKILL.md
     tags:
@@ -1520,7 +1525,7 @@ packages:
     category: content
     difficulty: intermediate
   - name: full-stack-builder
-    version: 1.0.0
+    version: 1.1.0
     description: 'End-to-end implementation agent that takes an architecture document or feature spec and delivers production-ready
       code with tests, API documentation, and security validation. Orchestrates quality skills throughout the build process
       rather than bolting them on at the end. Covers project scaffolding, incremental implementation sprints, and pre-delivery
@@ -1632,20 +1637,20 @@ packages:
     category: content
     difficulty: intermediate
   - name: release-captain
-    version: 1.0.0
-    description: 'Ship lifecycle manager that drives code from branch to PR through quality gates, secret scanning, changelog
-      generation, and dependency audits. Blocks on failing tests or CRITICAL findings. Produces versioned commits, changelog
-      entries, and opens the pull request with full traceability. Triggers on: "ship this", "create a release", "open a PR",
-      "prepare for release", "cut a release", "ship it", "ready to merge", "open pull request", "release this branch", "time
-      to ship". Use this agent when code is ready to ship and needs quality gates, changelog, and PR creation rather than
-      further development.'
+    version: 2.0.0
+    description: 'Explicit release-preparation manager. Edits the source-authorized version and changelog artifacts for a
+      named release target, runs quality gates, secret scanning, and dependency audits, then publishes the release-preparation
+      pull request through ship-workflow and stops at the open PR. Does not merge, clean up, tag, or publish. Triggers on:
+      "prepare release", "prepare for release", "cut a release", "create a release", "prepare the v2.4.0 release", "bump the
+      version and changelog for release". Use this agent when someone with release authority asks for version and changelog
+      preparation, not for ordinary shipping or opening a PR.'
     path: agents/release-captain
     source: https://github.com/Mathews-Tom/armory/blob/main/agents/release-captain/AGENT.md
     model: sonnet
     tags:
     - release
-    - deployment
-    - ci-cd
+    - versioning
+    - changelog
     - sonnet
     category: operations
     difficulty: intermediate
@@ -1745,7 +1750,7 @@ packages:
     category: operations
     difficulty: beginner
   - name: team-lead
-    version: 1.0.0
+    version: 1.1.0
     description: 'Meta-orchestrator agent that analyzes complex requests, decomposes them into agent-sized tasks, delegates
       to specialized agents, manages sequencing and parallelism, and synthesizes results into unified deliverables. Acts as
       the intelligent router and coordinator across the full agent team. Triggers on: "handle this end to end", "take care
@@ -2177,7 +2182,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.1.1
+    version: 1.2.0
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
@@ -2209,12 +2214,30 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
-  - name: stack-pr
+  - name: ship
     version: 0.1.0
+    description: 'Slash-command wrapper for the ship-workflow skill. `/ship` takes the current branch, an explicit `--pr`,
+      `--branch`, `--stack` or saved `--resume` target from its current state to the requested `--until pr|merged|clean` endpoint
+      (default `clean`), or previews it read-only with `--dry-run`. Triggers on: "/ship", "/ship --pr 123", "/ship --until
+      pr", "/ship --dry-run", "/ship --resume". Use this command when a user wants a concise argument surface for the resumable
+      shipping lifecycle while delegating every Git, provider, gate, landing and cleanup decision to skills/ship-workflow.'
+    path: commands/ship
+    source: https://github.com/Mathews-Tom/armory/blob/main/commands/ship/COMMAND.md
+    tags:
+    - git
+    - pull-requests
+    - shipping
+    - slash-command
+    category: development
+    difficulty: intermediate
+    phase: ship
+  - name: stack-pr
+    version: 0.2.0
     description: 'Slash-command wrapper for the stacked-prs skill. Triggers on: "/stack-pr inspect", "/stack-pr split", "/stack-pr
       publish", "/stack-pr sync", "/stack-pr validate", "/stack-pr merge", "/stack-pr cleanup", "stack-pr publish", "stack-pr
       split". Use this command when a user wants a concise command surface for inspecting, creating, publishing, synchronizing,
-      validating, merging, or cleaning up stacked pull requests while delegating topology decisions to skills/stacked-prs.'
+      validating, merging, or cleaning up stacked pull requests while delegating topology decisions to skills/stacked-prs
+      and stack landing and cleanup to its ship-workflow lifecycle delegation.'
     path: commands/stack-pr
     source: https://github.com/Mathews-Tom/armory/blob/main/commands/stack-pr/COMMAND.md
     tags:
@@ -2343,7 +2366,7 @@ packages:
     category: review
     difficulty: intermediate
   - name: core
-    version: 1.0.0
+    version: 1.0.1
     description: 'Essential packages for every Claude Code user. Bundles pull request review, code refinement, pre-landing
       checks, git branch protection, and commit message standards into a single install. Use this preset when setting up a
       new project or onboarding a teammate who needs a reliable baseline without opinionated language-specific tooling. Covers
@@ -2359,10 +2382,11 @@ packages:
     category: review
     difficulty: intermediate
   - name: eng-ops
-    version: 1.1.0
-    description: 'DEPRECATED: Superseded by the release-captain and full-stack-builder agents. release-captain orchestrates
-      ship-workflow, changelog-composer, pre-landing-review, dependency-audit with quality gates. full-stack-builder handles
-      implementation with test-harness, code-refiner, and api-docs-generator. Use these agents instead.'
+    version: 1.1.1
+    description: 'DEPRECATED: Superseded by the ship-workflow skill and the release-captain and full-stack-builder agents.
+      ship-workflow ships work through PR, gates, merge, and cleanup. release-captain prepares explicitly authorized version
+      and changelog changes with quality gates and opens the release PR. full-stack-builder handles implementation with test-harness,
+      code-refiner, and api-docs-generator. Use these instead.'
     path: presets/eng-ops
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/eng-ops/PRESET.md
     tags:
@@ -2468,11 +2492,11 @@ packages:
     category: meta
     difficulty: advanced
   - name: stack-workflow
-    version: 0.1.0
+    version: 0.2.0
     description: 'Bundles stacked pull request workflow packages for teams that regularly ship dependent PR chains. Triggers
       on: "stack workflow preset", "install stacked PR workflow", "stacked PR team setup", "enable stack guard", "stack-pr
-      preset", "stacked branch workflow". Use this preset when a project wants the stacked-prs skill, /stack-pr command, stack-guard
-      hook, git-protection hook, and PR review packages installed as one workflow.'
+      preset", "stacked branch workflow". Installs stacked-prs topology policy, ship-workflow lifecycle execution, /stack-pr,
+      stack-guard, git-protection and PR review packages as one workflow.'
     path: presets/stack-workflow
     source: https://github.com/Mathews-Tom/armory/blob/main/presets/stack-workflow/PRESET.md
     tags:

@@ -16,7 +16,7 @@ description:
 model: opus
 color: blue
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   category: development
   execution_phase: on-demand
   priority: 90
@@ -179,7 +179,9 @@ Repeat until all components are implemented.
 ### Passing Work
 
 - Delivers a feature branch with all commits, tests passing, documentation complete
-- Passes to `release-captain` agent when implementation is ready for release
+- On a GO recommendation, hands the branch to the `ship-workflow` skill with endpoint `pr` when the user or caller asked to open or publish a PR; a NO-GO is never handed off, and with no such request the branch is delivered to the caller unpublished
+- Passes the pre-delivery review evidence (`pre-landing-review`, `pr-review`) with the handoff; `ship-workflow` still runs its own gates
+- Hands off to `release-captain` only when the user or caller supplies explicit release authority, a source-backed release target, and a base branch; implementation completion alone is never release authority
 - Includes a build summary: components implemented, test coverage, known limitations
 - Reports GO/NO-GO status from pre-delivery review
 

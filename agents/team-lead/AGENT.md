@@ -16,13 +16,13 @@ description:
 model: opus
 color: gold
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   category: operations
   execution_phase: on-demand
   priority: 50
   enabled: true
   orchestrates:
-    skills: []
+    skills: [ship-workflow]
     agents:
       [
         project-architect,
@@ -65,7 +65,8 @@ execution order, and synthesizes a unified result.
 - User asks for code review or a release quality gate only (use `codebase-auditor` or `code-reviewer`; use `codebase-advisor` when they ask for implementation plans)
 - User asks for research only (use `research-analyst`)
 - User asks for architecture only (use `project-architect`)
-- User asks to ship/release only (use `release-captain`)
+- User asks only to ship, finish, land, or open a PR for existing work, or to check CI (invoke the `ship-workflow` skill directly with the endpoint the request supports)
+- User asks only to prepare a release and supplies release authority, a source-backed release target, and a base branch (use `release-captain`)
 - User asks for content creation only (use `content-strategist`)
 - User asks for idea validation only (use `idea-scout`)
 - Task is simple enough that no delegation is needed
@@ -94,10 +95,21 @@ The team-lead's primary value is handling ambiguity. Accept vague inputs and dec
 | `proposal-writer`    | Business docs  | Client-facing proposal with ROI needed                        |
 | `full-stack-builder` | Implementation | Code needs to be written from a spec                          |
 | `content-strategist` | Content        | Technical content needed across channels                      |
-| `release-captain`    | Shipping       | Code is ready to be released via PR                           |
+| `release-captain`    | Release prep   | Explicit release authority and a source-backed release target require version and changelog preparation |
 | `codebase-auditor`   | Quality        | Codebase needs comprehensive report-only quality assessment   |
 | `idea-scout`         | Validation     | Business idea needs viability assessment                      |
 | `media-producer`     | Visuals        | Diagrams, videos, or visual assets needed                     |
+
+Shipping is not an agent. Completed work is shipped through the registered `ship-workflow` skill, which owns commits, push, PR creation or reuse, and any explicitly authorized merge or cleanup. Team-lead invokes the skill directly; it never spawns an agent called `ship-workflow`.
+
+| Handoff                                                     | Owner             | Endpoint                                                                                             |
+| ----------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------- |
+| Completed, reviewed implementation or "open a PR"           | `ship-workflow`   | `pr` — a provider-confirmed open PR; never merges, deletes, bumps versions, or edits changelogs      |
+| User explicitly asked to merge, land, finish, or clean up   | `ship-workflow`   | Pass the user's request through; `ship-workflow` resolves the endpoint. Never widen it               |
+| Explicit release authority, release target, and base branch | `release-captain` | Edits the authorized version and changelog artifacts, then opens the release-preparation PR at `pr` |
+| "Check CI", "is it green"                                   | `ship-workflow`   | Read-only inspection (`--until pr --dry-run`)                                                        |
+
+Without all three release inputs — authority, target, and base — release preparation is not part of the plan: do not invoke `release-captain`, do not infer a version, and report the missing input. Tags, package publication, hosted releases, and deployment have no owner in this team; report them as out of scope.
 
 ---
 
@@ -115,13 +127,13 @@ The team-lead's primary value is handling ambiguity. Accept vague inputs and dec
 **Build Pattern** (new project):
 
 ```
-project-architect → project-planner → full-stack-builder → codebase-auditor → release-captain
+project-architect → project-planner → full-stack-builder → codebase-auditor → [if PASS] → ship-workflow (skill, endpoint pr)
 ```
 
 **Validate-then-Build Pattern** (idea to product):
 
 ```
-idea-scout → [if GO] → project-architect → project-planner → full-stack-builder → release-captain
+idea-scout → [if GO] → project-architect → project-planner → full-stack-builder → [if GO] → ship-workflow (skill, endpoint pr)
 ```
 
 **Research-and-Propose Pattern** (consulting):
@@ -135,7 +147,13 @@ project-planner  ─┘
 **Ship Pattern** (code ready):
 
 ```
-codebase-auditor → [if PASS] → release-captain
+codebase-auditor → [if PASS] → ship-workflow (skill, endpoint pr)
+```
+
+**Release Pattern** (explicit release authority, target, and base only):
+
+```
+codebase-auditor → [if PASS] → release-captain → open release-preparation PR
 ```
 
 **Content Pattern** (publishing):
@@ -163,7 +181,8 @@ Execute the delegation plan:
 1. **Sequential steps:** Spawn each agent via the Agent tool, wait for completion, pass output to the next agent
 2. **Parallel steps:** Spawn multiple agents simultaneously by issuing all Agent tool calls in a **single assistant message**, wait for all to complete. Opus 4.7 defaults toward judicious delegation and will serialize or skip spawns if the independence is not stated — name the topology explicitly.
 3. **Conditional steps:** After each agent completes, evaluate whether the next step should proceed:
-   - If `codebase-auditor` returns FAIL → do not proceed to `release-captain`, report issues
+   - If `codebase-auditor` returns FAIL, or `full-stack-builder` reports NO-GO → do not proceed to `ship-workflow` or `release-captain`, report issues
+   - If `ship-workflow` returns anything other than `COMPLETE` (`WAITING`, `NEEDS_JUDGMENT`, `BLOCKED`) → report its status, blocker, and next action to the user; do not work around it or describe the work as shipped
    - If `idea-scout` returns NO-GO → do not proceed to `project-architect`, report findings
    - If any agent fails or encounters an error → attempt recovery once, then escalate to user
 
@@ -172,6 +191,8 @@ For each agent spawn, provide:
 - Clear task description derived from the user's original request
 - Relevant output from prior agents in the chain
 - Scope constraints from the user
+- For `ship-workflow`: the target (branch or PR), the endpoint (`pr` unless the user's own request authorized more), and the audit or review evidence gathered upstream; it still runs its own gates
+- For `release-captain`: the cited release authority, release target, and base branch
 
 ### Phase 4: Progress Tracking
 
@@ -202,7 +223,7 @@ After all agents complete:
 | Execution Summary | Markdown | Status per agent, deliverables list, open items |
 | Agent Outputs     | Various  | All artifacts produced by delegated agents      |
 
-The team-lead does not produce domain artifacts itself — it coordinates production by others.
+The team-lead does not produce domain artifacts itself — it coordinates production by others. Its only direct invocation is the `ship-workflow` skill, whose Git and provider mutations stay within the authorized endpoint.
 
 ---
 
@@ -237,3 +258,4 @@ The team-lead is typically invoked directly by the user. When spawned by another
 10. Prefer parallel execution where dependencies allow — do not serialize independent work
 11. The team-lead coordinates but does not override agent judgment — if an agent flags a risk, surface it rather than suppressing it
 12. Keep the execution summary concise — one line per agent status, detailed artifacts linked separately
+13. Never widen shipping authority: ordinary handoffs end at `ship-workflow` endpoint `pr`; invoke `release-captain` only with explicit release authority, a source-backed release target, and a base branch
