@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.0.0
+
+### Changed
+
+- BREAKING: explicit full shipping requests now default to the complete `clean` lifecycle. Explicit PR-only and CI-inspection requests retain their narrower endpoint; resuming a saved run does not expand its authority.
+- BREAKING: ordinary shipping no longer chooses versions, writes changelogs or prepares releases. `release-captain` owns explicitly authorized release artifacts and hands shipping off at `pr`; tags and publication require their own authorization.
+- Established Git and provider mechanics are owned by one resumable executable controller. The assistant supplies bounded change grouping, substantive review, source-backed applicability decisions and unfamiliar diagnosis rather than a second hand-run lifecycle.
 
 ### Added
 
@@ -37,5 +43,8 @@
 - `NativeMergeResult` carries the echoed `merge_action`, `merge_method` and `bypass_rules`, and `matches()` decides exact-option equality, also for the request named by `NativeMergeInProgress`. Behaviour change: an accepted request sent without a method is now uncertain unless GitHub echoes `merge_method: "default"`; an omitted echo was accepted before.
 - The controller code identity now covers `native_stack.py`: editing it invalidates saved receipts and graph journals for resumption until a refreshed packet is supplied.
 - Read-only native previews check the strict ancestry chain between every locally available selected and retained head, report a still-`PLANNED` request whose prefix an external actor already landed, and distinguish a refused request that landed externally (`NEEDS_JUDGMENT`) from one that merged nothing (`BLOCKED`), matching execution's stop without fetching or writing.
+- A thin `/ship` command with explicit target, endpoint, dry-run and saved-run arguments; installed dispatch resolves the client-reported skill directory and fails clearly when a required workflow or stack companion is missing.
+- Coherent release, milestone and stacked-PR caller cutover, routing and preset integration that preserve each caller's prior authorization and keep stack topology/provenance judgment under `stacked-prs`.
+- Real hard-process-death regressions using fsync-backed native journal intents, SIGKILL and a cross-process dispatch witness: safe pre-dispatch recovery and uncertain post-dispatch recovery without duplicate native requests.
+- Temporary archive/installed-client and separate provider qualification across ordinary dirty/existing-PR clean workflows, fork source adoption, partial manual stacks and native/direct-queue merged endpoints. Native requests guard only the highest selected head, not every member atomically; queue enrollment is not a confirmed landing.
 
-The advertised skill and command remain unchanged until the complete lifecycle cutover. Release preparation for `2.0.0` remains deferred until the full train is qualified.

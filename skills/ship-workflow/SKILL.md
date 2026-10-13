@@ -2,7 +2,7 @@
 name: ship-workflow
 description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the supported path and cleans up only proven-stale branches and worktrees. Stops at the requested endpoint and never bumps versions, edits changelogs, tags or publishes. Triggers on: "ship it", "ship this", "open a PR", "push and PR", "land this PR", "merge PR and clean up", "check CI on my PR", "resume the ship run", "/ship-workflow".'
 metadata:
-  version: 1.0.1
+  version: 2.0.0
   category: review
   tags: [shipping, pull-request, ci-cd, merge, cleanup]
   difficulty: intermediate

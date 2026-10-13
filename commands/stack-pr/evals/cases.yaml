@@ -117,7 +117,7 @@ cases:
     prompt: "Ship it: merge main, run tests, open the release PR, and write the changelog."
     fixtures: []
     rubric:
-      - "release workflow belongs to ship-workflow, not stack-pr"
+      - "version/changelog preparation belongs to release-captain; ordinary PR shipping belongs to ship-workflow or /ship, not stack-pr"
       - "does not activate stack-pr command"
     trigger_expected: false
 

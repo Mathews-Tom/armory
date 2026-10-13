@@ -1215,7 +1215,7 @@ packages:
     category: development
     difficulty: intermediate
   - name: ship-workflow
-    version: 1.0.1
+    version: 2.0.0
     description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature
       branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work
       as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the
