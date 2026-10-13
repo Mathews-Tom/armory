@@ -4,7 +4,9 @@ Sync moves each child's own commits onto its parent's new tip (the trunk tip onc
 
 ## Executable Owner
 
-`skills/ship-workflow` `scripts/ship.py --stack-plan PATH` is the one execution owner of manual graph continuation (packet: `references/stack-model.md` § Explicit Stack Decision Packet). It promotes a child after its parent landed, with Git plumbing only, and enforces every invariant in this reference. The hand-run recipe below states the same invariants for an operator working without it. This behavior is fixture-tested against local Git repositories and a stateful provider fixture; it is not a claim about every provider configuration.
+The installed `ship-workflow` skill's `scripts/ship.py --stack-plan PATH` is the one execution owner of graph continuation once a parent has landed (packet: `references/stack-model.md` § Explicit Stack Decision Packet). It promotes each selected child after its parent landed, with Git plumbing only, pushes it under an expected-old lease, retargets it to the trunk and renews its gates, enforcing every invariant in this reference. Post-landing promotion and retargeting are never hand-run. This behavior is fixture-tested against local Git repositories and a stateful provider fixture; it is not a claim about every provider configuration.
+
+The hand-run recipe below is the standalone restack of an open stack before anything lands: a parent branch was rewritten or the trunk moved, and the children must follow it with the same proof. It never retargets a PR and never deletes a branch.
 
 ## Preflight
 
@@ -31,7 +33,7 @@ After the parent lands, observe:
 
 | Identity | Meaning |
 | --- | --- |
-| `L` | The current trunk tip containing the parent's landing, re-read after every landing and never assumed from an earlier one. For a hand-run sync onto a parent that was rewritten but has not landed, `L` is that parent's new head and the PR is not retargeted |
+| `L` | In the delegated run, the current trunk tip containing the parent's landing, re-read after every landing and never assumed from an earlier one. For a standalone restack, `L` is the rewritten parent's new head, or the current trunk tip for a root branch whose trunk moved, and the PR is not retargeted |
 
 If `F` is not an ancestor of `C` or the boundary cannot be proven, stop before merging the parent: name the missing identity and sync or supply the explicit fork first. `F` must be available locally. Git fetches advertised refs, not arbitrary objects, and a deleted parent ref advertises nothing, so an `F` that is no current ref tip is available only when it is already local or arrives with the history of the fetched child head.
 
@@ -94,17 +96,9 @@ Never use a bare `--force-with-lease` (it leases against a possibly stale remote
 
 ## Retarget
 
-Retarget a child to the trunk only after its parent landed and the promoted head's push is confirmed. The provider documents no atomic head/base guard for a base edit, so read the PR immediately before and after, and treat any mismatch as a stop:
+The delegated run retargets a child to the trunk only after its parent landed and the promoted head's push is confirmed. The provider documents no atomic head/base guard for a base edit, so it reads the PR immediately before and after and treats any mismatch as a stop: before, `OPEN`, head `N`, base still the old parent branch; after, base the trunk and head still `N`. A new base changes the provider diff and test context: gates are renewed for the new head and base; earlier green is never carried over.
 
-```bash
-gh pr view <child-pr> --json state,headRefOid,baseRefName
-gh pr edit <child-pr> --base <trunk>
-gh pr view <child-pr> --json state,headRefOid,baseRefName
-```
-
-Before: `OPEN`, `headRefOid` equal to `N`, base still the old parent branch. After: base `<trunk>` and head still `N`. A new base changes the provider diff and test context: gates are renewed for the new head and base; earlier green is never carried over.
-
-A repository can auto-delete a merged head branch and retarget its open children itself. When the child is already based on the trunk, or the parent head ref is already gone, reconcile that observed state instead of failing or re-sending the edit. The child head is still the old `C` in that case, so promotion is still required; the recorded `F` keeps the slice provable without the deleted ref.
+A repository can auto-delete a merged head branch and retarget its open children itself. When the child is already based on the trunk, or the parent head ref is already gone, the run reconciles that observed state instead of failing or re-sending the edit. The child head is still the old `C` in that case, so promotion is still required; the recorded `F` keeps the slice provable without the deleted ref.
 
 ## Unknown Outcomes
 

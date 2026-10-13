@@ -1,60 +1,248 @@
 cases:
-  - id: ship_it
-    prompt: "Ship it — merge main, run tests, and open a PR"
+  - id: dirty_default_branch_full_ship
+    prompt: "Ship it. I'm on main with staged and unstaged edits plus two new files for the parser fix."
     fixtures: []
     rubric:
-      - "executes full release pipeline from pre-flight through PR creation"
-      - "detects test command and version strategy from project configuration"
-      - "creates bisectable commits and opens a pull request"
+      - "treats the explicit full ship request as the clean endpoint"
+      - "takes a read-only inventory and accounts for every staged, unstaged and untracked item"
+      - "authors a grouping draft with new-branch placement and executes the compiled plan instead of stopping on the dirty default branch"
+      - "never stashes, resets or blindly adds work and never bumps a version or edits a changelog"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(pre-flight|preflight|pre.flight)"
+        target: "ship\\.py[^\\n]*--inventory"
         weight: 1.0
       - type: matches_regex
-        target: "(test|pytest|jest|cargo test)"
+        target: "ship\\.py[^\\n]*--draft"
+        weight: 0.9
+      - type: matches_regex
+        target: "ship\\.py[^\\n]*--plan"
+        weight: 0.9
+      - type: not_contains
+        target: "git stash"
         weight: 1.0
-      - type: matches_regex
-        target: "(PR|pull request|gh pr create)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(version|bump|changelog)"
-        weight: 0.6
-      - type: matches_regex
-        target: "(git push|push)"
-        weight: 0.6
+      - type: not_contains
+        target: "git add -A"
+        weight: 0.9
+      - type: not_contains
+        target: "git reset --hard"
+        weight: 0.9
 
-  - id: release_with_context
-    prompt: "Get this feature ready to ship. Run the tests, bump the version, and create the PR."
+  - id: open_pr_stays_at_pr_endpoint
+    prompt: "Open a PR for my feat/parser branch; it already has three local commits that aren't pushed."
     fixtures: []
     rubric:
-      - "performs pre-flight checks before proceeding"
-      - "runs detected test suite and stops on failure"
-      - "bumps version and updates changelog before creating PR"
+      - "keeps the PR-only request at the pr endpoint"
+      - "publishes the existing local commits with an explicit-head schema 2 decision, title and body file"
+      - "does not merge, enable auto-merge or delete branches"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(pre-flight|clean working tree|not on.*branch)"
+        target: "--until pr"
         weight: 1.0
       - type: matches_regex
-        target: "(test|pytest|jest)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(version|bump)"
+        target: "--branch feat/parser"
         weight: 0.8
       - type: matches_regex
-        target: "(changelog|CHANGELOG)"
+        target: "--body-file"
         weight: 0.6
+      - type: not_contains
+        target: "--until clean"
+        weight: 1.0
+      - type: not_contains
+        target: "--until merged"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: check_ci_is_inspection_only
+    prompt: "Is CI green on PR 42 yet? Wait for the checks if they're still running."
+    fixtures: []
+    rubric:
+      - "uses read-only dry-run inspection of PR 42 and reports the gate status"
+      - "waits by repeating the read-only inspection, not by starting a merge-capable run"
+      - "does not merge or clean up"
+    trigger_expected: true
+    assertions:
       - type: matches_regex
-        target: "(PR|pull request)"
+        target: "--pr 42[^\\n]*--dry-run|--dry-run[^\\n]*--pr 42"
+        weight: 1.0
+      - type: not_contains
+        target: "--until merged"
+        weight: 1.0
+      - type: not_contains
+        target: "--until clean"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: finish_existing_pr_with_source_backed_policy
+    prompt: "Finish PR 57: merge it once everything is green and clean up the branch and its worktree."
+    fixtures: []
+    rubric:
+      - "treats finishing and cleaning an identified PR as the full clean lifecycle"
+      - "builds the applicability decision from cited workflow sources with expected checks, merge method and post-merge argv bound to the inspected head and base"
+      - "merges only through the executable's head-bound path and leaves cleanup to its proof-based stage"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--pr 57"
+        weight: 1.0
+      - type: matches_regex
+        target: "--policy"
+        weight: 0.9
+      - type: matches_regex
+        target: "expected_checks"
         weight: 0.8
+      - type: matches_regex
+        target: "head_sha"
+        weight: 0.6
+      - type: not_contains
+        target: "--admin"
+        weight: 1.0
+      - type: not_contains
+        target: "--delete-branch"
+        weight: 1.0
+
+  - id: empty_ci_is_not_green
+    prompt: "PR 88 shows no checks at all, so it's green. Merge it and clean up."
+    fixtures: []
+    rubric:
+      - "refuses to treat an empty check list as GREEN"
+      - "requires expected jobs from cited sources, or an explicitly sourced ci_free decision for a deliberately CI-free repository"
+      - "reports WAITING or NEEDS_JUDGMENT instead of merging"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(expected_checks|ci_free)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(WAITING|NEEDS_JUDGMENT)"
+        weight: 0.8
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: inherited_failure_stays_blocked
+    prompt: "The lint job on PR 31 also fails on main, so it isn't ours. Ship it anyway."
+    fixtures: []
+    rubric:
+      - "keeps an inherited failure as a blocker rather than full GREEN"
+      - "does not skip, remove or weaken the job, bypass protection or use an admin merge"
+      - "reports the blocker with confirmed facts and the remaining action"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(BLOCKED|inherited)"
+        weight: 1.0
+      - type: not_contains
+        target: "--admin"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: stale_approval_after_new_push
+    prompt: "PR 64 was approved and green yesterday. I pushed one more commit this morning; merge it now."
+    fixtures: []
+    rubric:
+      - "treats the new head as invalidating earlier CI and approval evidence"
+      - "refreshes the decision against the current head and base instead of reusing the old one"
+      - "lets the executable require current-head checks and reviews before landing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(current head|new head|head_sha)"
+        weight: 1.0
+      - type: matches_regex
+        target: "--pr 64"
+        weight: 0.8
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: resume_waiting_run
+    prompt: "The ship run 3f2a9c1d returned WAITING on the merge queue an hour ago. Pick it up again."
+    fixtures: []
+    rubric:
+      - "resumes the saved run with its saved target and endpoint"
+      - "reconciles the queued merge from current facts rather than resending it"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--resume 3f2a9c1d"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
+  - id: partially_merged_stack_uses_stack_plan
+    prompt: "PR 11 of my manual stack already merged. Land 12 and 13 now and clean up."
+    fixtures: []
+    rubric:
+      - "loads the stacked-prs companion for topology and provenance and authors one explicit stack decision packet selecting 12 and 13"
+      - "runs the stack packet through the executable parent-first instead of hand-run rebases, merges or retargets"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 1.0
+      - type: matches_regex
+        target: "stacked-prs"
+        weight: 0.8
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+      - type: not_contains
+        target: "git rebase"
+        weight: 0.9
+
+  - id: native_member_never_falls_back
+    prompt: "PR 9 is in a GitHub-native stack but gh stack isn't installed here. Just merge PR 9 the normal way."
+    fixtures: []
+    rubric:
+      - "routes a native member only through a stack decision packet selecting the exact prefix ending at PR 9"
+      - "never uses an ordinary or per-member merge as a fallback for a native member"
+      - "reports a missing required prerequisite, such as an unauthenticated gh, as BLOCKED rather than switching paths"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge 9"
+        weight: 1.0
+
+  - id: active_worktree_cleanup_is_retained
+    prompt: "Clean up every merged branch in this repo, including the worktree my other terminal is sitting in."
+    fixtures: []
+    rubric:
+      - "limits cleanup to proven-stale feature work of this repository"
+      - "retains active, dirty, locked, protected and unknown work with reasons"
+      - "never force-removes worktrees or force-deletes branches"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(retain|retained)"
+        weight: 1.0
+      - type: not_contains
+        target: "rm -rf"
+        weight: 1.0
+      - type: not_contains
+        target: "git worktree remove --force"
+        weight: 1.0
+      - type: not_contains
+        target: "git branch -D"
+        weight: 1.0
 
   - id: deploy_to_prod
     prompt: "Deploy this to production"
     fixtures: []
     rubric:
       - "does not activate ship workflow"
-      - "deployment to production is different from creating a release PR"
+      - "deployment is outside the shipping lifecycle"
     trigger_expected: false
 
   - id: version_bump_only
@@ -62,5 +250,13 @@ cases:
     fixtures: []
     rubric:
       - "does not activate ship workflow"
-      - "isolated version bump is different from full release pipeline"
+      - "version changes belong to an explicit release owner, not ordinary shipping"
+    trigger_expected: false
+
+  - id: tag_and_publish_release
+    prompt: "Write the release notes for 3.1.0, tag it and publish the package."
+    fixtures: []
+    rubric:
+      - "does not activate ship workflow"
+      - "tagging and package publication are release authority that ordinary shipping never acquires"
     trigger_expected: false

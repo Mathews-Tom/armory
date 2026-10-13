@@ -42,42 +42,49 @@ cases:
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "fetches current remote state before rebasing"
-      - "uses force-with-lease for rewritten stack branches"
+      - "fetches current remote state without pruning before restacking"
+      - "proves each replayed child against the three-way expected tree"
+      - "pushes rewritten branches with an explicit expected-old lease, never a bare lease or --force"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "git fetch origin --prune"
-        weight: 0.8
+        target: "git fetch origin"
+        weight: 0.6
       - type: matches_regex
-        target: "git rebase"
-        weight: 0.8
+        target: "git merge-tree --write-tree --merge-base"
+        weight: 0.9
       - type: matches_regex
-        target: "--force-with-lease"
+        target: "--force-with-lease=refs/heads/"
         weight: 1.0
+      - type: not_contains
+        target: "push --force origin"
+        weight: 0.8
 
   - id: merge_stack_bottom_up
     prompt: "Merge the stack once checks pass, then clean up the branches."
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "merges root PR before children"
-      - "retargets each child after the parent lands"
-      - "does not delete parent branches while child PRs still target them"
+      - "inspects topology, native membership and provenance, then authors one explicit stack decision packet"
+      - "delegates parent-first landing, child promotion and retargeting, and cleanup once to the installed ship-workflow stack run"
+      - "does not hand-run merges, retargets after landing or branch deletions"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(root|parent).*(merge|PR)"
-        weight: 0.8
+        target: "--stack-plan"
+        weight: 1.0
       - type: matches_regex
-        target: "gh pr merge"
+        target: "ship-workflow"
         weight: 0.8
       - type: matches_regex
         target: "baseRefName"
-        weight: 0.8
-      - type: matches_regex
-        target: "gh pr edit[\\s\\S]*--base"
-        weight: 0.8
+        weight: 0.6
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+      - type: not_contains
+        target: "git push origin --delete"
+        weight: 1.0
 
   - id: retarget_existing_stack
     prompt: "Retarget the child PRs so each PR points at the correct parent branch in the stack."
@@ -151,8 +158,9 @@ cases:
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "detects the repo's squash_merge_commit_message policy before merge, not just whether squash is allowed"
-      - "folds stack trailers into the squash commit body only when the policy is PR_BODY or BLANK"
+      - "detects the repo's squash_merge_commit_message policy before choosing the merge method, not just whether squash is allowed"
+      - "keeps squash under COMMIT_MESSAGES; under PR_BODY needs the trailers in the PR bodies of a stack it created; under BLANK makes losing them an explicit provenance decision"
+      - "delegates the landing to the ship-workflow stack run, which never overrides the squash message"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -165,17 +173,20 @@ cases:
         target: "(COMMIT_MESSAGES|PR_BODY|BLANK)"
         weight: 0.9
       - type: matches_regex
-        target: "(PR_BODY|BLANK)[\\s\\S]*(--body|fold)"
-        weight: 0.9
+        target: "--stack-plan"
+        weight: 0.8
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
 
   - id: backfill_existing_stack_trailers
-    prompt: "Backfill Stack-Id trailers onto this existing unmerged stack and prove the leaf tree still matches the original source branch."
+    prompt: "Backfill Stack-Id trailers onto this local stack I created but haven't pushed yet, and prove the leaf tree still matches the original source branch."
     fixtures: []
     rubric:
       - "activates stacked-prs"
-      - "rewrites only unmerged stack branches"
+      - "rewrites only unpublished stack commits the skill created"
       - "adds trailers without altering tree content"
-      - "pushes rewritten branches with force-with-lease"
+      - "does not restamp commits that are already published or merged"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -183,9 +194,6 @@ cases:
         weight: 1.0
       - type: matches_regex
         target: "git diff --exit-code"
-        weight: 0.8
-      - type: matches_regex
-        target: "--force-with-lease"
         weight: 0.8
 
   - id: stack_id_mismatch_stops_mutation
@@ -239,28 +247,28 @@ cases:
       green. Do not infer the merge boundary.
     fixtures: []
     rubric:
-      - "requires the explicit highest PR number for a partial merge"
-      - "sends one guarded merge-async request on PR #42 with an explicit trailer-preserving merge method"
-      - "does not claim the prefix lands atomically and verifies each member and the remaining topology"
+      - "requires the explicit highest PR number for a partial merge and selects every open member up to #42"
+      - "authors a stack decision packet with the trailer-preserving merge method and delegates it to the ship-workflow stack run, which sends one guarded direct-merge request on #42"
+      - "does not claim the prefix lands atomically or that the guard covers lower heads, and re-inspects the remaining topology afterwards"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "pulls/42/merge-async"
+        target: "--stack-plan"
         weight: 1.0
       - type: matches_regex
-        target: "merge_action=direct_merge[\\s\\S]*merge_method=merge\\b|merge_method=merge\\b[\\s\\S]*merge_action=direct_merge"
+        target: "\"merge_method\":\\s*\"merge\""
         weight: 0.9
       - type: matches_regex
-        target: "bypass_rules=false"
-        weight: 0.8
-      - type: matches_regex
-        target: "(fetch|re-fetch|topology|retarget)"
-        weight: 0.8
+        target: "(topology|re-inspect|retained)"
+        weight: 0.6
       - type: not_contains
         target: "gh stack merge"
         weight: 1.0
       - type: not_contains
         target: "gh pr merge 42"
+        weight: 0.9
+      - type: not_contains
+        target: "gh api --method PUT"
         weight: 0.9
 
   - id: github_native_prefix_merge_squash
@@ -272,12 +280,15 @@ cases:
     rubric:
       - "checks squash_merge_commit_message before choosing squash as the merge method"
       - "expects trailers to survive automatically under COMMIT_MESSAGES with no squash-body workaround"
-      - "sends one direct merge-async request with merge_method=squash and no commit_title or commit_message override"
+      - "decides merge_method squash in the stack decision packet and delegates one direct request on #42 with no commit_title or commit_message override"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "pulls/42/merge-async[\\s\\S]*merge_method=squash\\b"
+        target: "\"merge_method\":\\s*\"squash\""
         weight: 1.0
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 0.8
       - type: matches_regex
         target: "squash_merge_commit_message"
         weight: 0.9
@@ -295,14 +306,15 @@ cases:
     fixtures: []
     rubric:
       - "rejects GitHub-native mode for cross-fork stacks"
-      - "falls back to the manual Armory workflow without losing provenance"
+      - "keeps the stack manual without losing provenance"
+      - "leaves any later landing to the delegated stack decision packet rather than hand-run merges"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "(fork|cross.repository|same.repository)"
         weight: 0.9
       - type: matches_regex
-        target: "(manual|fallback|root.to.leaf)"
+        target: "manual"
         weight: 0.9
       - type: matches_regex
         target: "(Stack-Id|Stack-Position|provenance)"
@@ -313,8 +325,8 @@ cases:
       - type: not_contains
         target: "gh stack merge"
         weight: 1.0
-      - type: matches_regex
-        target: "gh pr merge|gh pr edit[\\s\\S]*--base"
+      - type: not_contains
+        target: "gh pr merge"
         weight: 0.9
 
   - id: github_native_unavailable_fallback
@@ -345,12 +357,12 @@ cases:
     rubric:
       - "treats a detected native stack as mandatory, not opt-in"
       - "requires an explicitly selected highest PR instead of inferring the prefix"
-      - "uses one guarded merge-async request instead of gh pr merge for the detected stack"
+      - "delegates the selected prefix to the ship-workflow stack run's single guarded async request"
       - "does not offer the manual gh pr merge path as an alternative"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "merge-async"
+        target: "--stack-plan"
         weight: 1.0
       - type: matches_regex
         target: "(highest|explicit)[\\s\\S]*(PR|pull request|prefix)"
@@ -373,46 +385,36 @@ cases:
       request's response is lost.
     fixtures: []
     rubric:
-      - "selects the explicit prefix ending at #58 and refuses to widen it"
-      - "sends exactly one merge-async request on #58 with the inspected head as sha and bypass_rules=false"
-      - "routes to merge_queue and omits merge_method, commit_title and commit_message"
-      - "never retries an unknown outcome; reconciles from the request status and pull request states"
-      - "treats enqueued as not landed and verifies each landing plus both retained #59 and #60 trees and own slices, keeping #60 on #59"
-      - "never falls back to gh pr merge or per-member merges"
+      - "selects exactly #57 and #58 in the stack decision packet, lists #59 and #60 as unselected nodes and refuses to widen the prefix"
+      - "delegates to the ship-workflow stack run, which sends one queue request on #58 guarded only by #58's inspected head and sends no merge method"
+      - "on a lost response resumes the same run so the outcome is reconciled from pull request facts, never resending the request"
+      - "treats enqueued as not landed and relies on per-member landing proofs plus verification of retained #59 and #60 trees and own slices, keeping #60 on #59"
+      - "never falls back to gh pr merge, per-member merges or a hand-run merge-async request"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "pulls/58/merge-async"
+        target: "--stack-plan"
         weight: 1.0
       - type: matches_regex
-        target: "sha="
-        weight: 0.9
-      - type: matches_regex
-        target: "bypass_rules=false"
+        target: "\"select\":\\s*false"
         weight: 0.8
       - type: matches_regex
-        target: "merge_action=merge_queue"
-        weight: 0.9
-      - type: not_contains
-        target: "-f merge_method"
-        weight: 0.9
+        target: "--resume"
+        weight: 0.8
       - type: matches_regex
         target: "(never|do not|don't|no)[\\s\\S]{0,60}(retry|resend|re-send|send[\\s\\S]{0,20}again)"
         weight: 0.9
       - type: matches_regex
-        target: "merge-async/<?uuid"
-        weight: 0.8
-      - type: matches_regex
         target: "enqueued[\\s\\S]{0,120}(not|never)[\\s\\S]{0,40}(merged|landed)"
         weight: 0.9
       - type: matches_regex
-        target: "#59[\\s\\S]*(tree|slice)"
-        weight: 0.8
-      - type: matches_regex
-        target: "#60[\\s\\S]*(#59|tree|slice|retained|open)"
+        target: "#59[\\s\\S]*(tree|slice|retained|unselected)"
         weight: 0.8
       - type: not_contains
         target: "gh pr merge"
+        weight: 1.0
+      - type: not_contains
+        target: "gh api --method PUT"
         weight: 1.0
       - type: not_contains
         target: "gh stack merge"
@@ -444,20 +446,23 @@ cases:
       lists nothing for the stack branches. Clean up the local branches.
     fixtures: []
     rubric:
-      - "recognizes git branch --merged is unreachable proof after a squash or rebase merge"
-      - "proves content equivalence instead before deleting"
-      - "deletes only after the equivalence proof passes"
+      - "recognizes ancestry cannot prove a squash or rebase landing, and that git cherry or a quiet diff is not deletion proof either"
+      - "delegates cleanup-only to the ship-workflow stack run, selecting only nodes the provider reports merged"
+      - "relies on the run's recorded landed-head proof and expected-OID deletions, retaining any branch that fails it"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(git diff --quiet|git cherry)"
+        target: "--stack-plan"
         weight: 1.0
-      - type: matches_regex
-        target: "git branch -D"
-        weight: 0.8
       - type: matches_regex
         target: "(squash|rebase)[\\s\\S]*(ancestry|no ancestry|not list)"
         weight: 0.8
+      - type: not_contains
+        target: "git branch -D"
+        weight: 1.0
+      - type: not_contains
+        target: "git push origin --delete"
+        weight: 1.0
 
   - id: stack_base_is_not_main
     prompt: >
@@ -465,7 +470,7 @@ cases:
     fixtures: []
     rubric:
       - "resolves the base branch from the root PR's baseRefName instead of assuming main"
-      - "uses the resolved base in every rebase, retarget, and cleanup command"
+      - "uses the resolved base as the stack decision packet's trunk for the delegated landing"
       - "never hardcodes main when the stack's actual base is staging"
     trigger_expected: true
     assertions:
@@ -473,7 +478,7 @@ cases:
         target: "baseRefName"
         weight: 0.9
       - type: matches_regex
-        target: "staging"
+        target: "\"trunk\":\\s*\"staging\""
         weight: 0.9
       - type: not_contains
         target: "--base main"
@@ -481,6 +486,30 @@ cases:
       - type: not_contains
         target: "origin/main"
         weight: 1.0
+
+  - id: landing_without_ship_workflow_blocks
+    prompt: >
+      Merge PRs #21 and #22 of this manual stack. The ship-workflow skill is not
+      installed in this client.
+    fixtures: []
+    rubric:
+      - "activates stacked-prs"
+      - "stops BLOCKED naming the missing ship-workflow package for the landing"
+      - "does not fall back to hand-run merges, retargets or branch deletions"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "BLOCKED"
+        weight: 1.0
+      - type: matches_regex
+        target: "ship-workflow"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+      - type: not_contains
+        target: "git push origin --delete"
+        weight: 0.9
 
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."

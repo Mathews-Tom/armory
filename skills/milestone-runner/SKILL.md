@@ -2,7 +2,7 @@
 name: milestone-runner
 description: 'Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design. Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.'
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   category: development
   tags: [milestones, orchestration, adaptive-planning, stacked-prs, ci, release-management, execution-prompts, subagents]
   difficulty: advanced
@@ -17,7 +17,7 @@ metadata:
 
 Run milestone prompts produced by `plan-prompts`. The runner coordinates mandatory design reconciliation, dependency-safe execution, verification, CI, review, merge/cleanup, and release preparation.
 
-The runner executes existing prompts; it does not author a new product plan. It may require a docs-only reconciliation PR when the current plan no longer matches repository evidence. It invokes `stacked-prs` for stack topology and `ship-workflow` only after a complete release train requires preparation.
+The runner executes existing prompts; it does not author a new product plan. It may require a docs-only reconciliation PR when the current plan no longer matches repository evidence. It invokes `stacked-prs` for stack topology. Only after a complete release train requires preparation does it hand the train's source-traceable release target to the `release-captain` agent, which edits the release artifacts and publishes them through `ship-workflow` only until the PR exists.
 
 ## Core model
 
@@ -185,7 +185,7 @@ After all gates pass, merge with `stacked-prs` root-to-leaf. Recheck CI after ea
 4. Recompute the DAG and release train from external merge state. Treat all downstream design results as stale after a predecessor merge.
 5. If the train is incomplete, continue only with dependency-ready design gates.
 6. If target or required artifacts are `none`, record `RELEASE PREP: not-required`.
-7. If required, run `ship-workflow` in an isolated release-preparation branch only after all train milestones merge. Update only source-traceable version/changelog artifacts; require reviewed green merged release-preparation PR and post-merge release verification. Do not tag, publish, or create a hosted release without explicit plan evidence.
+7. If required, prepare the release only after all train milestones merge. Hand `release-captain` the plan's release authority, target, source-traceable version/changelog artifacts, and named base, each with its citation. It edits those artifacts in an isolated release-preparation branch and invokes `ship-workflow` with endpoint `pr`; `ship-workflow` never infers or owns release artifacts. The open release-preparation PR is not release completion: it must pass review, current green CI, and external integration through the same merge gate as milestone stacks, followed by post-merge release verification. Do not tag, publish, or create a hosted release without explicit plan evidence.
 8. After every `GO` or `NO-GO`, derive and report `NEXT STEPS` from the observed DAG, external merge state, and release-train contract. On `GO`, state whether to merge or record the milestone as merged, whether release preparation is deferred or must begin, and the next dependency-ready milestone. On `NO-GO`, state the exact remediation and retry gate, then either `SKIP <current milestone> FOR NOW; RUN <next milestone> — independent of <blocked dependency closure>` or `NO NEXT MILESTONE — <blocking reason>`. Do not advance a dependent milestone or invent release work.
 
 ## Output format
@@ -241,6 +241,7 @@ For merge-and-clean requests, also report each PR’s base, pre-merge CI, merge 
 | CI pending or failed | Treat as incomplete; do not merge or advance. |
 | Merge conflict | Stop and use stack conflict resolution; do not launch downstream work. |
 | Release target missing, contradictory, or unresolved | Stop the affected train; do not infer versioning or release artifacts. |
+| `release-captain` or `ship-workflow` not installed when release preparation is required | Stop release preparation `BLOCKED`, naming the missing package; do not edit release artifacts or publish by hand. |
 | Subagents or worktrees unavailable | Run design evidence, implementation, verification, and review serially in this session; report the reduced isolation. |
 | A lane reports success without cited evidence | Treat the milestone as unverified; re-dispatch independent verification before any merge. |
 | A lane wrote the ledger, an authoritative artifact, or ran git topology | Revert that write, re-derive the state from external evidence, and re-dispatch the lane with the write boundary restated. |

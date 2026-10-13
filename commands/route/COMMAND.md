@@ -9,7 +9,7 @@ description: >-
   "help me pick a skill", "discover packages". Use this command when unsure
   which armory skill, agent, or command to use for a task.
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   category: operations
   tags: [discovery, routing, meta, navigation]
   difficulty: beginner
@@ -107,12 +107,17 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 
 ## Ship Phase — "I need to ship"
 
+Shipping routes keep the authority the user asked for. `ship-workflow` is the single lifecycle owner: an open-PR or CI request never gains merge, cleanup, or release work, and ordinary shipping never edits versions or changelogs.
+
 | Task | Primary Package | Complements |
 |------|----------------|-------------|
-| Ship workflow (PR + changelog) | `ship-workflow` skill | `changelog-composer` |
+| Ship explicitly: commit, PR, CI, merge, and clean up | `/ship` command | `ship-workflow` skill |
+| Open a PR only | `ship-workflow` skill, endpoint `pr` | `/ship --until pr` |
+| Check CI or preview shipping without changes | `ship-workflow` skill, read-only inspection | `/ship --dry-run`, `github` |
+| Prepare an explicitly authorized release (version + changelog → PR) | `release-captain` agent | `changelog-composer`, `ship-workflow` |
+| Stack topology: split, publish, sync, retarget, provenance | `stacked-prs` skill | `/stack-pr` command |
 | Generate changelog | `changelog-composer` skill | — |
 | Generate API documentation | `api-docs-generator` skill | — |
-| Full release lifecycle | `release-captain` agent | `ship-workflow`, `changelog-composer` |
 | Engineering retrospective | `engineering-retro` skill | — |
 | Review before creating PR | `plan-review` agent | `pr-review` |
 

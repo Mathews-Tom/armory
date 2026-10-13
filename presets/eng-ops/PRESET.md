@@ -2,12 +2,13 @@
 name: eng-ops
 type: preset
 description:
-  "DEPRECATED: Superseded by the release-captain and full-stack-builder
-  agents. release-captain orchestrates ship-workflow, changelog-composer, pre-landing-review,
-  dependency-audit with quality gates. full-stack-builder handles implementation with
-  test-harness, code-refiner, and api-docs-generator. Use these agents instead."
+  "DEPRECATED: Superseded by the ship-workflow skill and the release-captain and
+  full-stack-builder agents. ship-workflow ships work through PR, gates, merge, and cleanup.
+  release-captain prepares explicitly authorized version and changelog changes with quality
+  gates and opens the release PR. full-stack-builder handles implementation with
+  test-harness, code-refiner, and api-docs-generator. Use these instead."
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   status: deprecated
   category: review
   tags: [engineering, operations, ci-cd, release]
@@ -29,11 +30,12 @@ preset:
 
 # Eng Ops
 
-> **DEPRECATED** — The `release-captain` and `full-stack-builder` agents supersede this
-> preset. `release-captain` manages the ship lifecycle with quality gates (secret scanning,
-> pre-landing review, changelog generation, PR creation). `full-stack-builder` handles
-> implementation with testing, documentation, and code refinement. Install these agents
-> instead.
+> **DEPRECATED** — The `ship-workflow` skill and the `release-captain` and `full-stack-builder`
+> agents supersede this preset. `ship-workflow` (or `/ship`) ships work through PR, current
+> gates, merge, and cleanup without changing versions. `release-captain` prepares explicitly
+> authorized version and changelog changes with quality gates and stops at the release PR.
+> `full-stack-builder` handles implementation with testing, documentation, and code
+> refinement. Install these instead.
 
 End-to-end engineering operations toolkit spanning the plan-build-test-ship-reflect lifecycle.
 
@@ -41,7 +43,7 @@ End-to-end engineering operations toolkit spanning the plan-build-test-ship-refl
 
 | Skill                   | Purpose                                        | Phase   |
 | ----------------------- | ---------------------------------------------- | ------- |
-| ship-workflow           | Orchestrate end-to-end shipping pipeline       | ship    |
+| ship-workflow           | Ship work from changes to merged and cleaned   | ship    |
 | qa-systematic           | Systematic test planning and QA strategy       | plan    |
 | test-harness            | Test scaffolding and generation                | test    |
 | benchmark-runner        | Performance benchmarking and regression checks | test    |
@@ -58,7 +60,8 @@ End-to-end engineering operations toolkit spanning the plan-build-test-ship-refl
    Run `migration-risk-analyzer` before applying schema or infrastructure changes.
 3. **Test** — generate test scaffolding with `test-harness`. Validate performance
    characteristics with `benchmark-runner`.
-4. **Ship** — orchestrate the release pipeline end-to-end with `ship-workflow`.
+4. **Ship** — take work through PR, gates, merge, and cleanup with `ship-workflow`; it never
+   changes versions or changelogs.
 5. **Reflect** — run `engineering-retro` after a milestone or incident to capture
    lessons learned and action items.
 
@@ -72,7 +75,7 @@ End-to-end engineering operations toolkit spanning the plan-build-test-ship-refl
 | Measuring latency, throughput, or memory usage     | benchmark-runner        |
 | Evaluating risk of a database or infra migration   | migration-risk-analyzer |
 | Tracking down a bug or production incident         | debug-investigator      |
-| Cutting a release or coordinating deploy steps     | ship-workflow           |
+| Shipping a change through PR, merge, and cleanup   | ship-workflow           |
 | Running a sprint retro or post-incident review     | engineering-retro       |
 
 ## When to Use

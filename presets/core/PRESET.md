@@ -12,7 +12,7 @@ description:
 
   "
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: review
   tags: [essential, baseline, review, git]
   difficulty: intermediate
@@ -75,5 +75,6 @@ These packages work well alongside the core preset:
 
 - **codebase-advisor** — repo improvement planning with self-contained implementation plans for executor agents.
 - **codebase-auditor** — unified quality assessment across code, security, and dependencies.
-- **release-captain** — ship lifecycle with quality gates, changelog, and PR creation.
+- **ship-workflow** — ship work through PR, current gates, merge, and cleanup; `/ship` is its command.
+- **release-captain** — explicit release preparation: authorized version and changelog changes, quality gates, and the release PR.
 - **full-stack-builder** — end-to-end implementation with testing and documentation.

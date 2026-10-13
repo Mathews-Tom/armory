@@ -71,6 +71,13 @@ repetitions, and explicit exclusions. The M3 declaration contains 450 cells.
 `omp_run.yaml` expands those conditions over pinned Claude and Codex OMP targets
 into the M4 900-cell subscription matrix without running a model.
 
+### Shipping cutover source epoch
+
+The shipping cutover deliberately changes the sampled `stack-pr` definition. `omp_run.yaml` pins that new source and derives fresh hashes for all three conditions; the corpus, samples, target declarations, repetitions and runtime limits remain unchanged. Regenerate and validate materialized inputs before any separately authorized comparison. No historical result, live-run approval or effectiveness verdict transfers to the new source epoch.
+
+`source-snapshots/ship-cutover-20261013-e48ceee6/` preserves the exact previous run contract and sampled command bytes. These files are historical evidence, not installable command definitions. Replay that contract only from its matching source revision, `e48ceee6da4605bb7f166297ebbbd2a8be45d9e6`; its existing source guard correctly refuses the current checkout. Historical receipts and their condition/content hashes remain unchanged. The new `/ship` package is explicitly excluded from the existing frozen corpus rather than silently expanding its population.
+
+
 The legacy seed task files remain directly loadable for focused harness tests.
 Their assertion criteria remain useful for prose deliverables. Tasks whose
 intended deliverable is an artifact use artifact-aware validation rather than

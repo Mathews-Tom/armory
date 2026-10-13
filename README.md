@@ -55,7 +55,7 @@ Orchestrator agents compose skills and other agents into multi-phase workflows. 
 | [research-analyst](agents/research-analyst/)     | opus   | Multi-source investigation with parallel agents across web, academic, video, and competitive sources            |
 | [idea-scout](agents/idea-scout/)                 | opus   | Business idea validation — Lean Canvas, parallel market/competitive/feasibility research, weighted scorecard    |
 | [full-stack-builder](agents/full-stack-builder/) | opus   | End-to-end implementation from spec — scaffolding, sprints, quality passes, documentation, pre-delivery review  |
-| [release-captain](agents/release-captain/)       | sonnet | Ship lifecycle with quality gates — pre-flight, secret scan, changelog, version bump, PR creation               |
+| [release-captain](agents/release-captain/)       | sonnet | Explicit release preparation — authorized version and changelog edits, quality gates, secret scan, release PR; stops at the PR |
 | [proposal-writer](agents/proposal-writer/)       | opus   | Technical proposals with ROI calculations, three-tier pricing, and Problem-Agitate-Solve framing                |
 | [content-strategist](agents/content-strategist/) | sonnet | Multi-channel content creation with per-channel adaptation and automated quality passes                         |
 | [media-producer](agents/media-producer/)         | sonnet | Visual and video format router — selects the right skill based on concept type and output needs                 |
@@ -101,7 +101,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [test-harness](skills/test-harness/)             | Comprehensive pytest suite generation — happy path, edge cases, error conditions, fixtures, mocks, async, parametrized tests                                |
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
-| [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, merge, and clean up stack topology                      |
+| [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
 | [plan-prompts](skills/plan-prompts/)             | Generate adaptive development plans, execution prompts, and an ignored local design-evidence ledger from source docs |
 | [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions before implementation planning begins |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones through serialized design reconciliation, reviewed PR gates, CI, cleanup, and release preparation |
@@ -168,7 +168,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | Skill                                            | Description                                                                                                                 |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
 | [changelog-composer](skills/changelog-composer/) | Structured changelogs from git history — conventional commit parsing, audience filtering, breaking change detection         |
-| [ship-workflow](skills/ship-workflow/)           | Automated release pipeline — merge main, run tests, pre-landing review, version bump, changelog, bisectable commits, PR     |
+| [ship-workflow](skills/ship-workflow/)           | Resumable shipping lifecycle — dirty or committed work through logical commits, PR, current CI and review gates, guarded merge, and proof-based cleanup; narrower requests keep their endpoint, and no version or changelog changes |
 | [engineering-retro](skills/engineering-retro/)   | Git-based engineering retrospective — commit analysis, velocity metrics, session patterns, health scoring over time windows |
 | [adr-writer](skills/adr-writer/)                 | Architecture Decision Records — context capture, alternatives analysis, consequence projection, status lifecycle            |
 | [api-docs-generator](skills/api-docs-generator/) | API documentation audit and enhancement — FastAPI docstrings, Pydantic examples, OpenAPI spec enrichment, coverage reports  |
@@ -250,6 +250,7 @@ Skills below are superseded by base model capabilities. They remain installable 
 | [evolve](commands/evolve/)               | Co-evolutionary skill generation |
 | [handoff](commands/handoff/)             | Refresh or scaffold `.docs/handoff.md` |
 | [route](commands/route/)                 | Package discovery and task-to-package routing |
+| [ship](commands/ship/)                   | Ship work through the ship-workflow lifecycle — full ship to cleanup by default, narrower endpoints on request |
 | [stack-pr](commands/stack-pr/)           | Stacked PR workflow command surface |
 | [decision-map](commands/decision-map/)           | Slash-command surface for charting and working decision maps |
 | [librarian](commands/librarian/)         | Explicit capture, status, and review for reusable skill observations |
@@ -289,7 +290,7 @@ Presets install curated bundles of passive packages (rules, hooks, commands) in 
 | [skill-evolution](presets/skill-evolution/) | 6 skills, 1 agent, 1 command               | EvoSkills pipeline — co-evolutionary skill factory with paper-to-skill, distillation, and verification. |
 | [terse-mode](presets/terse-mode/)       | 1 hook                                           | Terse output enforcement via prompt-context hook with compaction-immune rule injection.          |
 | [session-continuity](presets/session-continuity/) | 1 skill, 1 command, 1 hook          | Atomic handoff install: `/handoff`, greenfield scaffold, and opt-in Stop refresh gated by `.docs/handoff.md`. |
-| [stack-workflow](presets/stack-workflow/) | 3 skills, 1 command, 2 hooks                     | Stacked PR workflow stack with topology management, guard hooks, and review gates.               |
+| [stack-workflow](presets/stack-workflow/) | 4 skills, 1 command, 2 hooks                     | Complete stacked PR bundle with topology policy, lifecycle execution, guard hooks and review gates. |
 
 ### Deprecated Presets
 
@@ -301,7 +302,7 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 | [media-craft](presets/media-craft/)       | `media-producer` agent                          |
 | [content-ops](presets/content-ops/)       | `content-strategist` agent                      |
 | [research](presets/research/)             | `research-analyst` agent                        |
-| [eng-ops](presets/eng-ops/)               | `release-captain` + `full-stack-builder` agents |
+| [eng-ops](presets/eng-ops/)               | `ship-workflow` skill + `release-captain` + `full-stack-builder` agents |
 
 ---
 
@@ -480,7 +481,7 @@ uv run scripts/validate_agentskills.py           # Warnings only (default)
 uv run scripts/validate_agentskills.py --strict   # Extra fields are errors
 ```
 
-All 76 skills pass with 0 errors. The validator checks the 6-field frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
+The validator checks discovered skills against the agentskills.io frontmatter spec (name, description, license, compatibility, metadata, allowed-tools) and flags Claude Code-specific fields as warnings.
 
 ---
 

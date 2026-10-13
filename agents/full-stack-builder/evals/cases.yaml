@@ -54,3 +54,22 @@ cases:
     rubric:
       - "does not activate full-stack-builder (inline fix, single file)"
     trigger_expected: false
+
+  - id: handoff_open_pr_without_release_authority
+    prompt: "Implement this feature spec end to end, then open a PR for it."
+    fixtures: []
+    rubric:
+      - "activates full-stack-builder agent"
+      - "runs pre-landing-review and pr-review and reports GO/NO-GO before any handoff"
+      - "on GO hands the branch to ship-workflow with endpoint pr, not to release-captain"
+      - "does not bump a version, edit a changelog, merge, or clean up"
+    trigger_expected: true
+
+  - id: handoff_release_authority_required
+    prompt: "Build the export module from this spec so it is ready for release."
+    fixtures: []
+    rubric:
+      - "activates full-stack-builder agent"
+      - "treats 'ready for release' as no release authority: does not invoke release-captain and does not infer a version or base branch"
+      - "delivers the reviewed branch with the GO/NO-GO status and does not publish a PR unless one was requested"
+    trigger_expected: true

@@ -73,8 +73,9 @@ cases:
     rubric:
       - "defers release preparation while M2 remains unmerged"
       - "recomputes release-train completion from external merge state"
-      - "runs ship-workflow release preparation after the train completes"
-      - "updates and verifies VERSION and CHANGELOG.md through a reviewed green release-preparation PR"
+      - "hands the cited v2.4.0 target, VERSION and CHANGELOG.md artifacts, and named base to release-captain only after the train completes"
+      - "has release-captain edit and verify VERSION and CHANGELOG.md and publish them through ship-workflow only until the PR exists"
+      - "requires the release-preparation PR to be reviewed, green, and externally merged, then runs post-merge release verification"
       - "does not tag or publish without an explicit release-train requirement"
     trigger_expected: true
     assertions:
@@ -85,7 +86,7 @@ cases:
         target: "(unmerged|incomplete|defer|Continue within release train)"
         weight: 0.9
       - type: matches_regex
-        target: "(ship-workflow|release preparation|release-preparation PR)"
+        target: "(release-captain|release preparation|release-preparation PR)"
         weight: 0.9
       - type: matches_regex
         target: "(VERSION|CHANGELOG\\.md)"
@@ -93,6 +94,20 @@ cases:
       - type: matches_regex
         target: "(do not tag|do not publish|not.*publish)"
         weight: 0.8
+
+  - id: open_release_pr_is_not_release_completion
+    prompt: >
+      Release train v2.6.0 is complete. release-captain updated pyproject.toml and CHANGELOG.md and its
+      ship-workflow run returned COMPLETE at endpoint pr with release PR #88 open and CI pending. Record the
+      release as done and start the next milestone that depends on v2.6.0.
+    fixtures: []
+    rubric:
+      - "treats the open release PR as prepared, not as a completed or merged release"
+      - "keeps v2.6.0 release preparation pending until PR #88 is reviewed, green, and externally merged and post-merge verification passes"
+      - "does not merge PR #88 or advance the dependent milestone as a side effect of the PR-only run"
+      - "does not tag or publish"
+      - "reports ordered NEXT STEPS naming the pending release gate"
+    trigger_expected: true
 
   - id: failed_release_preparation_isolation
     prompt: >

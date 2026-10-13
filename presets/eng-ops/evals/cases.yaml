@@ -3,7 +3,7 @@ cases:
     prompt: "Set up a complete build-test-ship pipeline for our engineering team."
     fixtures: []
     rubric:
-      - "does not activate eng-ops preset (deprecated — use release-captain and full-stack-builder agents)"
+      - "does not activate eng-ops preset (deprecated — use the ship-workflow skill or /ship for shipping, full-stack-builder for implementation, and release-captain only for explicit release preparation)"
     trigger_expected: false
 
   - id: negative_security_audit_not_eng_ops

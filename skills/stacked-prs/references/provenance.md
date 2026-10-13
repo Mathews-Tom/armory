@@ -113,60 +113,46 @@ Trailer survival depends on merge mode and, for squash, on the repository's
 squash message policy — not on a blanket "squash discards messages"
 assumption.
 
-| Merge mode | Commit messages | Trailers survive |
+| Merge method | Commit messages | Trailers survive |
 | --- | --- | --- |
-| `gh pr merge --merge` | Original commits preserved | Yes, automatically |
-| `gh pr merge --rebase` | Original commits replayed | Yes, automatically |
-| `gh pr merge --squash`, policy `COMMIT_MESSAGES` (GitHub default) | Every squashed commit's full message concatenated | Yes, automatically, once per squashed commit |
-| `gh pr merge --squash`, policy `PR_BODY` | PR body only | Only if the PR body carries the trailers |
-| `gh pr merge --squash`, policy `BLANK` | Discarded | No; fold trailers in with `--body` |
+| `merge` | Original commits preserved | Yes, automatically |
+| `rebase` | Original commits replayed | Yes, automatically |
+| `squash`, policy `COMMIT_MESSAGES` (GitHub default) | Every squashed commit's full message concatenated | Yes, automatically, once per squashed commit |
+| `squash`, policy `PR_BODY` | PR body only | Only if the PR body carries the trailers |
+| `squash`, policy `BLANK` | Discarded | No |
 
 Merge mode affects only the trunk's landing commit. A child's own commits are
 promoted with their messages unchanged whichever mode landed its parent, and
 cleanup relies on the landing proof in `references/merge-discipline.md`, not on
 trailers.
 
-Detect the repo's squash message policy before merging, not merely whether
-squash is allowed:
+Detect the repo's squash message policy before choosing a node's merge
+method, not merely whether squash is allowed:
 
 ```bash
 gh api repos/{owner}/{repo} \
   --jq '{title: .squash_merge_commit_title, message: .squash_merge_commit_message}'
 ```
 
-- `COMMIT_MESSAGES` (GitHub's default): trailers survive automatically. No
-  `--body` override needed.
-- `PR_BODY`: trailers survive only if the PR body includes them; use the
-  squash-body path below.
-- `BLANK`: trailers are always discarded; use the squash-body path below or
-  switch to `--merge`/`--rebase`.
+- `COMMIT_MESSAGES` (GitHub's default): trailers survive a squash
+  automatically.
+- `PR_BODY`: trailers survive a squash only if the PR body includes them. For
+  a stack the skill created, put them in each PR body while publishing;
+  otherwise decide `merge` or `rebase`.
+- `BLANK`: trailers are always discarded by a squash; decide `merge` or
+  `rebase`.
 
-The executable merges each node with the method its decision authorizes and the
-repository allows, bound to the verified head, without overriding the squash
-commit title or message and never with merge-time branch deletion. Under
-`PR_BODY` or `BLANK`, a decision that needs trailers in trunk history selects
-`merge` or `rebase`.
-
-For a hand-run squash of a stack the skill created, when
-`squash_merge_commit_message` is `PR_BODY` or `BLANK`, inject the trailers into
-the squash commit body:
-
-```bash
-gh pr merge <pr> --squash \
-  --match-head-commit <head-oid> \
-  --subject "<pr-title>" \
-  --body "$(printf '%s\n\n%s\n%s' \
-    '<pr-summary>' \
-    'Stack-Id: <stack-id>' \
-    'Stack-Position: <n>/<total>')"
-```
-
-The squash body override writes only the landing commit message; it does not
-edit the PR. For an existing published stack, do not inject trailers it never
+The delegated `ship-workflow` stack run merges each node with the method its
+decision authorizes and the repository allows, bound to the verified head,
+without overriding the squash commit title or message and never with
+merge-time branch deletion. When only squash is allowed under `BLANK`, or
+under `PR_BODY` for a stack whose PR bodies lack the trailers, losing them in
+trunk history is a provenance decision for the user, never a silent default.
+For an existing published stack, do not add trailers to PR bodies it never
 carried.
 
-A GitHub-native stack is merged with one `merge-async` request
-(`references/github-native.md` § Merge). Its `merge_method` applies to direct
+A GitHub-native stack is landed with one `merge-async` request by the delegated
+run (`references/github-native.md` § Landing policy). Its `merge_method` applies to direct
 merges only; `commit_title` and `commit_message` exist but are direct-merge-only
 too, and Armory sends neither. A queue request omits all three, and the queue
 rules select the method. Under `COMMIT_MESSAGES` a squash is safe by default;
@@ -184,5 +170,5 @@ gh api repos/{owner}/{repo} \
   --jq '{merge: .allow_merge_commit, squash: .allow_squash_merge, rebase: .allow_rebase_merge}'
 ```
 
-If only squash is allowed, take the squash-body path (or confirm
-`COMMIT_MESSAGES`). Otherwise prefer `--merge`.
+If only squash is allowed, confirm `COMMIT_MESSAGES` or follow the `PR_BODY`
+and `BLANK` rules above. Otherwise prefer `merge`.

@@ -65,12 +65,12 @@ checked out and takes no PR argument, so it fails with `current branch
 "<branch>" is not part of a stack` when run from any other branch, including
 the stack's own base branch.
 
-If the probe cannot run, treat a later synchronous merge rejection ("must be
-merged using the asynchronous merge REST API") as authoritative detection:
-stop the manual path, re-inspect, and continue with
-`references/github-native.md` § Merge rather than reporting failure.
+If the probe cannot run, membership is unknown: record `native: unknown` and
+do not author a landing packet until it is known. The delegated run classifies
+membership itself and stops a selection whose stack number, position, size or
+base it cannot read.
 
-A native member is never handled by the manual graph path described in this reference set: no ordinary merge, promotion push or retarget is dispatched for it, and a manual stack is never converted to a native one (or back) automatically. Native members are merged only through the guarded `merge-async` prefix request in `references/github-native.md` § Merge.
+A native member is never handled by the manual graph path described in this reference set: no ordinary merge, promotion push or retarget is dispatched for it, and a manual stack is never converted to a native one (or back) automatically. Native members are landed only through the guarded prefix request described in `references/github-native.md` § Landing policy.
 
 ## Required Model
 
@@ -91,7 +91,7 @@ Represent each stack node with:
 
 ## Explicit Stack Decision Packet
 
-The executable owner of manual graph continuation is `skills/ship-workflow` `scripts/ship.py --stack-plan PATH [--until pr|merged|clean] [--dry-run] [--resume [RUN_ID]] [--wait-timeout SECONDS] [--repo [HOST/]OWNER/REPO]`; a saved graph run also resumes with `--resume RUN_ID` alone. `--until pr` only observes, `merged` lands without deleting branches, and `clean` (the default for a new run) also cleans up. The packet is a bounded JSON file read only from the path given with `--stack-plan`. It is never discovered or auto-loaded from the repository and is not a repository policy language. `--stack-plan` cannot be combined with the single-PR target, publication and planning flags (`--pr`, `--branch`, `--plan`, `--policy`, `--gates`, `--head-repo`, `--title`, `--body-file`, `--inventory`, `--draft`).
+The executable owner of manual and native graph continuation is the installed `ship-workflow` skill: `scripts/ship.py --stack-plan PATH [--until pr|merged|clean] [--dry-run] [--resume [RUN_ID]] [--wait-timeout SECONDS] [--repo [HOST/]OWNER/REPO]`, run from the absolute base directory the client reports when that registered skill loads, never from a source checkout or a path relative to this package. A missing `ship-workflow` skill is `BLOCKED` naming it. A saved graph run also resumes with `--resume RUN_ID` alone. `--until pr` only observes, `merged` lands without deleting branches, and `clean` (the default for a new run) also cleans up. The packet is a bounded JSON file read only from the path given with `--stack-plan`. It is never discovered or auto-loaded from the repository and is not a repository policy language. `--stack-plan` cannot be combined with the single-PR target, publication and planning flags (`--pr`, `--branch`, `--plan`, `--policy`, `--gates`, `--head-repo`, `--title`, `--body-file`, `--inventory`, `--draft`).
 
 ```json
 {
