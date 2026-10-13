@@ -57,6 +57,8 @@ Conventions the gate engine relies on
   GitHub with an unknown result (timeout, transport failure, signal,
   unrecognised failure); every other failure is a definite refusal or the
   command was never dispatched.  Stale head/base refusals are ``WAITING``.
+* ``retarget_pr`` sends one never-retried base-only ``PATCH .../pulls/<n>``
+  between authoritative ``read_pr`` checks; GitHub offers no atomic head/base guard.
 * ``queue_state`` answers only for the expected head: ``QUEUED`` (a merge-queue
   entry exists), ``AUTO_MERGE`` (auto-merge is armed, no entry yet) or ``IDLE``
   (GraphQL and REST agree that neither exists).  Head drift, a PR that is no
@@ -1398,6 +1400,157 @@ class GitHub:
             raise _merge_failure(
                 op, proc.returncode, proc.stderr.decode("utf-8", "replace")
             )
+
+    def retarget_pr(
+        self, number: int, base_ref: str, expected_head: str, expected_old_base: str
+    ) -> PullRequest:
+        """Move open PR ``number`` from ``expected_old_base`` to ``base_ref`` (never retried).
+
+        GitHub documents no atomic head/base guard for a pull request base
+        edit: the authoritative ``read_pr`` before and after the single
+        base-only ``PATCH .../pulls/<n>`` narrow the race but do not remove it.
+        Callers hold the common-directory mutation lock and a durable intent
+        before calling, never resend an unknown outcome blind, and renew gates
+        afterwards: a new base changes GitHub's diff and test context.  An open
+        PR already on ``base_ref`` at ``expected_head`` is returned without
+        dispatch (provider auto-retarget or an earlier unknown outcome).
+        Precheck drift (``retarget-state-changed`` / ``-head-changed`` /
+        ``-base-changed``) and definite 4xx refusals (``retarget-rejected``) are
+        not uncertain.  ``uncertain`` is true for a dispatch with an unknown
+        outcome and for every failed verification after GitHub accepted the
+        edit: as with ``merge``, a reread can lag an accepted request, so a
+        reread still on the old base is not proof of refusal.
+        """
+        _check_number(number)
+        _check_sha(expected_head, "expected head")
+        base, old = _branch_name(base_ref), _branch_name(expected_old_base)
+        for name in (base, old):
+            if (
+                name == "@"
+                or name.startswith(("-", ".", "/"))
+                or name.endswith((".", "/", ".lock"))
+                or re.search(r"[\s~^:?*\[\\]|\.\.|//|/\.|@\{|\.lock/", name)
+            ):
+                raise ValueError(f"invalid branch reference: {_clean(name, 80)!r}")
+        if base == old:
+            raise ValueError("the new base must differ from the expected old base")
+        op = f"retarget-pr:{self.full_name}#{number}"
+        before = self.read_pr(number)
+        self._retarget_drift(op, before, expected_head, accepted=False)
+        if before.base_ref == base:
+            return before  # already there: auto-retarget or an earlier unknown outcome
+        if before.base_ref != old:
+            raise ProviderError(
+                f"{op}: the pull request base is {_clean(before.base_ref, 80)}, not the expected {old}; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="retarget-base-changed",
+            )  # fmt: skip
+        self._retarget_dispatch(
+            op,
+            (
+                "gh", "api", "--method", "PATCH", "--include", "--hostname", self.host,
+                "-H", "Accept: application/vnd.github+json",
+                "-H", f"X-GitHub-Api-Version: {API_VERSION}",
+                "-f", f"base={base}",
+                f"{_repo_path(self.full_name)}/pulls/{number}",
+            ),
+        )  # fmt: skip
+        accepted = "GitHub accepted the base edit; reconcile with read_pr and never resend it blind"
+        try:
+            after = self.read_pr(number)
+        except ProviderError as exc:
+            raise ProviderError(
+                f"{op}: the pull request could not be reread ({_clean(str(exc), 160)}); {accepted}",
+                kind="WAITING", operation=op, uncertain=True, detail="retarget-unverified",
+            ) from exc  # fmt: skip
+        self._retarget_drift(op, after, expected_head, accepted=True)
+        if after.base_ref != base:
+            raise ProviderError(
+                f"{op}: the pull request base reads {_clean(after.base_ref, 80)}, not {base}; {accepted}",
+                kind="WAITING", operation=op, uncertain=True, detail="retarget-unverified",
+            )  # fmt: skip
+        return after
+
+    def _retarget_dispatch(self, op: str, argv: tuple[str, ...]) -> None:
+        """Run the one base-edit request; return only when GitHub answered 2xx."""
+        remaining = self._remaining()
+        if remaining is not None and remaining < MIN_MUTATION_WINDOW:
+            raise self._waiting(
+                op,
+                f"fewer than {MIN_MUTATION_WINDOW:g}s remain before the monitoring deadline; nothing was dispatched",
+                detail="retarget-not-dispatched",
+            )
+        timeout = CALL_TIMEOUT if remaining is None else min(CALL_TIMEOUT, remaining)
+        unsafe = "the base may have changed; reconcile with read_pr and never resend it blind"
+        try:
+            proc = self._runner(argv, timeout)
+        except FileNotFoundError as exc:
+            raise ProviderError(
+                f"{op}: the GitHub CLI 'gh' is not installed; nothing was dispatched",
+                kind="BLOCKED", operation=op, detail="missing-gh",
+            ) from exc  # fmt: skip
+        except subprocess.TimeoutExpired as exc:
+            raise ProviderError(
+                f"{op}: gh did not finish within {timeout:g}s; {unsafe}",
+                kind="WAITING", operation=op, uncertain=True, detail="retarget-uncertain-timeout",
+            ) from exc  # fmt: skip
+        except OSError as exc:
+            raise ProviderError(
+                f"{op}: running gh failed ({_clean(str(exc), 120)}); {unsafe}",
+                kind="BLOCKED", operation=op, uncertain=True, detail="retarget-unknown-outcome",
+            ) from exc  # fmt: skip
+        response = _split_response(proc.stdout)
+        status = response.status
+        if proc.returncode == 0 and status is not None and 200 <= status < 300:
+            return
+        failure = None if proc.returncode <= 0 else _failure(proc, response)
+        if failure is not None and failure.kind == "ratelimit":
+            raise self._waiting(
+                op,
+                f"rate limited; the base was not changed: {failure.detail}",
+                failure.status,
+                "retarget-rate-limited",
+            )
+        if (
+            failure is not None
+            and failure.kind == "blocked"
+            and failure.status is not None
+            and 400 <= failure.status < 500
+        ):
+            raise ProviderError(
+                f"{op}: HTTP {failure.status} GitHub refused the base edit: {failure.detail}",
+                kind="BLOCKED", operation=op, http_status=failure.status, detail="retarget-rejected",
+            )  # fmt: skip
+        reason = (
+            f"gh exited {proc.returncode} without a confirmed edit"
+            if failure is None
+            else failure.detail or "transport failure"
+        )
+        raise ProviderError(
+            f"{op}: {reason}; {unsafe}",
+            kind="WAITING", operation=op, uncertain=True,
+            http_status=None if failure is None else failure.status, detail="retarget-uncertain-transport",
+        )  # fmt: skip
+
+    @staticmethod
+    def _retarget_drift(
+        op: str, pr: PullRequest, expected_head: str, *, accepted: bool
+    ) -> None:
+        """Refuse a PR that is not open at ``expected_head``; ``accepted`` marks a post-edit read."""
+        tail = (
+            "GitHub accepted the base edit; reconcile with read_pr and never resend it blind"
+            if accepted
+            else "nothing was dispatched"
+        )
+        if pr.state != "OPEN":
+            raise ProviderError(
+                f"{op}: the pull request is {pr.state}, not open; {tail}",
+                kind="BLOCKED", operation=op, uncertain=accepted, detail="retarget-state-changed",
+            )  # fmt: skip
+        if pr.head_sha != expected_head:
+            raise ProviderError(
+                f"{op}: the pull request head moved to {pr.head_sha[:12]}, not the expected {expected_head[:12]}; {tail}",
+                kind="BLOCKED", operation=op, uncertain=accepted, detail="retarget-head-changed",
+            )  # fmt: skip
 
     def _require_merge_capability(self, op: str) -> None:
         """Prove, once, that the installed gh offers every flag the guarded merge needs."""

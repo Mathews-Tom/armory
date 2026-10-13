@@ -34,6 +34,7 @@ from state_store import (
     StateError,
     Store,
     Target,
+    validate_run_id,
 )
 
 Status = Literal["PLANNED", "COMPLETE", "WAITING", "NEEDS_JUDGMENT", "BLOCKED"]
@@ -46,6 +47,8 @@ EXIT_CODES: dict[str, int] = {
     "NEEDS_JUDGMENT": 4,
     "BLOCKED": 5,
 }
+# Cleanup retention reason for a ref an open PR still uses as head or base.
+OPEN_DEPENDENT_REASON = "an open PR uses this namespace/ref as head or base"
 
 
 @dataclass(frozen=True)
@@ -178,7 +181,7 @@ def load_decision(path: Path) -> Policy | Binding:
     binding = raw.get("binding")
     if not isinstance(binding, dict) or any(not isinstance(k, str) for k in binding):
         raise ValueError("binding must name a plan or an explicit head and base")
-    decision = _parse_decision(raw)
+    decision = parse_decision(raw)
     if set(binding) == {"plan"}:
         plan = binding["plan"]
         if not isinstance(plan, str) or re.fullmatch(r"[0-9a-f]{64}", plan) is None:
@@ -224,10 +227,10 @@ def load_policy(path: Path) -> Policy:
         raise ValueError(
             "head_sha and base_sha must bind full observed commit identities"
         )
-    return _parse_decision(raw).bound(str(revisions[0]), str(revisions[1]))
+    return parse_decision(raw).bound(str(revisions[0]), str(revisions[1]))
 
 
-def _parse_decision(raw: dict[str, object]) -> Decision:
+def parse_decision(raw: dict[str, object]) -> Decision:
     sources = _strings(raw.get("sources"), "sources", empty=False)
     expected = _strings(raw.get("expected_checks"), "expected_checks")
     skips = _strings(raw.get("allowed_skips", []), "allowed_skips")
@@ -555,6 +558,7 @@ def code_identity() -> str:
         "git_ops.py",
         "github_ops.py",
         "state_store.py",
+        "graph.py",
     ):
         digest.update(name.encode("ascii"))
         digest.update((Path(__file__).resolve().parent / name).read_bytes())
@@ -618,6 +622,8 @@ class _Execution:
         wait_timeout: float,
         store: Store,
         receipt: Receipt | None,
+        *,
+        run_id: str | None = None,
     ) -> None:
         self.git = git
         self.provider = provider
@@ -626,6 +632,7 @@ class _Execution:
         self.policy = policy
         self.store = store
         self.receipt = receipt
+        self.run_id = run_id
         self.initial = git.snapshot()
         self.latest: PullRequest | None = None
         self.base_tip: str | None = None
@@ -720,7 +727,7 @@ class _Execution:
     def _initialize(self, pr: PullRequest) -> None:
         if self.receipt is None:
             self.receipt = Receipt(
-                uuid.uuid4().hex,
+                self.run_id or uuid.uuid4().hex,
                 self.endpoint,
                 self.code,
                 self.policy.fingerprint if self.policy else None,
@@ -1228,7 +1235,7 @@ class _Execution:
         if candidate.namespace.lower() != self.record.head_repo.lower():
             return "outside the authorized head repository namespace"
         if (candidate.namespace.lower(), source) in open_refs:
-            return "an open PR uses this namespace/ref as head or base"
+            return OPEN_DEPENDENT_REASON
         if candidate.kind == "local":
             upstream = self.git.branch_upstream(branch)
             if (upstream is None) != (candidate.remote_branch is None):
@@ -2006,11 +2013,31 @@ def execute(
     wait_timeout: float,
     store: Store,
     receipt: Receipt | None = None,
+    *,
+    run_id: str | None = None,
 ) -> tuple[dict[str, object], int]:
+    """Reconcile PR ``number`` through ``endpoint``.
+
+    ``run_id`` preassigns the identity of the receipt a new run creates (a graph
+    coordinator journals it before dispatch); with a saved ``receipt`` it must be
+    that receipt's identity.
+    """
     if receipt is not None and receipt.target is None:
         raise ReceiptInputError(
             "saved run has no provider-confirmed PR target; publish its changeset first"
         )
+    if run_id is not None:
+        validate_run_id(run_id)
+        if receipt is not None and receipt.run_id != run_id:
+            raise ReceiptInputError("the preassigned run id is not the saved run's")
     return _Execution(
-        git, provider, number, endpoint, policy, wait_timeout, store, receipt
+        git,
+        provider,
+        number,
+        endpoint,
+        policy,
+        wait_timeout,
+        store,
+        receipt,
+        run_id=run_id,
     ).run()
