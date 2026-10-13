@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Ship local work or an existing PR through publication, landing and safe cleanup."""
+"""Ship local work or an existing PR through publication, landing and safe cleanup.
+
+An explicit --stack-plan packet, or the run id of a saved stack graph, instead
+continues an existing manual stack graph parent-first through the same per-PR
+landing and cleanup owner.
+"""
 
 from __future__ import annotations
 
@@ -38,9 +43,35 @@ from changeset import (
 )
 from git_ops import GitError, GitRepository, parse_remote_identity
 from github_ops import GitHub, ProviderError
+from graph import (
+    StackPlan,
+    execute_graph,
+    inspect_graph,
+    load_stack_plan,
+    resumed_plan,
+)
 from lifecycle import EXIT_CODES, Endpoint, load_decision
 from publish import Request, preview, ship
-from state_store import Receipt, ReceiptInputError, StateError, Store, validate_run_id
+from state_store import (
+    GraphJournal,
+    Receipt,
+    ReceiptInputError,
+    StateError,
+    Store,
+    validate_run_id,
+)
+
+# Single-PR selectors and inputs a stack graph run never takes.
+GRAPH_EXCLUDED = (
+    ("--pr", "pr"),
+    ("--branch", "branch"),
+    ("--plan", "plan"),
+    ("--policy", "policy"),
+    ("--gates", "gates"),
+    ("--head-repo", "head_repo"),
+    ("--title", "title"),
+    ("--body-file", "body_file"),
+)
 
 
 def run_namespace(record: Receipt) -> tuple[str, str] | None:
@@ -97,6 +128,92 @@ def infer_repository(git: GitRepository) -> tuple[str, str]:
             "remote identities are ambiguous; provide the actual PR base with --repo"
         )
     return next(iter(identities))
+
+
+def single_pr_selected(args: argparse.Namespace) -> bool:
+    """Whether a single-PR selector or input names the target of this invocation."""
+    return any(getattr(args, name) is not None for _, name in GRAPH_EXCLUDED)
+
+
+def resumed_graph(store: Store, args: argparse.Namespace) -> GraphJournal | None:
+    """The graph journal a bare ``--resume RUN_ID`` names once no receipt does.
+
+    Consulted only after the receipt lookup found nothing and only without any
+    single-PR selector or input, so every single-PR invocation keeps its receipt
+    lookup and never reads the graph journal directory.
+    """
+    if single_pr_selected(args):
+        return None
+    try:
+        return store.load_graph(args.resume)
+    except FileNotFoundError:
+        return None
+
+
+def find_graph(store: Store, resume: str, plan: StackPlan | None) -> GraphJournal:
+    """The graph journal ``--resume`` names, or the one unambiguous run of ``plan``."""
+    if resume != "unique":
+        kind = store.kind_of(resume)
+        if kind == "receipt":
+            raise ReceiptInputError("the run id names a single-PR run, not a graph")
+        if kind is None:
+            raise ReceiptInputError(
+                "missing graph journal: start the stack graph without --resume"
+            )
+        return store.load_graph(resume)
+    candidates = tuple(
+        journal
+        for journal in store.list_graphs()
+        if plan is None or journal.topology == plan.topology
+    )
+    pending = tuple(journal for journal in candidates if journal.status != "COMPLETE")
+    choices = pending if pending else candidates
+    if len(choices) != 1:
+        raise ReceiptInputError(
+            "saved stack graph run is missing or ambiguous; provide a run id"
+        )
+    return choices[0]
+
+
+def stack_graph(
+    git: GitRepository,
+    store: Store,
+    args: argparse.Namespace,
+    plan: StackPlan | None,
+    journal: GraphJournal | None,
+) -> tuple[dict[str, object], int]:
+    """Continue an explicit manual stack graph from --stack-plan and/or its run id.
+
+    ``journal`` is a graph run a bare ``--resume RUN_ID`` already loaded;
+    otherwise ``--resume`` selects the run of ``plan``.
+    """
+    stray = [flag for flag, name in GRAPH_EXCLUDED if getattr(args, name) is not None]
+    if stray:
+        raise ReceiptInputError(f"{', '.join(stray)} do not apply to a stack graph")
+    if journal is None and args.resume is not None:
+        journal = find_graph(store, args.resume, plan)
+    if journal is not None:
+        plan = resumed_plan(journal, plan)
+    if plan is None:
+        raise ReceiptInputError("a stack graph run needs --stack-plan or its run id")
+    if args.repo is not None:
+        host, repo = repository_selector(args.repo)
+        if (host, repo.lower()) != (plan.host, plan.repo.lower()):
+            raise ReceiptInputError("--repo does not match the stack plan repository")
+    endpoint: Endpoint
+    if args.until is not None:
+        endpoint = args.until
+    elif journal is not None:
+        endpoint = cast(Endpoint, journal.endpoint)
+    else:
+        endpoint = "clean"
+    deadline = time.monotonic() + args.wait_timeout
+    provider = GitHub(plan.host, plan.repo, deadline=deadline)
+    if args.dry_run:
+        return inspect_graph(git, provider, plan, endpoint, journal=journal), 0
+    return execute_graph(
+        git, provider, plan, endpoint, args.wait_timeout, store, journal
+    )
 
 
 def positive_number(value: str) -> int:
@@ -204,6 +321,12 @@ def main() -> int:
     )
     parser.add_argument("--title", help="title of a PR this run creates")
     parser.add_argument("--body-file", type=Path, help="body of a PR this run creates")
+    parser.add_argument(
+        "--stack-plan",
+        type=Path,
+        help="explicit stack graph decision packet (JSON): continue an existing "
+        "manual stack parent-first",
+    )
     args = parser.parse_args()
     if args.inventory or args.draft is not None:
         if args.inventory and args.draft is not None:
@@ -221,6 +344,7 @@ def main() -> int:
                     args.head_repo,
                     args.title,
                     args.body_file,
+                    args.stack_plan,
                 )
             )
             or args.dry_run
@@ -229,6 +353,11 @@ def main() -> int:
         if args.draft is not None and args.gates is None:
             parser.error("--draft requires the --gates decision packet")
         return planning(args.draft, args.gates)
+    if args.stack_plan is not None and single_pr_selected(args):
+        parser.error(
+            "--stack-plan excludes --pr, --branch, --plan, --policy, --gates, "
+            "--head-repo, --title and --body-file"
+        )
     if args.pr is not None and args.branch is not None:
         parser.error("--pr and --branch are mutually exclusive selectors")
     if (args.title is None) != (args.body_file is None):
@@ -239,6 +368,10 @@ def main() -> int:
         gates = load_gates(args.gates.resolve()) if args.gates else None
         body = args.body_file.resolve().read_bytes() if args.body_file else None
         head_repo = repository_selector(args.head_repo)[1] if args.head_repo else None
+        # Not resolved: the packet loader itself refuses a symbolic link.
+        stack_plan = (
+            load_stack_plan(args.stack_plan.absolute()) if args.stack_plan else None
+        )
     except (PlanError, ValueError, TypeError, OSError) as error:
         print(
             json.dumps({"schema_version": 1, "status": "BLOCKED", "error": str(error)})
@@ -247,6 +380,11 @@ def main() -> int:
     try:
         git = GitRepository(Path.cwd())
         store = Store(git.snapshot().common_dir)
+        graph_run: GraphJournal | None = None
+        if stack_plan is not None:
+            result, code = stack_graph(git, store, args, stack_plan, None)
+            print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+            return code
         receipt: Receipt | None = None
         selected = repository_selector(args.repo) if args.repo else None
         if args.resume is not None:
@@ -275,7 +413,8 @@ def main() -> int:
                 try:
                     receipt = store.load(args.resume)
                 except FileNotFoundError:
-                    if args.pr is None or args.until is None:
+                    graph_run = resumed_graph(store, args)
+                    if graph_run is None and (args.pr is None or args.until is None):
                         raise ReceiptInputError(
                             "missing receipt: provide --pr, --repo and --until to reconstruct scope"
                         ) from None
@@ -302,6 +441,10 @@ def main() -> int:
                             receipt.publication.host,
                             receipt.publication.base_repo,
                         )
+        if graph_run is not None:
+            result, code = stack_graph(git, store, args, None, graph_run)
+            print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+            return code
         if selected is None:
             selected = infer_repository(git)
         endpoint: Endpoint

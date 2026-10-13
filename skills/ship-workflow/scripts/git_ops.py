@@ -2,15 +2,20 @@
 
 Every command is an argv-vector ``git`` subprocess with an explicit working
 directory, a deadline, ``GIT_OPTIONAL_LOCKS=0`` and no repository-redirecting
-environment. Inspection never fetches, prunes, locks or writes. Anything that
-cannot be established raises :class:`GitError`; no method turns a failed or
-unknown observation into an empty success.
+environment. Inspection never fetches, prunes, locks or writes;
+:meth:`GitRepository.preview_three_way` copies three commits out through
+``git upload-pack`` into a private temporary repository and writes nothing
+here. Anything that cannot be established raises :class:`GitError`; no method
+turns a failed or unknown observation into an empty success.
 
 The mutation helpers (:meth:`GitRepository.fetch_base`,
+:meth:`~GitRepository.fetch_commit`,
 :meth:`~GitRepository.prepare_base_checkout`,
 :meth:`~GitRepository.delete_local_head`,
 :meth:`~GitRepository.delete_remote_head`,
-:meth:`~GitRepository.push_head` and
+:meth:`~GitRepository.push_head`,
+:meth:`~GitRepository.push_rewrite`,
+:meth:`~GitRepository.advance_local_branch` and
 :meth:`~GitRepository.remove_worktree`) change exactly the one named target.
 Each re-observes the live state first and rejects with :class:`GitRefused`,
 before changing anything, when a safety precondition does not hold. They never
@@ -30,10 +35,12 @@ import hashlib
 import os
 import re
 import shlex
+import shutil
 import signal
 import stat
 import subprocess
 import sys
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -82,6 +89,20 @@ _REDIRECTING_CONFIG_KEYS = frozenset({"core.worktree", "core.bare", "include.pat
 _MAX_CONFIG_ENV_ENTRIES = 4096
 
 _HASH_CHUNK = 1 << 20
+
+# An author/committer identity as ``git fsck`` accepts it: a non-empty name, an
+# email, a date without zero padding or overflow, and a zone.
+_IDENT_RE = re.compile(rb"[^<>\n\0]+ <[^<>\n\0]*> (?:0|[1-9][0-9]{0,17}) [+-][0-9]{4}")
+# A replay cannot sign; a slice commit carrying one of these is refused.
+_SIGNATURE_HEADERS = frozenset({b"gpgsig", b"gpgsig-sha256"})
+# The only headers a replayed commit is written with.
+_REPLAYED_HEADERS = frozenset(
+    {b"tree", b"parent", b"author", b"committer", b"encoding"}
+)
+# A slice with more commits than this is refused before anything is replayed.
+_MAX_SLICE_COMMITS = 256
+_OBJECT_FORMATS = frozenset({"sha1", "sha256"})
+_REPLAY_REFLOG = "ship-workflow: advance to the promoted head"
 
 
 class GitError(RuntimeError):
@@ -144,6 +165,65 @@ class Snapshot:
     worktrees: tuple[Worktree, ...]
     conflicts: tuple[str, ...] = ()
     operations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SliceCommit:
+    """One commit of a child's own slice, exactly as its raw object records it.
+
+    ``author`` is the complete author header value (``Name <email> epoch tz``)
+    and ``encoding`` the ``encoding`` header value, ``None`` when absent; a
+    replay writes both back byte-for-byte. ``message`` is every byte after the
+    header block, trailers and (missing) trailing newline included.
+    """
+
+    oid: str
+    parent: str
+    tree: str
+    author: bytes
+    encoding: bytes | None
+    message: bytes
+
+
+@dataclass(frozen=True)
+class Promotion:
+    """Proof that a child's own slice was replayed onto its parent's landing.
+
+    ``fork`` is the old parent head the slice sat on, ``old_head`` the child head
+    before the rewrite and ``landing`` the trunk tip it was replayed onto.
+    ``expected_tree`` is the clean three-way merge ``base=fork, ours=landing,
+    theirs=old_head``; ``new_head`` has exactly that tree, has ``landing`` as an
+    ancestor and holds ``commits`` linear commits with the original authors and
+    messages. ``slice_identity`` is the net delta identity of ``fork..old_head``
+    (see :meth:`GitRepository.whole_change_landed`); ``None`` only for a
+    net-empty slice, which :meth:`GitRepository.promote_slice` refuses.
+    """
+
+    fork: str
+    old_head: str
+    landing: str
+    expected_tree: str
+    new_head: str
+    commits: int
+    slice_identity: str | None
+
+
+@dataclass(frozen=True)
+class _CommitRecord:
+    """The parts of a raw commit a replay preserves, and what it cannot.
+
+    ``signatures`` names the signature headers present; ``unsupported`` every
+    other header that is not written back, and any header (other than a
+    signature) continued over several lines.
+    """
+
+    tree: str
+    parents: tuple[str, ...]
+    author: bytes
+    encoding: bytes | None
+    message: bytes
+    signatures: tuple[str, ...]
+    unsupported: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -442,6 +522,66 @@ def _parse_status(raw: bytes) -> tuple[_StatusEntry, ...]:
 
 def _length_prefixed(value: bytes) -> bytes:
     return len(value).to_bytes(8, "big") + value
+
+
+def _parse_commit(oid: str, raw: bytes) -> _CommitRecord:
+    """Split one raw commit object into the headers a replay needs and its message.
+
+    A continuation line (leading space) belongs to the header before it; only a
+    signature is expected to continue. The message is every byte after the
+    first blank line, unchanged.
+    """
+    end = raw.find(b"\n\n")
+    if end < 0:
+        raise GitError(f"commit {oid} has no header terminator")
+    values: dict[bytes, list[bytes]] = {}
+    continued: set[bytes] = set()
+    name = b""
+    for line in raw[:end].split(b"\n"):
+        if line.startswith(b" "):
+            if not name:
+                raise GitError(f"commit {oid} starts with a continuation line")
+            continued.add(name)
+            continue
+        name, sep, value = line.partition(b" ")
+        if not sep or not name:
+            raise GitError(f"commit {oid} has a malformed header line")
+        values.setdefault(name, []).append(value)
+    trees = values.get(b"tree", [])
+    authors = values.get(b"author", [])
+    committers = values.get(b"committer", [])
+    encodings = values.get(b"encoding", [])
+    if len(trees) != 1 or len(authors) != 1 or len(committers) != 1:
+        raise GitError(f"commit {oid} lacks exactly one tree, author and committer")
+    if len(encodings) > 1:
+        raise GitError(f"commit {oid} has more than one encoding header")
+    tree = trees[0].decode("ascii", "replace")
+    parents = tuple(p.decode("ascii", "replace") for p in values.get(b"parent", []))
+    for identity in (tree, *parents):
+        if _OID_RE.fullmatch(identity) is None:
+            raise GitError(f"commit {oid} names an invalid object id")
+    signatures = sorted(
+        header.decode("ascii") for header in values if header in _SIGNATURE_HEADERS
+    )
+    unsupported = {
+        header.decode("ascii", "replace")
+        for header in values
+        if header not in _REPLAYED_HEADERS and header not in _SIGNATURE_HEADERS
+    }
+    unsupported.update(
+        f"{header.decode('ascii', 'replace')} (multi-line)"
+        for header in continued
+        if header not in _SIGNATURE_HEADERS
+    )
+    return _CommitRecord(
+        tree=tree,
+        parents=parents,
+        author=authors[0],
+        encoding=encodings[0] if encodings else None,
+        message=raw[end + 2 :],
+        signatures=tuple(signatures),
+        unsupported=tuple(sorted(unsupported)),
+    )
 
 
 class GitRepository:
@@ -974,6 +1114,19 @@ class GitRepository:
 
     def _branch_in_use(self, branch: str) -> str | None:
         """Why ``refs/heads/<branch>`` must not be deleted now, or ``None``."""
+        reason = self._branch_held(branch)
+        if reason is not None:
+            return reason
+        if branch in self._remote_default_branches():
+            return "the default branch of a remote"
+        return None
+
+    def _branch_held(self, branch: str) -> str | None:
+        """Why local state holds ``refs/heads/<branch>``, or ``None``.
+
+        Held means checked out in any worktree, the branch of a rebase or bisect in
+        progress, or the common-directory HEAD. Reads no network.
+        """
         ref = f"refs/heads/{branch}"
         for entry in self._worktrees():
             if entry.branch == branch:
@@ -993,8 +1146,6 @@ class GitRepository:
             raise GitError("common-directory HEAD identity is unavailable")
         if common_head.stdout.rstrip(b"\n") == ref.encode():
             return "the common-directory primary/default HEAD"
-        if branch in self._remote_default_branches():
-            return "the default branch of a remote"
         return None
 
     def branch_upstream(self, branch: str) -> tuple[str, str] | None:
@@ -1108,6 +1259,60 @@ class GitRepository:
         if fetched != expected:
             raise GitError(
                 f"after the fetch {tracking} is {fetched}, not the expected {expected}",
+                uncertain=True,
+            )
+        return expected
+
+    def fetch_commit(self, remote: str, branch: str, expected_oid: str) -> str:
+        """Fetch the objects of ``remote``'s ``branch`` tip, exactly ``expected_oid``.
+
+        The remote must still advertise exactly ``expected_oid`` for
+        ``refs/heads/<branch>`` before anything is fetched; when the commit is
+        already available locally nothing is fetched at all. Otherwise only that
+        advertised branch is fetched, with ``--refmap=`` (the configured
+        remote-tracking refspecs are not applied) and no destination, so no
+        branch, remote-tracking ref, tag or ``FETCH_HEAD`` is written: the fetch
+        adds objects only. A plain advertised ref is used instead of a raw object
+        id because every server serves its advertised tips, while fetching an
+        unadvertised id depends on server configuration. The fetched objects are
+        unreferenced until the caller references them (``gc`` may prune them
+        after its expiry). ``expected_oid`` must resolve as a local commit
+        afterwards, else the outcome is ``uncertain``. The index, worktrees and
+        every user branch are untouched. Returns ``expected_oid``.
+        """
+        name = self._require_remote(remote)
+        short = self._validated_branch(branch)
+        expected = _require_oid(expected_oid, "expected branch tip")
+        source = f"refs/heads/{short}"
+        advertised = self._advertised_heads(name, source).get(source)
+        if advertised is None:
+            raise GitRefused(f"{name} does not advertise {source}; nothing was fetched")
+        if advertised != expected:
+            raise GitRefused(
+                f"{name} {source} is {advertised}, not the expected {expected}; "
+                "nothing was fetched"
+            )
+        if self.resolve_ref(expected) == expected:
+            return expected
+        self.run(
+            "-c",
+            "fetch.writeCommitGraph=false",
+            "fetch",
+            "--no-tags",
+            "--no-prune",
+            "--no-recurse-submodules",
+            "--no-write-fetch-head",
+            "--no-auto-gc",
+            "--no-auto-maintenance",
+            "--refmap=",
+            "--",
+            name,
+            source,
+        )
+        if self.resolve_ref(expected) != expected:
+            raise GitError(
+                f"after fetching {name} {source} the commit {expected} is not "
+                "available locally",
                 uncertain=True,
             )
         return expected
@@ -1358,6 +1563,50 @@ class GitRepository:
                 raise GitRefused(
                     f"{new} does not extend the published {ref}; rewriting it is not authorized"
                 )
+        self._leased_push(name, ref, new, expected_old)
+
+    def push_rewrite(
+        self, remote: str, branch: str, new_oid: str, expected_old: str
+    ) -> None:
+        """Move remote ``branch`` from exactly ``expected_old`` to ``new_oid``.
+
+        The rewrite-authorized sibling of :meth:`push_head`: ``new_oid`` need not
+        extend ``expected_old``. ``expected_old`` is required (never ``None``) and
+        must differ from ``new_oid``, and ``new_oid`` must be an available local
+        commit. The caller proves ``new_oid`` first (for a promoted slice:
+        :meth:`verify_promotion`). The remote must still advertise exactly
+        ``expected_old`` immediately before the push, else nothing is pushed. The
+        push carries only ``--force-with-lease=refs/heads/<branch>:<expected_old>``
+        (no other force), runs the repository's hooks, checks submodule commits
+        are published and is verified against the remote. A remote's default
+        branch is refused and nothing is retried. After a failure, a remote that
+        advertises ``new_oid`` is success; one that still advertises
+        ``expected_old`` after a definite refusal is :class:`GitRefused`; anything
+        else, or an unobservable remote, is ``uncertain``.
+        """
+        name = self._require_remote(remote)
+        short = self._validated_branch(branch)
+        new = _require_oid(new_oid, "new head")
+        old = _require_oid(expected_old, "expected remote head")
+        if old == new:
+            raise GitRefused(
+                f"the rewritten head {new} is the expected old head; nothing was pushed"
+            )
+        ref = f"refs/heads/{short}"
+        if self.resolve_ref(new) != new:
+            raise GitRefused(f"{new} is not an available local commit")
+        self._leased_push(name, ref, new, old)
+
+    def _leased_push(
+        self, name: str, ref: str, new: str, expected_old: str | None
+    ) -> None:
+        """Push ``new`` to ``ref`` under an explicit lease on ``expected_old``.
+
+        ``name``, ``ref`` and both identities are already validated. Refuses unless
+        the remote advertises exactly ``expected_old`` (``None``: absent) and ``ref``
+        is not its default branch; then dispatches once and reconciles the outcome
+        against the remote.
+        """
         advertised = self._advertised_heads(name, ref).get(ref)
         if advertised != expected_old:
             raise GitRefused(
@@ -1412,6 +1661,56 @@ class GitRepository:
                 f"{name} advertises {published} for {ref} after the push was accepted",
                 uncertain=True,
             )
+
+    def advance_local_branch(
+        self, branch: str, expected_old: str, new_oid: str
+    ) -> bool:
+        """Move local ``branch`` from exactly ``expected_old`` to ``new_oid``.
+
+        ``True`` when the branch was advanced. ``False``, with nothing changed,
+        when ``refs/heads/<branch>`` is absent, symbolic, no longer exactly
+        ``expected_old``, checked out in any worktree, held by a rebase or bisect
+        in progress or the common-directory HEAD. The move is an atomic
+        compare-and-swap (``update-ref <ref> <new> <old>``), so a branch that
+        moves between the check and the update survives. ``new_oid`` must be an
+        available local commit and differ from ``expected_old``. This primitive
+        does not judge ancestry: the caller passes the recorded old child head as
+        ``expected_old`` and a verified promotion as ``new_oid``. The index,
+        worktrees and every other branch are untouched.
+        """
+        name = self._validated_branch(branch)
+        old = _require_oid(expected_old, "expected branch OID")
+        new = _require_oid(new_oid, "new branch OID")
+        if old == new:
+            raise GitRefused(f"{new} is already the expected branch OID")
+        if self.resolve_ref(new) != new:
+            raise GitRefused(f"{new} is not an available local commit")
+        ref = f"refs/heads/{name}"
+        record = self._head_record(ref)
+        if record is None:
+            return False
+        oid, kind, symref = record
+        if symref or kind != "commit" or oid != old:
+            return False
+        if self._branch_held(name) is not None:
+            return False
+        result = self.run(
+            "update-ref", "--no-deref", "-m", _REPLAY_REFLOG, ref, new, old, check=False
+        )
+        after = self._head_record(ref)
+        current = None if after is None else after[0]
+        if result.returncode == 0:
+            if current != new:
+                raise GitError(
+                    f"{ref} is {current} after it was advanced to {new}", uncertain=True
+                )
+            return True
+        if current == old:
+            stderr = redact_credentials(result.stderr.decode("utf-8", "replace"))
+            raise GitError(
+                f"git update-ref failed and {ref} is unchanged: {stderr.strip()[:300]}"
+            )
+        return False
 
     def remove_worktree(
         self, path: Path, expected_head: str, expected_branch: str | None
@@ -1639,6 +1938,509 @@ class GitRepository:
         if not diff:
             return None
         return hashlib.sha256(diff).hexdigest()
+
+    # -- stack promotion ----------------------------------------------------
+
+    def three_way_tree(self, base: str, ours: str, theirs: str) -> str | None:
+        """Tree of the clean three-way merge of ``ours`` and ``theirs`` over ``base``.
+
+        Execution only: it writes objects into this repository. All three must be
+        full ids of available commits. Runs ``git merge-tree --write-tree
+        --merge-base=<base>``, which writes the merged trees and blobs (and
+        refreshes the modification time of objects that already exist) and
+        nothing else: no index, worktree, ref or merge state. Inspection uses
+        :meth:`preview_three_way` instead. ``None`` means the merge conflicts; a
+        conflict is never resolved. Needs Git 2.40 or later; an older Git, any
+        other failure or malformed output raises :class:`GitError`.
+        """
+        merge_base = self._require_commit(base, "merge base")
+        mine = self._require_commit(ours, "merge side")
+        other = self._require_commit(theirs, "merge side")
+        return self._merge_tree(merge_base, mine, other)
+
+    def preview_three_way(self, base: str, ours: str, theirs: str) -> str | None:
+        """:meth:`three_way_tree` of three local commits, writing nothing here.
+
+        For inspection and dry runs. The three commits must be available in this
+        repository (checked read-only). A private bare repository is created in a
+        fresh temporary directory outside this repository (refused when the
+        temporary location lies inside its git directory or a worktree), with
+        the same object format and no templates. It receives exactly the three
+        commits at depth 1 through ``git fetch`` from this repository's common
+        directory over protocol v2, whose ``upload-pack`` only reads (and serves
+        unreferenced commits too), with no tags, ``FETCH_HEAD``, submodule
+        recursion, commit-graph or automatic maintenance. The merge runs there and
+        the directory is always removed, also on failure. Nothing in this
+        repository is written: no object, ref, index, configuration, lock, file or
+        modification time.
+
+        The result is the cumulative three-way tree only: it does not prove the
+        per-commit replay of :meth:`promote_slice`, and the private repository has
+        none of this repository's local configuration or attributes (merge
+        drivers, rename settings), which the execution-time :meth:`three_way_tree`
+        sees. ``None`` means the merge conflicts. Every failure raises
+        :class:`GitError` (never ``uncertain``: nothing here was changed).
+        """
+        merge_base = self._require_commit(base, "merge base")
+        mine = self._require_commit(ours, "merge side")
+        other = self._require_commit(theirs, "merge side")
+        source = _real(self._common_dir())
+        protected = [source, _real(self._git_dir())]
+        protected.extend(_real(entry.path) for entry in self._worktrees())
+        location = _real(tempfile.gettempdir())
+        if any(_within(location, root) for root in protected):
+            raise GitRefused(
+                f"the temporary directory {location} lies inside the repository; "
+                "nothing was previewed"
+            )
+        scratch = tempfile.mkdtemp(prefix="ship-preview-")
+        try:
+            private = _real(scratch)
+            if any(_within(private, root) for root in protected):
+                raise GitRefused(
+                    f"the temporary directory {private} lies inside the repository; "
+                    "nothing was previewed"
+                )
+            scope = self._seed_preview(private, source, (merge_base, mine, other))
+            return self._merge_tree(merge_base, mine, other, *scope)
+        except GitError as exc:
+            if exc.uncertain:
+                raise GitError(
+                    f"the three-way preview did not finish; nothing here changed: {exc}"
+                ) from exc
+            raise
+        finally:
+            try:
+                shutil.rmtree(scratch)
+            except OSError as exc:
+                raise GitError(
+                    f"cannot remove the preview directory {scratch}: {exc.strerror}"
+                ) from exc
+
+    def _seed_preview(
+        self, private: str, source: str, commits: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        """Make ``private`` a bare repository holding ``commits`` from ``source``.
+
+        Returns the global options that select it. ``source`` (this repository's
+        common directory) is only read, by ``git upload-pack``.
+        """
+        reported = self.run("rev-parse", "--show-object-format").stdout
+        object_format = reported.decode("ascii", "replace").strip()
+        if object_format not in _OBJECT_FORMATS:
+            raise GitError(f"unsupported object format {object_format!r}")
+        scope = ("-C", private, f"--git-dir={private}")
+        self.run(
+            *scope,
+            "init",
+            "--quiet",
+            "--bare",
+            "--template=",
+            f"--object-format={object_format}",
+        )
+        self.run(
+            *scope,
+            "-c",
+            "protocol.version=2",
+            "-c",
+            "fetch.writeCommitGraph=false",
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "--no-write-fetch-head",
+            "--no-recurse-submodules",
+            "--no-auto-gc",
+            "--no-auto-maintenance",
+            "--depth=1",
+            "--",
+            source,
+            *commits,
+        )
+        for oid in commits:
+            seeded = self.run(
+                *scope,
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"{oid}^{{commit}}",
+                check=False,
+            )
+            received = seeded.stdout.decode("ascii", "replace").strip()
+            if seeded.returncode != 0 or received != oid:
+                raise GitError(f"the preview repository did not receive {oid}")
+        return scope
+
+    def _merge_tree(self, base: str, ours: str, theirs: str, *scope: str) -> str | None:
+        """``git [scope] merge-tree --write-tree`` of three verified commit ids."""
+        result = self.run(
+            *scope,
+            "merge-tree",
+            "--write-tree",
+            "--no-messages",
+            "-z",
+            f"--merge-base={base}",
+            ours,
+            theirs,
+            check=False,
+        )
+        if result.returncode == 129:
+            raise GitError(
+                "git merge-tree --write-tree --merge-base is unavailable; "
+                "Git 2.40 or later is required to prove a promotion"
+            )
+        if result.returncode not in (0, 1):
+            stderr = redact_credentials(
+                result.stderr.decode("utf-8", "replace").strip()
+            )
+            raise GitError(
+                f"git merge-tree failed (exit {result.returncode}): {stderr[:500]}"
+            )
+        tree_raw, terminator, rest = result.stdout.partition(b"\0")
+        tree = tree_raw.decode("ascii", "replace")
+        if not terminator or _OID_RE.fullmatch(tree) is None:
+            raise GitError("git merge-tree reported no valid tree")
+        if result.returncode == 1:
+            return None
+        if rest:
+            raise GitError("git merge-tree listed conflicts for a clean merge")
+        return tree
+
+    def slice_commits(self, fork: str, head: str) -> tuple[SliceCommit, ...]:
+        """The child's own commits ``fork..head``, oldest first. Read-only.
+
+        Reads objects only; writes nothing, so it is safe in inspection. ``fork``
+        must be a strict ancestor of ``head`` and the range one linear chain of
+        at most ``_MAX_SLICE_COMMITS`` (256) commits: every commit has exactly
+        one parent and the oldest one's parent is ``fork``. Refused with
+        :class:`GitRefused`: an empty or longer range, a merge or root commit,
+        any other topology, a signed commit (``gpgsig``/``gpgsig-sha256``: a
+        replay cannot sign it and never drops a signature, which would remove
+        provenance), any header a replay does not write back (anything but
+        tree, parent, author, committer and encoding, or one of those continued
+        over several lines), or an author identity ``git fsck`` would reject.
+        """
+        start = self._require_commit(fork, "fork point")
+        tip = self._require_commit(head, "slice head")
+        if start == tip:
+            raise GitRefused(f"the slice is empty: the fork point is the head {tip}")
+        if not self.is_ancestor(start, tip):
+            raise GitRefused(f"the fork point {start} is not an ancestor of {tip}")
+        commits: list[SliceCommit] = []
+        parent = start
+        for oid in self._linear_chain(start, tip):
+            record = self._commit_record(oid)
+            if record.parents != (parent,):
+                raise GitError(f"commit {oid} contradicts the listed history")
+            if record.signatures:
+                raise GitRefused(
+                    f"commit {oid} is signed ({', '.join(record.signatures)}); a "
+                    "replay cannot sign it and never drops a signature"
+                )
+            if record.unsupported:
+                raise GitRefused(
+                    f"commit {oid} carries {', '.join(record.unsupported)} "
+                    "header(s) that a replay cannot preserve"
+                )
+            if _IDENT_RE.fullmatch(record.author) is None:
+                raise GitRefused(
+                    f"commit {oid} has an author identity that cannot be written back"
+                )
+            commits.append(
+                SliceCommit(
+                    oid=oid,
+                    parent=parent,
+                    tree=record.tree,
+                    author=record.author,
+                    encoding=record.encoding,
+                    message=record.message,
+                )
+            )
+            parent = oid
+        return tuple(commits)
+
+    def promote_slice(self, fork: str, head: str, landing: str) -> Promotion:
+        """Replay the child's own slice ``fork..head`` onto ``landing``.
+
+        Execution only: it writes objects (merged trees and the replayed commits)
+        into this repository; no ref, index, worktree or checkout changes and no
+        hook runs. The expected result is the clean three-way merge
+        ``base=fork, ours=landing, theirs=head``; a conflict refuses and is never
+        resolved. Each slice commit, oldest first, is replayed with plumbing
+        only: its tree is the clean three-way merge of the commit over its own
+        parent onto the replayed tip, and its new commit object is composed from
+        the original author, ``encoding`` header and message bytes (trailers and
+        a missing trailing newline included) and written with ``git hash-object
+        -t commit -w``, then read back and compared byte-for-byte. The committer
+        is the repository's normal committer identity (``git var
+        GIT_COMMITTER_IDENT``, read once).
+
+        The replayed commits are unsigned, so the replay is refused before any
+        object is written when the effective configuration sets
+        ``commit.gpgSign`` (the caller's signing policy is never overridden or
+        bypassed) or when a slice commit is signed (see :meth:`slice_commits`).
+        A repository that requires signed commits needs a different,
+        caller-signed path; whether the provider requires signed commits is not
+        observable here. Also refused before any object is written: ``landing``
+        already an ancestor of ``head``, an unusable slice, a net-empty slice.
+        Refused after objects may have been written (never a ref): a conflicting
+        cumulative merge, a conflicting commit, or a commit that would become
+        empty on the landing (it is never dropped silently), and a result whose
+        tree is not the expected tree or whose ``landing..new_head`` is not one
+        linear chain of exactly the slice's commit count. Repeated calls give the
+        same result except for the committer timestamp.
+        """
+        start = self._require_commit(fork, "fork point")
+        old = self._require_commit(head, "child head")
+        target = self._require_commit(landing, "landing")
+        if self.signing_required():
+            raise GitRefused(
+                "commit.gpgSign requires signed commits and a plumbing replay cannot "
+                "sign them; nothing was written. A caller-signed path is required"
+            )
+        if self.is_ancestor(target, old):
+            raise GitRefused(f"{old} is already based on the landing {target}")
+        commits = self.slice_commits(start, old)
+        identity = self._net_change_identity(start, old)
+        if identity is None:
+            raise GitRefused(f"the slice {start}..{old} has no net change")
+        committer = self._committer_ident()
+        expected = self.three_way_tree(start, target, old)
+        if expected is None:
+            raise GitRefused(
+                f"replaying {start}..{old} onto {target} is a conflict; "
+                "it is never resolved automatically"
+            )
+        tip = target
+        tip_tree = self._tree_of(target)
+        for commit in commits:
+            tree = self.three_way_tree(commit.parent, tip, commit.oid)
+            if tree is None:
+                raise GitRefused(
+                    f"replaying {commit.oid} onto {tip} is a conflict; "
+                    "it is never resolved automatically"
+                )
+            if tree == tip_tree:
+                raise GitRefused(
+                    f"{commit.oid} would become empty on {target}; "
+                    "it is never dropped silently"
+                )
+            tip = self._replay(commit, tree, tip, committer)
+            tip_tree = tree
+        final_tree = self._tree_of(tip)
+        if final_tree != expected:
+            raise GitRefused(
+                f"the replayed slice has the tree {final_tree}, not the clean "
+                f"three-way tree {expected}"
+            )
+        if len(self._linear_chain(target, tip)) != len(commits):
+            raise GitRefused(f"{target}..{tip} does not hold exactly the slice")
+        return Promotion(
+            fork=start,
+            old_head=old,
+            landing=target,
+            expected_tree=expected,
+            new_head=tip,
+            commits=len(commits),
+            slice_identity=identity,
+        )
+
+    def verify_promotion(self, promotion: Promotion) -> None:
+        """Re-prove a recorded promotion from its identities; refuse any mismatch.
+
+        Read-only: nothing in this repository is written (the three-way tree is
+        recomputed with :meth:`preview_three_way`), so it is safe in inspection.
+        Checks, raising :class:`GitRefused` with the exact difference: every
+        recorded id is well-formed and every commit is available locally;
+        ``new_head`` has the tree ``expected_tree``; ``landing`` is an ancestor
+        of ``new_head`` and ``landing..new_head`` is one linear chain of exactly
+        ``commits`` non-merge commits carrying, in order, exactly the author,
+        ``encoding`` and message of the commits of ``fork..old_head`` (a usable
+        slice, see :meth:`slice_commits`) and no signature or other header;
+        ``slice_identity`` is the net delta identity of ``fork..old_head``; and
+        the clean three-way merge of the recorded ``fork``/``landing``/
+        ``old_head`` is still ``expected_tree``. The recorded ``expected_tree``
+        and ``new_head`` are never trusted on their own.
+        """
+        if not isinstance(promotion, Promotion):
+            raise GitRefused("a recorded promotion is required")
+        fork = _require_oid(promotion.fork, "recorded fork point")
+        old = _require_oid(promotion.old_head, "recorded old head")
+        landing = _require_oid(promotion.landing, "recorded landing")
+        expected = _require_oid(promotion.expected_tree, "recorded expected tree")
+        new = _require_oid(promotion.new_head, "recorded new head")
+        count = promotion.commits
+        if type(count) is not int or count < 1:
+            raise GitRefused("the recorded commit count must be a positive integer")
+        for what, value in (
+            ("fork point", fork),
+            ("old head", old),
+            ("landing", landing),
+            ("new head", new),
+        ):
+            if self.resolve_ref(value) != value:
+                raise GitRefused(
+                    f"the recorded {what} {value} is not an available local commit"
+                )
+        tree = self._tree_of(new)
+        if tree != expected:
+            raise GitRefused(
+                f"the new head {new} has the tree {tree}, not the recorded {expected}"
+            )
+        if not self.is_ancestor(landing, new):
+            raise GitRefused(f"the landing {landing} is not an ancestor of {new}")
+        replayed = self._linear_chain(landing, new)
+        originals = self.slice_commits(fork, old)
+        if len(replayed) != count or len(originals) != count:
+            raise GitRefused(
+                f"{landing}..{new} holds {len(replayed)} commit(s) and "
+                f"{fork}..{old} {len(originals)}, not the recorded {count}"
+            )
+        for original, oid in zip(originals, replayed, strict=True):
+            record = self._commit_record(oid)
+            if record.signatures or record.unsupported:
+                raise GitRefused(
+                    f"{oid} carries headers a replay of {original.oid} never writes"
+                )
+            if (record.author, record.message, record.encoding) != (
+                original.author,
+                original.message,
+                original.encoding,
+            ):
+                raise GitRefused(
+                    f"{oid} does not carry the exact author and message of "
+                    f"{original.oid}"
+                )
+        identity = self._net_change_identity(fork, old)
+        if identity != promotion.slice_identity:
+            raise GitRefused(
+                f"the recorded slice identity does not match {fork}..{old}"
+            )
+        recomputed = self.preview_three_way(fork, landing, old)
+        if recomputed != expected:
+            raise GitRefused(
+                f"the clean three-way tree of the recorded fork, landing and old "
+                f"head is {recomputed}, not the recorded {expected}"
+            )
+
+    def _linear_chain(self, start: str, tip: str) -> tuple[str, ...]:
+        """Commits ``start..tip`` oldest first; refused unless one linear chain.
+
+        A range of more than ``_MAX_SLICE_COMMITS`` commits is refused; at most
+        one commit beyond the bound is ever listed.
+        """
+        raw = self.run(
+            "rev-list",
+            "--topo-order",
+            "--reverse",
+            "--parents",
+            f"--max-count={_MAX_SLICE_COMMITS + 1}",
+            f"{start}..{tip}",
+        ).stdout
+        if raw and not raw.endswith(b"\n"):
+            raise GitError("unterminated rev-list output")
+        rows = [
+            line.decode("ascii", "replace").split(" ") for line in raw.split(b"\n")[:-1]
+        ]
+        if len(rows) > _MAX_SLICE_COMMITS:
+            raise GitRefused(
+                f"{start}..{tip} holds more than {_MAX_SLICE_COMMITS} commits; "
+                "a slice that long is never replayed"
+            )
+        for fields in rows:
+            if any(_OID_RE.fullmatch(field) is None for field in fields):
+                raise GitError("malformed rev-list record")
+            if len(fields) != 2:
+                kind = "root" if len(fields) == 1 else "merge"
+                raise GitRefused(
+                    f"{fields[0]} is a {kind} commit; {start}..{tip} is not one "
+                    "linear chain"
+                )
+        chain: list[str] = []
+        parent = start
+        for fields in rows:
+            if fields[1] != parent:
+                raise GitRefused(
+                    f"{start}..{tip} is not one linear chain at {fields[0]}"
+                )
+            chain.append(fields[0])
+            parent = fields[0]
+        if not chain or parent != tip:
+            raise GitRefused(f"{start}..{tip} is not one linear chain ending at {tip}")
+        return tuple(chain)
+
+    def _commit_record(self, oid: str) -> _CommitRecord:
+        return _parse_commit(oid, self.run("cat-file", "commit", oid).stdout)
+
+    def _tree_of(self, commit: str) -> str:
+        raw = self.run("rev-parse", "--verify", f"{commit}^{{tree}}").stdout
+        tree = raw.decode("ascii", "replace").strip()
+        if _OID_RE.fullmatch(tree) is None:
+            raise GitError("git returned an invalid tree id")
+        return tree
+
+    def signing_required(self) -> bool:
+        """Whether the effective configuration sets ``commit.gpgSign``. Read-only.
+
+        Repository, global, system and environment-supplied configuration all
+        count, as they do for ``git commit``. A plumbing replay cannot sign, so
+        :meth:`promote_slice` refuses when this holds and inspection reports it.
+        An unreadable or malformed value raises :class:`GitError`.
+        """
+        result = self.run(
+            "config", "--type=bool", "--get", "commit.gpgsign", check=False
+        )
+        if result.returncode == 1 and not result.stdout:
+            return False
+        if result.returncode != 0:
+            stderr = redact_credentials(result.stderr.decode("utf-8", "replace"))
+            raise GitError(
+                f"commit.gpgSign cannot be read: exit {result.returncode}: "
+                f"{stderr.strip()[:300]}"
+            )
+        value = result.stdout.rstrip(b"\n")
+        if value not in (b"true", b"false"):
+            raise GitError("git reported an unexpected commit.gpgSign value")
+        return value == b"true"
+
+    def _committer_ident(self) -> bytes:
+        """The committer identity Git gives a new commit here (``git var``)."""
+        raw = self.run("var", "GIT_COMMITTER_IDENT").stdout
+        if not raw.endswith(b"\n") or _IDENT_RE.fullmatch(raw[:-1]) is None:
+            raise GitError("git reported an unusable committer identity")
+        return raw[:-1]
+
+    def _replay(
+        self, commit: SliceCommit, tree: str, parent: str, committer: bytes
+    ) -> str:
+        """Write ``commit`` again as ``tree`` on ``parent``; return the new id.
+
+        The object is composed here from the original author, ``encoding`` and
+        message bytes and written with ``git hash-object -t commit -w``, which
+        refuses a malformed object; read back, it must be exactly those bytes.
+        """
+        encoding = (
+            b"" if commit.encoding is None else b"encoding %s\n" % commit.encoding
+        )
+        raw = b"".join(
+            (
+                b"tree %s\n" % tree.encode("ascii"),
+                b"parent %s\n" % parent.encode("ascii"),
+                b"author %s\n" % commit.author,
+                b"committer %s\n" % committer,
+                encoding,
+                b"\n",
+                commit.message,
+            )
+        )
+        written = self.run(
+            "hash-object", "-t", "commit", "-w", "--stdin", input_bytes=raw
+        ).stdout
+        new = written.decode("ascii", "replace").strip()
+        if _OID_RE.fullmatch(new) is None:
+            raise GitError("git hash-object returned an invalid commit id")
+        if self.run("cat-file", "commit", new).stdout != raw:
+            raise GitError(f"git stored {new} with other bytes than the replay")
+        return new
 
 
 def _lower_identity(identity: tuple[str, str] | None) -> tuple[str, str] | None:
