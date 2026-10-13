@@ -34,6 +34,7 @@ from state_store import (
     StateError,
     Store,
     Target,
+    validate_branch,
     validate_run_id,
 )
 
@@ -78,6 +79,28 @@ class Gate:
     status: GateStatus
     reason: str
     details: dict[str, object]
+
+
+@dataclass(frozen=True)
+class NativeLanding:
+    """Authority to verify the landing of one provider-MERGED native stack member.
+
+    Only the native stack owner passes it to :func:`execute`, for the member it
+    read in stack ``stack`` at ``position``. ``trunk`` is that stack's base, the
+    short branch name the provider lands every member on; a landed member keeps
+    its review base (``PullRequest.base_ref``), which is never the landing branch.
+    It never authorizes a merge: an OPEN native member stays BLOCKED with it.
+    """
+
+    trunk: str
+    stack: int
+    position: int
+
+    def __post_init__(self) -> None:
+        validate_branch(self.trunk, "native landing trunk")
+        for value in (self.stack, self.position):
+            if type(value) is not int or value <= 0:
+                raise ValueError("native stack number and position must be positive")
 
 
 def _strings(
@@ -258,13 +281,24 @@ def parse_decision(raw: dict[str, object]) -> Decision:
     )
 
 
-def evaluate(observation: Observation, policy: Policy | None) -> Gate:
-    """Decide from current identity, all applicable checks and provider policy."""
+def evaluate(
+    observation: Observation, policy: Policy | None, *, native_stack: bool = False
+) -> Gate:
+    """Decide from current identity, all applicable checks and provider policy.
+
+    ``native_stack`` is set only by the native stack owner evaluating one of its
+    members' own head against its current base, under the same rules; any other
+    native member is BLOCKED, and the native path evaluates only native members.
+    """
     pr = observation.pr
     if pr.state == "CLOSED":
         return Gate("BLOCKED", "PR is closed without a confirmed merge", {})
-    if pr.native:
+    if pr.native and not native_stack:
         return Gate("BLOCKED", "native membership requires the native stack path", {})
+    if native_stack and not pr.native:
+        return Gate(
+            "BLOCKED", "the native stack path evaluates only native members", {}
+        )
     if not observation.policy_known:
         return Gate(
             "BLOCKED",
@@ -559,6 +593,7 @@ def code_identity() -> str:
         "github_ops.py",
         "state_store.py",
         "graph.py",
+        "native_stack.py",
     ):
         digest.update(name.encode("ascii"))
         digest.update((Path(__file__).resolve().parent / name).read_bytes())
@@ -624,6 +659,7 @@ class _Execution:
         receipt: Receipt | None,
         *,
         run_id: str | None = None,
+        native: NativeLanding | None = None,
     ) -> None:
         self.git = git
         self.provider = provider
@@ -633,6 +669,7 @@ class _Execution:
         self.store = store
         self.receipt = receipt
         self.run_id = run_id
+        self.native = native
         self.initial = git.snapshot()
         self.latest: PullRequest | None = None
         self.base_tip: str | None = None
@@ -723,6 +760,40 @@ class _Execution:
         validate_namespace(self.git, self.provider.host, (pr.base_repo, pr.head_repo))
         self._facts(pr)
         return pr
+
+    def _native_member(self, pr: PullRequest) -> bool:
+        """Whether ``pr`` is the provider-MERGED native member the context names."""
+        native = self.native
+        if native is None or not pr.native:
+            return False
+        identity = (pr.native_stack_number, pr.native_stack_position)
+        return (
+            pr.number == self.number
+            and pr.state == "MERGED"
+            and identity == (native.stack, native.position)
+            and pr.native_stack_base == native.trunk
+        )
+
+    def _native_scope(self, pr: PullRequest) -> None:
+        """Native membership stays BLOCKED unless the context names this landing."""
+        if self.native is None:
+            if pr.native:
+                raise _Stop(
+                    "BLOCKED",
+                    "native membership cannot use the ordinary M1 path",
+                    "use the qualified native-stack owner; do not fall back to ordinary merge",
+                )
+            return
+        if not self._native_member(pr):
+            raise _Stop(
+                "BLOCKED",
+                "native landing context does not name this provider-MERGED native member",
+                "verify the member through the native stack owner once the provider reports it MERGED; never merge it here",
+            )
+
+    def _landing_ref(self, review_base: str) -> str:
+        """The branch a landing is verified on: the native trunk, else the PR base."""
+        return review_base if self.native is None else self.native.trunk
 
     def _initialize(self, pr: PullRequest) -> None:
         if self.receipt is None:
@@ -849,12 +920,7 @@ class _Execution:
     def _await_or_merge(self) -> PullRequest:
         while True:
             pr = self._read()
-            if pr.native:
-                raise _Stop(
-                    "BLOCKED",
-                    "native membership cannot use the ordinary M1 path",
-                    "use the qualified native-stack owner; do not fall back to ordinary merge",
-                )
+            self._native_scope(pr)
             if pr.state == "MERGED":
                 if pr.head_sha != self.record.head_sha:
                     raise _Stop(
@@ -1016,7 +1082,8 @@ class _Execution:
                 "intended base has no unambiguous associated Git remote",
                 "associate the actual base namespace and resume",
             )
-        tip = self.provider.base_tip(pr.base_ref)
+        landing_ref = self._landing_ref(pr.base_ref)
+        tip = self.provider.base_tip(landing_ref)
         self.base_tip = tip
         with self.store.mutation_lock():
             current = self._read()
@@ -1030,20 +1097,20 @@ class _Execution:
                     "landing identity changed during reconciliation",
                     "inspect the actual provider target before any checkout or deletion",
                 )
-            tracking = f"refs/remotes/{remote}/{pr.base_ref}"
+            tracking = f"refs/remotes/{remote}/{landing_ref}"
             if (
                 self.git.resolve_ref(tracking) != tip
                 or self.git.resolve_ref(tip) is None
             ):
                 operation = self._intent(
                     "fetch",
-                    f"{remote}:{pr.base_ref}",
+                    f"{remote}:{landing_ref}",
                     tip,
                     namespace=pr.base_repo,
-                    ref=f"refs/heads/{pr.base_ref}",
+                    ref=f"refs/heads/{landing_ref}",
                 )
                 self.mutation_attempted = True
-                self.git.fetch_base(remote, pr.base_ref, tip)
+                self.git.fetch_base(remote, landing_ref, tip)
                 self.mutation_confirmed = True
                 self._outcome(operation, "CONFIRMED", tip)
             if not self.git.is_ancestor(pr.merge_commit_sha, tip):
@@ -1054,13 +1121,13 @@ class _Execution:
                 )
             self.current_reachable = True
             self.record.merge_verified = True
-            retained = self._retained(pr.base_ref)
+            retained = self._retained(landing_ref)
             snapshot = retained.snapshot()
-            if snapshot.head != tip or snapshot.branch != pr.base_ref:
+            if snapshot.head != tip or snapshot.branch != landing_ref:
                 operation = self._intent("checkout", str(snapshot.root), tip)
                 self.mutation_attempted = True
                 self.checkout = retained.prepare_base_checkout(
-                    pr.base_ref, tip, snapshot
+                    landing_ref, tip, snapshot
                 )
                 self.mutation_confirmed = True
                 self._outcome(operation, "CONFIRMED", tip)
@@ -1212,12 +1279,13 @@ class _Execution:
     ) -> str | None:
         branch = candidate.branch
         source = candidate.source_branch
+        bases = {self.record.base_ref, self._landing_ref(self.record.base_ref)}
         if (
             candidate.kind == "local"
-            and branch == self.record.base_ref
+            and branch in bases
             or candidate.namespace is not None
             and candidate.namespace.lower() == self.record.repo.lower()
-            and source == self.record.base_ref
+            and source in bases
         ):
             return "intended retained base"
         if self.policy is not None and any(
@@ -1343,7 +1411,7 @@ class _Execution:
             pr
             for pr in closed
             if pr.state == "MERGED"
-            and not pr.native
+            and (not pr.native or self._native_member(pr))
             and pr.head_repo.lower() == candidate.namespace.lower()
             and pr.head_ref == candidate.source_branch
             and pr.base_repo.lower() == self.record.repo.lower()
@@ -1362,7 +1430,7 @@ class _Execution:
             pr = self.provider.read_pr(listed.number)
             if (
                 pr.state != "MERGED"
-                or pr.native
+                or (pr.native and not self._native_member(pr))
                 or pr.head_repo.lower() != candidate.namespace.lower()
                 or pr.head_ref != candidate.source_branch
                 or pr.base_repo.lower() != self.record.repo.lower()
@@ -1462,7 +1530,7 @@ class _Execution:
         if (
             current.common_dir != self.initial.common_dir
             or current.head != self.record.validation_sha
-            or current.branch != self.record.base_ref
+            or current.branch != self._landing_ref(self.record.base_ref)
             or current.fingerprint != self.checkout.fingerprint
             or current.dirty
             or current.operations
@@ -1557,7 +1625,7 @@ class _Execution:
         with self.store.mutation_lock():
             self._guard_checkout()
             if (
-                self.provider.base_tip(self.record.base_ref)
+                self.provider.base_tip(self._landing_ref(self.record.base_ref))
                 != self.record.validation_sha
             ):
                 raise _Stop(
@@ -1824,7 +1892,8 @@ class _Execution:
                 "saved completion no longer matches provider landing facts",
                 "reconcile the actual target; a receipt is not authoritative",
             )
-        self.base_tip = self.provider.base_tip(pr.base_ref)
+        landing_ref = self._landing_ref(pr.base_ref)
+        self.base_tip = self.provider.base_tip(landing_ref)
         if pr.merge_commit_sha is None or not self._reachable(
             pr.merge_commit_sha, self.base_tip
         ):
@@ -1848,10 +1917,10 @@ class _Execution:
                     "completed cleanup absence proof changed",
                     "inspect the new/retained refs; do not treat completion as deletion authority",
                 )
-        snapshot = self._retained(pr.base_ref).snapshot()
+        snapshot = self._retained(landing_ref).snapshot()
         if (
             snapshot.head == self.record.validation_sha
-            and snapshot.branch == pr.base_ref
+            and snapshot.branch == landing_ref
             and not snapshot.dirty
             and not snapshot.conflicts
             and not snapshot.operations
@@ -1945,6 +2014,7 @@ class _Execution:
                 )
             if self.endpoint == "pr" and self.receipt is None:
                 return self._finish("COMPLETE", None, "none", save=False)
+            self._native_scope(pr)
             self._initialize(pr)
             self.initialized = True
             if self._noop(pr):
@@ -1960,7 +2030,7 @@ class _Execution:
             self.checkout = retained.snapshot()
             if (
                 self.checkout.head != self.record.validation_sha
-                or self.checkout.branch != self.record.base_ref
+                or self.checkout.branch != self._landing_ref(self.record.base_ref)
                 or self.checkout.dirty
                 or self.checkout.operations
                 or self.checkout.conflicts
@@ -2015,12 +2085,22 @@ def execute(
     receipt: Receipt | None = None,
     *,
     run_id: str | None = None,
+    native: NativeLanding | None = None,
 ) -> tuple[dict[str, object], int]:
     """Reconcile PR ``number`` through ``endpoint``.
 
     ``run_id`` preassigns the identity of the receipt a new run creates (a graph
     coordinator journals it before dispatch); with a saved ``receipt`` it must be
     that receipt's identity.
+
+    A native stack member is BLOCKED, before any receipt is written, unless
+    ``native`` names it: then only a member the provider reports MERGED at that
+    stack number, position and base proceeds, and only to post-merge acceptance
+    and cleanup; it is never merged here. Its landing is fetched, proved
+    reachable and checked out on ``native.trunk`` instead of its review base,
+    which the receipt keeps recording as ``base_ref``. A native receipt is
+    therefore resumed only through the native stack owner holding the context;
+    resumed directly without it, it stays BLOCKED and is left unchanged.
     """
     if receipt is not None and receipt.target is None:
         raise ReceiptInputError(
@@ -2040,4 +2120,5 @@ def execute(
         store,
         receipt,
         run_id=run_id,
+        native=native,
     ).run()

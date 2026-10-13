@@ -165,12 +165,16 @@ The squash body override writes only the landing commit message; it does not
 edit the PR. For an existing published stack, do not inject trailers it never
 carried.
 
-For a GitHub-native stack merged with `gh stack merge`, no `--subject`/`--body`
-override exists (`references/github-native.md` § Merge). Under
-`COMMIT_MESSAGES` this is safe by default; under `PR_BODY` or `BLANK`, for a
-stack the skill created, fold the trailers into each PR body before merging so
-the squash captures them, or use `--merge-method merge`/`rebase` instead of
-squash.
+A GitHub-native stack is merged with one `merge-async` request
+(`references/github-native.md` § Merge). Its `merge_method` applies to direct
+merges only; `commit_title` and `commit_message` exist but are direct-merge-only
+too, and Armory sends neither. A queue request omits all three, and the queue
+rules select the method. Under `COMMIT_MESSAGES` a squash is safe by default;
+under `PR_BODY`, for a stack the skill created, fold the trailers into each PR
+body before merging so the squash captures them. Under `BLANK` trailers are
+lost: change the repository's policy first or merge directly with
+`merge_method=merge` or `rebase`. Under a merge queue, check the queue's method
+against this policy before enqueueing.
 
 Detect the repo's overall merge policy (which methods are allowed) separately,
 to choose a method at all:

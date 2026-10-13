@@ -55,19 +55,22 @@ gh api repos/{owner}/{repo}/pulls/<number> --jq '.stack'
 
 A plain `GET`; it mutates nothing and is safe to run for every open PR.
 Returns `null` when the PR is not part of a native stack, or an object with
-`number` (stack number), `size`, `position`, and `base.ref` when it is.
+`number` (stack number), `size`, `position`, and `base.ref` when it is. For a
+native PR, read the complete ordered membership with `gh api
+repos/{owner}/{repo}/stacks/<stack-number>` (`references/github-native.md` §
+Detecting an already-native stack).
 
 Do not use `gh stack view` for detection: it reads only the branch currently
 checked out and takes no PR argument, so it fails with `current branch
 "<branch>" is not part of a stack` when run from any other branch, including
 the stack's own base branch.
 
-If the probe cannot run, treat a later `mergePullRequest`/`merge-async`
-rejection ("must be merged using the asynchronous merge REST API") as
-authoritative detection and switch to `references/github-native.md` § Merge
-rather than reporting failure.
+If the probe cannot run, treat a later synchronous merge rejection ("must be
+merged using the asynchronous merge REST API") as authoritative detection:
+stop the manual path, re-inspect, and continue with
+`references/github-native.md` § Merge rather than reporting failure.
 
-A native member is never handled by the manual graph path described in this reference set: a node the provider reports as native is BLOCKED there, no ordinary merge is dispatched for it, and a manual stack is never converted to a native one (or back) automatically.
+A native member is never handled by the manual graph path described in this reference set: no ordinary merge, promotion push or retarget is dispatched for it, and a manual stack is never converted to a native one (or back) automatically. Native members are merged only through the guarded `merge-async` prefix request in `references/github-native.md` § Merge.
 
 ## Required Model
 

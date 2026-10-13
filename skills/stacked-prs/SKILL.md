@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization, merge order, cleanup, and optional GitHub-native stack support.'
 metadata:
-  version: 0.3.0
+  version: 0.3.1
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
@@ -25,7 +25,7 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 | `references/merge-discipline.md` | Bottom-up merge and branch cleanup rules | Merging or closing out a stack |
 | `references/metadata-format.md` | Optional metadata schema and validation rules | `.stack-prs.yaml` exists or inference is ambiguous |
 | `references/provenance.md` | Commit-trailer stack identity, stamping, verification, merge-mode coupling | Creating, splitting, syncing, or merging any stack |
-| `references/github-native.md` | Eligibility, `gh stack` operations, preview limits, and manual fallback | A GitHub-native stack is requested or detected |
+| `references/github-native.md` | Native detection, linking eligibility, guarded `merge-async` prefix merge, and manual fallback | A GitHub-native stack is requested or detected |
 
 ## When To Use
 
@@ -54,18 +54,21 @@ The package identity is provider-neutral. Git is the source of truth for branch 
 
 ## GitHub-native stack mode
 
-GitHub-native stacks are public preview and same-repository-only. They
-enhance manual Armory stacks; they do not replace provenance trailers,
-`.stack-prs.yaml`, or the provider-neutral workflow.
+GitHub-native stacks are same-repository-only. They enhance manual Armory
+stacks; they do not replace provenance trailers, `.stack-prs.yaml`, or the
+provider-neutral workflow.
 
 Native-stack membership is a provider-side property of a pull request, not a
 mode this skill chooses. Detect it for every stack PR during Inspect, before
-any merge planning, whether or not `github-native` mode was requested.
+any merge planning, whether or not `github-native` mode was requested: read
+`.stack` from `GET repos/{owner}/{repo}/pulls/<number>` and the complete
+ordered membership from `GET repos/{owner}/{repo}/stacks/<stack-number>`
+(`references/github-native.md` § Detecting an already-native stack).
 
 ### Creating native state (opt-in)
 
-Converting a manual stack to native with `gh stack link` is a mutation with
-public-preview risk. Use it only after this eligibility probe passes:
+Converting a manual stack to native with `gh stack link` is a provider
+mutation. Use it only after these eligibility checks pass:
 
 1. GitHub CLI plus `gh stack --help` succeeds; install `github/gh-stack` when absent.
 2. Native stack support is enabled for the repository; native exit code 9 falls
@@ -74,7 +77,7 @@ public-preview risk. Use it only after this eligibility probe passes:
    repository; reject forks and cross-repository stacks.
 4. Existing PR bases, local branch order, and `Stack-Id`/`Stack-Position`
    provenance agree. Stop on disagreement.
-5. The user explicitly requests native mode or accepts its public-preview risk.
+5. The user explicitly requests native mode.
 
 ### Operating on an already-native stack (mandatory)
 
@@ -84,9 +87,12 @@ mutation (`gh pr merge`, and the underlying `mergePullRequest`/`PUT
 .../pulls/{n}/merge`) for a stack member with "must be merged using the
 asynchronous merge REST API." There is no manual Armory merge path for an
 already-native stack; do not present one as an alternative. Conditions 1-4
-above still apply as safety checks; condition 5's user consent does not — a
-stack the provider already registered as native carries no additional
-preview risk beyond what already exists.
+above still apply as safety checks; condition 5's user consent does not — the
+provider already registered the stack as native.
+
+This section is the manual provider procedure. Native members are never merged
+by the ordinary single-PR path or by the manual graph path: no synchronous
+merge, no per-member request, and no fallback to either.
 
 When eligible or already native:
 
@@ -95,37 +101,48 @@ When eligible or already native:
 - Inspect both Armory provenance and the GitHub-native stack position.
 - Sync with `gh stack sync`; re-read `gh stack view` after every non-interactive
   sync and use `gh stack rebase` plus `gh stack push` for non-linear history.
-- Merge the entire stack only on an explicit user request; invoke
-  `gh stack merge --yes --merge-method <merge|squash|rebase>` with no
-  positional argument. For a partial prefix, require the exact highest PR
-  number and run `gh stack merge <pr-number> --yes --merge-method
-  <merge|squash|rebase>`. Outside a merge queue, GitHub merges every lower
-  layer atomically.
-- Before choosing `--squash`, check `gh api repos/{owner}/{repo} --jq
-  '.squash_merge_commit_message'`. Trailers survive automatically under
+- Merge only an explicitly authorized prefix: require the exact highest
+  selected PR number. Never infer a prefix and never widen it implicitly; the
+  provider operation includes every open member below the selected PR, so
+  refuse when an open lower member is outside the authorization.
+- Immediately before dispatch, re-read every member's head, base, checks and
+  provenance and the stack base's merge policy. Route on the stack base:
+  `merge_action=merge_queue` when it has a merge queue, `merge_action=direct_merge`
+  when its policy is fully known without one, and stop as blocked when it
+  cannot be read.
+- Send exactly one `PUT repos/{owner}/{repo}/pulls/<highest>/merge-async` with
+  `sha=<inspected head of <highest>>` and `bypass_rules=false`. `sha` guards
+  only the selected head; lower members' heads are not checked by the server.
+  A direct merge carries `merge_method`; a queue request omits
+  `merge_method`, `commit_title` and `commit_message` (the provider refuses
+  them with 422) and the queue rules choose the method.
+- Never resend the request. An unknown outcome (timeout, transport failure) is
+  reconciled from `GET .../pulls/<highest>/merge-async/<uuid>` and pull request
+  states; a 409 returns the existing request, and an immediate 200 can mean
+  already merged or already queued. `enqueued` is final for a queue request
+  and never means merged; queue members can land in separate merge groups.
+- Before choosing `merge_method=squash`, check `gh api repos/{owner}/{repo}
+  --jq '.squash_merge_commit_message'`. Trailers survive automatically under
   `COMMIT_MESSAGES` (GitHub's default). Under `PR_BODY` they survive only if
   every PR body already carries them. Under `BLANK` they are always lost and
-  `gh stack merge` has no `--subject`/`--body` override to fold them back in —
-  change the repository's policy first or merge with `--merge-method
-  merge`/`rebase` instead.
-- `gh stack merge` exposes no `--subject`/`--body`. With
-  `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a PR
-  squashing a single commit takes that commit's headline as the base-branch
+  Armory sends no `commit_title`/`commit_message` override — change the
+  repository's policy first or merge directly with `merge_method=merge` or
+  `rebase` instead. Under a merge queue, check the queue's method the same way.
+- With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (GitHub's default), a
+  PR squashing a single commit takes that commit's headline as the base-branch
   subject, not the PR title, and this cannot be corrected after merge without
   rewriting pushed history. When the visible subject matters for a
-  single-commit PR under `--merge-method squash`, align the commit headline
-  with the PR title first (`git commit --amend -m "<pr-title>"`, then
-  force-with-lease push) before running `gh stack merge`.
-- For a merge queue, method flags are ignored and stack members may land in
-  separate queue groups; require explicit queue acceptance and verify each group.
-- Re-fetch and verify the remaining stack topology, CI, and provenance after
-  GitHub's cascading rebase/retarget.
+  single-commit PR under a squash, align the commit headline with the PR title
+  first (`git commit --amend -m "<pr-title>"`, then force-with-lease push)
+  before the merge request.
+- Verify every selected member from its own pull request facts: `MERGED`, a landing reachable from the stack base, and a full landing tree equal to the clean three-way application of its reviewed own slice to the canonical-trunk base before that landing. A merged upper member keeps its review base (the lower member's branch); do not treat that as a contradiction or rewrite it.
+- Verify every retained open member after GitHub's retarget and rebase: the lowest retained member is based on the stack base; each higher one is based on the retained member immediately below it and contains that member's current head. Verify each full rebased tree and exact own-slice identity against that placement. Then re-fetch and verify the remaining topology, CI and provenance.
 
 Fall back to the manual workflow only when the stack is not yet native: the
-creation probe fails, the stack spans a fork, the preview surface is
-unavailable, or provider/trailer topology differs. Never silently switch
-modes mid-stack, and never attempt the manual merge path once Inspect has
-found the stack is already native.
+creation checks fail, the stack spans a fork, native support is unavailable,
+or provider/trailer topology differs. Never silently switch modes mid-stack,
+and never attempt the manual merge path once Inspect has found the stack is
+already native.
 
 ## Workflow
 
@@ -225,8 +242,8 @@ uv run python scripts/evaluate_package.py --path skills/stacked-prs
 
 Before merging, confirm the Inspect native-stack probe reported `null` for
 this PR. A non-null result means the provider already treats this stack as
-native; `gh pr merge` will be rejected outright — switch to the GitHub-native
-stack mode merge path above instead of continuing here.
+native; `gh pr merge` will be rejected outright — stop here and follow the
+GitHub-native guarded prefix merge above instead.
 
 Merge root to leaf:
 
@@ -347,7 +364,7 @@ Do not publish if the leaf differs from the source branch.
 | Top split branch differs from source | Stop before PR creation and report remaining diff |
 | Commit in stack range missing `Stack-Id` trailer | Stop; stamp via provenance backfill before merge |
 | Trailer `Stack-Id` differs from `.stack-prs.yaml` | Stop; resolve canonical ID before mutation |
-| PR is a detected native-stack member | Stop the manual merge path; use GitHub-native stack mode merge instead |
+| PR is a detected native-stack member | Stop the manual merge path; use the GitHub-native guarded `merge-async` prefix merge, never `gh pr merge` |
 | Squash repo with `PR_BODY`/`BLANK` message policy and trailers not present | Stop; use the squash-body merge path |
 | Local branch fails its merge-mode-appropriate proof (unmerged per `git branch --merged <base>` under a merge-commit landing, or shows `+` commits under `git cherry <base> <branch>` for a squash/rebase landing) | Stop; do not force-delete without explicit user instruction |
 

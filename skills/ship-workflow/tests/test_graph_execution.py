@@ -1244,7 +1244,7 @@ def test_dry_run_after_an_unreported_push_plans_its_reconciliation_read_only(
 # -- native membership ---------------------------------------------------------------
 
 
-def test_selected_native_member_blocks_the_whole_graph_before_any_merge(
+def test_selection_mixing_manual_and_native_members_is_blocked_before_any_write(
     world: GraphWorld,
 ) -> None:
     parent_and_child(world)
@@ -1278,6 +1278,29 @@ def test_unselected_native_sibling_is_left_untouched(world: GraphWorld) -> None:
     assert all(push[0] != "stack/s" for push in world.git.pushes)
     roles = {row["pr"]: row["role"] for row in rows(result, "nodes")}
     assert roles == {11: "selected", 12: "selected", 14: "retained"}
+
+
+def test_selected_node_turning_native_mid_run_is_blocked_before_its_retarget(
+    world: GraphWorld,
+) -> None:
+    parent, child = parent_and_child(world)
+
+    def join_native_stack() -> None:
+        world.forge.pulls[12].native = True
+
+    world.git.before_push = join_native_stack
+
+    result, code = world.run(world.plan(PAIR, {11, 12}), "merged")
+
+    assert (code, result["status"]) == (5, "BLOCKED"), result
+    assert "#12 became a native stack member" in str(result["blocker"])
+    new = promotion(world.journal(run_id(result)), 12).new_head
+    # The promotion push raced the provider change; nothing follows it.
+    assert world.git.pushes == [("stack/c", child, new)]
+    assert world.forge.merge_calls == [(11, parent, "squash")]
+    assert (world.forge.retarget_calls, world.forge.patches) == ([], [])
+    current = world.forge.current(12)
+    assert (current.state, current.base_ref) == ("OPEN", "stack/p")
 
 
 # -- controller concurrency, cancellation and sources --------------------------------

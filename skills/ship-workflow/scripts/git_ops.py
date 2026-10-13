@@ -1870,27 +1870,13 @@ class GitRepository:
             return False
         if self.is_ancestor(candidate, landed):
             return True
-        bases = self.run("merge-base", "--all", candidate, landed, check=False)
-        if bases.returncode == 1:
+        fork = self.merge_base(candidate, landed)
+        if fork is None:
             return False
-        if bases.returncode != 0:
-            raise GitError("git merge-base failed")
-        forks = [line for line in bases.stdout.split(b"\n") if line]
-        if len(forks) != 1:
-            return False
-        fork = forks[0].decode("ascii", "replace")
-        if _OID_RE.fullmatch(fork) is None:
-            raise GitError("git returned an invalid merge base")
         wanted = self._net_change_identity(fork, candidate)
         if wanted is None:
             return False
-        count_raw = self.run(
-            "rev-list", "--count", "--no-merges", f"{fork}..{candidate}"
-        ).stdout
-        try:
-            count = int(count_raw)
-        except ValueError:
-            raise GitError("git returned an invalid commit count") from None
+        count = self._change_commits(fork, candidate)
         for width in sorted({1, count}):
             if width < 1:
                 continue
@@ -1901,6 +1887,39 @@ class GitRepository:
             ):
                 return True
         return False
+
+    def landing_bases(self, base: str, head: str, landing: str) -> tuple[str, ...]:
+        """Where the trunk stood before ``landing`` put the change ``base..head`` on it.
+
+        The first parent of ``landing`` (one squash or merge commit, or a rebase
+        of a single commit) and, when the change has N > 1 non-merge commits, the
+        parent of the N-th linear first-parent commit back from ``landing`` (a
+        rebase replaying them one by one), the widths
+        :meth:`whole_change_landed` reads. Nothing is proved here: the caller
+        compares a tree over each candidate. Read-only; all three must be full
+        ids of available commits, and unknown or non-commit revisions raise.
+        """
+        start = self._require_commit(base, "change base")
+        tip = self._require_commit(head, "change head")
+        landed = self._require_commit(landing, "landing commit")
+        bases: list[str] = []
+        first = self.first_parent(landed)
+        if first is not None:
+            bases.append(first)
+        count = self._change_commits(start, tip)
+        if count > 1:
+            parent = self._landing_parent(landed, count)
+            if parent is not None and parent not in bases:
+                bases.append(parent)
+        return tuple(bases)
+
+    def _change_commits(self, base: str, head: str) -> int:
+        """The number of non-merge commits in ``base..head``."""
+        raw = self.run("rev-list", "--count", "--no-merges", f"{base}..{head}").stdout
+        try:
+            return int(raw)
+        except ValueError:
+            raise GitError("git returned an invalid commit count") from None
 
     def _require_commit(self, oid: str, what: str) -> str:
         value = _require_oid(oid, what)
@@ -1938,6 +1957,59 @@ class GitRepository:
         if not diff:
             return None
         return hashlib.sha256(diff).hexdigest()
+
+    def commit_tree(self, commit: str) -> str:
+        """The full tree id of available commit ``commit`` (a full id). Read-only."""
+        return self._tree_of(self._require_commit(commit, "commit"))
+
+    def first_parent(self, commit: str) -> str | None:
+        """The first parent of available commit ``commit``; None for a root commit.
+
+        Read-only. ``commit`` must be a full id; replacement objects and grafts
+        are whatever this repository's Git honours.
+        """
+        return self._peel_commit(f"{self._require_commit(commit, 'commit')}^1")
+
+    def merge_base(self, first: str, second: str) -> str | None:
+        """The single best common ancestor of two available commits (full ids).
+
+        Read-only. None when they share no history or when Git reports several
+        best common ancestors: an ambiguous fork point is never chosen.
+        """
+        one = self._require_commit(first, "commit")
+        two = self._require_commit(second, "commit")
+        bases = self.run("merge-base", "--all", one, two, check=False)
+        if bases.returncode == 1:
+            return None
+        if bases.returncode != 0:
+            raise GitError("git merge-base failed")
+        forks = [line for line in bases.stdout.split(b"\n") if line]
+        if len(forks) != 1:
+            return None
+        fork = forks[0].decode("ascii", "replace")
+        if _OID_RE.fullmatch(fork) is None:
+            raise GitError("git returned an invalid merge base")
+        return fork
+
+    def slice_identity(self, base: str, head: str) -> str:
+        """Identity of the exact net change from commit ``base`` to commit ``head``.
+
+        The SHA-256 of ``git diff-tree -r --raw -z --no-renames`` of the two
+        commits' trees: every changed path with both modes, both full object ids
+        (blobs, symlink targets and submodule gitlinks alike) and its change
+        status, byte for byte and binary-safe. Rename and copy detection are off
+        and no index, worktree, textconv or external diff is used, so the same
+        delta between any two commits has the same identity. Read-only. A
+        net-empty change has no own slice and is refused with
+        :class:`GitRefused`; unknown or non-commit revisions raise
+        :class:`GitError`.
+        """
+        start = self._require_commit(base, "slice base")
+        tip = self._require_commit(head, "slice head")
+        identity = self._net_change_identity(start, tip)
+        if identity is None:
+            raise GitRefused(f"the change from {start} to {tip} is empty")
+        return identity
 
     # -- stack promotion ----------------------------------------------------
 

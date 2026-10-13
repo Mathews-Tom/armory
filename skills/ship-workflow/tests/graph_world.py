@@ -4,8 +4,13 @@ A bare repository is the remote, one clone is the invoking checkout and another
 clone plays an external actor. :class:`GraphForge` models many pull requests over
 the bare repository: open heads and bases are its refs, it lands PRs with real
 squash, merge or rebase commits, keeps ``refs/pull/N/head`` and injects the
-provider faults a graph run must reconcile. It is a behavioural model for
-transition and error coverage only, not evidence of vendor behaviour.
+provider faults a graph run must reconcile. :class:`NativeStackForge` adds
+GitHub-native stacks over the same bare repository: stack listings, the trunk
+merge policy and ``merge-async`` requests with the prefix, guard, queue-option
+and in-progress semantics observed on GitHub and a modelled request expiry,
+landing each member with real Git commits and rebasing the open members above
+the landed prefix. Both are behavioural models for transition and error coverage
+only, not evidence of vendor behaviour.
 """
 
 from __future__ import annotations
@@ -13,7 +18,7 @@ from __future__ import annotations
 import subprocess
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -22,6 +27,10 @@ from git_ops import GitError
 from github_ops import (
     Check,
     GitHub,
+    NativeMergeInProgress,
+    NativeMergeResult,
+    NativeStack,
+    NativeTrunkPolicy,
     Observation,
     ProviderError,
     PullRequest,
@@ -59,6 +68,13 @@ PROVENANCE: dict[str, object] = {
 Result = dict[str, object]
 PushFault = Literal["none", "lost", "applied_lost"]
 RetargetFault = Literal["none", "lost", "applied_lost"]
+PutFault = Literal["none", "lost", "applied_lost"]
+RebaseFault = Literal["none", "drift", "extra", "lag", "retarget", "lowest"]
+PROVIDER_AUTHOR = ("Provider", "provider@example.invalid", "@1700000200 +0000")
+QUEUE_REFUSAL = (
+    "Custom merge params (merge_method, commit_title, commit_message) are not "
+    "supported with the merge_queue merge action"
+)
 
 
 @dataclass(frozen=True)
@@ -435,6 +451,341 @@ class GraphForge(GitHub):
 
     def branch_protected(self, full_name: str, ref: str) -> bool:
         return ref == TRUNK
+
+
+@dataclass
+class AsyncRequest:
+    """One modelled ``merge-async`` request: its options, prefix and progress."""
+
+    uuid: str
+    action: str
+    method: str | None
+    expected_head: str
+    prefix: tuple[int, ...]
+    status: str = "pending"
+    message: str = "Merge request accepted"
+    sha: str | None = None
+    landed: int = 0
+
+
+class NativeStackForge(GraphForge):
+    """GraphForge whose ``stacks`` (number -> PRs bottom to top) are native stacks.
+
+    ``start_native_merge`` merges the open prefix ending at the requested PR; its
+    ``sha`` guards only that PR's head. A queue trunk refuses a request carrying
+    a method (422) and keeps a request ``enqueued`` while each :meth:`tick` lands
+    one member as its own merge group; a direct request lands the whole prefix on
+    the next tick and reports ``merged``. Every landed member keeps its review
+    base. Once a prefix landed, :meth:`rebase_open` rebases the open members
+    above it. ``auto_tick`` ticks on every request status read; ``expired`` makes
+    every status read a 404. ``echo_fault`` answers a new request with another
+    method; ``immediate`` answers it ``enqueued`` without an id (it is still
+    queued). An ordinary merge of a native member is logged in ``merge_calls``
+    and fails the test. ``puts`` logs every request sent; ``existing`` models a
+    request someone else sent.
+    """
+
+    def __init__(self, bare: Path) -> None:
+        super().__init__(bare)
+        self.stacks: dict[int, list[int]] = {}
+        self.unknown: set[int] = set()
+        self.queue = False
+        self.queue_method = "squash"
+        self.methods: tuple[str, ...] = ("merge", "squash", "rebase")
+        self.policy_known = True
+        self.puts: list[tuple[int, str, str | None, str]] = []
+        self.requests: list[AsyncRequest] = []
+        self.put_fault: PutFault = "none"
+        self.before_put: Callable[[], None] | None = None
+        self.auto_tick = True
+        self.expired = False
+        self.fail_after: int | None = None
+        self.fail_message = "Merge conflict detected in the merge group"
+        self.landing_fault: dict[int, dict[str, str]] = {}
+        self.rebase_fault: RebaseFault = "none"
+        self.rebased: dict[int, str] = {}
+        self.echo_fault = False
+        self.immediate = False
+
+    def _stack_of(self, number: int) -> tuple[int, list[int]] | None:
+        for stack, order in self.stacks.items():
+            if number in order:
+                return stack, order
+        return None
+
+    def current(self, number: int) -> PullRequest:
+        pr = super().current(number)
+        found = self._stack_of(number)
+        if found is None:
+            return pr
+        if number in self.unknown:
+            return replace(pr, native=True)
+        stack, order = found
+        return replace(
+            pr,
+            native=True,
+            native_stack_number=stack,
+            native_stack_position=order.index(number) + 1,
+            native_stack_size=len(order),
+            native_stack_base=TRUNK,
+        )
+
+    def merge(self, number: int, expected_head: str, method: str) -> None:
+        if self._stack_of(number) is not None:
+            self.merge_calls.append((number, expected_head, method))
+            raise AssertionError(f"native member #{number} reached the ordinary merge")
+        super().merge(number, expected_head, method)
+
+    def read_native_stack(self, number: int) -> NativeStack:
+        order = self.stacks.get(number)
+        if order is None:
+            raise ProviderError(
+                f"native-stack:{REPO}#{number}: no such stack",
+                kind="BLOCKED",
+                operation="native-stack",
+                http_status=404,
+                detail="native-stack-unknown",
+            )
+        return NativeStack(number, TRUNK, tuple(self.current(n) for n in order))
+
+    def native_trunk_policy(self, stack: NativeStack) -> NativeTrunkPolicy:
+        if not self.policy_known:
+            return NativeTrunkPolicy(
+                TRUNK, None, (), False, ("rules-unavailable: main rulesets unreadable",)
+            )
+        if self.queue:
+            return NativeTrunkPolicy(
+                TRUNK, "merge_queue", (self.queue_method,), True, ()
+            )
+        return NativeTrunkPolicy(TRUNK, "direct_merge", self.methods, True, ())
+
+    def _answer(self, request: AsyncRequest) -> NativeMergeResult:
+        return NativeMergeResult(
+            status=request.status,
+            uuid=request.uuid,
+            message=request.message,
+            sha=request.sha,
+            expected_head_sha=request.expected_head,
+            merge_action=request.action,
+            merge_method=request.method or "default",
+            bypass_rules=False,
+        )
+
+    def existing(
+        self, number: int, head: str, method: str | None, action: str
+    ) -> AsyncRequest:
+        """A request for ``number`` that another actor already sent."""
+        return self._request(number, head, method, action)
+
+    def _request(
+        self, number: int, head: str, method: str | None, action: str
+    ) -> AsyncRequest:
+        found = self._stack_of(number)
+        if found is None:
+            raise AssertionError(f"#{number} is not a native member")
+        order = found[1]
+        prefix = tuple(
+            n for n in order[: order.index(number) + 1] if self.pulls[n].state == "OPEN"
+        )
+        request = AsyncRequest(
+            f"00000000-0000-4000-8000-{len(self.requests) + 1:012d}",
+            action,
+            method,
+            head,
+            prefix,
+        )
+        self.requests.append(request)
+        return request
+
+    def start_native_merge(
+        self, number: int, expected_head: str, method: str | None, action: str
+    ) -> NativeMergeResult:
+        self.puts.append((number, expected_head, method, action))
+        hook, self.before_put = self.before_put, None
+        if hook is not None:
+            hook()
+        op = f"native-merge:{REPO}#{number}"
+        active = [
+            request
+            for request in self.requests
+            if request.prefix[-1] == number
+            and request.status in ("pending", "enqueued")
+        ]
+        if active:
+            raise NativeMergeInProgress(
+                f"{op}: an async merge request is already in progress",
+                operation=op,
+                existing=self._answer(active[-1]),
+            )
+        refusal: str | None = None
+        if self.current(number).state != "OPEN":
+            refusal = "the pull request is not open"
+        elif action == "merge_queue" and method is not None:
+            refusal = QUEUE_REFUSAL
+        elif (action == "merge_queue") != self.queue:
+            refusal = "the merge action does not match the base branch rules"
+        if refusal is not None:
+            raise ProviderError(
+                f"{op}: HTTP 422 GitHub refused the async merge: {refusal}",
+                kind="BLOCKED",
+                operation=op,
+                http_status=422,
+                detail="native-merge-rejected",
+            )
+        if self.current(number).head_sha != expected_head:
+            raise ProviderError(
+                f"{op}: GitHub refused the async merge: the pull request head no "
+                "longer matches the expected head; nothing was merged",
+                kind="WAITING",
+                operation=op,
+                http_status=422,
+                detail="native-merge-head-changed",
+            )
+        fault, self.put_fault = self.put_fault, "none"
+        if fault == "lost":
+            raise ProviderError(
+                f"{op}: gh did not finish; do not retry it",
+                kind="WAITING",
+                operation=op,
+                uncertain=True,
+                detail="native-merge-uncertain-timeout",
+            )
+        request = self._request(number, expected_head, method, action)
+        if fault == "applied_lost":
+            raise ProviderError(
+                f"{op}: the connection was lost; do not retry it",
+                kind="WAITING",
+                operation=op,
+                uncertain=True,
+                detail="native-merge-uncertain-transport",
+            )
+        if self.immediate:
+            return NativeMergeResult("enqueued", None, "Already queued", None, None)
+        if self.echo_fault:
+            return replace(self._answer(request), merge_method="rebase")
+        return self._answer(request)
+
+    def read_native_merge(self, number: int, uuid: str) -> NativeMergeResult:
+        if self.auto_tick:
+            self.tick()
+        found = [
+            request
+            for request in self.requests
+            if request.uuid == uuid and request.prefix[-1] == number
+        ]
+        if not found or self.expired:
+            op = f"native-merge-status:{REPO}#{number}"
+            raise ProviderError(
+                f"{op}: GitHub does not know async merge request {uuid}",
+                kind="BLOCKED",
+                operation=op,
+                http_status=404,
+                detail="native-merge-request-unknown",
+            )
+        return self._answer(found[0])
+
+    def tick(self) -> None:
+        """One background step of the oldest unfinished request."""
+        for request in self.requests:
+            unfinished = request.landed < len(request.prefix)
+            if unfinished and request.status in ("pending", "enqueued"):
+                self._advance(request)
+                return
+
+    def _advance(self, request: AsyncRequest) -> None:
+        if self.queue and request.status == "pending":
+            request.status = "enqueued"
+            return
+        count = 1 if self.queue else len(request.prefix) - request.landed
+        for number in request.prefix[request.landed : request.landed + count]:
+            if self.fail_after is not None and request.landed >= self.fail_after:
+                request.status, request.message = "failed", self.fail_message
+                return
+            self._land_member(number, request.method or self.queue_method)
+            request.landed += 1
+        if request.landed == len(request.prefix):
+            if not self.queue:
+                request.status = "merged"
+                request.sha = self.landing(request.prefix[-1])
+            self.rebase_open(request.prefix[-1])
+
+    def _commit_on(self, parent: str, files: dict[str, str], message: str) -> str:
+        index = self.bare.parent / "provider.index"
+        change = Change(files, message.encode(), PROVIDER_AUTHOR)
+        return commit(self.bare, index, parent, change)
+
+    def _land_member(self, number: int, method: str) -> None:
+        """Land member ``number``'s own slice on the trunk; it keeps its review base."""
+        pull = self.pulls[number]
+        head = self._rev(f"refs/heads/{pull.head_ref}")
+        review = self._rev(f"refs/heads/{pull.base_ref}")
+        below = None if pull.base_ref == TRUNK else review
+        tip = self._rev(f"refs/heads/{TRUNK}")
+        message = f"{pull.title} (#{number})"
+        if method == "rebase":
+            landing = tip
+            listing = git(self.bare, "rev-list", "--reverse", f"{review}..{head}")
+            for oid in listing.splitlines():
+                landing = self._replay(oid, landing)
+        else:
+            tree = self._merge_tree(tip, head, base=below)
+            parents = ("-p", tip, "-p", head) if method == "merge" else ("-p", tip)
+            landing = git(self.bare, "commit-tree", tree, *parents, "-m", message)
+        fault = self.landing_fault.get(number)
+        if fault is not None:
+            tampered = self._commit_on(landing, fault, "tampered")
+            tree = git(self.bare, "rev-parse", f"{tampered}^{{tree}}")
+            landing = git(self.bare, "commit-tree", tree, "-p", tip, "-m", message)
+        git(self.bare, "update-ref", f"refs/heads/{TRUNK}", landing, tip)
+        self._publish_head(number, head)
+        pull.state, pull.landed = "MERGED", (head, review, landing)
+
+    def rebase_open(self, selected: int) -> None:
+        """Rebase the open members above landed ``selected``, as ``rebase_fault`` says.
+
+        Each is replayed commit by commit with real Git: the lowest onto the trunk
+        tip, then retargeted to the trunk, and each higher one onto the new head
+        of the member below it; ``rebased`` records every head written. ``drift``
+        and ``extra`` add a commit to the lowest one; ``lag`` leaves them all,
+        ``retarget`` only retargets the lowest and ``lowest`` rebases only it.
+        """
+        found = self._stack_of(selected)
+        if found is None or self.rebase_fault == "lag":
+            return
+        order = found[1]
+        above = order[order.index(selected) + 1 :]
+        if not above or self.pulls[above[0]].state != "OPEN":
+            return
+        if self.rebase_fault == "retarget":
+            self.pulls[above[0]].base_ref = TRUNK
+            return
+        fork = self.landed_head(selected)
+        onto = self._rev(f"refs/heads/{TRUNK}")
+        for position, number in enumerate(above):
+            pull = self.pulls[number]
+            if pull.state != "OPEN" or (position and self.rebase_fault == "lowest"):
+                return
+            old = self._rev(f"refs/heads/{pull.head_ref}")
+            rebased = onto
+            listing = git(self.bare, "rev-list", "--reverse", f"{fork}..{old}")
+            for oid in listing.splitlines():
+                rebased = self._replay(oid, rebased)
+            if not position and self.rebase_fault == "drift":
+                rebased = self._commit_on(rebased, {"top.txt": "drifted\n"}, "drift")
+            elif not position and self.rebase_fault == "extra":
+                rebased = self._commit_on(rebased, {"extra.txt": "extra\n"}, "extra")
+            git(self.bare, "update-ref", f"refs/heads/{pull.head_ref}", rebased, old)
+            self._publish_head(number, rebased)
+            self.rebased[number] = rebased
+            if not position:
+                pull.base_ref = TRUNK
+            fork, onto = old, rebased
+
+    def landed_head(self, number: int) -> str:
+        landed = self.pulls[number].landed
+        if landed is None:
+            raise AssertionError(f"#{number} has not landed")
+        return landed[0]
 
 
 class GraphGit(MappedGit):

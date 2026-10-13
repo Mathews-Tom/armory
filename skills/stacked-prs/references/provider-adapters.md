@@ -70,6 +70,8 @@ gh pr merge <number> --merge
 
 Prefer `--merge` when merge commits are allowed. If the repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK` (`gh api repos/{owner}/{repo} --jq '.squash_merge_commit_message'`), use the squash-body merge path in `references/provenance.md` so `Stack-Id` and `Stack-Position` survive in history. Under `COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers automatically.
 
+`merge_pr` is never used for a native stack member (`references/stack-model.md` § Native Stack Detection): the provider refuses the synchronous merge, and there is no fallback to it. Native members are merged only by one guarded `PUT repos/{owner}/{repo}/pulls/<highest>/merge-async` request for an explicitly authorized prefix and reconciled from `GET .../merge-async/<uuid>` and pull request facts (`references/github-native.md` § Merge).
+
 Do not use `--delete-branch` while any open PR still has the branch being merged as `baseRefName`. For GitHub stacks, branch deletion can close descendant PRs unmerged when their base branch disappears.
 
 Delete a remote stack branch only after provider-confirmed merge and after no open PR targets it as a base:
