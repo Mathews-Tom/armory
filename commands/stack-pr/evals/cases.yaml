@@ -43,14 +43,14 @@ cases:
     rubric:
       - "activates stack-pr command"
       - "delegates to skills/stacked-prs sync workflow"
-      - "uses force-with-lease for rewritten branches"
+      - "uses an explicit expected-old lease for rewritten branches"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "sync"
         weight: 0.8
       - type: matches_regex
-        target: "--force-with-lease"
+        target: "--force-with-lease=refs/heads/"
         weight: 1.0
 
   - id: slash_validate
@@ -69,11 +69,55 @@ cases:
         target: "commands executed|exact"
         weight: 0.6
 
+  - id: slash_merge_delegates_lifecycle
+    prompt: "/stack-pr merge --base main feat/parser-core feat/parser-cache"
+    fixtures: []
+    rubric:
+      - "activates stack-pr command"
+      - "delegates to skills/stacked-prs, which authors a stack decision packet selecting exactly the listed branches' PRs"
+      - "runs the landing through the installed ship-workflow stack run to the merged endpoint without deleting branches"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 1.0
+      - type: matches_regex
+        target: "--until merged"
+        weight: 0.9
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+      - type: not_contains
+        target: "git push origin --delete"
+        weight: 1.0
+
+  - id: slash_cleanup_without_workflow_blocks
+    prompt: "/stack-pr cleanup --base main feat/parser-core feat/parser-cache (only stacked-prs is installed in this client)"
+    fixtures: []
+    rubric:
+      - "activates stack-pr command"
+      - "stops BLOCKED naming the missing skills/ship-workflow package before any mutation"
+      - "does not delete branches by hand"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "BLOCKED"
+        weight: 1.0
+      - type: matches_regex
+        target: "skills/ship-workflow"
+        weight: 1.0
+      - type: not_contains
+        target: "git branch -D"
+        weight: 1.0
+      - type: not_contains
+        target: "git push origin --delete"
+        weight: 1.0
+
   - id: negative_ship_it
     prompt: "Ship it: merge main, run tests, open the release PR, and write the changelog."
     fixtures: []
     rubric:
-      - "release workflow belongs to ship-workflow, not stack-pr"
+      - "version/changelog preparation belongs to release-captain; ordinary PR shipping belongs to ship-workflow or /ship, not stack-pr"
       - "does not activate stack-pr command"
     trigger_expected: false
 

@@ -4,10 +4,12 @@ cases:
     fixtures: []
     rubric:
       - "activates team-lead agent"
-      - "decomposes into multi-agent workflow (architect → planner → builder → auditor → release)"
+      - "decomposes into multi-agent workflow (architect → planner → builder → auditor → ship-workflow skill with endpoint pr)"
       - "presents delegation plan before executing"
       - "spawns agents in correct dependency order"
       - "produces unified execution summary"
+      - "ends the build pipeline at an open PR through ship-workflow endpoint pr after a codebase-auditor PASS, not through release-captain"
+      - "does not bump a version, edit a changelog, tag, or claim deployment; reports deployment as having no owner in the team"
     trigger_expected: true
 
   - id: validate_and_build
@@ -46,5 +48,32 @@ cases:
     prompt: "Ship this branch as a PR."
     fixtures: []
     rubric:
-      - "does not activate team-lead (release-captain territory)"
+      - "does not activate team-lead (ship-workflow territory, endpoint pr)"
+      - "does not route to release-captain and grants no release, merge, or cleanup authority"
     trigger_expected: false
+
+  - id: single_agent_task_release_with_authority
+    prompt: "Prepare the 2.4.0 release. CONTRIBUTING says VERSION and CHANGELOG.md are the release artifacts. Open the release-preparation PR against release/2.x."
+    fixtures: []
+    rubric:
+      - "does not activate team-lead (release-captain territory with explicit authority, target, and base)"
+    trigger_expected: false
+
+  - id: build_then_release_with_authority
+    prompt: "Design, plan, and build the notification service, audit it, then prepare the 3.0.0 release. CONTRIBUTING names VERSION and CHANGELOG.md as the release artifacts and release/3.x as the base."
+    fixtures: []
+    rubric:
+      - "activates team-lead agent"
+      - "runs architect, planner, builder, and codebase-auditor in order and proceeds only on a PASS"
+      - "invokes release-captain with the cited release authority, target 3.0.0, and base release/3.x"
+      - "release-captain publishes the release-preparation PR through ship-workflow endpoint pr; no merge, tag, or package publication"
+    trigger_expected: true
+
+  - id: build_then_release_without_target
+    prompt: "Build the reporting module, audit it, and release it."
+    fixtures: []
+    rubric:
+      - "activates team-lead agent"
+      - "ends the pipeline at ship-workflow endpoint pr and does not invoke release-captain"
+      - "does not infer a version, a bump level, or a base branch; reports the missing release authority, target, and base as the open input"
+    trigger_expected: true

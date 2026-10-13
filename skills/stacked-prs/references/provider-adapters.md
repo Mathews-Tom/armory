@@ -10,8 +10,8 @@ Package names stay provider-neutral. Provider-specific behavior lives behind an 
 | `create_pr` | head branch, base branch, title, body file | PR URL and number |
 | `edit_base` | PR number, base branch | Updated PR metadata |
 | `checks` | PR number or branch | Check conclusions |
-| `merge_pr` | PR number, merge method | Merged state |
-| `delete_remote_branch` | branch | Deletion result |
+
+Landing, post-landing retargeting and branch deletion are not adapter operations of this package: they belong to the delegated `ship-workflow` stack run, which binds merges to verified heads, deletes remote heads only under expected-old leases and never uses merge-time branch deletion.
 
 ## GitHub Adapter
 
@@ -60,25 +60,14 @@ gh pr list --state open --json number,baseRefName,headRefName \
   --jq '.[] | select(.baseRefName == "<branch-being-merged>")'
 ```
 
-Merge a root PR:
+Read the allowed merge methods when choosing a node's decision:
 
 ```bash
 gh api repos/{owner}/{repo} \
   --jq '{merge: .allow_merge_commit, squash: .allow_squash_merge, rebase: .allow_rebase_merge}'
-gh pr merge <number> --merge
 ```
 
-Prefer `--merge` when merge commits are allowed. If the repository squashes and `squash_merge_commit_message` is `PR_BODY` or `BLANK` (`gh api repos/{owner}/{repo} --jq '.squash_merge_commit_message'`), use the squash-body merge path in `references/provenance.md` so `Stack-Id` and `Stack-Position` survive in history. Under `COMMIT_MESSAGES` (GitHub's default), squash already preserves trailers automatically.
-
-Do not use `--delete-branch` while any open PR still has the branch being merged as `baseRefName`. For GitHub stacks, branch deletion can close descendant PRs unmerged when their base branch disappears.
-
-Delete a remote stack branch only after provider-confirmed merge and after no open PR targets it as a base:
-
-```bash
-gh pr list --state open --json number,baseRefName,headRefName \
-  --jq '.[] | select(.baseRefName == "<merged-stack-branch>")'
-git push origin --delete <branch>
-```
+Prefer `merge` when merge commits are allowed; otherwise follow the squash message policy rules in `references/provenance.md` § Merge Mode Coupling. A native stack member is never merged synchronously; its landing policy is `references/github-native.md` § Landing policy.
 
 ## PR Body Stack Section
 
@@ -103,7 +92,7 @@ Upstack: #102
 - `uv run pytest tests/parser`: passed
 ```
 
-Regenerate the stack section after publish, sync, retarget, or merge.
+Regenerate the stack section when this skill creates a PR or retargets it to its correct parent. The delegated landing run never edits PR titles or bodies.
 
 ## Provider Stop Conditions
 
@@ -111,8 +100,7 @@ Regenerate the stack section after publish, sync, retarget, or merge.
 - Existing PR is closed and unmerged.
 - Provider rejects changing a PR base.
 - Required checks fail.
-- Branch protection prevents merge.
-- An open child PR still targets a branch selected for deletion.
-- Provider reports branch deletion failure after merge.
+
+Protection, merge and deletion failures during a delegated landing are reported by that run with its confirmed facts.
 
 Do not retry by changing topology. Report the provider error and the exact command that failed.

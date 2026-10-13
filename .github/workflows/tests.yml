@@ -38,6 +38,12 @@ jobs:
       - name: Install project environment
         run: uv sync --locked
 
+      - name: Ship workflow lint and strict types
+        run: |
+          uv run ruff check skills/ship-workflow/scripts skills/ship-workflow/tests
+          uv run ruff format --check skills/ship-workflow/scripts skills/ship-workflow/tests
+          uv run mypy --strict skills/ship-workflow/scripts
+
       - name: Repo-level tests
         run: uv run python -m pytest tests/ -q
 
