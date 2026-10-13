@@ -34,6 +34,12 @@ outcome is reconciled from facts on resumption and never resent. Landing, renewe
 gates, post-merge acceptance and cleanup stay with :func:`lifecycle.execute`, one
 preassigned per-node receipt each. :func:`inspect_graph` reports the same plan
 without any write.
+
+:func:`membership` classifies every node at one point. A selection of manual nodes
+runs here; a selection of members of one GitHub-native stack is handed to the
+native stack owner (``native_stack``), which reuses this coordinator's journal,
+locking, deadline and per-node lifecycle landing; a mixed selection is BLOCKED
+before any write. A graph run never changes from one kind to the other.
 """
 
 from __future__ import annotations
@@ -62,6 +68,7 @@ from state_store import (
     GraphJournal,
     GraphNode,
     LockBusy,
+    NativeRecord,
     Promotion,
     Receipt,
     ReceiptInputError,
@@ -761,11 +768,64 @@ class Finding:
 def membership(pr: PullRequest) -> Literal["manual", "native"]:
     """The single manual/native classification point of a graph node.
 
-    The manual coordinator continues only ``manual`` nodes. A ``native`` member is
-    BLOCKED: no ordinary merge is dispatched and nothing converts it into a manual
-    node. The native stack owner replaces this classification.
+    A PR carrying a provider stack object is ``native``, even when parts of its
+    stack identity are unknown; nothing converts it into a manual node, and no
+    native member ever receives an ordinary merge.
     """
     return "native" if pr.native else "manual"
+
+
+def selection(
+    plan: StackPlan, prs: Mapping[int, PullRequest]
+) -> Literal["manual", "native", "mixed"]:
+    """The membership of the selected nodes; ``mixed`` is BLOCKED by every owner."""
+    kinds = {membership(prs[node.pr]) for node in plan.selected_nodes()}
+    if len(kinds) != 1:
+        return "mixed"
+    return "native" if kinds == {"native"} else "manual"
+
+
+def route_finding(
+    plan: StackPlan, prs: Mapping[int, PullRequest], journal: GraphJournal | None
+) -> Finding | None:
+    """Why the observed selection cannot continue ``journal``; ``None`` when it can.
+
+    A mixed selection is BLOCKED. A journal that recorded a native request stays
+    native, and a manual journal that recorded graph intents, or whose selection
+    still has an open node, never becomes native.
+    """
+    kind = selection(plan, prs)
+    if kind == "mixed":
+        return Finding(
+            "BLOCKED",
+            None,
+            "the selection mixes native stack members with manual nodes",
+            "select only manual nodes or only members of one native stack; "
+            "nothing is converted from one kind to the other",
+        )
+    native = journal is not None and journal.native is not None
+    if kind == "manual" and native:
+        return Finding(
+            "NEEDS_JUDGMENT",
+            None,
+            "this graph run recorded a native stack request, but its selection is "
+            "no longer native",
+            "inspect the provider facts; a native run never continues as a manual one",
+        )
+    open_selected = any(prs[node.pr].state == "OPEN" for node in plan.selected_nodes())
+    if (
+        kind == "native"
+        and journal is not None
+        and not native
+        and (journal.intents or open_selected)
+    ):
+        return Finding(
+            "NEEDS_JUDGMENT",
+            None,
+            "a manual graph run never continues as a native stack run",
+            "start a new graph run from current facts",
+        )
+    return None
 
 
 def contradictions(
@@ -779,9 +839,10 @@ def contradictions(
     each node to its last confirmed head OID and base ref. A node whose parent
     landed may already sit on the trunk (provider retargeting); every other change
     of namespace, state, head or base is a judgment that blocks every graph
-    mutation. A selected native member is BLOCKED, and a selected node with an open
-    unselected ancestor needs judgment: parent-first scope never widens. Retained
-    nodes outside the scope are reported by :func:`context_changes` instead.
+    mutation. A selected node with an open unselected ancestor needs judgment:
+    parent-first scope never widens. Retained nodes outside the scope are reported
+    by :func:`context_changes` instead. Execution reaches this check only for a
+    manual selection (:func:`selection`); a dry run also lists it for a mixed one.
     """
     findings: list[Finding] = []
     relevant = _scope(plan)
@@ -793,17 +854,6 @@ def contradictions(
             findings.append(Finding("NEEDS_JUDGMENT", node.pr, problem, _REFRESH))
             continue
         if not node.selected:
-            continue
-        if membership(prs[node.pr]) == "native":
-            findings.append(
-                Finding(
-                    "BLOCKED",
-                    node.pr,
-                    f"#{node.pr} is a native stack member; the manual graph never "
-                    "lands it with an ordinary merge",
-                    "continue it through the native stack owner",
-                )
-            )
             continue
         scope = [
             ancestor
@@ -1104,8 +1154,15 @@ class _GraphRun:
     Every graph mutation holds the common-directory lock, re-observes its exact
     preconditions, journals a durable intent before dispatch and reconciles the
     actual outcome after it. Landing, renewed gates, post-merge acceptance and
-    cleanup of every node stay with :func:`lifecycle.execute`.
+    cleanup of every node stay with :func:`lifecycle.execute`. A native selection
+    is continued by the native stack owner (``native_stack.NativeRun``), a
+    subclass that replaces the contradiction check, the refresh of a resumed
+    packet, the journal record, the per-step action, the open-node preparation,
+    the landing context and the result.
     """
+
+    # Whether this coordinator owns native stack selections.
+    native_owner = False
 
     def __init__(
         self,
@@ -1154,6 +1211,9 @@ class _GraphRun:
         try:
             prs = self._observe()
             self._remote(self.plan.repo)
+            owner = self._owner(prs)
+            if owner is not self:
+                return owner.run()
             if self.endpoint == "pr":
                 # Observation only: pending intents are classified, never recorded.
                 expected, _, pending = _projected(
@@ -1212,13 +1272,71 @@ class _GraphRun:
         self.prs = {node.pr: self.provider.read_pr(node.pr) for node in self.plan.nodes}
         return self.prs
 
+    def _owner(self, prs: Mapping[int, PullRequest]) -> _GraphRun:
+        """The coordinator of the observed selection: this run or the native owner.
+
+        Imported here, not at module level: ``native_stack`` builds on this module.
+        """
+        finding = route_finding(self.plan, prs, self.journal)
+        if finding is not None:
+            raise _Stop(finding.status, finding.reason, finding.next_action)
+        native = selection(self.plan, prs) == "native"
+        if native == self.native_owner:
+            return self
+        if not native:
+            raise _Stop(
+                "NEEDS_JUDGMENT",
+                "the selection stopped being native while it was observed",
+                "resume this graph run to re-evaluate the current facts",
+            )
+        import native_stack
+
+        owner = native_stack.NativeRun(
+            self.git,
+            self.provider,
+            self.plan,
+            self.endpoint,
+            0.0,
+            self.store,
+            self.journal,
+        )
+        owner.deadline = self.deadline
+        return owner
+
+    def _native_record(self) -> NativeRecord | None:
+        """The native record a new journal starts with (the lock is held)."""
+        return None
+
+    def _landing_context(
+        self, node: PlanNode, pr: PullRequest
+    ) -> lifecycle.NativeLanding | None:
+        """The native landing authority :func:`lifecycle.execute` gets for ``node``."""
+        return None
+
     def _check(
         self,
         prs: Mapping[int, PullRequest],
         expected: Mapping[int, tuple[str, str]],
         pending: tuple[Finding, ...],
     ) -> None:
-        """Stop on the first finding; changes outside the scope are only reported."""
+        """Stop on the first finding; changes outside the scope are only reported.
+
+        A selected node that became a native stack member during this manual run
+        is BLOCKED here, every step, before any capture, push or retarget.
+        """
+        native = [
+            node.pr
+            for node in self.plan.selected_nodes()
+            if membership(prs[node.pr]) == "native"
+        ]
+        if native:
+            raise _Stop(
+                "BLOCKED",
+                f"#{native[0]} became a native stack member during this manual graph "
+                "run; it is never pushed, retargeted or merged on the manual path",
+                "inspect the provider stack and start a new graph run from current "
+                "facts; nothing is converted from one kind to the other",
+            )
         self.changes = context_changes(self.plan, prs, expected)
         self.findings = (*pending, *contradictions(self.plan, prs, expected))
         if self.findings:
@@ -1239,6 +1357,7 @@ class _GraphRun:
                 if not row.selected:
                     row.state = "RETAINED"
             with self.store.mutation_lock():
+                journal.native = self._native_record()
                 # Adopted only while the lock is held and kept only once saved: a
                 # busy lock or a failed first save names no run id, as none exists.
                 self.journal = journal
@@ -1812,6 +1931,7 @@ class _GraphRun:
             self.store,
             receipt,
             run_id=run_id,
+            native=self._landing_context(node, pr),
         )
         self.results[node.pr] = result
         checkout = result.get("usable_checkout")
@@ -2202,9 +2322,15 @@ def inspect_graph(
     evaluated. ``journal`` supplies a resumed run's last confirmed identities,
     captured forks and pending intents, which are classified as execution would
     reconcile them, without recording anything. Contradictions and blockers are
-    listed and the status stays ``PLANNED``.
+    listed and the status stays ``PLANNED``. A native selection is previewed by
+    the native stack owner (``native_stack.inspect_native``), equally write-free.
     """
-    return _Preview(git, provider, plan, journal).result(endpoint)
+    prs = {node.pr: provider.read_pr(node.pr) for node in plan.nodes}
+    if selection(plan, prs) == "native":
+        import native_stack
+
+        return native_stack.inspect_native(git, provider, plan, endpoint, journal, prs)
+    return _Preview(git, provider, plan, journal, prs).result(endpoint)
 
 
 class _Preview:
@@ -2216,18 +2342,24 @@ class _Preview:
         provider: GitHub,
         plan: StackPlan,
         journal: GraphJournal | None,
+        prs: dict[int, PullRequest],
     ) -> None:
         self.git = git
         self.provider = provider
         self.plan = plan
         self.journal = journal
         self.snapshot = git.snapshot()
-        self.prs = {node.pr: provider.read_pr(node.pr) for node in plan.nodes}
+        self.prs = prs
         self.tip = provider.base_tip(plan.trunk)
         expected, self.reconciled, pending = _projected(
             git, provider.host, plan, journal, self.prs
         )
-        self.findings = [*pending, *contradictions(plan, self.prs, expected)]
+        route = route_finding(plan, prs, journal)
+        self.findings = [
+            *([] if route is None else [route]),
+            *pending,
+            *contradictions(plan, self.prs, expected),
+        ]
         self.changes = context_changes(plan, self.prs, expected)
         self.signing: bool | None = None
 

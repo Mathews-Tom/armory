@@ -3,8 +3,8 @@
 The repository is real Git (a bare remote and clones). The provider is a small
 stateful read model whose PR facts derive from the bare repository's refs; it lands
 a PR only when a test squashes it, and every provider mutation fails the test. It
-makes no claim about vendor behaviour. "No write" is the mode, modification time
-and content of every path of the inspected checkout and its Git directory.
+makes no claim about vendor behaviour. "No write" is the mode, inode, modification
+time and content of every path of the inspected checkout and its Git directory.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ PROVENANCE: dict[str, object] = {
 
 Result = dict[str, object]
 Rows = list[dict[str, object]]
-State = dict[str, tuple[int, int, bytes]]
+State = dict[str, tuple[int, int, int, bytes]]
 
 
 @dataclass
@@ -273,11 +273,12 @@ def files(root: Path) -> dict[str, bytes]:
 
 
 def snapshot(*roots: Path) -> State:
-    """Mode, modification time and content of every path below ``roots``.
+    """Mode, inode, modification time and content of every path below ``roots``.
 
     Directories and links count too, so a created, removed or rewritten object,
-    ref, index, lock, directory or journal changes it, and so does an existing
-    object Git merely freshens by writing it again.
+    ref, index, lock, directory or journal changes it, even one replaced by an
+    identical copy, and so does an existing object Git merely freshens by
+    writing it again.
     """
     found: State = {}
     for root in roots:
@@ -289,7 +290,7 @@ def snapshot(*roots: Path) -> State:
                 content = os.fsencode(os.readlink(path))
             else:
                 content = b""
-            found[str(path)] = (info.st_mode, info.st_mtime_ns, content)
+            found[str(path)] = (info.st_mode, info.st_ino, info.st_mtime_ns, content)
     return found
 
 
@@ -714,7 +715,7 @@ def test_moved_head_needs_judgment_before_any_journal_or_mutation(
     assert stack.head("feat/b") == moved
 
 
-def test_native_member_is_blocked_without_an_ordinary_merge(
+def test_mixed_native_and_manual_selection_is_blocked_without_any_write(
     stack: Stack, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     stack.forge.pulls[11].native = True

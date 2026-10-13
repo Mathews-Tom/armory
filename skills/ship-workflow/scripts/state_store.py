@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
+from github_ops import MERGE_METHODS, NATIVE_MERGE_ACTIONS, NATIVE_MERGE_STATUSES
+
 SCHEMA_VERSION = 3
 _LEGACY_SCHEMA_VERSION = 1
 _CHANGESET_SCHEMA_VERSION = 2
@@ -143,6 +145,9 @@ _HOST_NAME = re.compile(r"[a-z0-9][a-z0-9.-]*")
 _INTENT_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}")
 _BRANCH_FORBIDDEN = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+# The optional native record of a stack-graph journal: one merge-async request.
+NATIVE_DISPATCH_STATES = ("PLANNED", "DISPATCHING", "ACCEPTED", "REJECTED", "UNKNOWN")
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
 class ReceiptInputError(ValueError):
@@ -930,12 +935,106 @@ class GraphIntent:
 
 
 @dataclass
+class NativeMember:
+    """Original facts of one native stack member, frozen before the request.
+
+    ``base_ref``/``base_sha`` are the member's REVIEW base as the provider
+    reported it; a member that lands keeps that review base. ``tree`` is the full
+    tree of ``head_sha``. ``slice_identity`` is the exact net (path, mode, blob,
+    status) delta from ``slice_base`` to ``head_sha``
+    (:meth:`git_ops.GitRepository.slice_identity`): ``slice_base`` is the head of
+    the member below; for the lowest recorded member it is the commit its own
+    slice starts from (the stack base commit), recorded explicitly.
+    Only a retained member has ``fork``, the head of the highest selected member
+    it sits on. Only a scope member has landing evidence, filled in as confirmed:
+    ``landing`` is its provider merge commit, ``landed_tree`` that commit's tree
+    and ``verified`` that the landing was proved on the trunk.
+    """
+
+    pr: int
+    position: int
+    head_ref: str
+    head_sha: str
+    base_ref: str
+    base_sha: str
+    tree: str
+    slice_base: str
+    slice_identity: str
+    fork: str | None = None
+    landing: str | None = None
+    landed_tree: str | None = None
+    verified: bool = False
+
+
+@dataclass
+class NativeRequest:
+    """The one ``merge-async`` request of a native run (``bypass_rules`` is false).
+
+    ``action``/``method``/``expected_head`` are the exact request options; the
+    method is None for ``merge_queue`` and for a ``default`` request without
+    one. ``state`` moves PLANNED -> DISPATCHING (journaled with
+    ``dispatched_at`` before the PUT) -> ACCEPTED, REJECTED (a definite refusal)
+    or UNKNOWN (an uncertain outcome, never sent again). An ACCEPTED request
+    with a ``uuid`` records the provider's echo of action, method (``default``
+    when none was sent) and expected head, which equal the request; an ACCEPTED
+    request without one is the provider's immediate ``merged``/``enqueued``
+    answer. ``status``/``message``/``sha`` are the last observed request status,
+    its bounded single-line provider message (never a decision input) and the
+    request's merge commit (``merged`` only); ``detail`` is the refusal,
+    uncertainty or terminal failure reason.
+    """
+
+    action: str
+    method: str | None
+    expected_head: str
+    state: str = "PLANNED"
+    dispatched_at: str | None = None
+    uuid: str | None = None
+    status: str | None = None
+    message: str | None = None
+    sha: str | None = None
+    echo_action: str | None = None
+    echo_method: str | None = None
+    echo_head: str | None = None
+    detail: str | None = None
+
+
+@dataclass
+class NativeRecord:
+    """The native stack part of a stack-graph journal.
+
+    ``stack``/``base_ref``/``base_sha``/``size`` identify the provider stack;
+    ``base_ref`` is the journal trunk. ``scope`` is the ordered open prefix the
+    request merges, ending at ``selected``; ``retained`` the ordered open
+    unselected members above it, up to the top of the stack. ``members`` holds
+    one row per scope then retained PR, bottom to top, at consecutive positions.
+    """
+
+    stack: int
+    base_ref: str
+    base_sha: str
+    size: int
+    selected: int
+    scope: list[int]
+    retained: list[int]
+    members: list[NativeMember]
+    request: NativeRequest
+
+    def member(self, pr: int) -> NativeMember:
+        for row in self.members:
+            if row.pr == pr:
+                return row
+        raise StateError(f"PR #{pr} is not a recorded native stack member")
+
+
+@dataclass
 class GraphJournal:
     """The master journal of one stack-graph run; per-node receipts stay separate.
 
     ``plan`` is the canonical normalized stack plan this run froze; it is validated
     here only as bounded JSON, and ``graph.journal_plan`` cross-checks it against
-    ``plan_identity``, ``topology`` and the node rows.
+    ``plan_identity``, ``topology`` and the node rows. ``native`` is present only
+    for a native stack run; a manual journal has no ``native`` key at all.
     """
 
     run_id: str
@@ -954,6 +1053,7 @@ class GraphJournal:
     status: str = "WAITING"
     issue: str | None = None
     next_action: str | None = None
+    native: NativeRecord | None = None
     kind: Literal["stack-graph"] = "stack-graph"
 
     def node(self, pr: int) -> GraphNode:
@@ -963,7 +1063,10 @@ class GraphJournal:
         raise StateError(f"PR #{pr} is not a node of this graph run")
 
     def serialize(self) -> dict[str, object]:
-        return {"schema_version": GRAPH_SCHEMA_VERSION, **asdict(self)}
+        payload = asdict(self)
+        if self.native is None:
+            del payload["native"]
+        return {"schema_version": GRAPH_SCHEMA_VERSION, **payload}
 
     @classmethod
     def parse(cls, value: object) -> GraphJournal:
@@ -971,7 +1074,8 @@ class GraphJournal:
         version = raw.get("schema_version")
         if type(version) is not int or version != GRAPH_SCHEMA_VERSION:
             raise ReceiptInputError("unsupported graph journal schema version")
-        if set(raw) != set(cls.__dataclass_fields__) | {"schema_version"}:
+        manual = set(cls.__dataclass_fields__) - {"native"} | {"schema_version"}
+        if set(raw) - {"native"} != manual:
             raise ReceiptInputError("graph journal fields are missing or unsupported")
         if raw["kind"] != GRAPH_KIND:
             raise ReceiptInputError("journal is not a stack-graph journal")
@@ -1011,10 +1115,12 @@ class GraphJournal:
             status=status,
             issue=_optional_text(raw["issue"], "issue"),
             next_action=_optional_text(raw["next_action"], "next_action"),
+            native=_native_record(raw["native"]) if "native" in raw else None,
         )
         _check_graph_nodes(journal)
         _check_graph_intents(journal)
         _check_graph_completion(journal)
+        _check_graph_native(journal)
         return journal
 
 
@@ -1309,6 +1415,251 @@ def _check_intent_node(
         or (promotion.old_head, promotion.new_head) != (intent.expected_old, intent.new)
     ):
         raise ReceiptInputError(f"{label} must move exactly a verified promotion")
+
+
+def _positive(value: object, label: str) -> int:
+    if type(value) is not int or not 0 < value <= _PR_MAX:
+        raise ReceiptInputError(f"{label} must be a bounded positive integer")
+    return value
+
+
+def _optional_plain(value: object, label: str) -> str | None:
+    return None if value is None else _plain(value, label, _GRAPH_DETAIL_CHARS)
+
+
+def _optional_choice(value: object, label: str, choices: tuple[str, ...]) -> str | None:
+    if value is None:
+        return None
+    if _text(value, label) not in choices:
+        raise ReceiptInputError(f"{label} has an unsupported value")
+    return cast(str, value)
+
+
+def _native_numbers(value: object, label: str, *, empty: bool) -> list[int]:
+    if not isinstance(value, list) or len(value) > _GRAPH_MAX_NODES:
+        raise ReceiptInputError(f"{label} must list at most {_GRAPH_MAX_NODES} PRs")
+    numbers = [_pr_number(item, label) for item in value]
+    if (not empty and not numbers) or len(set(numbers)) != len(numbers):
+        raise ReceiptInputError(f"{label} must list distinct PRs")
+    return numbers
+
+
+def _native_member(value: object) -> NativeMember:
+    raw = _object(value, "native member")
+    if set(raw) != set(NativeMember.__dataclass_fields__):
+        raise ReceiptInputError("native member fields are missing or unsupported")
+    pr = _pr_number(raw["pr"], "native member pr")
+    label = f"native member #{pr}"
+    verified = raw["verified"]
+    if not isinstance(verified, bool):
+        raise ReceiptInputError(f"{label} verified flag must be a boolean")
+    member = NativeMember(
+        pr=pr,
+        position=_positive(raw["position"], f"{label} position"),
+        head_ref=validate_branch(raw["head_ref"], f"{label} head ref"),
+        head_sha=_oid(raw["head_sha"], f"{label} head"),
+        base_ref=validate_branch(raw["base_ref"], f"{label} review base ref"),
+        base_sha=_oid(raw["base_sha"], f"{label} review base"),
+        tree=_oid(raw["tree"], f"{label} tree"),
+        slice_base=_oid(raw["slice_base"], f"{label} slice base"),
+        slice_identity=_digest(raw["slice_identity"], f"{label} slice identity"),
+        fork=_optional_oid(raw["fork"], f"{label} fork"),
+        landing=_optional_oid(raw["landing"], f"{label} landing"),
+        landed_tree=_optional_oid(raw["landed_tree"], f"{label} landed tree"),
+        verified=verified,
+    )
+    if member.slice_base == member.head_sha:
+        raise ReceiptInputError(f"{label} own slice must be nonempty")
+    if (member.landed_tree is not None and member.landing is None) or (
+        verified and member.landed_tree is None
+    ):
+        raise ReceiptInputError(
+            f"{label}: a landed tree needs its landing, and a verified landing both"
+        )
+    return member
+
+
+def _native_request(value: object) -> NativeRequest:
+    raw = _object(value, "native request")
+    if set(raw) != set(NativeRequest.__dataclass_fields__):
+        raise ReceiptInputError("native request fields are missing or unsupported")
+    label = "native request"
+    action = _text(raw["action"], f"{label} action")
+    state = _text(raw["state"], f"{label} state")
+    if action not in NATIVE_MERGE_ACTIONS or state not in NATIVE_DISPATCH_STATES:
+        raise ReceiptInputError(f"{label} has an unsupported action or state")
+    method = _optional_choice(raw["method"], f"{label} method", MERGE_METHODS)
+    if (action == "merge_queue" and method is not None) or (
+        action == "direct_merge" and method is None
+    ):
+        raise ReceiptInputError(
+            f"{label}: merge_queue sends no method and direct_merge names one"
+        )
+    uuid = _optional_text(raw["uuid"], f"{label} uuid")
+    if uuid is not None and not _UUID.fullmatch(uuid):
+        raise ReceiptInputError(f"{label} uuid must be a lowercase UUID")
+    request = NativeRequest(
+        action=action,
+        method=method,
+        expected_head=_oid(raw["expected_head"], f"{label} expected head"),
+        state=state,
+        dispatched_at=(
+            None
+            if raw["dispatched_at"] is None
+            else _timestamp(raw["dispatched_at"], f"{label} dispatched_at")
+        ),
+        uuid=uuid,
+        status=_optional_choice(
+            raw["status"], f"{label} status", NATIVE_MERGE_STATUSES
+        ),
+        message=_optional_plain(raw["message"], f"{label} message"),
+        sha=_optional_oid(raw["sha"], f"{label} sha"),
+        echo_action=_optional_choice(
+            raw["echo_action"], f"{label} echoed action", NATIVE_MERGE_ACTIONS
+        ),
+        echo_method=_optional_choice(
+            raw["echo_method"], f"{label} echoed method", ("default", *MERGE_METHODS)
+        ),
+        echo_head=_optional_oid(raw["echo_head"], f"{label} echoed head"),
+        detail=_optional_plain(raw["detail"], f"{label} detail"),
+    )
+    _check_native_request(request)
+    return request
+
+
+def _check_native_request(request: NativeRequest) -> None:
+    label = "native request"
+    echo = (request.echo_action, request.echo_method, request.echo_head)
+    echoed = echo != (None, None, None)
+    if (request.state == "PLANNED") != (request.dispatched_at is None):
+        raise ReceiptInputError(f"{label}: exactly a dispatched request has a time")
+    if (request.status is None) != (request.message is None):
+        raise ReceiptInputError(f"{label} observes its status and message together")
+    if (request.status == "merged") != (request.sha is not None):
+        raise ReceiptInputError(f"{label}: only a merged status has a merge commit")
+    if request.state in ("PLANNED", "DISPATCHING"):
+        if (
+            request.uuid is not None
+            or request.status is not None
+            or request.detail is not None
+            or echoed
+        ):
+            raise ReceiptInputError(f"{label} has no outcome before its response")
+        return
+    if request.state == "ACCEPTED":
+        exact = (request.action, request.method or "default", request.expected_head)
+        if request.status is None:
+            raise ReceiptInputError(f"{label}: an accepted request has a status")
+        if request.uuid is None:
+            # The provider's immediate answer for a PR already merged or queued.
+            if request.status not in ("merged", "enqueued") or echoed:
+                raise ReceiptInputError(
+                    f"{label}: only an immediate merged/enqueued answer has no id"
+                )
+        elif echo != exact:
+            raise ReceiptInputError(
+                f"{label}: the accepted echo must equal the exact request options"
+            )
+        return
+    if request.uuid is not None or echoed or request.detail is None:
+        raise ReceiptInputError(
+            f"{label}: a refused or unknown request has no id or echo, and a reason"
+        )
+    if request.status is not None and (
+        request.state == "UNKNOWN" or request.status != "failed"
+    ):
+        raise ReceiptInputError(
+            f"{label}: only an immediately failed refusal has a status"
+        )
+
+
+def _native_record(value: object) -> NativeRecord:
+    raw = _object(value, "native record")
+    if set(raw) != set(NativeRecord.__dataclass_fields__):
+        raise ReceiptInputError("native record fields are missing or unsupported")
+    members = raw["members"]
+    if not isinstance(members, list) or len(members) > _GRAPH_MAX_NODES:
+        raise ReceiptInputError(
+            f"native record holds at most {_GRAPH_MAX_NODES} members"
+        )
+    record = NativeRecord(
+        stack=_positive(raw["stack"], "native stack number"),
+        base_ref=validate_branch(raw["base_ref"], "native stack base ref"),
+        base_sha=_oid(raw["base_sha"], "native stack base"),
+        size=_positive(raw["size"], "native stack size"),
+        selected=_pr_number(raw["selected"], "native selected PR"),
+        scope=_native_numbers(raw["scope"], "native scope", empty=False),
+        retained=_native_numbers(raw["retained"], "native retained", empty=True),
+        members=[_native_member(row) for row in members],
+        request=_native_request(raw["request"]),
+    )
+    _check_native_record(record)
+    return record
+
+
+def _check_native_record(record: NativeRecord) -> None:
+    order = [*record.scope, *record.retained]
+    if len(order) > _GRAPH_MAX_NODES or len(set(order)) != len(order):
+        raise ReceiptInputError("native scope and retained PRs must be distinct")
+    if record.selected != record.scope[-1]:
+        raise ReceiptInputError("the native scope must end at the selected PR")
+    if [member.pr for member in record.members] != order:
+        raise ReceiptInputError(
+            "native members must be the scope then the retained PRs, bottom to top"
+        )
+    selected = record.member(record.selected)
+    first = record.members[0].position
+    for index, member in enumerate(record.members):
+        label = f"native member #{member.pr}"
+        if member.position != first + index:
+            raise ReceiptInputError(f"{label} is not at the next stack position")
+        if index:
+            lower = record.members[index - 1]
+            if (member.base_ref, member.slice_base) != (lower.head_ref, lower.head_sha):
+                raise ReceiptInputError(
+                    f"{label} must sit on the member below it and slice from its head"
+                )
+        if member.pr in record.retained:
+            if member.fork != selected.head_sha or member.landing is not None:
+                raise ReceiptInputError(
+                    f"{label} is retained on the selected head and never lands here"
+                )
+        elif member.fork is not None:
+            raise ReceiptInputError(f"{label}: only a retained member records a fork")
+    if record.members[-1].position != record.size:
+        raise ReceiptInputError("the native members must reach the top of the stack")
+    if record.request.expected_head != selected.head_sha:
+        raise ReceiptInputError("the native request must guard the selected head")
+    if record.request.state in ("PLANNED", "DISPATCHING") and any(
+        member.landing is not None for member in record.members
+    ):
+        raise ReceiptInputError(
+            "native landings are recorded only after the request outcome"
+        )
+
+
+def _check_graph_native(journal: GraphJournal) -> None:
+    """A native record binds the journal trunk and its selected/unselected nodes."""
+    native = journal.native
+    if native is None:
+        return
+    if native.base_ref != journal.trunk:
+        raise ReceiptInputError("a native graph run's trunk is its stack base")
+    selected = {node.pr: node.selected for node in journal.nodes}
+    if any(selected.get(pr) is not True for pr in native.scope):
+        raise ReceiptInputError("every native scope PR must be a selected graph node")
+    if any(selected.get(pr) is not False for pr in native.retained):
+        raise ReceiptInputError("every retained native PR must be an unselected node")
+    if journal.endpoint == "pr" and native.request.state != "PLANNED":
+        raise ReceiptInputError("a pr-endpoint graph run is observation-only")
+    if (
+        journal.status == "COMPLETE"
+        and journal.endpoint != "pr"
+        and any(not native.member(pr).verified for pr in native.scope)
+    ):
+        raise ReceiptInputError(
+            "a complete native run has verified every scope landing"
+        )
 
 
 def _graph_key(run_id: str) -> str:

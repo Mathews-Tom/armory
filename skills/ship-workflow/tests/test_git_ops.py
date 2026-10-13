@@ -2168,3 +2168,98 @@ def test_pr_head_observes_historical_ref_not_recreated_feature_tip(
         repo, "HEAD"
     )
     assert inspector.pr_head("origin", 8) is None
+
+
+def test_own_slice_identity_survives_a_landing_on_a_moved_trunk_byte_for_byte(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path / "repo")
+    root = oid(repo, "HEAD")
+    git(repo, "switch", "-q", "-c", "stack/layer1")
+    (repo / "lower.txt").write_text("lower layer\n")
+    commit_all(repo, "lower layer")
+    lower = oid(repo, "HEAD")
+    git(repo, "switch", "-q", "-c", "stack/layer2")
+    (repo / "data.bin").write_bytes(b"\x00\xff\x00binary\n")
+    os.symlink("lower.txt", repo / "link")
+    (repo / "tool.sh").write_text("#!/bin/sh\n")
+    (repo / "tool.sh").chmod(0o755)
+    (repo / "tracked.txt").unlink()
+    commit_all(repo, "upper layer")
+    upper = oid(repo, "HEAD")
+    # The same contents with a plain file mode and a regular file for the link.
+    git(repo, "switch", "-q", "-c", "variant", lower)
+    (repo / "data.bin").write_bytes(b"\x00\xff\x00binary\n")
+    (repo / "link").write_text("lower.txt")
+    (repo / "tool.sh").write_text("#!/bin/sh\n")
+    (repo / "tracked.txt").unlink()
+    commit_all(repo, "upper layer without modes")
+    variant = oid(repo, "HEAD")
+    # The trunk moved on unrelated work; the lower layer, then the upper slice land.
+    git(repo, "switch", "-q", "main")
+    (repo / "unrelated.txt").write_text("trunk work\n")
+    commit_all(repo, "unrelated trunk work")
+    git(repo, "merge", "--squash", "stack/layer1")
+    git(repo, "commit", "-q", "-m", "land lower")
+    git(repo, "cherry-pick", upper)
+    landing = oid(repo, "HEAD")
+    inspector = GitRepository(repo)
+    before = tree_state(repo)
+
+    own = inspector.slice_identity(lower, upper)
+    parent = inspector.first_parent(landing)
+
+    assert parent == oid(repo, "HEAD^")
+    assert inspector.slice_identity(str(parent), landing) == own
+    assert inspector.commit_tree(upper) == oid(repo, f"{upper}^{{tree}}")
+    assert inspector.commit_tree(landing) != inspector.commit_tree(upper)
+    # Modes, symlinks and deletions are part of the identity; the base matters.
+    assert inspector.slice_identity(lower, variant) != own
+    assert inspector.slice_identity(root, upper) != own
+    assert inspector.first_parent(root) is None
+    with pytest.raises(GitRefused):
+        inspector.slice_identity(upper, upper)
+    with pytest.raises(GitError):
+        inspector.slice_identity("f" * 40, upper)
+    with pytest.raises(GitError):
+        inspector.commit_tree(oid(repo, f"{upper}^{{tree}}"))
+    with pytest.raises(GitError):
+        inspector.first_parent(upper[:12])
+    assert tree_state(repo) == before  # inspection never writes
+
+
+def test_landing_bases_prove_a_multi_commit_rebase_landing_over_the_prior_trunk(
+    tmp_path: Path,
+) -> None:
+    repo = init_repo(tmp_path / "repo")
+    base = oid(repo, "HEAD")
+    git(repo, "switch", "-q", "-c", "stack/layer1")
+    # Two commits of one slice edit the same line, so they overlap.
+    (repo / "layer.txt").write_text("first\n")
+    commit_all(repo, "layer: first")
+    (repo / "layer.txt").write_text("second\n")
+    commit_all(repo, "layer: second")
+    head = oid(repo, "HEAD")
+    git(repo, "switch", "-q", "main")
+    (repo / "unrelated.txt").write_text("trunk work\n")
+    commit_all(repo, "unrelated trunk work")
+    before = oid(repo, "HEAD")
+    git(repo, "cherry-pick", f"{base}..{head}")
+    rebased = oid(repo, "HEAD")
+    git(repo, "merge", "-q", "--no-ff", "-m", "merge layer", head)
+    merged = oid(repo, "HEAD")
+    inspector = GitRepository(repo)
+    state = tree_state(repo)
+
+    bases = inspector.landing_bases(base, head, rebased)
+
+    assert bases == (oid(repo, f"{rebased}^"), before)
+    assert tree_state(repo) == state  # finding the candidates writes nothing
+    # Only the trunk before the whole replay proves the landing.
+    assert inspector.three_way_tree(base, bases[0], head) is None
+    assert inspector.three_way_tree(base, before, head) == inspector.commit_tree(
+        rebased
+    )
+    assert inspector.landing_bases(base, head, merged) == (rebased,)
+    with pytest.raises(GitError):
+        inspector.landing_bases(base, head[:12], rebased)

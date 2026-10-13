@@ -19,8 +19,13 @@ from state_store import (
     ChangesetRecord,
     CreateRecord,
     GateRow,
+    GraphJournal,
+    GraphNode,
     GroupRecord,
     LockBusy,
+    NativeMember,
+    NativeRecord,
+    NativeRequest,
     PublicationRecord,
     PushRecord,
     Receipt,
@@ -1364,3 +1369,298 @@ def test_separate_clones_do_not_share_journals(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         Store(common_dir_of(tmp_path / "two")).load(RUN)
     assert not (tmp_path / "two" / ".git" / "armory").exists()
+
+
+# -- native stack records of graph journals ---------------------------------------
+
+NOW = "2026-10-13T12:00:00+00:00"
+UUID = "6aa849f9-5647-4c96-a58d-8019d8830a2c"
+STACK_BASE = "b" * 40
+
+
+def head_of(pr: int) -> str:
+    return f"{pr:040x}"
+
+
+def native_member(pr: int, position: int, base_ref: str, base: str) -> NativeMember:
+    return NativeMember(
+        pr=pr,
+        position=position,
+        head_ref=f"stack/layer{position}",
+        head_sha=head_of(pr),
+        base_ref=base_ref,
+        base_sha=base,
+        tree=f"{pr + 100:040x}",
+        slice_base=base,
+        slice_identity=f"{pr:064x}",
+    )
+
+
+def native_journal() -> GraphJournal:
+    """Stack 7 on main: PRs 4 and 5 are the queued scope, 6 is retained above."""
+    lower = native_member(4, 1, "main", STACK_BASE)
+    selected = native_member(5, 2, lower.head_ref, lower.head_sha)
+    retained = replace(
+        native_member(6, 3, selected.head_ref, selected.head_sha),
+        fork=selected.head_sha,
+    )
+    nodes = [
+        GraphNode(4, None, True, "owner/repo", "stack/layer1", head_of(4), "main",
+                  DIGEST),
+        GraphNode(5, 4, True, "owner/repo", "stack/layer2", head_of(5),
+                  "stack/layer1", DIGEST),
+        GraphNode(6, 5, False, "owner/repo", "stack/layer3", head_of(6),
+                  "stack/layer2", None, state="RETAINED"),
+    ]  # fmt: skip
+    return GraphJournal(
+        run_id=RUN,
+        host="github.com",
+        repo="owner/repo",
+        trunk="main",
+        endpoint="clean",
+        plan_identity=DIGEST,
+        topology=DIGEST2,
+        plan={},
+        code_identity=DIGEST,
+        nodes=nodes,
+        created_at=NOW,
+        updated_at=NOW,
+        native=NativeRecord(
+            stack=7,
+            base_ref="main",
+            base_sha=STACK_BASE,
+            size=3,
+            selected=5,
+            scope=[4, 5],
+            retained=[6],
+            members=[lower, selected, retained],
+            request=NativeRequest("merge_queue", None, head_of(5)),
+        ),
+    )
+
+
+def accepted(journal: GraphJournal) -> GraphJournal:
+    """The queue accepted the request; both scope members landed and were proved."""
+    native = journal.native
+    assert native is not None
+    native.request = replace(
+        native.request,
+        state="ACCEPTED",
+        dispatched_at=NOW,
+        uuid=UUID,
+        status="enqueued",
+        message="Merge request enqueued.",
+        echo_action="merge_queue",
+        echo_method="default",
+        echo_head=head_of(5),
+    )
+    for member in native.members[:2]:
+        member.landing = f"{member.pr + 200:040x}"
+        member.landed_tree = f"{member.pr + 300:040x}"
+        member.verified = True
+    return journal
+
+
+def completed(journal: GraphJournal) -> GraphJournal:
+    for node, run_id in zip(journal.nodes[:2], (OTHER_RUN, "c" * 32), strict=True):
+        node.state, node.run_id = "LANDED", run_id
+    journal.status = "COMPLETE"
+    return journal
+
+
+@pytest.mark.parametrize(
+    "build", [native_journal, lambda: accepted(native_journal()),
+              lambda: completed(accepted(native_journal()))],
+)  # fmt: skip
+def test_native_graph_journal_round_trips_through_the_store(
+    common: Path, build: Callable[[], GraphJournal]
+) -> None:
+    journal = build()
+
+    Store(common).save_graph(journal)
+    loaded = Store(common).load_graph(RUN)
+
+    assert loaded == journal
+    assert GraphJournal.parse(json.loads(json.dumps(loaded.serialize()))) == journal
+    stale, fresh = Store(common), Store(common)
+    stale.load_graph(RUN)
+    current = fresh.load_graph(RUN)
+    current.updated_at = "2026-10-13T12:05:00+00:00"
+    fresh.save_graph(current)
+    with pytest.raises(StateError):
+        stale.save_graph(journal)
+
+
+def test_manual_graph_journal_keeps_its_exact_shape(common: Path) -> None:
+    journal = native_journal()
+    journal.native = None
+    store = Store(common)
+
+    store.save_graph(journal)
+    data = (common / "armory" / "ship" / "graphs" / f"{RUN}.json").read_bytes()
+
+    assert "native" not in json.loads(data)
+    assert Store(common).load_graph(RUN) == journal
+    explicit = {**journal.serialize(), "native": None}
+    with pytest.raises(ReceiptInputError):
+        GraphJournal.parse(explicit)
+
+
+def native_payload() -> Payload:
+    return accepted(native_journal()).serialize()
+
+
+def native_part(data: Payload, *path: str | int) -> dict[str, object]:
+    target: object = data["native"]
+    for key in path:
+        if isinstance(key, int):
+            target = cast(list[object], target)[key]
+        else:
+            target = cast(dict[str, object], target)[key]
+    return cast(dict[str, object], target)
+
+
+def set_native(*path: str | int, **values: object) -> Callable[[Payload], None]:
+    def change(data: Payload) -> None:
+        native_part(data, *path).update(values)
+
+    return change
+
+
+def set_journal(**values: object) -> Callable[[Payload], None]:
+    def change(data: Payload) -> None:
+        data.update(values)
+
+    return change
+
+
+def select_node(pr: int, selected: bool) -> Callable[[Payload], None]:
+    def change(data: Payload) -> None:
+        for node in cast(list[dict[str, object]], data["nodes"]):
+            if node["pr"] == pr:
+                node["selected"] = selected
+                node["decision_identity"] = DIGEST if selected else None
+                node["state"] = "PENDING" if selected else "RETAINED"
+
+    return change
+
+
+def complete_unverified(data: Payload) -> None:
+    nodes = cast(list[dict[str, object]], data["nodes"])
+    for node, run_id in zip(nodes[:2], (OTHER_RUN, "c" * 32), strict=True):
+        node["state"], node["run_id"] = "LANDED", run_id
+    data["status"] = "COMPLETE"
+    native_part(data, "members", 1).update(verified=False)
+
+
+def oversized_scope(data: Payload) -> None:
+    native_part(data)["scope"] = list(range(1, 70))
+
+
+# Each corruption and the rule that refuses it.
+NATIVE_REJECTS: list[tuple[Callable[[Payload], None], str]] = [
+    (set_journal(native=None), "native record must be a JSON object"),
+    (set_native(unknown=True), "native record fields are missing"),
+    (set_native("request", unknown=True), "native request fields are missing"),
+    (set_native("members", 0, unknown=True), "native member fields are missing"),
+    (set_native("request", uuid=UUID.upper()), "uuid must be a lowercase UUID"),
+    (set_native("request", uuid="not-a-uuid"), "uuid must be a lowercase UUID"),
+    (set_native("request", method="squash"), "merge_queue sends no method"),
+    (set_native("request", action="direct_merge", echo_action="direct_merge"),
+     "direct_merge names one"),
+    (set_native("request", action="fast_forward"), "unsupported action or state"),
+    (set_native("request", method="fast-forward", action="default"),
+     "request method has an unsupported value"),
+    (set_native("request", echo_method="squash"), "echo must equal the exact"),
+    (set_native("request", echo_head=head_of(4)), "echo must equal the exact"),
+    (set_native("request", expected_head=head_of(4), echo_head=head_of(4)),
+     "must guard the selected head"),
+    (set_native("request", message="line one\nline two"),
+     "message must be plain text"),
+    (set_native("request", message="m" * 513), "message must be plain text"),
+    (set_native("request", status="merged"), "only a merged status has a merge"),
+    (set_native("request", status="queued"), "status has an unsupported value"),
+    (set_native("request", sha=head_of(9)), "only a merged status has a merge"),
+    (set_native("request", message=None), "status and message together"),
+    (set_native("request", uuid=None), "only an immediate merged/enqueued answer"),
+    (set_native("request", state="PLANNED"), "exactly a dispatched request has a time"),
+    (set_native("request", state="DISPATCHING", uuid=None, status=None,
+                message=None, echo_action=None, echo_method=None, echo_head=None),
+     "landings are recorded only after the request outcome"),
+    (set_native("request", state="REJECTED", detail="HTTP 422 refused"),
+     "a refused or unknown request has no id or echo"),
+    (set_native("request", state="UNKNOWN", uuid=None, echo_action=None,
+                echo_method=None, echo_head=None, status=None, message=None),
+     "a refused or unknown request has no id or echo"),
+    (set_native("request", state="SENT"), "unsupported action or state"),
+    (set_native(selected=4), "scope must end at the selected PR"),
+    (set_native(scope=[4, 5, 4]), "native scope must list distinct PRs"),
+    (set_native(scope=[], selected=5), "native scope must list distinct PRs"),
+    (oversized_scope, "native scope must list at most"),
+    (set_native(retained=[]), "members must be the scope then the retained PRs"),
+    (set_native(size=4), "must reach the top of the stack"),
+    (set_native(base_ref="trunk"), "trunk is its stack base"),
+    (set_native(base_ref="refs/heads/main"), "stack base ref must be a short branch"),
+    (set_native(stack=0), "stack number must be a bounded positive integer"),
+    (set_native("members", 1, position=3), "#5 is not at the next stack position"),
+    (set_native("members", 1, base_ref="main"), "#5 must sit on the member below"),
+    (set_native("members", 1, slice_base=STACK_BASE),
+     "#5 must sit on the member below"),
+    (set_native("members", 1, slice_base=head_of(5)), "#5 own slice must be nonempty"),
+    (set_native("members", 1, head_sha="abc"), "#5 head must be a full object"),
+    (set_native("members", 1, slice_identity="ff"),
+     "#5 slice identity must be a SHA-256 identity"),
+    (set_native("members", 1, landing=None), "a landed tree needs its landing"),
+    (set_native("members", 1, landed_tree=None), "a verified landing both"),
+    (set_native("members", 1, verified="yes"), "#5 verified flag must be a boolean"),
+    (set_native("members", 1, fork=head_of(5)),
+     "#5: only a retained member records a fork"),
+    (set_native("members", 2, fork=head_of(4)), "#6 is retained on the selected head"),
+    (set_native("members", 2, landing=head_of(9)), "and never lands here"),
+    (set_native("members", 0, pr=6), "members must be the scope then the retained"),
+    (select_node(6, True), "every retained native PR must be an unselected node"),
+    (select_node(5, False), "every native scope PR must be a selected graph node"),
+    (complete_unverified, "a complete native run has verified every scope landing"),
+    (set_journal(endpoint="pr"), "a pr-endpoint graph run is observation-only"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("corrupt", "rule"), NATIVE_REJECTS)
+def test_malformed_native_records_are_refused(
+    corrupt: Callable[[Payload], None], rule: str
+) -> None:
+    data = native_payload()
+    GraphJournal.parse(data)
+    corrupt(data)
+
+    with pytest.raises(ReceiptInputError, match=rule):
+        GraphJournal.parse(data)
+
+
+@pytest.mark.parametrize(
+    "request_row",
+    [
+        {"state": "ACCEPTED", "uuid": None, "status": "merged", "message": "done",
+         "sha": "c" * 40, "echo_action": None, "echo_method": None,
+         "echo_head": None},
+        {"state": "REJECTED", "uuid": None, "status": "failed",
+         "message": "Merge conflict.", "echo_action": None, "echo_method": None,
+         "echo_head": None, "detail": "the provider answered failed"},
+        {"state": "UNKNOWN", "uuid": None, "status": None, "message": None,
+         "echo_action": None, "echo_method": None, "echo_head": None,
+         "detail": "native-merge-uncertain-timeout"},
+    ],
+)  # fmt: skip
+def test_each_request_outcome_keeps_confirmed_landings(
+    common: Path, request_row: dict[str, object]
+) -> None:
+    data = native_payload()
+    native_part(data, "request").update(request_row)
+    journal = GraphJournal.parse(data)
+
+    Store(common).save_graph(journal)
+    loaded = Store(common).load_graph(RUN)
+
+    assert loaded == journal
+    assert loaded.native is not None
+    assert [m.landing is not None for m in loaded.native.members] == [True, True, False]

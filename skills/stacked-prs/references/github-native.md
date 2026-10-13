@@ -1,16 +1,17 @@
 # GitHub-native stacked pull requests
 
-GitHub-native stacked pull requests are public preview. Native-stack
-membership is a provider-side property of a pull request; detect it for every
-open stack PR during Inspect (`references/stack-model.md` § Native Stack
-Detection) before any merge planning.
+Native-stack membership is a provider-side property of a pull request;
+detect it for every open stack PR during Inspect (`references/stack-model.md`
+§ Native Stack Detection) before any merge planning. This reference is the
+manual provider procedure; native members are never merged by the ordinary
+single-PR path or the manual graph path.
 
 ## Two distinct operations, two different opt-in rules
 
 - **Creating native state** — `gh stack link` converts a manual stack (or
-  links loose PRs) into a native stack on GitHub. This is a mutation with
-  public-preview risk; it requires the eligibility probe below plus explicit
-  user consent.
+  links loose PRs) into a native stack on GitHub. This is a provider
+  mutation; it requires the eligibility checks below plus explicit user
+  consent.
 - **Operating on a stack Inspect already found to be native** — merging,
   syncing, or otherwise mutating a PR the provider already registers as a
   stack member. This is not a choice: the provider's synchronous merge
@@ -32,10 +33,10 @@ Require all of the following before running `gh stack link`:
    as unavailable and fall back to manual mode.
 4. Armory branch order, PR base order, and `Stack-Id`/`Stack-Position` trailers
    agree with the proposed native order.
-5. The user explicitly selects `github-native` mode or accepts the preview risk.
+5. The user explicitly selects `github-native` mode.
 
-Do not use native linking for cross-fork stacks, unavailable preview tooling,
-disabled repository support, or topology mismatch. Report the reason and use
+Do not use native linking for cross-fork stacks, unavailable `gh stack`
+tooling, disabled repository support, or topology mismatch. Report the reason and use
 manual Armory mode instead.
 
 Condition 5 gates linking only. Once Inspect finds a PR already native (see
@@ -54,12 +55,21 @@ gh api repos/{owner}/{repo}/pulls/<number> --jq '.stack'
 
 Returns `null` when the PR is not part of a native stack, or an object with
 `number`, `size`, `position`, and `base.ref` when it is. Run this for every
-open stack PR during Inspect, before merge planning.
+open stack PR during Inspect, before merge planning. Read the complete,
+ordered membership from the stack itself:
 
-If the probe is unavailable for any reason, treat the merge-time
-`mergePullRequest`/`merge-async` "part of a stack" rejection as authoritative
-detection and switch to the native merge path below rather than reporting
-failure.
+```bash
+gh api repos/{owner}/{repo}/stacks/<stack-number>
+```
+
+Members are listed bottom to top, including members that already merged (they
+keep their original heads). After a partial landing the stack still lists
+every position.
+
+If the probe is unavailable for any reason, treat a synchronous merge
+rejection ("must be merged using the asynchronous merge REST API") as
+authoritative detection: stop the manual path, re-inspect with the reads
+above, and continue with § Merge rather than reporting failure.
 
 ## Link and inspect
 
@@ -178,15 +188,9 @@ never as merged, and reconcile from pull request facts.
 
 After the request settles:
 
-1. Confirm each selected member from its own pull request facts: state
-   `MERGED`, merge commit, and a landing tree equal to the reviewed tree.
-2. Confirm each retained (unselected) open member. GitHub retargeted the
-   lowest retained member to the stack base and rebased it onto the new
-   landing. Its tree, and its diff against the new base, must still equal the
-   reviewed slice.
-3. Re-fetch, verify stack topology, CI and provenance, then rebuild or
-   resync the remaining stack. Clean only confirmed merged branches; never
-   delete a base that an open member still uses.
+1. Confirm each selected member from its own pull request facts: state `MERGED`, a landing reachable from the stack base, and a full landing tree equal to the clean three-way application of its reviewed own slice to the canonical-trunk base before that landing. A merged upper member keeps its review base (the lower member's branch) although it landed on the stack base; that is expected, not a contradiction, and is never rewritten.
+2. Confirm each retained (unselected) open member. GitHub retargets the lowest retained member to the stack base and rebases it onto the new landing; higher retained members stay based on the member immediately below them and contain its current head. Verify each full rebased tree and exact own-slice identity against that placement, not a literal equality with the old full tree when the trunk changed.
+3. Re-fetch, verify stack topology, CI and provenance, then rebuild or resync the remaining stack. Clean only confirmed merged branches; never delete a base that an open member still uses.
 
 ### Choosing a merge method for trailer survival
 
@@ -240,7 +244,7 @@ GitHub applies the bottom pull request's base-branch requirements across a
 native stack. Still inspect every displayed stack layer as green before a merge.
 
 Manual Armory mode remains mandatory for a stack Inspect has NOT already found
-native: an ineligible creation probe, a cross-fork stack, unavailable preview
+native: failed creation checks, a cross-fork stack, unavailable `gh stack`
 tooling, or topology mismatch. It retains its root-to-leaf merge, explicit
 rebase/retarget, and trailer-preservation rules. Manual mode is not available
 once Inspect finds a stack already native — see "Two distinct operations"

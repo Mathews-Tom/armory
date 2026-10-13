@@ -129,7 +129,7 @@ Use this path only for the specific provider failure where a child PR was closed
 - The invoking checkout has local changes, a conflict or a Git operation in progress before a push, retarget or merge.
 - An expected-old lease is stale.
 - Topology or a head changed since the packet was written for a selected node or one of its ancestors: a new, missing, rebased, retargeted or closed node, a changed parent, or a head moved outside the controller. The same change to another unselected node is reported, not a stop.
-- The node is a native stack member (`references/stack-model.md` § Native Stack Detection).
+- The node is a native stack member (`references/stack-model.md` § Native Stack Detection): the manual path stops, and the stack is merged only through the guarded `merge-async` prefix request in `references/github-native.md` § Merge, never by `gh pr merge`.
 - In a stack the skill created, a commit is missing `Stack-Id` or has a `Stack-Id` that differs from `.stack-prs.yaml`.
 - Squash message policy is `PR_BODY` or `BLANK`, the merge is hand-run, and stack trailers the skill created are not present in the squash body or PR body.
 - Provider reports branch protection failure.

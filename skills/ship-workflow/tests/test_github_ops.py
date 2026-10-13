@@ -3214,7 +3214,9 @@ class NativeProvider:
         """Validate and accept one request as GitHub does; refusals accept nothing.
 
         The accepted operation covers every open member from the stack bottom
-        up to the selected PR; members above it are not part of it.
+        up to the selected PR; members above it are not part of it. While an
+        accepted request covering the selected PR is pending, a new one is
+        refused with 409 naming that request and its options.
         """
         assert path.endswith("/merge-async"), path
         fields = {
@@ -3230,6 +3232,10 @@ class NativeProvider:
             return render(argv, self.put_replies.pop(0))
         number = int(path.rsplit("/", 2)[1])
         selected = self.members[number]
+        active = [op for op in self.operations if number in op.scope]
+        if active and self.request_status == "pending":
+            details = self._details(active[-1], selected.head)
+            return render(argv, Reply(409, {"status": "pending", "details": details}))
         action = fields["merge_action"]
         custom = {"merge_method", "commit_title", "commit_message"} & fields.keys()
         if action == "merge_queue" and custom:
@@ -3249,15 +3255,19 @@ class NativeProvider:
             bypass_rules=fields.get("bypass_rules") == "true",
         )
         self.operations.append(operation)
-        details = {
+        details = self._details(operation, selected.head)
+        return render(argv, Reply(202, {"status": "pending", "details": details}))
+
+    @staticmethod
+    def _details(operation: Operation, head: str) -> dict[str, Any]:
+        return {
             "message": "Merge request enqueued.",
             "uuid": operation.uuid,
             "merge_method": operation.method,
             "merge_action": operation.action,
-            "expected_head_sha": selected.head,
+            "expected_head_sha": head,
             "bypass_rules": operation.bypass_rules,
         }
-        return render(argv, Reply(202, {"status": "pending", "details": details}))
 
     def _get(self, path: str) -> Reply:
         base = f"/repos/{REPO}"
@@ -3646,6 +3656,40 @@ def test_start_native_merge_409_surfaces_the_existing_request_identity() -> None
     assert (error.kind, error.uncertain, error.http_status) == ("WAITING", False, 409)
     assert (error.existing.uuid, error.existing.status) == (OTHER_UUID, "pending")
     assert len(provider.puts) == 1
+    assert not error.existing.matches("direct_merge", "squash", head)
+    assert error.existing.matches("direct_merge", "merge", head)
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "same"),
+    [
+        ((None, "merge_queue"), (None, "merge_queue"), True),
+        (("squash", "direct_merge"), ("squash", "direct_merge"), True),
+        ((None, "default"), (None, "merge_queue"), False),
+        (("merge", "direct_merge"), ("squash", "direct_merge"), False),
+        (("squash", "default"), (None, "default"), False),
+    ],
+)  # fmt: skip
+def test_request_already_in_flight_reconciles_by_its_exact_options(
+    first: tuple[str | None, str],
+    second: tuple[str | None, str],
+    same: bool,
+) -> None:
+    provider = NativeProvider()
+    head = provider.members[5].head
+    gh, sleeps = native_gh(provider)
+    started = gh.start_native_merge(5, head, *first)
+
+    with pytest.raises(github_ops.NativeMergeInProgress) as caught:
+        gh.start_native_merge(5, head, *second)
+
+    existing = caught.value.existing
+    assert (existing.uuid, existing.status) == (started.uuid, "pending")
+    assert existing.matches(second[1], second[0], head) is same
+    assert existing.matches(first[1], first[0], head)
+    assert not existing.matches(first[1], first[0], OTHER_HEAD)
+    assert len(provider.operations) == 1
+    assert (len(provider.puts), sleeps) == (2, [])
 
 
 def test_start_native_merge_default_without_method_lets_github_choose() -> None:
@@ -3756,6 +3800,13 @@ def test_start_native_merge_not_ready_or_missing_pr_is_a_definite_refusal(
         (None, Reply(202, {"status": "pending", "details": {
             "message": "m", "uuid": UUID, "merge_action": "merge_queue",
             "expected_head_sha": sha(0x105), "bypass_rules": True}})),
+        (None, Reply(202, {"status": "pending", "details": {
+            "message": "m", "uuid": UUID, "merge_action": "merge_queue",
+            "expected_head_sha": sha(0x105), "bypass_rules": False}})),
+        (None, Reply(202, {"status": "pending", "details": {
+            "message": "m", "uuid": UUID, "merge_action": "queue",
+            "merge_method": "default", "expected_head_sha": sha(0x105),
+            "bypass_rules": False}})),
     ],
 )  # fmt: skip
 def test_start_native_merge_unknown_outcome_is_uncertain_and_never_resent(
@@ -3804,6 +3855,9 @@ def test_start_native_merge_honours_the_absolute_monitoring_deadline() -> None:
         {"status": "failed", "details": {"message": "m", "sha": NATIVE_LANDED[5]}},
         {"status": "failed"},
         {"status": "enqueued"},
+        {"status": "pending", "details": {"message": "m", "merge_action": "squash"}},
+        {"status": "pending", "details": {"message": "m", "merge_method": "ff"}},
+        {"status": "pending", "details": {"message": "m", "bypass_rules": "no"}},
     ],
 )
 def test_read_native_merge_rejects_malformed_or_unknown_status(

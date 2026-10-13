@@ -2,7 +2,8 @@
 """Ship local work or an existing PR through publication, landing and safe cleanup.
 
 An explicit --stack-plan packet, or the run id of a saved stack graph, instead
-continues an existing manual stack graph parent-first through the same per-PR
+continues an existing manual stack graph parent-first, or a selected prefix of one
+GitHub-native stack through one async merge request, through the same per-PR
 landing and cleanup owner.
 """
 
@@ -182,7 +183,7 @@ def stack_graph(
     plan: StackPlan | None,
     journal: GraphJournal | None,
 ) -> tuple[dict[str, object], int]:
-    """Continue an explicit manual stack graph from --stack-plan and/or its run id.
+    """Continue a manual or native stack graph from --stack-plan and/or its run id.
 
     ``journal`` is a graph run a bare ``--resume RUN_ID`` already loaded;
     otherwise ``--resume`` selects the run of ``plan``.
@@ -325,7 +326,7 @@ def main() -> int:
         "--stack-plan",
         type=Path,
         help="explicit stack graph decision packet (JSON): continue an existing "
-        "manual stack parent-first",
+        "manual stack parent-first or a selected native stack prefix",
     )
     args = parser.parse_args()
     if args.inventory or args.draft is not None:

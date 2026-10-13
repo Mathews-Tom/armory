@@ -115,13 +115,14 @@ Native stacks
   afterwards.  There is no implicit action change, no fallback to a
   synchronous merge and no retry.  A ``pending`` reply (a new request) must
   carry a UUID and echo the head, action, method (``default`` when none was
-  sent) and ``bypass_rules=false`` exactly, or it is uncertain.  A 2xx
-  ``merged`` or ``enqueued`` reply means the PR was already merged or already
-  queued (no new request, normally no UUID) and a 2xx ``failed`` reply is
-  returned as read.  400 (closed or draft PR), 403, 404 and 422 are definite
-  refusals.  Uncertainty follows ``merge``; a 409 naming an existing request
-  raises ``NativeMergeInProgress`` carrying that request, whose options may
-  differ from the ones sent.
+  sent) and ``bypass_rules=false`` exactly (``NativeMergeResult.matches``), or
+  it is uncertain.  A 2xx ``merged`` or ``enqueued`` reply means the PR was
+  already merged or already queued (no new request, normally no UUID) and a
+  2xx ``failed`` reply is returned as read.  400 (closed or draft PR), 403,
+  404 and 422 are definite refusals.  Uncertainty follows ``merge``; a 409
+  naming an existing request raises ``NativeMergeInProgress`` carrying that
+  request with its echoed options, which may differ from the ones sent:
+  ``existing.matches(action, method, expected_head)`` tells them apart.
 * ``read_native_merge(n, uuid)`` reads ``GET .../pulls/<n>/merge-async/<uuid>``.
   Statuses are ``pending``, ``enqueued``, ``merged`` (with the selected PR's
   merge commit ``sha``) and ``failed`` (GitHub's reason in ``message``);
@@ -326,6 +327,8 @@ class NativeMergeResult:
 
     ``sha`` is set only for ``merged``; ``message`` is GitHub's (for ``failed``,
     the reason).  ``uuid`` is None for an immediate already-merged/queued reply.
+    ``merge_action``, ``merge_method`` and ``bypass_rules`` are the request
+    options GitHub echoes in ``details`` (None when it omits one).
     """
 
     status: str
@@ -333,6 +336,25 @@ class NativeMergeResult:
     message: str
     sha: str | None
     expected_head_sha: str | None
+    merge_action: str | None = None
+    merge_method: str | None = None
+    bypass_rules: bool | None = None
+
+    def matches(self, action: str, method: str | None, expected_head: str) -> bool:
+        """Whether this is exactly a request sent as ``start_native_merge`` sends it.
+
+        True only for an identified request echoing ``action``, ``method``
+        (``default`` for a request sent without one), ``expected_head`` and
+        ``bypass_rules=false``.  Use it to reconcile ``NativeMergeInProgress``:
+        a request with other options is not the one that was meant.
+        """
+        return (
+            self.uuid is not None
+            and self.merge_action == action
+            and self.merge_method == (method or "default")
+            and self.expected_head_sha == expected_head
+            and self.bypass_rules is False
+        )
 
 
 @dataclass(frozen=True)
@@ -347,8 +369,9 @@ class NativeTrunkPolicy:
 class NativeMergeInProgress(ProviderError):
     """GitHub refused (409) because an async merge request already exists.
 
-    ``existing`` is that request as GitHub reported it; reconcile its options
-    with ``read_native_merge`` before treating the PR as handled.
+    ``existing`` is that request as GitHub reported it, with its echoed options;
+    ``existing.matches`` decides whether it is exactly the intended request.
+    Reconcile it with ``read_native_merge`` before treating the PR as handled.
     """
 
     def __init__(
@@ -1900,7 +1923,7 @@ class GitHub:
                 "reconcile from read_pr facts",
                 kind="BLOCKED", operation=op, http_status=404, detail="native-merge-request-unknown",
             ) from exc  # fmt: skip
-        result, _ = _parse_native_result(raw, op)
+        result = _parse_native_result(raw, op)
         if result.uuid is not None and result.uuid != uuid:
             raise _malformed(op, "response.details.uuid does not echo the requested id")
         return replace(result, uuid=uuid)
@@ -2540,12 +2563,7 @@ def _accepted_native_merge(
     ``bypass_rules=false``; ``merged``/``enqueued``/``failed`` are returned as read.
     """
     try:
-        result, details = _parse_native_result(json.loads(response.body), op)
-        echo = (
-            details.opt_text("merge_action"),
-            details.opt_text("merge_method"),
-            details.opt_flag("bypass_rules"),
-        )
+        result = _parse_native_result(json.loads(response.body), op)
     except (ValueError, ProviderError) as exc:
         raise ProviderError(
             f"{op}: the async merge response is unreadable; {unsafe}",
@@ -2554,15 +2572,7 @@ def _accepted_native_merge(
     if result.status != "pending":
         # 200 for a PR already merged or already queued (no new request), or failed.
         return result
-    # GitHub echoes the method as "default" when none was sent.
-    methods: set[str | None] = {method} if method is not None else {None, "default"}
-    if (
-        result.uuid is None
-        or result.expected_head_sha != expected_head
-        or echo[0] != action
-        or echo[1] not in methods
-        or echo[2] is not False
-    ):
+    if not result.matches(action, method, expected_head):
         raise ProviderError(
             f"{op}: the accepted async merge request contradicts the request sent; {unsafe}",
             kind="BLOCKED", operation=op, uncertain=True, detail="native-merge-contradiction",
@@ -2598,7 +2608,7 @@ def _native_merge_failure(
 
     if failure.status == 409:
         try:
-            existing, _ = _parse_native_result(json.loads(response.body), op)
+            existing = _parse_native_result(json.loads(response.body), op)
         except (ValueError, ProviderError):
             existing = None
         if existing is not None and existing.uuid is not None:
@@ -2813,8 +2823,8 @@ def _parse_stack_listing(
     return _StackListing(number, base_ref, tuple(entries))
 
 
-def _parse_native_result(raw: Any, op: str) -> tuple[NativeMergeResult, _Obj]:
-    """Strict ``merge-async`` status body; returns the result and its ``details`` object."""
+def _parse_native_result(raw: Any, op: str) -> NativeMergeResult:
+    """Strict ``merge-async`` status body, with the request options it echoes."""
     top = _Obj.of(raw, op, "response")
     status = top.text("status")
     if status not in NATIVE_MERGE_STATUSES:
@@ -2828,14 +2838,22 @@ def _parse_native_result(raw: Any, op: str) -> tuple[NativeMergeResult, _Obj]:
     landed = details.opt_sha("sha")
     if (status == "merged") != (landed is not None):
         raise _malformed(op, "response.details.sha contradicts response.status")
-    result = NativeMergeResult(
+    action = details.opt_text("merge_action")
+    if action is not None and action not in NATIVE_MERGE_ACTIONS:
+        raise _malformed(op, "response.details.merge_action is not a merge action")
+    method = details.opt_text("merge_method")
+    if method is not None and method not in ("default", *MERGE_METHODS):
+        raise _malformed(op, "response.details.merge_method is not a merge method")
+    return NativeMergeResult(
         status=status,
         uuid=uuid,
         message=_clean(details.text("message")),
         sha=landed,
         expected_head_sha=details.opt_sha("expected_head_sha"),
+        merge_action=action,
+        merge_method=method,
+        bypass_rules=details.opt_flag("bypass_rules"),
     )
-    return result, details
 
 
 @dataclass(frozen=True)
