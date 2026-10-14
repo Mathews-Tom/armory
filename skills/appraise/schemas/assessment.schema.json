@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/assessment.schema.json",
+  "title": "Appraisal assessment",
+  "description": "Engine-calibrated assessment. assessment.md, questions.md and limitations.md are rendered from this document.",
+  "type": "object",
+  "required": ["schema_version", "assessment_id", "run_id", "generated_at", "tool", "mode", "subject", "repositories", "result", "competencies", "strengths", "confirmed_weaknesses", "potential_risks", "evidence_gaps", "development_plan", "interview_questions", "summary", "self_reports", "contested_evidence", "rejected_evidence", "coverage", "limitations", "provenance", "changes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "assessment_id": {"$ref": "#/$defs/digest"},
+    "run_id": {"type": "string"},
+    "generated_at": {"type": "string"},
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {"name": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "mode": {"enum": ["review", "self", "promotion", "manager"]},
+    "subject": {
+      "type": "object",
+      "required": ["candidate_id", "identity_verified", "identity_basis", "domain", "specialization", "target_level", "consent"],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {"type": "string"},
+        "identity_verified": {"type": "boolean"},
+        "identity_basis": {"type": "array", "items": {"type": "string"}},
+        "domain": {"type": "string"},
+        "specialization": {"type": ["string", "null"]},
+        "target_level": {"type": ["string", "null"]},
+        "consent": {"enum": [null, "subject_informed"]}
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["repo_id", "locator", "revision", "revision_time", "analyzed_at", "is_fork", "relationship", "parent_locator", "upstream_diff_status", "ancestry", "candidate_role", "attribution_confidence", "candidate_surviving_share", "sample_coverage", "history_shallow", "analysis_depth"],
+        "additionalProperties": false,
+        "properties": {
+          "repo_id": {"type": "string"},
+          "locator": {"type": "string"},
+          "revision": {"type": "string"},
+          "revision_time": {"type": "string"},
+          "analyzed_at": {"type": "string"},
+          "is_fork": {"type": ["boolean", "null"]},
+          "relationship": {"type": "string"},
+          "parent_locator": {"type": ["string", "null"]},
+          "upstream_diff_status": {"type": "string"},
+          "ancestry": {"type": "string"},
+          "candidate_role": {"type": "string"},
+          "attribution_confidence": {"$ref": "#/$defs/confidence"},
+          "candidate_surviving_share": {"type": ["number", "null"]},
+          "sample_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+          "history_shallow": {"type": "boolean"},
+          "analysis_depth": {"enum": ["quick", "standard", "deep"]}
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["recommended_level", "technical_capability_level", "scope_influence_level", "scope_influence_status", "plausible_levels", "plausible_range", "confidence", "confidence_factors", "inconclusive_reasons", "determination", "decision_trace", "next_level_blockers", "target_level_comparison"],
+      "additionalProperties": false,
+      "properties": {
+        "recommended_level": {"type": "string"},
+        "technical_capability_level": {"type": ["string", "null"]},
+        "scope_influence_level": {"type": ["string", "null"]},
+        "scope_influence_status": {"enum": ["observed", "partial", "not_observable"]},
+        "plausible_levels": {"type": "array", "items": {"type": "string"}},
+        "plausible_range": {
+          "type": "object",
+          "required": ["lower", "upper"],
+          "additionalProperties": false,
+          "properties": {"lower": {"type": ["string", "null"]}, "upper": {"type": ["string", "null"]}}
+        },
+        "confidence": {"$ref": "#/$defs/confidence"},
+        "confidence_factors": {
+          "type": "object",
+          "required": ["attribution", "evidence", "coverage", "range_width", "notes"],
+          "additionalProperties": false,
+          "properties": {
+            "attribution": {"$ref": "#/$defs/confidence"},
+            "evidence": {"$ref": "#/$defs/confidence"},
+            "coverage": {"$ref": "#/$defs/confidence"},
+            "range_width": {"type": "integer", "minimum": 0},
+            "notes": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "inconclusive_reasons": {"type": "array", "items": {"type": "string"}},
+        "determination": {"type": "string"},
+        "decision_trace": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["level", "band", "outcome", "clauses"],
+            "additionalProperties": false,
+            "properties": {
+              "level": {"type": "string"},
+              "band": {"enum": ["technical", "scope"]},
+              "outcome": {"$ref": "#/$defs/outcome"},
+              "clauses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["clause", "outcome", "detail", "explanation", "competencies"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "clause": {"type": "string"},
+                    "outcome": {"$ref": "#/$defs/outcome"},
+                    "detail": {"type": "string"},
+                    "explanation": {"type": "string", "description": "Plain-language reading of the rule against the candidate's scores."},
+                    "competencies": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "next_level_blockers": {"type": "array", "items": {"type": "string"}},
+        "target_level_comparison": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["target_level", "outcome", "blockers"],
+              "additionalProperties": false,
+              "properties": {
+                "target_level": {"type": "string"},
+                "outcome": {"enum": ["meets", "below", "above", "inconclusive"]},
+                "blockers": {"type": "array", "items": {"type": "string"}}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "competencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "group", "score", "status", "not_observable_reason", "confidence", "proposed_score", "supporting_evidence_ids", "counterevidence_ids", "self_report_ids", "independent_sources", "adjustments", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "group": {"type": "string"},
+          "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 5},
+          "status": {"enum": ["observed", "not_observable", "self_reported"]},
+          "not_observable_reason": {"enum": [null, "no_opportunity", "no_evidence", "evidence_rejected", "insufficient_attribution", "access_limited", "not_sampled"]},
+          "confidence": {"$ref": "#/$defs/confidence"},
+          "proposed_score": {"type": ["integer", "null"], "minimum": 0, "maximum": 5},
+          "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+          "counterevidence_ids": {"type": "array", "items": {"type": "string"}},
+          "self_report_ids": {"type": "array", "items": {"type": "string"}},
+          "independent_sources": {"type": "integer", "minimum": 0},
+          "adjustments": {"type": "array", "items": {"type": "string"}},
+          "rationale": {"type": "string"}
+        }
+      }
+    },
+    "strengths": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "confirmed_weaknesses": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "potential_risks": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "evidence_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["competency", "reason", "resolution"],
+        "additionalProperties": false,
+        "properties": {
+          "competency": {"type": "string"},
+          "reason": {"type": "string"},
+          "resolution": {"type": "string"}
+        }
+      }
+    },
+    "development_plan": {"type": "array", "items": {"type": "object"}},
+    "interview_questions": {"type": "array", "items": {"type": "object"}},
+    "summary": {"type": "string"},
+    "self_reports": {"type": "array", "items": {"type": "object"}},
+    "contested_evidence": {"type": "array", "items": {"type": "object"}},
+    "rejected_evidence": {"type": "array", "items": {"type": "object"}},
+    "coverage": {"type": "object"},
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message", "impact", "repo"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "impact": {"type": "string"},
+          "repo": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["rubric_id", "rubric_version", "rubric_sha256", "input_sha256", "forensics_sha256", "judgments_sha256", "evidence_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "rubric_id": {"type": "string"},
+        "rubric_version": {"type": "string"},
+        "rubric_sha256": {"$ref": "#/$defs/digest"},
+        "input_sha256": {"$ref": "#/$defs/digest"},
+        "forensics_sha256": {"$ref": "#/$defs/digest"},
+        "judgments_sha256": {"$ref": "#/$defs/digest"},
+        "evidence_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "changes": {
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["previous_assessment_id", "summary", "result_changes", "competency_changes", "evidence_added", "evidence_removed", "freshness"],
+          "additionalProperties": false,
+          "properties": {
+            "previous_assessment_id": {"type": "string"},
+            "summary": {"type": "array", "items": {"type": "string"}},
+            "result_changes": {"type": "array", "items": {"type": "object"}},
+            "competency_changes": {"type": "array", "items": {"type": "object"}},
+            "evidence_added": {"type": "array", "items": {"type": "string"}},
+            "evidence_removed": {"type": "array", "items": {"type": "string"}},
+            "freshness": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "confidence": {"enum": ["low", "medium", "high"]},
+    "outcome": {"enum": ["pass", "fail", "unknown"]},
+    "finding": {
+      "type": "object",
+      "required": ["summary", "evidence_ids", "dropped_evidence_ids", "competencies"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": {"type": "string"},
+        "evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "dropped_evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "competencies": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

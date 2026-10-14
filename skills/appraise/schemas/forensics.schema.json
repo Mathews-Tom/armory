@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/forensics.schema.json",
+  "title": "Repository forensics",
+  "description": "Deterministic, read-only repository analysis produced by `discover`. Contains no raw email addresses.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "generated_at", "tool", "input_sha256", "candidate", "repositories"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "run_id": {"type": "string", "minLength": 8},
+    "generated_at": {"type": "string"},
+    "tool": {"$ref": "#/$defs/tool"},
+    "input_sha256": {"$ref": "#/$defs/digest"},
+    "candidate": {
+      "type": "object",
+      "required": ["display", "status", "identifiers", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "display": {"type": ["string", "null"]},
+        "status": {"enum": ["resolved", "provisional", "needs_candidate", "unresolved"]},
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "value", "source"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {"enum": ["github", "email", "name"]},
+              "value": {"type": "string"},
+              "source": {"enum": ["declared", "self_gh_login", "self_git_config"]}
+            }
+          }
+        },
+        "notes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "repositories": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/repository"}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {"name": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "confidence": {"enum": ["low", "medium", "high"]},
+    "limitation": {
+      "type": "object",
+      "required": ["code", "message", "impact"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "message": {"type": "string"},
+        "impact": {"enum": ["attribution", "coverage", "lineage", "collaboration", "verification", "identity", "freshness"]}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": ["key", "display", "email_redacted", "match", "commits", "login"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "pattern": "^id:[0-9a-f]{12}$"},
+        "display": {"type": "string"},
+        "email_redacted": {"type": "string"},
+        "match": {"enum": ["declared_email", "github_noreply", "host_linked", "mailmap", "declared_name", "sole_contributor"]},
+        "commits": {"type": "integer", "minimum": 0},
+        "login": {"type": ["string", "null"]}
+      }
+    },
+    "sample_item": {
+      "type": "object",
+      "required": ["id", "kind", "read_budget", "reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^S-R\\d+-\\d{3}$"},
+        "kind": {"enum": ["file", "commit"]},
+        "path": {"type": "string"},
+        "commit": {"type": "string"},
+        "subject": {"type": "string"},
+        "lines": {"type": "integer", "minimum": 0},
+        "read_budget": {"type": "integer", "minimum": 1, "description": "Lines to read for full coverage credit: min(item size, depth budget)."},
+        "subsystem": {"type": ["string", "null"]},
+        "candidate_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "reasons": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "repository": {
+      "type": "object",
+      "required": ["repo_id", "locator", "source_kind", "host", "mirror", "revision", "revision_source", "revision_time", "analyzed_at", "working_tree", "history", "host_metadata", "lineage", "identity", "contributors", "attribution", "subsystems", "languages", "exclusions", "files", "sampling", "injection_flags", "collaboration", "ci", "host_evidence", "limitations"],
+      "additionalProperties": false,
+      "properties": {
+        "repo_id": {"type": "string", "pattern": "^R\\d+$"},
+        "locator": {"type": "string"},
+        "source_kind": {"enum": ["local", "remote"]},
+        "host": {
+          "type": "object",
+          "required": ["kind", "owner", "name", "web_url"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {"enum": ["github", "other", "none"]},
+            "owner": {"type": ["string", "null"]},
+            "name": {"type": ["string", "null"]},
+            "web_url": {"type": ["string", "null"]}
+          }
+        },
+        "mirror": {"type": "string"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+        "revision_source": {"enum": ["head", "declared"]},
+        "revision_time": {"type": "string"},
+        "analyzed_at": {"type": "string"},
+        "working_tree": {
+          "type": "object",
+          "required": ["dirty", "note"],
+          "additionalProperties": false,
+          "properties": {"dirty": {"type": ["boolean", "null"]}, "note": {"type": "string"}}
+        },
+        "history": {
+          "type": "object",
+          "required": ["commit_count", "non_merge_commits", "merge_commits", "first_commit_at", "last_commit_at", "is_shallow", "root_commits"],
+          "additionalProperties": false,
+          "properties": {
+            "commit_count": {"type": "integer", "minimum": 0},
+            "non_merge_commits": {"type": "integer", "minimum": 0},
+            "merge_commits": {"type": "integer", "minimum": 0},
+            "first_commit_at": {"type": ["string", "null"]},
+            "last_commit_at": {"type": ["string", "null"]},
+            "is_shallow": {"type": "boolean"},
+            "root_commits": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "host_metadata": {
+          "type": "object",
+          "required": ["available", "error", "fork", "parent", "source", "template", "archived", "default_branch"],
+          "additionalProperties": false,
+          "properties": {
+            "available": {"type": "boolean"},
+            "error": {"type": ["string", "null"]},
+            "fork": {"type": ["boolean", "null"]},
+            "parent": {"type": ["string", "null"]},
+            "source": {"type": ["string", "null"]},
+            "template": {"type": ["string", "null"]},
+            "archived": {"type": ["boolean", "null"]},
+            "default_branch": {"type": ["string", "null"]}
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "required": ["relationship", "upstream_locator", "upstream_available", "ancestry", "fork_point", "fork_only_commits", "candidate_fork_only_commits", "inherited_commits", "upstream_sync_merges", "candidate_upstream_commits", "delta_kind", "delta", "content_baseline", "hints", "notes"],
+          "additionalProperties": false,
+          "properties": {
+            "relationship": {"enum": ["none", "host_fork", "template", "declared_upstream", "local_upstream_remote"]},
+            "upstream_locator": {"type": ["string", "null"]},
+            "upstream_available": {"type": ["boolean", "null"]},
+            "ancestry": {"enum": ["not_applicable", "shared_history", "no_common_ancestor", "unknown"]},
+            "fork_point": {"type": ["string", "null"]},
+            "fork_only_commits": {"type": ["integer", "null"], "minimum": 0},
+            "candidate_fork_only_commits": {"type": ["integer", "null"], "minimum": 0},
+            "inherited_commits": {"type": ["integer", "null"], "minimum": 0},
+            "upstream_sync_merges": {"type": ["integer", "null"], "minimum": 0},
+            "candidate_upstream_commits": {"type": ["integer", "null"], "minimum": 0},
+            "delta_kind": {"enum": ["not_a_fork", "unchanged", "dependency_only", "docs_or_config_only", "modified", "substantial", "unknown"]},
+            "delta": {
+              "anyOf": [
+                {"type": "null"},
+                {
+                  "type": "object",
+                  "required": ["files_changed", "lines_added", "lines_deleted", "candidate_lines_added", "new_paths"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "files_changed": {"type": "integer", "minimum": 0},
+                    "lines_added": {"type": "integer", "minimum": 0},
+                    "lines_deleted": {"type": "integer", "minimum": 0},
+                    "candidate_lines_added": {"type": "integer", "minimum": 0},
+                    "new_paths": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              ]
+            },
+            "content_baseline": {
+              "anyOf": [
+                {"type": "null"},
+                {
+                  "type": "object",
+                  "required": ["commit", "blob_overlap"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "commit": {"type": "string"},
+                    "blob_overlap": {"type": "number", "minimum": 0, "maximum": 1}
+                  }
+                }
+              ]
+            },
+            "hints": {"type": "array", "items": {"type": "string"}},
+            "notes": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "identity": {
+          "type": "object",
+          "required": ["status", "basis_confidence", "matched", "unconfirmed_aliases", "notes"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"enum": ["resolved", "provisional", "needs_candidate", "unresolved"]},
+            "basis_confidence": {"anyOf": [{"$ref": "#/$defs/confidence"}, {"type": "null"}]},
+            "matched": {"type": "array", "items": {"$ref": "#/$defs/identity"}},
+            "unconfirmed_aliases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key", "display", "email_redacted", "reason", "commits"],
+                "additionalProperties": false,
+                "properties": {
+                  "key": {"type": "string"},
+                  "display": {"type": "string"},
+                  "email_redacted": {"type": "string"},
+                  "reason": {"type": "string"},
+                  "commits": {"type": "integer", "minimum": 0}
+                }
+              }
+            },
+            "notes": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "contributors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "display", "email_redacted", "kind", "commits", "is_candidate", "login"],
+            "additionalProperties": false,
+            "properties": {
+              "key": {"type": "string"},
+              "display": {"type": "string"},
+              "email_redacted": {"type": "string"},
+              "kind": {"enum": ["human", "bot", "automation_suspected"]},
+              "commits": {"type": "integer", "minimum": 0},
+              "is_candidate": {"type": "boolean"},
+              "login": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "attribution": {
+          "type": "object",
+          "required": ["candidate_commits", "candidate_coauthored_commits", "human_commits", "candidate_commit_share", "surviving_lines", "candidate_surviving_share", "added_lines", "candidate_added_share", "role", "ai_assisted_commits", "ai_mentioned_commits", "bulk_import_commits", "attribution_confidence", "blame"],
+          "additionalProperties": false,
+          "properties": {
+            "candidate_commits": {"type": "integer", "minimum": 0},
+            "candidate_coauthored_commits": {"type": "integer", "minimum": 0},
+            "human_commits": {"type": "integer", "minimum": 0},
+            "candidate_commit_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+            "surviving_lines": {
+              "type": "object",
+              "required": ["total", "candidate", "inherited", "bulk_import", "unknown"],
+              "additionalProperties": false,
+              "properties": {
+                "total": {"type": "integer", "minimum": 0},
+                "candidate": {"type": "integer", "minimum": 0},
+                "inherited": {"type": "integer", "minimum": 0},
+                "bulk_import": {"type": "integer", "minimum": 0},
+                "unknown": {"type": "integer", "minimum": 0}
+              }
+            },
+            "candidate_surviving_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+            "added_lines": {
+              "type": "object",
+              "required": ["total", "candidate"],
+              "additionalProperties": false,
+              "properties": {"total": {"type": "integer", "minimum": 0}, "candidate": {"type": "integer", "minimum": 0}}
+            },
+            "candidate_added_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+            "role": {"enum": ["exclusive_author", "primary_author", "significant_contributor", "minor_contributor", "upstream_contributor_only", "none", "unknown"]},
+            "ai_assisted_commits": {"type": "integer", "minimum": 0, "description": "Candidate commits with AI co-author trailers or tool-generated footers."},
+            "ai_mentioned_commits": {"type": "integer", "minimum": 0, "description": "Other candidate commits whose message mentions AI tooling; a hint, not a declaration."},
+            "bulk_import_commits": {"type": "array", "items": {"type": "string"}},
+            "attribution_confidence": {"$ref": "#/$defs/confidence"},
+            "blame": {
+              "type": "object",
+              "required": ["files_eligible", "files_blamed", "complete", "candidate_files_unblamed", "options"],
+              "additionalProperties": false,
+              "properties": {
+                "files_eligible": {"type": "integer", "minimum": 0},
+                "files_blamed": {"type": "integer", "minimum": 0},
+                "candidate_files_unblamed": {"type": "integer", "minimum": 0, "description": "Files the candidate touched that the blame budget skipped; nonzero lowers attribution confidence."},
+                "complete": {"type": "boolean"},
+                "options": {"type": "string"}
+              }
+            }
+          }
+        },
+        "subsystems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "files", "lines", "candidate_lines", "share"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string"},
+              "files": {"type": "integer", "minimum": 0},
+              "lines": {"type": "integer", "minimum": 0},
+              "candidate_lines": {"type": "integer", "minimum": 0},
+              "share": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+            }
+          }
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["language", "lines", "candidate_lines"],
+            "additionalProperties": false,
+            "properties": {
+              "language": {"type": "string"},
+              "lines": {"type": "integer", "minimum": 0},
+              "candidate_lines": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "exclusions": {
+          "type": "object",
+          "required": ["counts", "examples"],
+          "additionalProperties": false,
+          "properties": {
+            "counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+            "examples": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "category", "lines", "subsystem", "candidate_lines", "inherited_lines", "blamed", "candidate_touched", "signals"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": "string"},
+              "category": {"enum": ["source", "test", "docs", "ci", "config", "build"]},
+              "lines": {"type": "integer", "minimum": 0},
+              "subsystem": {"type": "string"},
+              "candidate_lines": {"type": "integer", "minimum": 0},
+              "inherited_lines": {"type": "integer", "minimum": 0},
+              "blamed": {"type": "boolean"},
+              "candidate_touched": {"type": "boolean", "description": "Some candidate commit changed this path. An unblamed file the candidate never touched has a known candidate share of zero; an unblamed touched file's share is unknown."},
+              "signals": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "sampling": {
+          "type": "object",
+          "required": ["depth", "files", "commits", "notes"],
+          "additionalProperties": false,
+          "properties": {
+            "depth": {"enum": ["quick", "standard", "deep"]},
+            "files": {"type": "array", "items": {"$ref": "#/$defs/sample_item"}},
+            "commits": {"type": "array", "items": {"$ref": "#/$defs/sample_item"}},
+            "notes": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "injection_flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "line", "pattern", "excerpt"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": "string"},
+              "line": {"type": "integer", "minimum": 1},
+              "pattern": {"type": "string"},
+              "excerpt": {"type": "string", "maxLength": 160}
+            }
+          }
+        },
+        "collaboration": {
+          "type": "object",
+          "required": ["human_contributors", "other_human_commits", "prs_authored", "prs_merged", "reviews_given", "opportunity", "host_complete"],
+          "additionalProperties": false,
+          "properties": {
+            "human_contributors": {"type": "integer", "minimum": 0},
+            "other_human_commits": {"type": "integer", "minimum": 0},
+            "prs_authored": {"type": ["integer", "null"], "minimum": 0},
+            "prs_merged": {"type": ["integer", "null"], "minimum": 0},
+            "reviews_given": {"type": ["integer", "null"], "minimum": 0},
+            "opportunity": {"type": ["boolean", "null"]},
+            "host_complete": {"type": "boolean"}
+          }
+        },
+        "ci": {
+          "type": "object",
+          "required": ["workflow_files", "check_runs"],
+          "additionalProperties": false,
+          "properties": {
+            "workflow_files": {"type": "array", "items": {"type": "string"}},
+            "check_runs": {
+              "type": "object",
+              "required": ["available", "conclusions", "error"],
+              "additionalProperties": false,
+              "properties": {
+                "available": {"type": "boolean"},
+                "conclusions": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+                "error": {"type": ["string", "null"]}
+              }
+            }
+          }
+        },
+        "host_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "url", "observation", "candidate_attribution"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {"type": "string", "pattern": "^H-R\\d+-\\d{3,}$"},
+              "kind": {"enum": ["pull_request", "review", "ci_run", "host_metadata"]},
+              "url": {"type": ["string", "null"]},
+              "observation": {"type": "string"},
+              "candidate_attribution": {"enum": ["verified", "not_applicable"]}
+            }
+          }
+        },
+        "limitations": {"type": "array", "items": {"$ref": "#/$defs/limitation"}}
+      }
+    }
+  }
+}

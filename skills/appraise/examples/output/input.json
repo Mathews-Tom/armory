@@ -1,0 +1,36 @@
+{
+  "additional_artifacts": [],
+  "budgets": {
+    "blame_files": 2000,
+    "host_identity_lookups": 30,
+    "read_lines_per_item": 400,
+    "sample_commits": 12,
+    "sample_files": 24
+  },
+  "candidate": {
+    "display": "Alice Doe",
+    "identifiers": [
+      {
+        "kind": "email",
+        "value": "alice@example.com"
+      }
+    ]
+  },
+  "consent": null,
+  "depth": "standard",
+  "domain": "software_engineering",
+  "mode": "review",
+  "offline": true,
+  "output_format": "both",
+  "repositories": [
+    {
+      "locator": "/tmp/appraise-example/queuebox",
+      "revision": null,
+      "upstream": null
+    }
+  ],
+  "rubric_path": null,
+  "schema_version": "1.0",
+  "specialization": null,
+  "target_level": null
+}

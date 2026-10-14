@@ -1,0 +1,76 @@
+cases:
+  - id: candidate_review_from_github
+    prompt: >
+      Appraise the candidate octo-dev using https://github.com/octo-dev/queuebox. Check whether it is a fork,
+      what they actually wrote, and give me a calibrated level with a development plan and interview questions.
+    fixtures: []
+    rubric:
+      - "activates appraise and runs discover with the stated candidate rather than assuming the owner wrote everything"
+      - "reports pinned revision, lineage and attribution limitations before any level"
+      - "quotes the engine's recommended level, range and confidence without restating a different title"
+      - "keeps not-observable competencies separate from low scores"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(discover|appraise\\.py)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(attribution|fork|upstream)"
+        weight: 0.6
+      - type: not_contains
+        target: "number of stars"
+        weight: 0.4
+
+  - id: self_calibration_multi_repo
+    prompt: >
+      What level am I based on my repos ~/code/svc-a and ~/code/svc-b? Calibrate my seniority across both and tell me
+      what to work on over the next 90 days to reach Staff.
+    fixtures: []
+    rubric:
+      - "activates appraise in self or promotion mode with both repositories in one run"
+      - "resolves the candidate from the user's own identity, not repository ownership"
+      - "explains Staff blockers from the decision trace and maps them to measurable plan items"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(--mode (self|promotion)|self-appraisal|promotion evidence)"
+        weight: 0.7
+      - type: matches_regex
+        target: "(?i)(blocker|scope|influence)"
+        weight: 0.5
+
+  - id: manager_appraisal_requires_consent
+    prompt: >
+      I manage Priya. Use her commits in our payments repo to appraise where she is and what she should grow next.
+    fixtures: []
+    rubric:
+      - "activates appraise in manager mode"
+      - "requires that the subject is informed (consent subject_informed) before running"
+      - "frames output as development, shared with the subject, contestable"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(consent|informed|share)"
+        weight: 0.8
+
+  - id: diff_code_review_is_not_appraisal
+    prompt: "Review this pull request diff for bugs and missing tests before I merge it."
+    fixtures: []
+    rubric:
+      - "does not activate appraise; a defect review of a diff is pr-review territory"
+    trigger_expected: false
+
+  - id: ranking_by_popularity_is_refused
+    prompt: "Rank these five developers by GitHub stars and commit counts so I know who is most senior."
+    fixtures: []
+    rubric:
+      - "does not run a ranking by stars or commit counts"
+      - "explains that volume and popularity are not evidence of ability"
+    trigger_expected: false
+
+  - id: repository_tutorial_is_not_appraisal
+    prompt: "Teach me how this repository works so I can onboard and make my first change."
+    fixtures: []
+    rubric:
+      - "does not activate appraise; onboarding a learner is repo-tutor territory"
+    trigger_expected: false

@@ -1,0 +1,1013 @@
+{
+  "assessment_id": "6cf03dda3db22c82af8f2a57c331e877b60aa1a906474b318e086d02cf5d14d7",
+  "changes": null,
+  "competencies": [
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [
+        "E-006"
+      ],
+      "group": "technical",
+      "id": "problem_solving",
+      "independent_sources": 1,
+      "name": "Problem solving",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Race-aware claim path; incomplete failure handling counts against it.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-002"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "code_quality",
+      "independent_sources": 1,
+      "name": "Code quality",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Small, cohesive store with clear error type.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-001",
+        "E-002"
+      ]
+    },
+    {
+      "adjustments": [
+        "E-009 cannot support a score (attribution unlikely, status downgraded)"
+      ],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "architecture",
+      "independent_sources": 3,
+      "name": "Architecture",
+      "not_observable_reason": null,
+      "proposed_score": 4,
+      "rationale": "Versioned storage boundary plus a recorded design decision; HTTP module is not the candidate's.",
+      "score": 4,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-001",
+        "E-004",
+        "E-008"
+      ]
+    },
+    {
+      "adjustments": [
+        "cited E-010 dropped: line_end 130 beyond end of file (48 lines)"
+      ],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "system_design",
+      "independent_sources": 2,
+      "name": "System design",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Concurrency handled for one process; multi-process limit acknowledged.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-002",
+        "E-004"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [
+        "E-005"
+      ],
+      "group": "technical",
+      "id": "testing",
+      "independent_sources": 1,
+      "name": "Testing",
+      "not_observable_reason": null,
+      "proposed_score": 2,
+      "rationale": "CI gate exists but the worker is untested and one test is misnamed.",
+      "score": 2,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-007"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "security",
+      "independent_sources": 0,
+      "name": "Security",
+      "not_observable_reason": "no_evidence",
+      "proposed_score": null,
+      "rationale": "No inspected code crosses a trust boundary.",
+      "score": null,
+      "self_report_ids": [],
+      "status": "not_observable",
+      "supporting_evidence_ids": []
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [
+        "E-006"
+      ],
+      "group": "technical",
+      "id": "operations",
+      "independent_sources": 1,
+      "name": "Operations",
+      "not_observable_reason": null,
+      "proposed_score": 2,
+      "rationale": "CI present; failure recovery in the worker is incomplete.",
+      "score": 2,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-007"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "technical_depth",
+      "independent_sources": 1,
+      "name": "Technical depth",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Correct use of SQLite threading and WAL settings.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-003"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "engineering_judgment",
+      "independent_sources": 2,
+      "name": "Engineering judgment",
+      "not_observable_reason": null,
+      "proposed_score": 4,
+      "rationale": "Explicit rejected alternative and named revisit trigger; forward-version refusal.",
+      "score": 4,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-004",
+        "E-001"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [],
+      "group": "technical",
+      "id": "learning",
+      "independent_sources": 1,
+      "name": "Learning",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Iterated the schema through a migration rather than a rewrite.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-008"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "medium",
+      "counterevidence_ids": [],
+      "group": "delivery",
+      "id": "ownership",
+      "independent_sources": 2,
+      "name": "Ownership",
+      "not_observable_reason": null,
+      "proposed_score": 3,
+      "rationale": "Maintains and evolves the store across commits; records lifecycle decisions.",
+      "score": 3,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-008",
+        "E-004"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [],
+      "group": "delivery",
+      "id": "product_thinking",
+      "independent_sources": 0,
+      "name": "Product thinking",
+      "not_observable_reason": null,
+      "proposed_score": 2,
+      "rationale": "Problem statement only; no usage or outcome evidence.",
+      "score": 2,
+      "self_report_ids": [],
+      "status": "observed",
+      "supporting_evidence_ids": [
+        "E-011"
+      ]
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [],
+      "group": "influence",
+      "id": "collaboration",
+      "independent_sources": 0,
+      "name": "Collaboration",
+      "not_observable_reason": "no_evidence",
+      "proposed_score": null,
+      "rationale": "Another contributor exists, but no reviews or discussions were available offline.",
+      "score": null,
+      "self_report_ids": [],
+      "status": "not_observable",
+      "supporting_evidence_ids": []
+    },
+    {
+      "adjustments": [],
+      "confidence": "low",
+      "counterevidence_ids": [],
+      "group": "influence",
+      "id": "technical_leadership",
+      "independent_sources": 0,
+      "name": "Technical leadership",
+      "not_observable_reason": "no_evidence",
+      "proposed_score": null,
+      "rationale": "No standards, mentoring or cross-team artefacts in scope.",
+      "score": null,
+      "self_report_ids": [],
+      "status": "not_observable",
+      "supporting_evidence_ids": []
+    }
+  ],
+  "confirmed_weaknesses": [
+    {
+      "competencies": [
+        "operations",
+        "problem_solving"
+      ],
+      "dropped_evidence_ids": [],
+      "evidence_ids": [
+        "E-006"
+      ],
+      "summary": "Worker failure recovery is not implemented although documented: jobs that fail stay 'running'."
+    },
+    {
+      "competencies": [
+        "testing"
+      ],
+      "dropped_evidence_ids": [],
+      "evidence_ids": [
+        "E-005"
+      ],
+      "summary": "Test suite overstates coverage: the worker path has no test oracle."
+    }
+  ],
+  "contested_evidence": [],
+  "coverage": {
+    "repositories": [
+      {
+        "candidate_line_coverage": 0.9573,
+        "candidate_lines_inspected": 112,
+        "candidate_lines_total": 117,
+        "repo": "R1",
+        "sample_coverage": 0.6364,
+        "sample_items": 11,
+        "sample_items_audited": 7,
+        "sample_items_inspected": 7
+      }
+    ]
+  },
+  "development_plan": [
+    {
+      "action": "Enforce MAX_ATTEMPTS using the attempts column; move exhausted jobs to a 'failed' state; requeue on transient errors.",
+      "category": "confirmed_weakness",
+      "competencies": [
+        "operations",
+        "problem_solving"
+      ],
+      "effort": "S",
+      "horizon_days": 14,
+      "id": "P-01",
+      "priority": "P1",
+      "source_evidence_ids": [
+        "E-006"
+      ],
+      "success_criterion": "A test that injects a failing handler observes attempts == MAX_ATTEMPTS and state == 'failed'.",
+      "title": "Make retries real",
+      "why": "Failed jobs are stranded in 'running', which silently loses work."
+    },
+    {
+      "action": "Add worker tests for success, handler exception and empty queue; rename or remove test_worker_runs.",
+      "category": "confirmed_weakness",
+      "competencies": [
+        "testing"
+      ],
+      "effort": "S",
+      "horizon_days": 30,
+      "id": "P-02",
+      "priority": "P1",
+      "source_evidence_ids": [
+        "E-005",
+        "E-007"
+      ],
+      "success_criterion": "Coverage of worker.py at 100% of branches, enforced in CI.",
+      "title": "Test the worker, not just the store",
+      "why": "The riskiest path has no oracle and a misleading test name."
+    },
+    {
+      "action": "Review the other contributor's HTTP changes through pull requests and document a contribution guide for the store API.",
+      "category": "evidence_gap",
+      "competencies": [
+        "collaboration",
+        "technical_leadership"
+      ],
+      "effort": "M",
+      "horizon_days": 90,
+      "id": "P-03",
+      "priority": "P2",
+      "source_evidence_ids": [],
+      "success_criterion": "At least five substantive reviews and one merged guide authored by the candidate.",
+      "title": "Make collaboration visible",
+      "why": "Scope and influence are not observable here, which blocks levels that require them."
+    },
+    {
+      "action": "Write ADR 002 comparing row-level leasing in SQLite vs. Postgres SKIP LOCKED with a measured benchmark.",
+      "category": "next_level_opportunity",
+      "competencies": [
+        "system_design",
+        "architecture"
+      ],
+      "effort": "M",
+      "horizon_days": 60,
+      "id": "P-04",
+      "priority": "P2",
+      "source_evidence_ids": [
+        "E-004"
+      ],
+      "success_criterion": "ADR with a reproducible benchmark showing claims/sec for 1, 2 and 4 workers.",
+      "title": "Design the multi-worker path",
+      "why": "The ADR names the single-host ceiling as the revisit trigger."
+    }
+  ],
+  "evidence_gaps": [
+    {
+      "competency": "security",
+      "reason": "no_evidence: Nothing inspected demonstrated this competency.",
+      "resolution": "Evidence that would resolve it: source_code, ci_config, documentation."
+    },
+    {
+      "competency": "collaboration",
+      "reason": "no_evidence: Nothing inspected demonstrated this competency.",
+      "resolution": "Evidence that would resolve it: review, pull_request, issue."
+    },
+    {
+      "competency": "technical_leadership",
+      "reason": "no_evidence: Nothing inspected demonstrated this competency.",
+      "resolution": "Evidence that would resolve it: design_doc, documentation, review, pull_request, external_artifact."
+    }
+  ],
+  "generated_at": "2026-10-14T00:00:00Z",
+  "interview_questions": [
+    {
+      "competencies": [
+        "system_design",
+        "problem_solving"
+      ],
+      "evidence_ids": [
+        "E-002"
+      ],
+      "id": "Q-01",
+      "question": "claim() guards the update with state = 'queued' even though it already holds a lock. What failure did that second guard protect against, and when would it matter?",
+      "would_change": "system_design confidence; whether the guard is deliberate or incidental"
+    },
+    {
+      "competencies": [
+        "operations"
+      ],
+      "evidence_ids": [
+        "E-006"
+      ],
+      "id": "Q-02",
+      "question": "The worker declares MAX_ATTEMPTS but never enforces it. Was bounded retry deferred on purpose, and how would you stop a poison job from blocking the queue?",
+      "would_change": "operations from 2 to 3 if a credible design and its absence are explained"
+    },
+    {
+      "competencies": [
+        "architecture"
+      ],
+      "evidence_ids": [
+        "E-001",
+        "E-008"
+      ],
+      "id": "Q-03",
+      "question": "Walk through upgrading a populated v1 store to v2. What happens to in-flight 'running' jobs during the migration?",
+      "would_change": "architecture confidence from medium to high"
+    },
+    {
+      "competencies": [
+        "engineering_judgment"
+      ],
+      "evidence_ids": [
+        "E-004"
+      ],
+      "id": "Q-04",
+      "question": "The ADR rejects Postgres for operational reasons. What measurement would tell you it is time to revisit that decision?",
+      "would_change": "engineering_judgment confidence"
+    },
+    {
+      "competencies": [
+        "collaboration"
+      ],
+      "evidence_ids": [],
+      "id": "Q-05",
+      "question": "How have you worked with the contributor who owns the HTTP module, for example through reviews, shared decisions or disagreements?",
+      "would_change": "collaboration from not observable to observed if it points to verifiable reviews"
+    }
+  ],
+  "limitations": [
+    {
+      "code": "host_metadata_unavailable",
+      "impact": "lineage",
+      "message": "Host metadata unavailable: offline run: host metadata, pull requests and reviews not collected. Fork/template status could not be checked with the host.",
+      "repo": "R1"
+    },
+    {
+      "code": "ai_assistance_undeclared",
+      "impact": "attribution",
+      "message": "No candidate commit carries an AI co-author trailer. AI assistance is undeclared, not shown to be absent; scores rest on the decisions visible in the code either way.",
+      "repo": "R1"
+    },
+    {
+      "code": "evidence_rejected",
+      "impact": "verification",
+      "message": "1 cited item(s) failed verification and were excluded: E-010",
+      "repo": null
+    }
+  ],
+  "mode": "review",
+  "potential_risks": [
+    {
+      "competencies": [
+        "system_design"
+      ],
+      "dropped_evidence_ids": [],
+      "evidence_ids": [
+        "E-004",
+        "E-002"
+      ],
+      "summary": "Throughput ceiling from a process-wide lock if more than one worker is deployed."
+    }
+  ],
+  "provenance": {
+    "evidence_sha256": "1e86c15e28333eead9b67e6b3025e780b6a864eddbe037ca3d715fbede9625e0",
+    "forensics_sha256": "d0cf10cbe44658e66db1047506e0fba9a7a2b9ed6387019814ce09ab1abd273b",
+    "input_sha256": "2f8254588107f686269a0d821ed5a0d16a2038d66cfc6ffbe0c2e646640a7003",
+    "judgments_sha256": "526d84f72c3d778c7a19e51e9202cec01c0486b73a4624d5bbf65ad78e4782be",
+    "rubric_id": "software_engineering",
+    "rubric_sha256": "e5026b771609c1ef59781180772923bbbce393d39fefff6e11c00f4f40c6c89c",
+    "rubric_version": "1.0.0"
+  },
+  "rejected_evidence": [
+    {
+      "id": "E-010",
+      "reasons": [
+        "line_end 130 beyond end of file (48 lines)"
+      ]
+    }
+  ],
+  "repositories": [
+    {
+      "analysis_depth": "standard",
+      "analyzed_at": "2026-10-14T00:00:00Z",
+      "ancestry": "not_applicable",
+      "attribution_confidence": "high",
+      "candidate_role": "primary_author",
+      "candidate_surviving_share": 0.9213,
+      "history_shallow": false,
+      "is_fork": null,
+      "locator": "https://github.com/example-org/queuebox",
+      "parent_locator": null,
+      "relationship": "none",
+      "repo_id": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "revision_time": "2025-10-21T08:53:20Z",
+      "sample_coverage": 0.6364,
+      "upstream_diff_status": "not_a_fork"
+    }
+  ],
+  "result": {
+    "confidence": "medium",
+    "confidence_factors": {
+      "attribution": "high",
+      "coverage": "medium",
+      "evidence": "medium",
+      "notes": [
+        "Overall confidence is medium. It is the weakest of four checks: attribution is high, evidence is medium, sample coverage is medium, and the level is not settled: the evidence allows Mid-level to Senior.",
+        "7 supporting evidence items across 11 observed competencies; mean sample coverage 63.6%."
+      ],
+      "range_width": 1
+    },
+    "decision_trace": [
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥2 of [group:technical] at score ≥1",
+            "competencies": [
+              "problem_solving",
+              "code_quality",
+              "architecture",
+              "system_design",
+              "testing",
+              "operations",
+              "technical_depth",
+              "engineering_judgment",
+              "learning"
+            ],
+            "detail": "met by problem_solving=3, code_quality=3, architecture=4, system_design=3, testing=2, operations=2, technical_depth=3, engineering_judgment=4, learning=3",
+            "explanation": "9 of the 10 technical competencies score 1 or more; Junior needs 2.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "junior",
+        "outcome": "pass"
+      },
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥3 of [group:technical] at score ≥3",
+            "competencies": [
+              "problem_solving",
+              "code_quality",
+              "architecture",
+              "system_design",
+              "technical_depth",
+              "engineering_judgment",
+              "learning"
+            ],
+            "detail": "met by problem_solving=3, code_quality=3, architecture=4, system_design=3, technical_depth=3, engineering_judgment=4, learning=3",
+            "explanation": "7 of the 10 technical competencies score 3 or more; Mid-level needs 3.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [problem_solving, code_quality] at score ≥3",
+            "competencies": [
+              "problem_solving",
+              "code_quality"
+            ],
+            "detail": "met by problem_solving=3, code_quality=3",
+            "explanation": "Mid-level needs one of problem solving or code quality at 3 or more. Currently problem solving is 3 (medium confidence); code quality is 3 (medium confidence).",
+            "outcome": "pass"
+          },
+          {
+            "clause": "no observed [group:technical] below 1",
+            "competencies": [],
+            "detail": "no observed score below threshold",
+            "explanation": "No observed technical competency score is below 1.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "mid",
+        "outcome": "pass"
+      },
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥5 of [group:technical] at score ≥3",
+            "competencies": [
+              "problem_solving",
+              "code_quality",
+              "architecture",
+              "system_design",
+              "technical_depth",
+              "engineering_judgment",
+              "learning"
+            ],
+            "detail": "met by problem_solving=3, code_quality=3, architecture=4, system_design=3, technical_depth=3, engineering_judgment=4, learning=3",
+            "explanation": "7 of the 10 technical competencies score 3 or more; Senior needs 5.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [architecture, system_design] at score ≥4",
+            "competencies": [
+              "architecture"
+            ],
+            "detail": "met by architecture=4",
+            "explanation": "Senior needs one of architecture or system design at 4 or more. Currently architecture is 4 (medium confidence); system design is 3 (medium confidence).",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [engineering_judgment] at score ≥3",
+            "competencies": [
+              "engineering_judgment"
+            ],
+            "detail": "met by engineering_judgment=4",
+            "explanation": "Engineering judgment is 4 (medium confidence); Senior needs 3 or more.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [testing] at score ≥3",
+            "competencies": [],
+            "detail": "met by none",
+            "explanation": "Testing is 2 (medium confidence); Senior needs 3 or more.",
+            "outcome": "fail"
+          },
+          {
+            "clause": "≥1 of [operations, security, system_design] at score ≥3",
+            "competencies": [
+              "system_design"
+            ],
+            "detail": "met by system_design=3",
+            "explanation": "Senior needs one of operations or security or system design at 3 or more. Currently operations is 2 (low confidence); security wasn't shown by anything inspected; system design is 3 (medium confidence).",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [ownership] at score ≥3",
+            "competencies": [
+              "ownership"
+            ],
+            "detail": "met by ownership=3",
+            "explanation": "Ownership is 3 (medium confidence); Senior needs 3 or more.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "no observed [code_quality, testing, engineering_judgment, architecture] below 2",
+            "competencies": [],
+            "detail": "no observed score below threshold",
+            "explanation": "No observed code quality / testing / engineering judgment / architecture score is below 2.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "senior",
+        "outcome": "fail"
+      },
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥4 of [group:technical] at score ≥4 with medium+ confidence",
+            "competencies": [
+              "architecture",
+              "engineering_judgment"
+            ],
+            "detail": "met by architecture=4, engineering_judgment=4; not observable: security",
+            "explanation": "2 of the 10 technical competencies score 4 or more; Staff needs 4 with at least medium confidence.",
+            "outcome": "fail"
+          },
+          {
+            "clause": "≥6 of [group:technical] at score ≥3",
+            "competencies": [
+              "problem_solving",
+              "code_quality",
+              "architecture",
+              "system_design",
+              "technical_depth",
+              "engineering_judgment",
+              "learning"
+            ],
+            "detail": "met by problem_solving=3, code_quality=3, architecture=4, system_design=3, technical_depth=3, engineering_judgment=4, learning=3",
+            "explanation": "7 of the 10 technical competencies score 3 or more; Staff needs 6.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [architecture] at score ≥4 with medium+ confidence",
+            "competencies": [
+              "architecture"
+            ],
+            "detail": "met by architecture=4",
+            "explanation": "Architecture is 4 (medium confidence); Staff needs 4 or more with at least medium confidence.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "≥1 of [engineering_judgment] at score ≥4 with medium+ confidence",
+            "competencies": [
+              "engineering_judgment"
+            ],
+            "detail": "met by engineering_judgment=4",
+            "explanation": "Engineering judgment is 4 (medium confidence); Staff needs 4 or more with at least medium confidence.",
+            "outcome": "pass"
+          },
+          {
+            "clause": "no observed [architecture, code_quality, testing, engineering_judgment] below 3",
+            "competencies": [
+              "testing"
+            ],
+            "detail": "below: testing=2",
+            "explanation": "Staff allows no architecture / code quality / testing / engineering judgment below 3; testing is 2 (medium confidence).",
+            "outcome": "fail"
+          },
+          {
+            "clause": "evidence for [architecture, system_design, technical_depth, engineering_judgment] spans ≥3 subsystems",
+            "competencies": [
+              "architecture",
+              "system_design",
+              "technical_depth",
+              "engineering_judgment"
+            ],
+            "detail": "found 3",
+            "explanation": "Independent evidence for architecture, system design, technical depth, engineering judgment spans 3 subsystems; Staff needs 3.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "staff",
+        "outcome": "fail"
+      },
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥6 of [group:technical] at score ≥4 with medium+ confidence",
+            "competencies": [
+              "architecture",
+              "engineering_judgment"
+            ],
+            "detail": "met by architecture=4, engineering_judgment=4; not observable: security",
+            "explanation": "2 of the 10 technical competencies score 4 or more; Principal needs 6 with at least medium confidence.",
+            "outcome": "fail"
+          },
+          {
+            "clause": "≥2 of [group:technical] at score ≥5 with medium+ confidence",
+            "competencies": [],
+            "detail": "met by none; not observable: security",
+            "explanation": "0 of the 10 technical competencies score 5 or more; Principal needs 2 with at least medium confidence.",
+            "outcome": "fail"
+          },
+          {
+            "clause": "≥1 of [architecture, system_design] at score ≥5",
+            "competencies": [],
+            "detail": "met by none",
+            "explanation": "Principal needs one of architecture or system design at 5 or more. Currently architecture is 4 (medium confidence); system design is 3 (medium confidence).",
+            "outcome": "fail"
+          },
+          {
+            "clause": "no observed [architecture, code_quality, testing, engineering_judgment] below 4",
+            "competencies": [
+              "code_quality",
+              "testing"
+            ],
+            "detail": "below: code_quality=3, testing=2",
+            "explanation": "Principal allows no architecture / code quality / testing / engineering judgment below 4; code quality is 3 (medium confidence), testing is 2 (medium confidence).",
+            "outcome": "fail"
+          },
+          {
+            "clause": "evidence for [group:technical] spans ≥2 repositories",
+            "competencies": [
+              "problem_solving",
+              "code_quality",
+              "architecture",
+              "system_design",
+              "testing",
+              "security",
+              "operations",
+              "technical_depth",
+              "engineering_judgment",
+              "learning"
+            ],
+            "detail": "found 1",
+            "explanation": "Independent evidence spans 1 repository; Principal needs 2, showing the work across more than one system.",
+            "outcome": "fail"
+          }
+        ],
+        "level": "principal",
+        "outcome": "fail"
+      },
+      {
+        "band": "technical",
+        "clauses": [
+          {
+            "clause": "≥4 of [group:technical] at score ≥5 with high+ confidence",
+            "competencies": [],
+            "detail": "met by none; not observable: security",
+            "explanation": "0 of the 10 technical competencies score 5 or more; Distinguished needs 4 with at least high confidence.",
+            "outcome": "fail"
+          }
+        ],
+        "level": "distinguished",
+        "outcome": "fail"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥1 of [ownership, collaboration, technical_leadership] at score ≥1",
+            "competencies": [
+              "ownership"
+            ],
+            "detail": "met by ownership=3",
+            "explanation": "Junior needs one of ownership or collaboration or technical leadership at 1 or more. Currently ownership is 3 (medium confidence); collaboration wasn't shown by anything inspected; technical leadership wasn't shown by anything inspected.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "junior",
+        "outcome": "pass"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥1 of [ownership, collaboration, technical_leadership] at score ≥3",
+            "competencies": [
+              "ownership"
+            ],
+            "detail": "met by ownership=3",
+            "explanation": "Mid-level needs one of ownership or collaboration or technical leadership at 3 or more. Currently ownership is 3 (medium confidence); collaboration wasn't shown by anything inspected; technical leadership wasn't shown by anything inspected.",
+            "outcome": "pass"
+          }
+        ],
+        "level": "mid",
+        "outcome": "pass"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥2 of [ownership, collaboration, technical_leadership, product_thinking] at score ≥3",
+            "competencies": [
+              "ownership"
+            ],
+            "detail": "met by ownership=3; not observable: collaboration, technical_leadership",
+            "explanation": "Senior needs 2 of ownership, collaboration, technical leadership, product thinking at 3 or more. Currently ownership is 3 (medium confidence); collaboration wasn't shown by anything inspected; technical leadership wasn't shown by anything inspected; product thinking is 2 (low confidence).",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "≥1 of [ownership] at score ≥4",
+            "competencies": [],
+            "detail": "met by none",
+            "explanation": "Ownership is 3 (medium confidence); Senior needs 4 or more.",
+            "outcome": "fail"
+          }
+        ],
+        "level": "senior",
+        "outcome": "fail"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥1 of [technical_leadership] at score ≥3",
+            "competencies": [],
+            "detail": "met by none; not observable: technical_leadership",
+            "explanation": "Technical leadership wasn't shown by anything inspected; Staff needs 3 or more.",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "≥1 of [collaboration] at score ≥3",
+            "competencies": [],
+            "detail": "met by none; not observable: collaboration",
+            "explanation": "Collaboration wasn't shown by anything inspected; Staff needs 3 or more.",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "≥1 of [ownership, technical_leadership] at score ≥4",
+            "competencies": [],
+            "detail": "met by none; not observable: technical_leadership",
+            "explanation": "Staff needs one of ownership or technical leadership at 4 or more. Currently ownership is 3 (medium confidence); technical leadership wasn't shown by anything inspected.",
+            "outcome": "unknown"
+          }
+        ],
+        "level": "staff",
+        "outcome": "unknown"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥1 of [technical_leadership] at score ≥4 with medium+ confidence",
+            "competencies": [],
+            "detail": "met by none; not observable: technical_leadership",
+            "explanation": "Technical leadership wasn't shown by anything inspected; Principal needs 4 or more with at least medium confidence.",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "≥1 of [collaboration] at score ≥4",
+            "competencies": [],
+            "detail": "met by none; not observable: collaboration",
+            "explanation": "Collaboration wasn't shown by anything inspected; Principal needs 4 or more.",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "evidence for [technical_leadership, collaboration] spans ≥2 repositories",
+            "competencies": [
+              "technical_leadership",
+              "collaboration"
+            ],
+            "detail": "found 0",
+            "explanation": "Independent evidence spans 0 repositories; Principal needs 2, showing the work across more than one system.",
+            "outcome": "fail"
+          }
+        ],
+        "level": "principal",
+        "outcome": "fail"
+      },
+      {
+        "band": "scope",
+        "clauses": [
+          {
+            "clause": "≥1 of [technical_leadership] at score ≥5 with high+ confidence",
+            "competencies": [],
+            "detail": "met by none; not observable: technical_leadership",
+            "explanation": "Technical leadership wasn't shown by anything inspected; Distinguished needs 5 or more with at least high confidence.",
+            "outcome": "unknown"
+          },
+          {
+            "clause": "≥2 verified external_artifact evidence",
+            "competencies": [],
+            "detail": "found 0",
+            "explanation": "Distinguished needs 2 verified external corroborations (such as recognition outside these repositories); 0 found.",
+            "outcome": "fail"
+          }
+        ],
+        "level": "distinguished",
+        "outcome": "fail"
+      }
+    ],
+    "determination": "Mid-level. Every Mid-level requirement is met by verified, attributable evidence. Senior is not reached: Testing is 2 (medium confidence); Senior needs 3 or more.",
+    "inconclusive_reasons": [],
+    "next_level_blockers": [
+      "Testing is 2 (medium confidence); Senior needs 3 or more."
+    ],
+    "plausible_levels": [
+      "mid",
+      "senior"
+    ],
+    "plausible_range": {
+      "lower": "mid",
+      "upper": "senior"
+    },
+    "recommended_level": "mid",
+    "scope_influence_level": "mid",
+    "scope_influence_status": "partial",
+    "target_level_comparison": null,
+    "technical_capability_level": "mid"
+  },
+  "run_id": "be0ed1a12f4bb9b2",
+  "schema_version": "1.0",
+  "self_reports": [],
+  "strengths": [
+    {
+      "competencies": [
+        "architecture"
+      ],
+      "dropped_evidence_ids": [],
+      "evidence_ids": [
+        "E-001",
+        "E-008"
+      ],
+      "summary": "Designs persisted state for evolution: versioned migrations with forward-version refusal."
+    },
+    {
+      "competencies": [
+        "engineering_judgment"
+      ],
+      "dropped_evidence_ids": [],
+      "evidence_ids": [
+        "E-004"
+      ],
+      "summary": "Records tradeoffs with a rejected alternative and an explicit revisit trigger."
+    }
+  ],
+  "subject": {
+    "candidate_id": "Alice Doe",
+    "consent": null,
+    "domain": "software_engineering",
+    "identity_basis": [
+      "declared_email"
+    ],
+    "identity_verified": true,
+    "specialization": null,
+    "target_level": null
+  },
+  "summary": "Alice built queuebox's durable core: a SQLite job store with forward-version-guarded migrations (E-001), a lock-serialised claim path that guards the state transition in SQL (E-002), and an ADR that records the rejected Postgres option and the throughput ceiling the design accepts (E-004). The migration refactor (E-008) shows the store evolving without breaking existing files. The weak points are concrete: test_worker_runs never calls the worker, so the worker's failure path is untested (E-005), and the worker declares MAX_ATTEMPTS but never enforces it, contradicting its 'bounded retries' docstring (E-006). Collaboration and technical leadership have no evidence in this repository even though another contributor was present; the HTTP module is theirs and is not credited (E-009). Security was not exercised by any inspected code.",
+  "tool": {
+    "name": "appraise",
+    "version": "1.0.0"
+  }
+}
