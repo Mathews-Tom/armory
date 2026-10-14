@@ -246,6 +246,8 @@ description: "Review architecture and provide feedback."
 
 Every package should include `category`, `tags`, and `difficulty` under `metadata:` in frontmatter.
 
+Maintain these fields directly in each package definition. The manifest generator mirrors declared metadata; it does not infer categories, tags, or difficulty.
+
 ### Category
 
 Assign one category from the table below:
