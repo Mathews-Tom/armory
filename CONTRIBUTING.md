@@ -182,6 +182,7 @@ The `_templates/` directory holds reference files shared across multiple package
 2. `scripts/sync_templates.py` defines which packages consume each template via `TEMPLATE_CONSUMERS`
 3. Running the script copies templates to `{type-dir}/{consumer}/references/{template}`
 4. A pre-commit hook runs sync automatically when templates or references change
+5. CI runs the same synchronizer and fails if any registered copy needs updating; run `uv run python scripts/sync_templates.py` and commit the resulting copies before pushing
 
 **To add a shared template:**
 

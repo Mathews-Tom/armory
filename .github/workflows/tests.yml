@@ -38,6 +38,9 @@ jobs:
       - name: Install project environment
         run: uv sync --locked
 
+      - name: Verify shared template synchronization
+        run: uv run python scripts/sync_templates.py
+
       - name: Ship workflow lint and strict types
         run: |
           uv run ruff check skills/ship-workflow/scripts skills/ship-workflow/tests
