@@ -44,6 +44,12 @@ jobs:
           uv run ruff format --check skills/ship-workflow/scripts skills/ship-workflow/tests
           uv run mypy --strict skills/ship-workflow/scripts
 
+      - name: Appraise lint and strict types
+        run: |
+          uv run ruff check skills/appraise/scripts skills/appraise/tests
+          uv run ruff format --check skills/appraise/scripts skills/appraise/tests
+          uv run mypy --strict skills/appraise/scripts
+
       - name: Repo-level tests
         run: uv run python -m pytest tests/ -q
 
