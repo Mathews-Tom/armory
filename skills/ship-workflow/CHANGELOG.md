@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Tests
+
+- Cover reviews on later API pages superseding earlier approvals through dismissals, change requests, and stale-head approvals; the regression detects loss of later-page evidence.
+
 ## 2.0.0
 
 ### Changed

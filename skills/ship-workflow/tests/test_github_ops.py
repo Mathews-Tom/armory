@@ -505,6 +505,27 @@ def test_reviews_beyond_one_page_are_all_considered() -> None:
     assert obs.approvals == 130
 
 
+def test_later_review_pages_supersede_earlier_approvals() -> None:
+    reviews = [review(n, f"user{n}", "APPROVED") for n in range(1, 101)]
+    reviews.extend(
+        [
+            review(101, "user1", "DISMISSED"),
+            review(102, "user2", "CHANGES_REQUESTED"),
+            review(103, "user3", "APPROVED", commit=OTHER_HEAD),
+        ]
+    )
+    perms = {
+        f"/repos/{REPO}/collaborators/user{n}/permission": permission()
+        for n in range(1, 101)
+    }
+    obs = observe(
+        routes() | {f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged(reviews)} | perms
+    )
+    assert obs.approvals == 97
+    assert obs.changes_requested is True
+    assert has_issue(obs, "stale-approval-ignored")
+
+
 # --------------------------------------------------------------------------
 # Check evidence: head/base binding, duplicates, non-Actions rows
 
