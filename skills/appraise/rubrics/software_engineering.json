@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0",
+  "rubric_id": "software_engineering",
+  "rubric_version": "1.0.0",
+  "domain": "software_engineering",
+  "title": "Generic software engineering competency rubric",
+  "disclaimer": "Generic capability anchors derived from demonstrated scope. Not any organization's official leveling framework; supply an organization rubric file to calibrate against a specific ladder.",
+  "score_anchors": {
+    "0": "Demonstrated serious deficiency: direct evidence of unsafe or fundamentally incorrect execution. Never used for missing evidence.",
+    "1": "Foundational: limited, mostly bounded execution.",
+    "2": "Developing: routine scoped work with some independent competence.",
+    "3": "Proficient: independently reliable on moderately complex work.",
+    "4": "Advanced: strong judgment and execution across challenging constraints.",
+    "5": "Exceptional: rare demonstrated depth, scope, and repeatable consequential impact."
+  },
+  "groups": {
+    "technical": "Engineering decisions visible in the candidate's own work.",
+    "delivery": "Sustained ownership and user-outcome orientation.",
+    "influence": "Effect on other people, teams, and ecosystems."
+  },
+  "competencies": [
+    {"id": "problem_solving", "name": "Problem solving", "group": "technical", "indicators": ["requirements decomposition", "correctness", "edge cases", "algorithm choice"], "evidence_sources": ["source_code", "test_code", "commit", "diff"], "requires_opportunity": null},
+    {"id": "code_quality", "name": "Code quality", "group": "technical", "indicators": ["readability", "coupling", "coherence", "module boundaries", "maintainability"], "evidence_sources": ["source_code", "diff"], "requires_opportunity": null},
+    {"id": "architecture", "name": "Architecture", "group": "technical", "indicators": ["modularity", "design constraints", "compatibility boundaries", "system evolution"], "evidence_sources": ["source_code", "design_doc", "diff", "commit"], "requires_opportunity": null},
+    {"id": "system_design", "name": "System design", "group": "technical", "indicators": ["scale", "concurrency", "reliability", "latency", "performance tradeoffs"], "evidence_sources": ["source_code", "design_doc", "benchmark_methodology"], "requires_opportunity": null},
+    {"id": "testing", "name": "Testing", "group": "technical", "indicators": ["risk-based coverage", "integration tests", "test oracles", "regression protection"], "evidence_sources": ["test_code", "ci_config", "ci_run"], "requires_opportunity": null},
+    {"id": "security", "name": "Security", "group": "technical", "indicators": ["trust boundaries", "access control", "dependency risk", "input handling", "secret handling"], "evidence_sources": ["source_code", "ci_config", "documentation"], "requires_opportunity": null},
+    {"id": "operations", "name": "Operations", "group": "technical", "indicators": ["deployability", "monitoring", "observability", "failure recovery", "cost awareness"], "evidence_sources": ["source_code", "ci_config", "release", "documentation"], "requires_opportunity": null},
+    {"id": "technical_depth", "name": "Technical depth", "group": "technical", "indicators": ["language and platform mechanisms", "underlying algorithms", "research grounding"], "evidence_sources": ["source_code", "design_doc", "benchmark_methodology"], "requires_opportunity": null},
+    {"id": "engineering_judgment", "name": "Engineering judgment", "group": "technical", "indicators": ["simplicity", "prioritization", "rejected alternatives", "technical debt management"], "evidence_sources": ["design_doc", "commit", "diff", "source_code", "benchmark_methodology"], "requires_opportunity": null},
+    {"id": "learning", "name": "Learning", "group": "technical", "indicators": ["iteration", "appropriate corrections", "response to feedback and failures"], "evidence_sources": ["commit", "diff", "review", "pull_request"], "requires_opportunity": null},
+    {"id": "ownership", "name": "Ownership", "group": "delivery", "indicators": ["sustained delivery", "maintenance", "investigation", "lifecycle decisions"], "evidence_sources": ["commit", "release", "issue", "ci_config"], "requires_opportunity": null},
+    {"id": "product_thinking", "name": "Product thinking", "group": "delivery", "indicators": ["user problem framing", "usability", "measured outcomes", "adoption"], "evidence_sources": ["documentation", "design_doc", "issue", "release"], "requires_opportunity": null},
+    {"id": "collaboration", "name": "Collaboration", "group": "influence", "indicators": ["code review", "feedback incorporation", "shared decision-making", "communication"], "evidence_sources": ["review", "pull_request", "issue"], "requires_opportunity": "collaborators"},
+    {"id": "technical_leadership", "name": "Technical leadership", "group": "influence", "indicators": ["mentorship", "reusable standards", "technical direction", "leverage beyond own features"], "evidence_sources": ["design_doc", "documentation", "review", "pull_request", "external_artifact"], "requires_opportunity": null}
+  ],
+  "evidence_policy": {
+    "support_attribution": ["verified", "probable", "possible"],
+    "independent_attribution": ["verified", "probable"],
+    "independent_sources_for_score": {"4": 2, "5": 3},
+    "distinct_scopes_for_score": {"5": 2},
+    "counterevidence_review_from_score": 4,
+    "zero_requires_verified_weakness": true,
+    "self_report_score_cap": 3
+  },
+  "levels": [
+    {
+      "id": "junior",
+      "label": "Junior",
+      "description": "Bounded implementation with substantial guidance.",
+      "requires_scope": false,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 1, "n": 2}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["ownership", "collaboration", "technical_leadership"], "score": 1, "n": 1}
+      ]
+    },
+    {
+      "id": "mid",
+      "label": "Mid-level",
+      "description": "Independent feature or subsystem work using established engineering practices.",
+      "requires_scope": false,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 3, "n": 3},
+        {"type": "at_least", "of": ["problem_solving", "code_quality"], "score": 3, "n": 1},
+        {"type": "none_below", "of": "group:technical", "score": 1}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["ownership", "collaboration", "technical_leadership"], "score": 3, "n": 1}
+      ]
+    },
+    {
+      "id": "senior",
+      "label": "Senior",
+      "description": "Owns ambiguous, complex subsystems with robust operational and architectural judgment.",
+      "requires_scope": false,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 3, "n": 5},
+        {"type": "at_least", "of": ["architecture", "system_design"], "score": 4, "n": 1},
+        {"type": "at_least", "of": ["engineering_judgment"], "score": 3, "n": 1},
+        {"type": "at_least", "of": ["testing"], "score": 3, "n": 1},
+        {"type": "at_least", "of": ["operations", "security", "system_design"], "score": 3, "n": 1},
+        {"type": "at_least", "of": ["ownership"], "score": 3, "n": 1},
+        {"type": "none_below", "of": ["code_quality", "testing", "engineering_judgment", "architecture"], "score": 2}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["ownership", "collaboration", "technical_leadership", "product_thinking"], "score": 3, "n": 2},
+        {"type": "at_least", "of": ["ownership"], "score": 4, "n": 1}
+      ]
+    },
+    {
+      "id": "staff",
+      "label": "Staff",
+      "description": "Drives reusable technical direction across complex components and produces leverage beyond discrete features.",
+      "requires_scope": true,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 4, "n": 4, "min_confidence": "medium"},
+        {"type": "at_least", "of": "group:technical", "score": 3, "n": 6},
+        {"type": "at_least", "of": ["architecture"], "score": 4, "n": 1, "min_confidence": "medium"},
+        {"type": "at_least", "of": ["engineering_judgment"], "score": 4, "n": 1, "min_confidence": "medium"},
+        {"type": "none_below", "of": ["architecture", "code_quality", "testing", "engineering_judgment"], "score": 3},
+        {"type": "min_distinct_scopes", "of": ["architecture", "system_design", "technical_depth", "engineering_judgment"], "n": 3}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["technical_leadership"], "score": 3, "n": 1},
+        {"type": "at_least", "of": ["collaboration"], "score": 3, "n": 1},
+        {"type": "at_least", "of": ["ownership", "technical_leadership"], "score": 4, "n": 1}
+      ]
+    },
+    {
+      "id": "principal",
+      "label": "Principal",
+      "description": "Sustained strategy and consequential architecture spanning multiple systems, teams, or ecosystem boundaries.",
+      "requires_scope": true,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 4, "n": 6, "min_confidence": "medium"},
+        {"type": "at_least", "of": "group:technical", "score": 5, "n": 2, "min_confidence": "medium"},
+        {"type": "at_least", "of": ["architecture", "system_design"], "score": 5, "n": 1},
+        {"type": "none_below", "of": ["architecture", "code_quality", "testing", "engineering_judgment"], "score": 4},
+        {"type": "min_distinct_repos", "of": "group:technical", "n": 2}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["technical_leadership"], "score": 4, "n": 1, "min_confidence": "medium"},
+        {"type": "at_least", "of": ["collaboration"], "score": 4, "n": 1},
+        {"type": "min_distinct_repos", "of": ["technical_leadership", "collaboration"], "n": 2}
+      ]
+    },
+    {
+      "id": "distinguished",
+      "label": "Distinguished",
+      "description": "Rare, externally corroborated, sustained technical influence across a discipline or large ecosystem.",
+      "requires_scope": true,
+      "technical": [
+        {"type": "at_least", "of": "group:technical", "score": 5, "n": 4, "min_confidence": "high"}
+      ],
+      "scope": [
+        {"type": "at_least", "of": ["technical_leadership"], "score": 5, "n": 1, "min_confidence": "high"},
+        {"type": "evidence_kind", "kinds": ["external_artifact"], "verification": ["host_reported", "repository_claimed"], "n": 2}
+      ]
+    }
+  ],
+  "inconclusive_when": [
+    {"type": "observed_below", "of": "group:technical", "n": 4},
+    {"type": "supporting_evidence_below", "n": 5},
+    {"type": "attributable_repositories_below", "n": 1}
+  ],
+  "confidence_policy": {
+    "evidence": {
+      "high": {"min_supporting_evidence": 12, "min_observed": 8},
+      "medium": {"min_supporting_evidence": 6, "min_observed": 5}
+    },
+    "coverage": {"high": 0.8, "medium": 0.5},
+    "range_width_caps": {"1": "medium", "2": "low"}
+  }
+}

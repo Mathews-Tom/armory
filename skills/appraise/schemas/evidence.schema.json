@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/evidence.schema.json",
+  "title": "Verified evidence register",
+  "description": "Deduplicated evidence after engine verification. Attribution, permalinks and span digests are engine-computed.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "provenance", "evidence", "rejected", "duplicates", "inspected", "coverage"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "run_id": {"type": "string"},
+    "provenance": {
+      "type": "object",
+      "required": ["forensics_sha256", "judgments_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "forensics_sha256": {"$ref": "#/$defs/digest"},
+        "judgments_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/record"}},
+    "rejected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reasons"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "reasons": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        }
+      }
+    },
+    "duplicates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "duplicate_of"],
+        "additionalProperties": false,
+        "properties": {"id": {"type": "string"}, "duplicate_of": {"type": "string"}}
+      }
+    },
+    "inspected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repo", "target", "sample_id", "valid", "candidate_lines"],
+        "additionalProperties": false,
+        "properties": {
+          "repo": {"type": "string"},
+          "target": {"type": "string"},
+          "sample_id": {"type": ["string", "null"]},
+          "valid": {"type": "boolean"},
+          "candidate_lines": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["repositories"],
+      "additionalProperties": false,
+      "properties": {
+        "repositories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["repo", "sample_items", "sample_items_inspected", "sample_items_audited", "sample_coverage", "candidate_lines_total", "candidate_lines_inspected", "candidate_line_coverage"],
+            "additionalProperties": false,
+            "properties": {
+              "repo": {"type": "string"},
+              "sample_items": {"type": "integer", "minimum": 0},
+              "sample_items_inspected": {"type": "integer", "minimum": 0},
+              "sample_items_audited": {"type": "integer", "minimum": 0, "description": "Inspected sample items that were also read through `appraise.py show` (show-log.jsonl)."},
+              "sample_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+              "candidate_lines_total": {"type": "integer", "minimum": 0},
+              "candidate_lines_inspected": {"type": "integer", "minimum": 0},
+              "candidate_line_coverage": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "record": {
+      "type": "object",
+      "required": ["id", "source", "kind", "repository", "revision", "path", "line_start", "line_end", "commit", "url", "span_sha256", "subsystem", "polarity", "candidate_attribution", "attribution_share", "attribution_basis", "verification", "status", "observation", "interpretation", "competencies", "confidence", "caveats", "adjustments", "contested"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^(E-\\d{3,}|H-R\\d+-\\d{3,}|SR-\\d{2,})$"},
+        "source": {"enum": ["agent", "engine", "self_report"]},
+        "kind": {"type": "string"},
+        "repository": {"type": ["string", "null"]},
+        "revision": {"type": ["string", "null"]},
+        "path": {"type": ["string", "null"]},
+        "line_start": {"type": ["integer", "null"], "minimum": 1},
+        "line_end": {"type": ["integer", "null"], "minimum": 1},
+        "commit": {"type": ["string", "null"]},
+        "url": {"type": ["string", "null"]},
+        "span_sha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "subsystem": {"type": ["string", "null"]},
+        "polarity": {"enum": ["strength", "weakness", "neutral"]},
+        "candidate_attribution": {"enum": ["verified", "probable", "possible", "unlikely", "inherited", "unknown", "self_reported", "not_applicable"]},
+        "attribution_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "attribution_basis": {"type": "string"},
+        "verification": {"enum": ["directly_inspected", "repository_claimed", "ci_reported", "executed", "host_reported", "self_report"]},
+        "status": {"enum": ["verified", "downgraded", "unverified"]},
+        "observation": {"type": "string"},
+        "interpretation": {"type": "string"},
+        "competencies": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"enum": ["low", "medium", "high"]},
+        "caveats": {"type": "array", "items": {"type": "string"}},
+        "adjustments": {"type": "array", "items": {"type": "string"}},
+        "contested": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["claim", "note", "resolution"],
+              "additionalProperties": false,
+              "properties": {
+                "claim": {"enum": ["not_authored", "misinterpreted", "outdated", "other"]},
+                "note": {"type": "string"},
+                "resolution": {"enum": ["retained_verified_attribution", "excluded_from_scoring", "flagged_for_review"]}
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

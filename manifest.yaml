@@ -67,6 +67,28 @@ packages:
     category: review
     difficulty: intermediate
     phase: ship
+  - name: appraise
+    version: 1.0.0
+    description: 'Evidence-based competency and seniority appraisal of a software engineer from one or more Git repositories:
+      attributes authorship with git blame, separates fork and upstream code, verifies every cited line, and calibrates technical,
+      scope and overall levels with explicit uncertainty, a development plan and targeted questions. Use this skill when asked
+      to "appraise this developer", "calibrate my seniority", "assess this candidate from their GitHub", "what level am I
+      based on my repos", "review this engineer''s contributions", "build a promotion evidence pack", or "how can I grow as
+      an engineer from my code". Covers candidate review, self-appraisal, promotion packs, manager or mentor appraisals with
+      consent, progress over time and recalibration after interview answers. Not for code review of a diff, repository tutorials,
+      or architecture reviews.'
+    path: skills/appraise
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/appraise/SKILL.md
+    tags:
+    - seniority
+    - competency
+    - hiring
+    - self-assessment
+    - git-forensics
+    - career-growth
+    category: review
+    difficulty: advanced
+    phase: review
   - name: architecture-diagram
     version: 2.4.0
     description: 'Generate architecture diagrams as fully editable SVG with native AWS, Azure, and GCP icons for cloud diagrams,

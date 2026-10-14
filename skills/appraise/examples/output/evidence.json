@@ -1,0 +1,408 @@
+{
+  "coverage": {
+    "repositories": [
+      {
+        "candidate_line_coverage": 0.9573,
+        "candidate_lines_inspected": 112,
+        "candidate_lines_total": 117,
+        "repo": "R1",
+        "sample_coverage": 0.6364,
+        "sample_items": 11,
+        "sample_items_audited": 7,
+        "sample_items_inspected": 7
+      }
+    ]
+  },
+  "duplicates": [],
+  "evidence": [
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 20-29: candidate=10",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [
+        "Migration of a populated v1 database was not executed."
+      ],
+      "commit": null,
+      "competencies": [
+        "architecture",
+        "code_quality",
+        "engineering_judgment"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-001",
+      "interpretation": "Deliberate on-disk compatibility boundary with forward-version protection.",
+      "kind": "source_code",
+      "line_end": 29,
+      "line_start": 20,
+      "observation": "Migrations are keyed on PRAGMA user_version; a store written by a newer version is refused instead of being silently downgraded.",
+      "path": "src/queuebox/store.py",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "761be78935b335f28ba1b6329cabac3fd22398430dda48127a887668fdf5222a",
+      "status": "verified",
+      "subsystem": "src/queuebox",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/src/queuebox/store.py#L20-L29",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 31-43: candidate=13",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [
+        "Single-process only; the lock does not help across processes, which the ADR acknowledges."
+      ],
+      "commit": null,
+      "competencies": [
+        "code_quality",
+        "problem_solving",
+        "system_design"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-002",
+      "interpretation": "Understands the double-claim race; guards the transition at both the lock and SQL level.",
+      "kind": "source_code",
+      "line_end": 43,
+      "line_start": 31,
+      "observation": "claim() selects the oldest queued job and updates it with a state = 'queued' guard inside a lock, then commits.",
+      "path": "src/queuebox/store.py",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "4be0168d12e435d0e42f9e412bd41f53a79d0b66fc1627d6ec8073a1445af1df",
+      "status": "verified",
+      "subsystem": "src/queuebox",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/src/queuebox/store.py#L31-L43",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 14-18: candidate=5",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": null,
+      "competencies": [
+        "technical_depth"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-003",
+      "interpretation": "Knows SQLite's threading and journaling mechanics well enough to relax a default safely.",
+      "kind": "source_code",
+      "line_end": 18,
+      "line_start": 14,
+      "observation": "Connection opened with check_same_thread=False and WAL mode, paired with an explicit threading.Lock.",
+      "path": "src/queuebox/store.py",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "4672400092f2198b4f77ca9c864869b23b711d6155221f279383aaf3d3bde928",
+      "status": "verified",
+      "subsystem": "src/queuebox",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/src/queuebox/store.py#L14-L18",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 1-14: candidate=14",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": null,
+      "competencies": [
+        "architecture",
+        "engineering_judgment",
+        "ownership"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-004",
+      "interpretation": "Explicit tradeoff reasoning with a rejected alternative and a named revisit trigger.",
+      "kind": "design_doc",
+      "line_end": 14,
+      "line_start": 1,
+      "observation": "ADR states context, rejects Postgres for an operational-dependency reason, and records the single-host throughput ceiling as a consequence.",
+      "path": "docs/adr/001-sqlite-wal.md",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "b845f51399d5cf91a9e297fc20dbc51f36387e13d2d59c7bdec57fb78d5427cb",
+      "status": "verified",
+      "subsystem": "docs/adr",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/docs/adr/001-sqlite-wal.md#L1-L14",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 14-17: candidate=4",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": null,
+      "competencies": [
+        "testing"
+      ],
+      "confidence": "high",
+      "contested": null,
+      "id": "E-005",
+      "interpretation": "Test name overstates coverage; the worker's exception path has no oracle.",
+      "kind": "test_code",
+      "line_end": 17,
+      "line_start": 14,
+      "observation": "test_worker_runs only calls store.claim(); the worker module is never imported or exercised.",
+      "path": "tests/test_store.py",
+      "polarity": "weakness",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "ab4173fc8de31be55117aa2cdf902d185ca6b837519fb07089c9f9047f4d36ad",
+      "status": "verified",
+      "subsystem": "tests",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/tests/test_store.py#L14-L17",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 7-20: candidate=14",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": null,
+      "competencies": [
+        "operations",
+        "problem_solving"
+      ],
+      "confidence": "high",
+      "contested": null,
+      "id": "E-006",
+      "interpretation": "The documented bounded-retry behaviour is not implemented; failure recovery is incomplete.",
+      "kind": "source_code",
+      "line_end": 20,
+      "line_start": 7,
+      "observation": "MAX_ATTEMPTS is declared but never read; on failure the worker sleeps 0.1s and re-raises, so a failing job stays 'running' forever.",
+      "path": "src/queuebox/worker.py",
+      "polarity": "weakness",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "1dc693d76d4462778177bfc400720137a63abd45417c86d880f8a495cd4beebf",
+      "status": "verified",
+      "subsystem": "src/queuebox",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/src/queuebox/worker.py#L7-L20",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 1-9: candidate=9",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [
+        "Workflow read, not executed; no CI status was collected."
+      ],
+      "commit": null,
+      "competencies": [
+        "operations",
+        "testing"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-007",
+      "interpretation": "Baseline regression gate exists; CI results themselves were not available offline.",
+      "kind": "ci_config",
+      "line_end": 9,
+      "line_start": 1,
+      "observation": "CI installs the package and runs pytest on push and pull request.",
+      "path": ".github/workflows/ci.yml",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "84af0f9f6c48343ccfb962f7b7b222a8610a767c56d4c8d4c64da28c1ea667bd",
+      "status": "verified",
+      "subsystem": ".github",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/.github/workflows/ci.yml#L1-L9",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "commit author identity",
+      "attribution_share": null,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": "7d09825ba17df52ed7b047398e32a74b9e8d4d81",
+      "competencies": [
+        "architecture",
+        "learning",
+        "ownership"
+      ],
+      "confidence": "medium",
+      "contested": null,
+      "id": "E-008",
+      "interpretation": "Evolves persisted state incrementally and maintains its own earlier work.",
+      "kind": "commit",
+      "line_end": null,
+      "line_start": null,
+      "observation": "Adds a v2 migration (attempt counting) on top of the existing schema rather than recreating the table.",
+      "path": null,
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "cc27bde09643e71debad43c2abe9a316588183c8cf19e08dd078de17b7df1e39",
+      "status": "verified",
+      "subsystem": null,
+      "url": "https://github.com/example-org/queuebox/commit/7d09825ba17df52ed7b047398e32a74b9e8d4d81",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [
+        "claimed attribution probable exceeds computed unlikely; computed value kept"
+      ],
+      "attribution_basis": "blame over lines 1-10: other=10",
+      "attribution_share": 0.0,
+      "candidate_attribution": "unlikely",
+      "caveats": [
+        "Possibly another contributor's file."
+      ],
+      "commit": null,
+      "competencies": [
+        "architecture"
+      ],
+      "confidence": "low",
+      "contested": null,
+      "id": "E-009",
+      "interpretation": "Cited to show the service boundary; authorship is checked by the engine.",
+      "kind": "source_code",
+      "line_end": 10,
+      "line_start": 1,
+      "observation": "Minimal HTTP health endpoint.",
+      "path": "src/queuebox/web.py",
+      "polarity": "strength",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "d39035fb3446fc21ed9c7e73308ca910d801755a43f1df3ef382931f752cd087",
+      "status": "downgraded",
+      "subsystem": "src/queuebox",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/src/queuebox/web.py#L1-L10",
+      "verification": "directly_inspected"
+    },
+    {
+      "adjustments": [],
+      "attribution_basis": "blame over lines 1-3: candidate=3",
+      "attribution_share": 1.0,
+      "candidate_attribution": "verified",
+      "caveats": [],
+      "commit": null,
+      "competencies": [
+        "product_thinking"
+      ],
+      "confidence": "low",
+      "contested": null,
+      "id": "E-011",
+      "interpretation": "States the user problem and deployment constraint; no usage or adoption evidence.",
+      "kind": "documentation",
+      "line_end": 3,
+      "line_start": 1,
+      "observation": "README describes the product as a durable single-host job queue.",
+      "path": "README.md",
+      "polarity": "neutral",
+      "repository": "R1",
+      "revision": "5d820b5a5e0f095e017ccaaab67b5d16dd001545",
+      "source": "agent",
+      "span_sha256": "cfc98f543bc87b42d5ba84f82d2a959776a6245ab2d6479fff542c8d728ba9a1",
+      "status": "verified",
+      "subsystem": "(root)",
+      "url": "https://github.com/example-org/queuebox/blob/5d820b5a5e0f095e017ccaaab67b5d16dd001545/README.md#L1-L3",
+      "verification": "repository_claimed"
+    }
+  ],
+  "inspected": [
+    {
+      "candidate_lines": 20,
+      "repo": "R1",
+      "sample_id": "S-R1-001",
+      "target": "src/queuebox/worker.py",
+      "valid": true
+    },
+    {
+      "candidate_lines": 48,
+      "repo": "R1",
+      "sample_id": "S-R1-002",
+      "target": "src/queuebox/store.py",
+      "valid": true
+    },
+    {
+      "candidate_lines": 18,
+      "repo": "R1",
+      "sample_id": "S-R1-003",
+      "target": "tests/test_store.py",
+      "valid": true
+    },
+    {
+      "candidate_lines": 14,
+      "repo": "R1",
+      "sample_id": "S-R1-004",
+      "target": "docs/adr/001-sqlite-wal.md",
+      "valid": true
+    },
+    {
+      "candidate_lines": 9,
+      "repo": "R1",
+      "sample_id": "S-R1-005",
+      "target": ".github/workflows/ci.yml",
+      "valid": true
+    },
+    {
+      "candidate_lines": 0,
+      "repo": "R1",
+      "sample_id": "S-R1-006",
+      "target": "src/queuebox/web.py",
+      "valid": true
+    },
+    {
+      "candidate_lines": 3,
+      "repo": "R1",
+      "sample_id": "S-R1-007",
+      "target": "README.md",
+      "valid": true
+    },
+    {
+      "candidate_lines": 0,
+      "repo": "R1",
+      "sample_id": null,
+      "target": "7d09825ba17d",
+      "valid": true
+    },
+    {
+      "candidate_lines": 0,
+      "repo": "R1",
+      "sample_id": null,
+      "target": "2865bd96e1f1",
+      "valid": true
+    }
+  ],
+  "provenance": {
+    "forensics_sha256": "d0cf10cbe44658e66db1047506e0fba9a7a2b9ed6387019814ce09ab1abd273b",
+    "judgments_sha256": "526d84f72c3d778c7a19e51e9202cec01c0486b73a4624d5bbf65ad78e4782be"
+  },
+  "rejected": [
+    {
+      "id": "E-010",
+      "reasons": [
+        "line_end 130 beyond end of file (48 lines)"
+      ]
+    }
+  ],
+  "run_id": "be0ed1a12f4bb9b2",
+  "schema_version": "1.0"
+}

@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/rubric.schema.json",
+  "title": "Appraise competency rubric",
+  "description": "Competency dimensions, evidence policy and declarative level rules. A new domain or organization ladder is a new file conforming to this schema.",
+  "type": "object",
+  "required": ["schema_version", "rubric_id", "rubric_version", "domain", "title", "score_anchors", "groups", "competencies", "evidence_policy", "levels", "inconclusive_when", "confidence_policy"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "rubric_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "rubric_version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "domain": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "title": {"type": "string", "minLength": 1},
+    "disclaimer": {"type": "string"},
+    "score_anchors": {
+      "type": "object",
+      "required": ["0", "1", "2", "3", "4", "5"],
+      "additionalProperties": false,
+      "properties": {
+        "0": {"type": "string"}, "1": {"type": "string"}, "2": {"type": "string"},
+        "3": {"type": "string"}, "4": {"type": "string"}, "5": {"type": "string"}
+      }
+    },
+    "groups": {"type": "object", "additionalProperties": {"type": "string"}},
+    "competencies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "group", "indicators", "evidence_sources", "requires_opportunity"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "name": {"type": "string"},
+          "group": {"type": "string"},
+          "indicators": {"type": "array", "items": {"type": "string"}},
+          "evidence_sources": {"type": "array", "items": {"$ref": "#/$defs/evidence_kind"}},
+          "requires_opportunity": {"enum": [null, "collaborators"]}
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "required": ["support_attribution", "independent_attribution", "independent_sources_for_score", "distinct_scopes_for_score", "counterevidence_review_from_score", "zero_requires_verified_weakness", "self_report_score_cap"],
+      "additionalProperties": false,
+      "properties": {
+        "support_attribution": {"type": "array", "items": {"$ref": "#/$defs/attribution"}},
+        "independent_attribution": {"type": "array", "items": {"$ref": "#/$defs/attribution"}},
+        "independent_sources_for_score": {"$ref": "#/$defs/score_map"},
+        "distinct_scopes_for_score": {"$ref": "#/$defs/score_map"},
+        "counterevidence_review_from_score": {"type": "integer", "minimum": 0, "maximum": 6},
+        "zero_requires_verified_weakness": {"type": "boolean"},
+        "self_report_score_cap": {"type": "integer", "minimum": 0, "maximum": 5}
+      }
+    },
+    "levels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "description", "requires_scope", "technical", "scope"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "label": {"type": "string"},
+          "description": {"type": "string"},
+          "requires_scope": {"type": "boolean"},
+          "technical": {"type": "array", "items": {"$ref": "#/$defs/clause"}},
+          "scope": {"type": "array", "items": {"$ref": "#/$defs/clause"}}
+        }
+      }
+    },
+    "inconclusive_when": {"type": "array", "items": {"$ref": "#/$defs/inconclusive_clause"}},
+    "confidence_policy": {
+      "type": "object",
+      "required": ["evidence", "coverage", "range_width_caps"],
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "type": "object",
+          "required": ["high", "medium"],
+          "additionalProperties": false,
+          "properties": {
+            "high": {"$ref": "#/$defs/evidence_threshold"},
+            "medium": {"$ref": "#/$defs/evidence_threshold"}
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "required": ["high", "medium"],
+          "additionalProperties": false,
+          "properties": {
+            "high": {"type": "number", "minimum": 0, "maximum": 1},
+            "medium": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        },
+        "range_width_caps": {"type": "object", "additionalProperties": {"$ref": "#/$defs/confidence"}}
+      }
+    }
+  },
+  "$defs": {
+    "confidence": {"enum": ["low", "medium", "high"]},
+    "attribution": {"enum": ["verified", "probable", "possible", "unlikely", "inherited", "unknown", "self_reported", "not_applicable"]},
+    "evidence_kind": {"enum": ["source_code", "test_code", "commit", "diff", "ci_config", "ci_run", "design_doc", "documentation", "benchmark_methodology", "benchmark_result", "pull_request", "review", "issue", "release", "external_artifact", "self_report", "host_metadata"]},
+    "score_map": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "selector": {
+      "anyOf": [
+        {"type": "string", "pattern": "^group:[a-z][a-z0-9_]*$"},
+        {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}}
+      ]
+    },
+    "evidence_threshold": {
+      "type": "object",
+      "required": ["min_supporting_evidence", "min_observed"],
+      "additionalProperties": false,
+      "properties": {
+        "min_supporting_evidence": {"type": "integer", "minimum": 0},
+        "min_observed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "clause": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "of", "score", "n"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "at_least"},
+            "of": {"$ref": "#/$defs/selector"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 5},
+            "n": {"type": "integer", "minimum": 1},
+            "min_confidence": {"$ref": "#/$defs/confidence"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "of", "score"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "none_below"},
+            "of": {"$ref": "#/$defs/selector"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 5}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "of", "n"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"enum": ["min_distinct_scopes", "min_distinct_repos"]},
+            "of": {"$ref": "#/$defs/selector"},
+            "n": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "kinds", "verification", "n"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "evidence_kind"},
+            "kinds": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_kind"}},
+            "verification": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+            "n": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    },
+    "inconclusive_clause": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "of", "n"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "observed_below"},
+            "of": {"$ref": "#/$defs/selector"},
+            "n": {"type": "integer", "minimum": 1}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "n"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"enum": ["supporting_evidence_below", "attributable_repositories_below"]},
+            "n": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    }
+  }
+}

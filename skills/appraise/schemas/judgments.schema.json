@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/judgments.schema.json",
+  "title": "Agent judgments",
+  "description": "Evidence and proposed ratings authored by the assessing agent. The engine re-verifies every claim; attribution is computed, never trusted.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "summary", "inspected", "evidence", "competencies", "strengths", "confirmed_weaknesses", "potential_risks", "development_plan", "interview_questions", "self_reports", "challenges"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "run_id": {"type": "string", "minLength": 8},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 2400},
+    "inspected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["repo"],
+        "additionalProperties": false,
+        "properties": {
+          "repo": {"$ref": "#/$defs/repo_id"},
+          "path": {"type": "string", "minLength": 1},
+          "commit": {"$ref": "#/$defs/sha"},
+          "line_start": {"type": "integer", "minimum": 1},
+          "line_end": {"type": "integer", "minimum": 1},
+          "sample_id": {"type": "string"}
+        }
+      }
+    },
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "competencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "score", "rationale", "supporting_evidence_ids", "counterevidence_ids", "counterevidence_reviewed", "confidence"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 5},
+          "rationale": {"type": "string"},
+          "supporting_evidence_ids": {"$ref": "#/$defs/ids"},
+          "counterevidence_ids": {"$ref": "#/$defs/ids"},
+          "counterevidence_reviewed": {"type": "boolean"},
+          "confidence": {"$ref": "#/$defs/confidence"},
+          "not_observable_reason": {"enum": ["no_opportunity", "no_evidence", "access_limited", "not_sampled"]}
+        }
+      }
+    },
+    "strengths": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "confirmed_weaknesses": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "potential_risks": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "development_plan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "title", "competencies", "source_evidence_ids", "why", "action", "success_criterion", "effort", "priority", "horizon_days"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^P-\\d{2,}$"},
+          "category": {"enum": ["confirmed_weakness", "plausible_risk", "evidence_gap", "next_level_opportunity"]},
+          "title": {"type": "string", "minLength": 1},
+          "competencies": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "source_evidence_ids": {"$ref": "#/$defs/ids"},
+          "why": {"type": "string", "minLength": 1},
+          "action": {"type": "string", "minLength": 1},
+          "success_criterion": {"type": "string", "minLength": 1},
+          "effort": {"enum": ["S", "M", "L"]},
+          "priority": {"enum": ["P1", "P2", "P3"]},
+          "horizon_days": {"type": "integer", "minimum": 1, "maximum": 365}
+        }
+      }
+    },
+    "interview_questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "competencies", "evidence_ids", "would_change"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^Q-\\d{2,}$"},
+          "question": {"type": "string", "minLength": 10},
+          "competencies": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "evidence_ids": {"$ref": "#/$defs/ids"},
+          "would_change": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "self_reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question_id", "answer", "competencies", "contradicts_evidence_ids", "corroborating_evidence_ids"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^SR-\\d{2,}$"},
+          "question_id": {"type": ["string", "null"]},
+          "answer": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "competencies": {"type": "array", "items": {"type": "string"}},
+          "contradicts_evidence_ids": {"$ref": "#/$defs/ids"},
+          "corroborating_evidence_ids": {"$ref": "#/$defs/ids"}
+        }
+      }
+    },
+    "challenges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["evidence_id", "claim", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "evidence_id": {"type": "string"},
+          "claim": {"enum": ["not_authored", "misinterpreted", "outdated", "other"]},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repo_id": {"type": "string", "pattern": "^R\\d+$"},
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{7,64}$"},
+    "ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "confidence": {"enum": ["low", "medium", "high"]},
+    "finding": {
+      "type": "object",
+      "required": ["summary", "evidence_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": {"type": "string", "minLength": 1},
+        "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "competencies": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["id", "kind", "polarity", "verification", "observation", "interpretation", "competencies", "confidence", "caveats"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^E-\\d{3,}$"},
+        "kind": {"enum": ["source_code", "test_code", "commit", "diff", "ci_config", "ci_run", "design_doc", "documentation", "benchmark_methodology", "benchmark_result", "pull_request", "review", "issue", "release", "external_artifact", "host_metadata"]},
+        "repo": {"$ref": "#/$defs/repo_id"},
+        "path": {"type": "string", "minLength": 1},
+        "line_start": {"type": "integer", "minimum": 1},
+        "line_end": {"type": "integer", "minimum": 1},
+        "commit": {"$ref": "#/$defs/sha"},
+        "url": {"type": "string"},
+        "artifact": {"type": "string", "description": "Path of an additional artifact declared in input.json."},
+        "polarity": {"enum": ["strength", "weakness", "neutral"]},
+        "verification": {"enum": ["directly_inspected", "repository_claimed", "ci_reported", "executed", "host_reported"]},
+        "execution": {
+          "type": "object",
+          "required": ["command", "exit_code", "log_path"],
+          "additionalProperties": false,
+          "properties": {
+            "command": {"type": "string"},
+            "exit_code": {"type": "integer"},
+            "log_path": {"type": "string"}
+          }
+        },
+        "claimed_attribution": {"enum": ["verified", "probable", "possible", "unlikely", "inherited", "unknown"]},
+        "observation": {"type": "string", "minLength": 1, "maxLength": 1200},
+        "interpretation": {"type": "string", "minLength": 1, "maxLength": 1200},
+        "competencies": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"$ref": "#/$defs/confidence"},
+        "caveats": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

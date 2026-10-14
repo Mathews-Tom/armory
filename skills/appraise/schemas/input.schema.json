@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "appraise/input.schema.json",
+  "title": "Appraisal run input",
+  "description": "Normalized request for one appraisal run across one or more repositories.",
+  "type": "object",
+  "required": ["schema_version", "repositories", "candidate", "mode", "consent", "domain", "rubric_path", "specialization", "target_level", "depth", "output_format", "additional_artifacts", "budgets", "offline"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["locator", "upstream", "revision"],
+        "additionalProperties": false,
+        "properties": {
+          "locator": {"type": "string", "minLength": 1, "description": "Local checkout path, Git URL, GitHub URL, or OWNER/REPO shorthand."},
+          "upstream": {"type": ["string", "null"], "description": "Declared upstream locator; overrides host metadata."},
+          "revision": {"type": ["string", "null"], "description": "Revision to pin; default is the source HEAD."}
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["display", "identifiers"],
+      "additionalProperties": false,
+      "properties": {
+        "display": {"type": ["string", "null"]},
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {"enum": ["github", "email", "name", "self"]},
+              "value": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "mode": {"enum": ["review", "self", "promotion", "manager"]},
+    "consent": {"enum": [null, "subject_informed"], "description": "Required as subject_informed in manager mode."},
+    "domain": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "rubric_path": {"type": ["string", "null"]},
+    "specialization": {"type": ["string", "null"]},
+    "target_level": {"type": ["string", "null"]},
+    "depth": {"enum": ["quick", "standard", "deep"]},
+    "output_format": {"enum": ["markdown", "json", "both"]},
+    "additional_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {"type": "string"},
+          "kind": {"enum": ["design_doc", "documentation", "external_artifact", "release", "benchmark_methodology"]},
+          "description": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": ["sample_files", "sample_commits", "blame_files", "host_identity_lookups", "read_lines_per_item"],
+      "additionalProperties": false,
+      "properties": {
+        "sample_files": {"type": "integer", "minimum": 1},
+        "sample_commits": {"type": "integer", "minimum": 0},
+        "blame_files": {"type": "integer", "minimum": 0, "description": "0 means unlimited."},
+        "host_identity_lookups": {"type": "integer", "minimum": 0},
+        "read_lines_per_item": {"type": "integer", "minimum": 1, "description": "Lines of each sampled file or commit to read for full coverage credit."}
+      }
+    },
+    "offline": {"type": "boolean"}
+  }
+}

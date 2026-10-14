@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 143](https://img.shields.io/badge/packages-143-informational)](manifest.yaml)
+[![packages: 144](https://img.shields.io/badge/packages-144-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -127,6 +127,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 
 | Skill                                                  | Description                                                                                                                                         |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [appraise](skills/appraise/)                                       | Evidence-based competency and seniority appraisal from one or more Git repositories — blame-verified attribution, fork/upstream separation, rubric-driven levels with uncertainty, development plan, targeted questions |
 | [architecture-reviewer](skills/architecture-reviewer/) | Architecture reviews across 7 scored dimensions — structural integrity, scalability, security, performance, enterprise readiness, operations, data  |
 | [codebase-advisor](skills/codebase-advisor/)           | Senior repo advisor — audits codebase evidence, vets findings, and writes self-contained implementation plans for executor agents                   |
 | [code-refiner](skills/code-refiner/)                   | Deep code simplification and refactoring — structural complexity analysis, anti-pattern detection, idiomatic rewrites across Python, Go, TS, Rust   |
