@@ -14,8 +14,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
-import yaml  # noqa: E402
-
 from scripts.frontmatter import extract_version, parse_frontmatter, validate_version  # noqa: E402
 from scripts.package_types import REPO_ROOT, TYPES, PackageType, detect_type_from_path  # noqa: E402
 
@@ -69,14 +67,9 @@ def evaluate_package(pkg_dir: Path, pkg_type: PackageType) -> dict[str, object]:
         )
     else:
         try:
-            parsed = parse_frontmatter(definition.read_text(encoding="utf-8"))
-        except (ValueError, yaml.YAMLError) as exc:
+            meta = parse_frontmatter(definition.read_text(encoding="utf-8"))
+        except ValueError as exc:
             findings.append(_finding("CRITICAL", f"Invalid YAML frontmatter: {exc}"))
-        else:
-            if isinstance(parsed, dict):
-                meta = parsed
-            else:
-                findings.append(_finding("CRITICAL", "Frontmatter must be a mapping"))
 
     if meta is not None:
         for field in pkg_type.required_frontmatter:

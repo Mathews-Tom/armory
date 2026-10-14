@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 import yaml
@@ -635,3 +636,247 @@ class TestResolveProfilePackages:
         result = resolve_profile_packages("extended", profiles)
         # Empty dict signals "all"
         assert result == {}
+
+
+def _point_at_repo(mod: ModuleType, monkeypatch: pytest.MonkeyPatch, root: Path, manifest: object | None) -> None:
+    manifest_path = root / "manifest.yaml"
+    if manifest is not None:
+        manifest_path.write_text(manifest if isinstance(manifest, str) else yaml.dump(manifest))
+    monkeypatch.setattr(mod, "MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr(mod, "REPO_ROOT", root)
+    monkeypatch.setattr("scripts.package_types.REPO_ROOT", root)
+
+
+class TestInvalidDeclarations:
+    """Invalid package declarations fail loudly instead of being dropped."""
+
+    @pytest.mark.parametrize(
+        "manifest",
+        [
+            {},
+            [],
+            "just a string",
+            {"packages": []},
+            {"packages": {"skills": "nope"}},
+            {"packages": {"skills": ["nope"]}},
+            {"packages": {"skills": [{"path": "skills/s1"}]}},
+            {"packages": {"skills": [{"name": "s1"}]}},
+            {"packages": {"skills": [{"name": "s1", "path": "skills/s1", "version": "1.2.3\n"}]}},
+            {"packages": {"skills": [{"name": "s1", "path": "skills/s1", "description": None}]}},
+            {"packages": {"skills": [{"name": "s1", "path": "skills/s1", "version": 1.5}]}},
+            "packages: [unclosed",
+        ],
+    )
+    def test_malformed_manifest_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, manifest: object,
+    ) -> None:
+        import scripts.install as mod
+
+        (tmp_path / "skills" / "s1").mkdir(parents=True)
+        _point_at_repo(mod, monkeypatch, tmp_path, manifest)
+        with pytest.raises(ValueError, match="manifest.yaml"):
+            discover_packages()
+
+    def test_missing_declared_directory_names_package_and_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        _point_at_repo(mod, monkeypatch, tmp_path, {
+            "packages": {"skills": [{"name": "ghost", "path": "skills/ghost"}]},
+        })
+        with pytest.raises(ValueError, match="ghost") as info:
+            discover_packages()
+        assert "skills/ghost" in str(info.value)
+
+    @pytest.mark.parametrize(
+        "content",
+        ["", "---\n---\nBody", "---\n- a\n- b\n---\nBody", "---\njust text\n---\nBody",
+         "---\nname: [unclosed\n---\nBody", "---\ndescription: no name\n---\nBody",
+         "---\nname: [a, b]\n---\nBody"],
+    )
+    def test_fallback_invalid_definition_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: str,
+    ) -> None:
+        import scripts.install as mod
+
+        skill_dir = tmp_path / "skills" / "bad"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(content)
+        _point_at_repo(mod, monkeypatch, tmp_path, None)
+        with pytest.raises(ValueError, match="SKILL.md"):
+            discover_packages()
+
+    def test_fallback_ignores_non_package_entries(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        (tmp_path / "skills" / "no-definition").mkdir(parents=True)
+        (tmp_path / "skills" / "README.txt").write_text("not a package")
+        _point_at_repo(mod, monkeypatch, tmp_path, None)
+        assert discover_packages() == []
+
+    def test_unresolved_profile_package_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        profiles_path = tmp_path / "profiles.yaml"
+        profiles_path.write_text(yaml.dump({"profiles": {"p": {"packages": {"skills": ["missing"]}}}}))
+        monkeypatch.setattr(mod, "PROFILES_PATH", profiles_path)
+        pkgs = [PackageInfo("present", "1.0.0", "", tmp_path, _skill_type())]
+        with pytest.raises(ValueError, match="missing"):
+            filter_by_profile(pkgs, "p")
+
+    def test_unknown_profile_section_raises(self) -> None:
+        profiles = {"p": {"packages": {"widgets": ["w"]}}}
+        with pytest.raises(ValueError, match="widgets"):
+            resolve_profile_packages("p", profiles)
+
+
+class TestMainValidation:
+    """main() resolves profiles across types and fails before mutating anything."""
+
+    def _run(self, mod: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, argv: list[str]) -> tuple[int, Path]:
+        claude_dir = tmp_path / "claude-home"
+        monkeypatch.setattr(mod, "DEFAULT_CLAUDE_DIR", claude_dir)
+        monkeypatch.setattr("sys.argv", ["install.py", *argv])
+        return mod.main(), claude_dir
+
+    def test_invalid_selection_returns_nonzero_without_mutation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "skills" / "valid").mkdir(parents=True)
+        _point_at_repo(mod, monkeypatch, repo, {
+            "packages": {"skills": [
+                {"name": "valid", "path": "skills/valid"},
+                {"name": "[red]ghost", "path": "skills/ghost"},
+            ]},
+        })
+        code, claude_dir = self._run(mod, monkeypatch, tmp_path, [])
+        assert code != 0
+        assert not claude_dir.exists()
+        assert "[red]ghost" in capsys.readouterr().out
+
+    def test_unresolved_profile_returns_nonzero_without_mutation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        (repo / "skills" / "s1").mkdir(parents=True)
+        _point_at_repo(mod, monkeypatch, repo, {
+            "packages": {"skills": [{"name": "s1", "path": "skills/s1"}]},
+        })
+        profiles_path = repo / "profiles.yaml"
+        profiles_path.write_text(yaml.dump({"profiles": {"p": {"packages": {"skills": ["nope"]}}}}))
+        monkeypatch.setattr(mod, "PROFILES_PATH", profiles_path)
+        code, claude_dir = self._run(mod, monkeypatch, tmp_path, ["--profile", "p"])
+        assert code != 0
+        assert not claude_dir.exists()
+
+    @pytest.mark.parametrize("entrypoint", ["cli", "library"])
+    def test_preset_discovery_failure_does_not_copy_the_preset(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entrypoint: str,
+    ) -> None:
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        preset = repo / "presets" / "bundle"
+        preset.mkdir(parents=True)
+        (preset / "PRESET.md").write_text(
+            "---\nname: bundle\nmetadata:\n  version: 1.0.0\npreset:\n"
+            "  packages:\n    skills:\n      - name: ghost\n---\nBundle.\n"
+        )
+        _point_at_repo(mod, monkeypatch, repo, {
+            "packages": {
+                "presets": [{"name": "bundle", "path": "presets/bundle", "version": "1.0.0"}],
+                "skills": [{"name": "ghost", "path": "skills/ghost", "version": "1.0.0"}],
+            },
+        })
+        if entrypoint == "cli":
+            code, destination = self._run(mod, monkeypatch, tmp_path, ["--type", "preset"])
+            assert code == 1
+        else:
+            destination = tmp_path / "claude-home"
+            pkg = PackageInfo("bundle", "1.0.0", "", preset, TYPES["preset"])
+            plan = InstallPlan(pkg, InstallAction.INSTALL, None, destination / "presets" / "bundle")
+            with pytest.raises(mod.InstallInputError):
+                mod.install_preset(plan, destination)
+        assert not destination.exists()
+
+    @pytest.mark.parametrize(
+        ("platform", "retained_path"),
+        [
+            ("cursor", ".cursor/rules/existing.mdc"),
+            ("gemini", ".gemini/skills/existing/SKILL.md"),
+            ("codex", "AGENTS.md"),
+        ],
+    )
+    def test_invalid_adapter_definition_preserves_installed_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        platform: str, retained_path: str,
+    ) -> None:
+        import scripts.generate_adapters as adapters
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        for name, content in (
+            ("good", "---\nname: good\ndescription: Good skill\n---\nBody.\n"),
+            ("bad", "---\n- not-a-mapping\n---\nBody.\n"),
+        ):
+            skill = repo / "skills" / name
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(content)
+        monkeypatch.setattr("scripts.package_types.REPO_ROOT", repo)
+        monkeypatch.setattr(adapters, "REPO_ROOT", repo)
+        project = tmp_path / "project"
+        retained = project / retained_path
+        retained.parent.mkdir(parents=True)
+        retained.write_bytes(b"retained user content\n")
+        code, _ = self._run(
+            mod, monkeypatch, tmp_path,
+            ["--target", platform, "--project-dir", str(project)],
+        )
+        assert code == 1
+        assert {
+            p.relative_to(project).as_posix(): p.read_bytes()
+            for p in project.rglob("*") if p.is_file()
+        } == {retained_path: b"retained user content\n"}
+
+    def test_mixed_profile_with_type_filter_selects_that_type(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        (repo / "skills" / "s1").mkdir(parents=True)
+        (repo / "agents" / "a1").mkdir(parents=True)
+        skill_content = "---\nname: s1\nmetadata:\n  version: 1.0.0\n---\nSkill body.\n"
+        (repo / "skills" / "s1" / "SKILL.md").write_text(skill_content)
+        (repo / "agents" / "a1" / "AGENT.md").write_text("---\nname: a1\n---\nAgent body.\n")
+        _point_at_repo(mod, monkeypatch, repo, {
+            "packages": {
+                "skills": [{"name": "s1", "path": "skills/s1", "version": "1.0.0"}],
+                "agents": [{"name": "a1", "path": "agents/a1", "version": "1.0.0"}],
+            },
+        })
+        profiles_path = repo / "profiles.yaml"
+        profiles_path.write_text(yaml.dump({"profiles": {
+            "mixed": {"packages": {"skills": ["s1"], "agents": ["a1"]}},
+        }}))
+        monkeypatch.setattr(mod, "PROFILES_PATH", profiles_path)
+
+        answers = iter(["all", "y"])
+        monkeypatch.setattr(mod.Prompt, "ask", lambda *args, **kwargs: next(answers))
+        code, claude_dir = self._run(
+            mod, monkeypatch, tmp_path, ["--profile", "mixed", "--type", "skill"]
+        )
+        assert code == 0
+        assert (claude_dir / "skills" / "s1" / "SKILL.md").read_text() == skill_content
+        assert not (claude_dir / "agents").exists()

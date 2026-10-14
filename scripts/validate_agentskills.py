@@ -49,12 +49,8 @@ def validate_skill(pkg_dir: Path) -> tuple[list[str], list[str]]:
     try:
         text = definition.read_text(encoding="utf-8")
         meta = parse_frontmatter(text)
-    except (ValueError, Exception) as exc:
+    except (OSError, ValueError) as exc:
         errors.append(f"{pkg_name}: failed to parse frontmatter: {exc}")
-        return errors, warnings
-
-    if not isinstance(meta, dict):
-        errors.append(f"{pkg_name}: frontmatter is not a mapping")
         return errors, warnings
 
     # Required fields

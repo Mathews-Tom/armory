@@ -18,6 +18,8 @@ Armory supports seven package types. Each lives in its own top-level directory w
 
 Each package lives in its own directory under the appropriate type directory and must contain its definition file.
 
+Definition frontmatter must be a YAML mapping; empty, scalar, and list-valued frontmatter are rejected. Package versions use exactly `X.Y.Z` with no surrounding whitespace or trailing newline. Shared parsing raises a validation error instead of returning non-mapping YAML values to callers.
+
 ### Skill (`SKILL.md`)
 
 ```yaml
@@ -180,6 +182,7 @@ The `_templates/` directory holds reference files shared across multiple package
 2. `scripts/sync_templates.py` defines which packages consume each template via `TEMPLATE_CONSUMERS`
 3. Running the script copies templates to `{type-dir}/{consumer}/references/{template}`
 4. A pre-commit hook runs sync automatically when templates or references change
+5. CI runs the same synchronizer and fails if any registered copy needs updating; run `uv run python scripts/sync_templates.py` and commit the resulting copies before pushing
 
 **To add a shared template:**
 
@@ -242,6 +245,8 @@ description: "Review architecture and provide feedback."
 ## Metadata Fields
 
 Every package should include `category`, `tags`, and `difficulty` under `metadata:` in frontmatter.
+
+Maintain these fields directly in each package definition. The manifest generator mirrors declared metadata; it does not infer categories, tags, or difficulty.
 
 ### Category
 

@@ -30,7 +30,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 import yaml
 
-from scripts.frontmatter import extract_body, parse_frontmatter
+from scripts.frontmatter import FrontmatterError, extract_body, parse_frontmatter
 from scripts.package_types import REPO_ROOT, TYPES
 
 # ---------------------------------------------------------------------------
@@ -148,12 +148,8 @@ def load_packages(
             content = def_file.read_text(encoding="utf-8")
             try:
                 fm = parse_frontmatter(content)
-            except ValueError:
-                print(
-                    f"WARNING: {def_file} has invalid frontmatter, skipping",
-                    file=sys.stderr,
-                )
-                continue
+            except FrontmatterError as exc:
+                raise FrontmatterError(f"{def_file}: {exc}") from exc
 
             name = fm.get("name", "")
             if not name:
@@ -683,17 +679,16 @@ class GeminiAdapter(AdapterGenerator):
             content = skill_md.read_text(encoding="utf-8")
             try:
                 fm = parse_frontmatter(content)
-            except (ValueError, Exception):
+            except ValueError:
                 errors.append(
                     f"gemini: {skill_dir.name}/SKILL.md has invalid frontmatter"
                 )
                 continue
-            if isinstance(fm, dict):
-                leaked = claude_fields & set(fm.keys())
-                if leaked:
-                    errors.append(
-                        f"gemini: {skill_dir.name}/SKILL.md has Claude-specific fields: {leaked}"
-                    )
+            leaked = claude_fields & set(fm.keys())
+            if leaked:
+                errors.append(
+                    f"gemini: {skill_dir.name}/SKILL.md has Claude-specific fields: {leaked}"
+                )
         return errors
 
 
@@ -758,7 +753,11 @@ def main() -> int:
     args = parser.parse_args()
 
     # Load packages
-    packages = load_packages(type_filter=args.types)
+    try:
+        packages = load_packages(type_filter=args.types)
+    except FrontmatterError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     total = sum(len(pkgs) for pkgs in packages.values())
     if total == 0:
         print("ERROR: No packages found", file=sys.stderr)

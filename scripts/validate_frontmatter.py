@@ -10,7 +10,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-import yaml
 
 from scripts.frontmatter import extract_version, parse_frontmatter, validate_version
 from scripts.package_types import TYPES, PackageType
@@ -144,11 +143,8 @@ def validate_package(pkg_dir: Path, pkg_type: PackageType) -> list[str]:
     try:
         text = definition.read_text(encoding="utf-8")
         meta = parse_frontmatter(text)
-    except (ValueError, yaml.YAMLError) as e:
+    except ValueError as e:
         return [f"{prefix}: invalid frontmatter: {e}"]
-
-    if not isinstance(meta, dict):
-        return [f"{prefix}: frontmatter must be a YAML mapping"]
 
     # Required fields presence check
     for field in pkg_type.required_frontmatter:

@@ -337,14 +337,18 @@ just install-profile core
 just install-profile python-strict
 
 # Install by type
-uv run scripts/install.py --type skills
-uv run scripts/install.py --type agents
+uv run scripts/install.py --type skill
+uv run scripts/install.py --type agent
 
 # Interactive TUI
 uv run scripts/install.py
 ```
 
 Displays a version-aware table of all packages, detects installed versions, and lets you select which to install or upgrade. Profiles install curated bundles of packages across all types.
+
+The profile installer validates manifest declarations, or definition frontmatter when no manifest exists, and resolves every package named by a selected profile before writing the installation destination. Malformed declarations, missing declared source directories, and unresolved profile entries stop installation with a diagnostic naming the offending declaration. Combine `--profile core --type skill` to resolve the profile across all package types and install only its skills.
+
+Preset selections validate cross-type package discovery before creating the destination. Adapter generation and installation reject invalid definition frontmatter before replacing existing generated output.
 
 **Option 3 — Claude Code plugin marketplace (skills, agents, commands only)**
 

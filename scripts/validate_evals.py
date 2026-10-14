@@ -35,11 +35,8 @@ def is_deprecated(pkg_dir: Path, pkg_type: PackageType) -> bool:
     try:
         text = definition.read_text(encoding="utf-8")
         meta = parse_frontmatter(text)
-        return (
-            isinstance(meta, dict)
-            and meta.get("metadata", {}).get("status") == "deprecated"
-        )
-    except (ValueError, yaml.YAMLError):
+        return meta.get("metadata", {}).get("status") == "deprecated"
+    except ValueError:
         return False
 
 
