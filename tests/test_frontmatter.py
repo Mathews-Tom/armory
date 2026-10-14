@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 
 from scripts.frontmatter import (
     extract_body,
@@ -21,11 +22,11 @@ class TestParseFrontmatter:
         assert result["description"] == "A test"
 
     def test_no_frontmatter_raises(self) -> None:
-        with pytest.raises(ValueError, match="No valid YAML frontmatter found"):
+        with pytest.raises(ValueError):
             parse_frontmatter("Just plain text, no frontmatter.")
 
     def test_incomplete_frontmatter_raises(self) -> None:
-        with pytest.raises(ValueError, match="No valid YAML frontmatter found"):
+        with pytest.raises(ValueError):
             parse_frontmatter("---\nname: broken\nno closing delimiter")
 
     def test_multiline_frontmatter(self) -> None:
@@ -41,10 +42,28 @@ class TestParseFrontmatter:
         assert result["metadata"]["version"] == "1.2.3"
         assert result["metadata"]["author"] == "test"
 
-    def test_empty_frontmatter_returns_none(self) -> None:
-        content = "---\n\n---\nBody.\n"
-        result = parse_frontmatter(content)
-        assert result is None
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "---\n\n---\nBody.\n",
+            "---\n- a\n- b\n---\nBody.\n",
+            "---\njust a scalar\n---\nBody.\n",
+            "---\n42\n---\nBody.\n",
+        ],
+        ids=["null", "list", "string", "int"],
+    )
+    def test_non_mapping_frontmatter_raises(self, content: str) -> None:
+        with pytest.raises(ValueError):
+            parse_frontmatter(content)
+
+    def test_malformed_yaml_raises_value_error_with_cause(self) -> None:
+        content = "---\nname: [unclosed\n---\nBody.\n"
+        with pytest.raises(ValueError) as excinfo:
+            parse_frontmatter(content)
+        assert isinstance(excinfo.value.__cause__, yaml.YAMLError)
+
+    def test_flow_mapping_frontmatter_accepted(self) -> None:
+        assert parse_frontmatter("---\n{}\n---\nBody.\n") == {}
 
 
 class TestExtractVersion:
@@ -123,3 +142,7 @@ class TestValidateVersion:
 
     def test_invalid_text(self) -> None:
         assert validate_version("latest") is False
+
+    @pytest.mark.parametrize("version", ["1.2.3\n", "1.2.3\r\n", "\n1.2.3", " 1.2.3"])
+    def test_invalid_whitespace_variants(self, version: str) -> None:
+        assert validate_version(version) is False

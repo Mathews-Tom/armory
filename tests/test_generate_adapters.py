@@ -41,6 +41,27 @@ def repo_with_archived_skill(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     return repo
 
 
+def test_invalid_definition_leaves_existing_generation_untouched(
+    repo_with_archived_skill: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invalid = repo_with_archived_skill / "skills" / "bad"
+    invalid.mkdir()
+    (invalid / "SKILL.md").write_text("---\n- not-a-mapping\n---\nBody.\n")
+    out = tmp_path / "out"
+    retained = out / "cursor" / ".cursor" / "rules" / "kept.mdc"
+    _write_stale(retained)
+    monkeypatch.setattr(sys, "argv", ["generate_adapters.py", "--output-dir", str(out)])
+
+    assert main() == 1
+    assert {
+        p.relative_to(out).as_posix(): p.read_text()
+        for p in out.rglob("*")
+        if p.is_file()
+    } == {"cursor/.cursor/rules/kept.mdc": "stale"}
+
+
 class TestStaleOutputPruning:
     def test_archived_skill_is_not_discovered(
         self, repo_with_archived_skill: Path

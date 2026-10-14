@@ -9,6 +9,7 @@ import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
@@ -20,8 +21,15 @@ from rich.panel import Panel
 from rich.progress import Progress
 from rich.prompt import Prompt
 from rich.table import Table
+from rich.text import Text
 
-from scripts.frontmatter import extract_body, extract_version, parse_frontmatter
+from scripts.frontmatter import (
+    FrontmatterError,
+    extract_body,
+    extract_version,
+    parse_frontmatter,
+    validate_version,
+)
 from scripts.hooks_installer import install_hook as _install_hook_to_settings
 from scripts.package_types import (
     MANIFEST_PATH,
@@ -49,6 +57,10 @@ TYPE_COLORS: dict[str, str] = {
 }
 
 console = Console()
+
+
+class InstallInputError(ValueError):
+    """Package or profile declarations cannot support a complete installation."""
 
 
 class InstallAction(Enum):
@@ -105,21 +117,54 @@ def discover_packages(pkg_type: PackageType | None = None) -> list[PackageInfo]:
     return _discover_from_definition_files(types_to_scan)
 
 
+def _require_str(value: object, where: str, field: str, *, optional: bool = False) -> str:
+    if not isinstance(value, str):
+        raise InstallInputError(f"{where}: '{field}' must be a string, got {value!r}")
+    if not optional and not value.strip():
+        raise InstallInputError(f"{where}: '{field}' must be a non-empty string")
+    return value
+
+
 def _discover_from_manifest(types_to_scan: list[PackageType]) -> list[PackageInfo]:
     """Read packages from manifest.yaml (new format: packages.skills, packages.agents, etc.)."""
-    manifest = yaml.safe_load(MANIFEST_PATH.read_text(encoding="utf-8"))
-    packages_section = manifest.get("packages", {})
+    try:
+        manifest = yaml.safe_load(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise InstallInputError(f"{MANIFEST_PATH}: malformed YAML: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise InstallInputError(f"{MANIFEST_PATH}: root must be a mapping, got {type(manifest).__name__}")
+    packages_section = manifest.get("packages")
+    if not isinstance(packages_section, dict):
+        raise InstallInputError(
+            f"{MANIFEST_PATH}: 'packages' must be a mapping, got {type(packages_section).__name__}"
+        )
     packages: list[PackageInfo] = []
 
     for pt in types_to_scan:
-        for entry in packages_section.get(pt.manifest_section, []):
-            source = REPO_ROOT / entry["path"]
+        entries = packages_section.get(pt.manifest_section, [])
+        if not isinstance(entries, list):
+            raise InstallInputError(
+                f"{MANIFEST_PATH}: packages.{pt.manifest_section} must be a list, "
+                f"got {type(entries).__name__}"
+            )
+        for idx, entry in enumerate(entries):
+            where = f"{MANIFEST_PATH}: packages.{pt.manifest_section}[{idx}]"
+            if not isinstance(entry, dict):
+                raise InstallInputError(f"{where}: entry must be a mapping, got {type(entry).__name__}")
+            name = _require_str(entry.get("name"), where, "name")
+            where = f"{where} ({name})"
+            rel_path = _require_str(entry.get("path"), where, "path")
+            version = entry.get("version", "0.0.0")
+            if not isinstance(version, str) or not validate_version(version):
+                raise InstallInputError(f"{where}: 'version' must have the form X.Y.Z, got {version!r}")
+            description = _require_str(entry.get("description", ""), where, "description", optional=True)
+            source = REPO_ROOT / rel_path
             if not source.is_dir():
-                continue
+                raise InstallInputError(f"{where}: declared source directory does not exist: {source}")
             packages.append(PackageInfo(
-                name=entry["name"],
-                version=entry.get("version", "0.0.0"),
-                description=entry.get("description", ""),
+                name=name,
+                version=version,
+                description=description,
                 source_path=source,
                 pkg_type=pt,
             ))
@@ -145,18 +190,20 @@ def _discover_from_definition_files(types_to_scan: list[PackageType]) -> list[Pa
             content = def_file.read_text(encoding="utf-8")
             try:
                 meta = parse_frontmatter(content)
-            except ValueError:
-                continue
+            except ValueError as exc:
+                raise InstallInputError(f"{def_file}: invalid frontmatter: {exc}") from exc
 
-            name = meta.get("name", "")
-            if not name:
-                continue
-
+            name = _require_str(meta.get("name"), str(def_file), "name")
             version = extract_version(meta) or "0.0.0"
+            if not validate_version(version):
+                raise InstallInputError(f"{def_file}: version must have the form X.Y.Z, got {version!r}")
+            description = meta.get("description", "")
+            if not isinstance(description, str):
+                raise InstallInputError(f"{def_file}: 'description' must be a string")
             packages.append(PackageInfo(
                 name=name,
                 version=version,
-                description=meta.get("description", "").strip(),
+                description=description.strip(),
                 source_path=pkg_dir,
                 pkg_type=pt,
             ))
@@ -422,24 +469,24 @@ def resolve_preset_packages(
 def install_preset(
     plan: InstallPlan, claude_dir: Path,
 ) -> tuple[int, list[str]]:
-    """Install a preset — copy directory, then transitively install bundled packages.
+    """Validate bundled package discovery, then copy and install the preset.
 
     Returns (file_count, list of sub-package install messages).
     """
     pkg = plan.package
-    file_count = copy_package(pkg.source_path, plan.target_path)
     messages: list[str] = []
 
     # Resolve bundled packages
     bundled = resolve_preset_packages(pkg.source_path, pkg.pkg_type)
     if not bundled:
-        return file_count, messages
+        return copy_package(pkg.source_path, plan.target_path), messages
 
     # Discover all available packages for resolution
     all_packages = discover_packages()
     pkg_index: dict[tuple[str, str], PackageInfo] = {
         (p.pkg_type.key, p.name): p for p in all_packages
     }
+    file_count = copy_package(pkg.source_path, plan.target_path)
 
     for type_key, names in bundled.items():
         for name in names:
@@ -585,17 +632,28 @@ def execute_plans(
 # ---------------------------------------------------------------------------
 
 
-def load_profiles() -> dict[str, dict]:
+def load_profiles() -> dict[str, dict[str, Any]]:
     """Load profiles from profiles.yaml."""
     if not PROFILES_PATH.exists():
         return {}
-    data = yaml.safe_load(PROFILES_PATH.read_text(encoding="utf-8"))
-    return data.get("profiles", {})
+    try:
+        data = yaml.safe_load(PROFILES_PATH.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise InstallInputError(f"{PROFILES_PATH}: malformed YAML: {exc}") from exc
+    if not isinstance(data, dict):
+        raise InstallInputError(f"{PROFILES_PATH}: root must be a mapping, got {type(data).__name__}")
+    profiles = data.get("profiles", {})
+    if not isinstance(profiles, dict):
+        raise InstallInputError(f"{PROFILES_PATH}: 'profiles' must be a mapping")
+    for pname, profile in profiles.items():
+        if not isinstance(profile, dict):
+            raise InstallInputError(f"{PROFILES_PATH}: profile '{pname}' must be a mapping")
+    return profiles
 
 
 def resolve_profile_packages(
     profile_name: str,
-    profiles: dict[str, dict],
+    profiles: dict[str, dict[str, Any]],
     visited: set[str] | None = None,
 ) -> dict[str, set[str]]:
     """Resolve a profile into {type_key: {pkg_names}} with include-chain expansion.
@@ -611,7 +669,7 @@ def resolve_profile_packages(
 
     profile = profiles.get(profile_name)
     if profile is None:
-        raise ValueError(f"Unknown profile: {profile_name}")
+        raise InstallInputError(f"Unknown profile: {profile_name}")
 
     if profile.get("all", False):
         return {}  # sentinel: caller installs everything
@@ -627,12 +685,20 @@ def resolve_profile_packages(
             result.setdefault(type_key, set()).update(names)
 
     # Add this profile's packages
-    for type_key, names in profile.get("packages", {}).items():
+    packages_spec = profile.get("packages", {})
+    if not isinstance(packages_spec, dict):
+        raise InstallInputError(f"Profile '{profile_name}': 'packages' must be a mapping")
+    for type_key, names in packages_spec.items():
         # type_key in profiles.yaml matches manifest_section (e.g., "skills", "agents")
         # Map to PackageType key
         pkg_type_key = _section_to_type_key(type_key)
-        if pkg_type_key:
-            result.setdefault(pkg_type_key, set()).update(names)
+        if pkg_type_key is None:
+            raise InstallInputError(f"Profile '{profile_name}': unknown package type section '{type_key}'")
+        if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+            raise InstallInputError(
+                f"Profile '{profile_name}': packages.{type_key} must be a list of names"
+            )
+        result.setdefault(pkg_type_key, set()).update(names)
 
     return result
 
@@ -663,6 +729,18 @@ def filter_by_profile(
     ):
         return packages
 
+    known = {(p.pkg_type.key, p.name) for p in packages}
+    missing = sorted(
+        f"{type_key}:{name}"
+        for type_key, names in resolved.items()
+        for name in names
+        if (type_key, name) not in known
+    )
+    if missing:
+        raise InstallInputError(
+            f"Profile '{profile_name}' references unknown packages: {', '.join(missing)}"
+        )
+
     return [
         pkg for pkg in packages
         if pkg.pkg_type.key in resolved and pkg.name in resolved[pkg.pkg_type.key]
@@ -683,7 +761,10 @@ def install_to_platform(target: str, project_dir: Path) -> int:
     """Generate adapter output and copy to project directory for non-Claude targets."""
     from scripts.generate_adapters import _ADAPTERS, load_packages
 
-    packages = load_packages()
+    try:
+        packages = load_packages()
+    except FrontmatterError as exc:
+        raise InstallInputError(str(exc)) from exc
     total = sum(len(pkgs) for pkgs in packages.values())
     if total == 0:
         console.print("[red]No packages found.[/red]")
@@ -766,7 +847,11 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.list_profiles:
-        profiles = load_profiles()
+        try:
+            profiles = load_profiles()
+        except InstallInputError as exc:
+            console.print(Text(f"Error: {exc}", style="red"))
+            return 1
         if not profiles:
             console.print("[red]No profiles found in profiles.yaml[/red]")
             return 1
@@ -784,16 +869,28 @@ def main() -> int:
         return 0
 
     if args.target != "claude":
-        return install_to_platform(args.target, args.project_dir)
+        try:
+            return install_to_platform(args.target, args.project_dir)
+        except InstallInputError as exc:
+            console.print(Text(f"Error: {exc}", style="red"))
+            return 1
 
     console.print(Panel("armory installer", border_style="blue"))
 
     # Discover
     type_filter = TYPES.get(args.pkg_type) if args.pkg_type else None
-    packages = discover_packages(type_filter)
-
-    if args.profile:
-        packages = filter_by_profile(packages, args.profile)
+    try:
+        # Profiles and presets resolve packages across types before any writes.
+        packages = discover_packages(
+            None if args.profile or args.pkg_type == "preset" else type_filter
+        )
+        if args.profile:
+            packages = filter_by_profile(packages, args.profile)
+        if type_filter:
+            packages = [p for p in packages if p.pkg_type == type_filter]
+    except InstallInputError as exc:
+        console.print(Text(f"Error: {exc}", style="red"))
+        return 1
 
     if not packages:
         console.print("[red]No packages found.[/red]")

@@ -18,6 +18,8 @@ Armory supports seven package types. Each lives in its own top-level directory w
 
 Each package lives in its own directory under the appropriate type directory and must contain its definition file.
 
+Definition frontmatter must be a YAML mapping; empty, scalar, and list-valued frontmatter are rejected. Package versions use exactly `X.Y.Z` with no surrounding whitespace or trailing newline. Shared parsing raises a validation error instead of returning non-mapping YAML values to callers.
+
 ### Skill (`SKILL.md`)
 
 ```yaml
