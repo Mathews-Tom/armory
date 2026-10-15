@@ -1179,7 +1179,7 @@ packages:
     - citation-audit
     - literature-review
   - name: ship-workflow
-    version: 2.0.0
+    version: 2.1.0
     description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature
       branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work
       as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the
@@ -1246,7 +1246,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: stacked-prs
-    version: 0.4.0
+    version: 0.5.0
     description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create
       stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs",
       "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use

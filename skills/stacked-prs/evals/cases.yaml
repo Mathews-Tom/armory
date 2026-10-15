@@ -1,4 +1,27 @@
 cases:
+  - id: routine_stack_shipping_with_local_replay_gates
+    prompt: "Merge stack PRs 51 and 52 parent-first. Push and PR checks have the same display names. Validate every replayed commit before push, preserve our hooks, and retain protected or active worktrees."
+    fixtures: []
+    rubric:
+      - "delegates explicit selected scope to ship-workflow with routine provider-backed assurance"
+      - "uses --gates and per_commit true before push instead of temporary pre-push hook overrides"
+      - "distinguishes current workflow/event/publisher/attempt evidence without renaming jobs"
+      - "renews checks after promotion/retargeting and cleans only confirmed landed work"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 1.0
+      - type: matches_regex
+        target: "--gates"
+        weight: 1.0
+      - type: matches_regex
+        target: "per_commit"
+        weight: 1.0
+      - type: matches_regex
+        target: "(protected|active|retain)"
+        weight: 0.8
+
   - id: create_three_branch_stack
     prompt: "Create stacked PRs for feat/parser-core, feat/parser-cache, and feat/parser-cli based on main."
     fixtures: []

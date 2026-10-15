@@ -1719,3 +1719,54 @@ def test_ordered_selection_of_head_index_and_final_lines_is_accepted(
     assert blob(work, tip, b"a.txt") == b"one\nTWO\nthree\nfour\nFIVE\n"
     assert status(work) == b""
     assert worktree_bytes(work) == before
+
+
+def _packet(**changes: object) -> dict[str, object]:
+    packet: dict[str, object] = {
+        "schema_version": 1,
+        "sources": ["test policy: repository gates"],
+        "gates": [{"name": "unit", "argv": ["make", "test"]}],
+        "secret_scan": {"argv": ["scan", "{base}", "{head}"]},
+        "local_gates_free": False,
+    }
+    return {**packet, **changes}
+
+
+def test_gate_deadline_and_per_commit_round_trip_through_the_canonical_packet() -> None:
+    plain = parse_gates(_packet())
+    explicit = parse_gates(
+        _packet(
+            gates=[{"name": "unit", "argv": ["make", "test"], "timeout": 7200}],
+            per_commit=True,
+        )
+    )
+
+    assert (plain.per_commit, plain.gates[0].timeout) == (False, changeset.GATE_TIMEOUT)
+    assert (explicit.per_commit, explicit.gates[0].timeout) == (True, 7200.0)
+    for policy in (plain, explicit):
+        assert parse_gates(json.loads(json.dumps(policy.canonical()))) == policy
+    # Identities recorded before either field existed stay valid; each field moves it.
+    assert plain.canonical() == _packet(
+        secret_scan={"argv": ["scan", "{base}", "{head}"]}
+    )
+    assert (
+        plain.gates[0].identity
+        == hashlib.sha256(
+            json.dumps(["unit", ["make", "test"]], ensure_ascii=True).encode()
+        ).hexdigest()
+    )
+    assert explicit.identity != plain.identity
+    assert explicit.gates[0].identity != plain.gates[0].identity
+
+
+@pytest.mark.parametrize("timeout", [0, -1, True, "60", float("inf"), 86_401])
+def test_a_gate_deadline_must_be_a_bounded_positive_number(timeout: object) -> None:
+    with pytest.raises(PlanError, match="timeout"):
+        parse_gates(
+            _packet(gates=[{"name": "unit", "argv": ["make"], "timeout": timeout}])
+        )
+
+
+def test_per_commit_must_be_a_boolean() -> None:
+    with pytest.raises(PlanError, match="per_commit"):
+        parse_gates(_packet(per_commit="yes"))

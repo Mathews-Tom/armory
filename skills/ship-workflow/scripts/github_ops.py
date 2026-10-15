@@ -20,20 +20,40 @@ Conventions the gate engine relies on
   approvals, merge methods or strict-base policy are not fully authoritative;
   ``required_checks`` / ``required_approvals`` / ``approvals`` are then lower
   bounds only.
-* ``Check.base_sha`` is set to the current base only with *checkout proof*: the
-  completed job's own log shows exactly one ``actions/checkout`` step that
-  synced the PR's repository and emitted a commit (``git log -1 --format=%H``),
-  and ``git/commits`` shows that commit has parents ``[tested base, PR head]``.
-  ``Check.test_sha`` is that commit and ``Check.run_id`` the workflow run.
-  Timestamps, ``merge_commit_sha`` and workflow-run PR metadata are never
-  enough: without proof ``base_sha`` is None (a provably different metadata
-  base is kept as stale evidence) and a ``checkout-*`` issue whose detail
-  contains ``NEEDS_JUDGMENT`` is reported.  Push and other non-merge events
-  and non-Actions checks are head-only (``base_sha`` None).
-* Trust boundary: job logs are produced by workflow code, which the PR itself
-  can change.  Only runner-structured text inside the checkout step's segment
-  is read and the commit it names is authenticated through ``git/commits``;
-  that it truly tested the commit is not cryptographically provable.
+* Assurance (``observe(..., assurance=)``).  ``routine`` (the default) judges
+  from the provider's own current evidence: every applicable check run and
+  commit status of the PR head, required reviews, protections and merge policy.
+  It never reads job logs and trusts no repository checkout step.  Merge-context
+  freshness comes only from provider facts: the strict required-checks policy is
+  proven by the PR head containing the base commit (compare metadata); a
+  ``pull_request`` job counts as merge-context only when its run still names the
+  PR's current base ref and was triggered (``run.created_at``, immutable even
+  across re-runs) after the last base change (``base_ref_changed`` or
+  ``automatic_base_change_succeeded``; ``Check.retargeted``), so a run against a
+  previous base never satisfies the current one even when the base commit
+  coincides.  ``Check.base_sha`` is then the run metadata's base claim (None for
+  head-only events and statuses).  In both modes only the newest applicable run
+  of each (workflow, event) is judged, derived from every observed run of the
+  head: older runs' rows are dropped, a newer run that is waiting, has no job,
+  failed to start or lacks a row for one of its jobs (jobs listing,
+  ``filter=latest``) is pending or failed evidence, never an older success, and
+  rows of earlier attempts of a re-run give way to the current attempt.
+  ``high`` adds *checkout proof*: ``Check.base_sha`` is set to the current base
+  only when the completed job's own log shows exactly one ``actions/checkout``
+  step that synced the PR's repository and emitted a commit
+  (``git log -1 --format=%H``), and ``git/commits`` shows that commit has
+  parents ``[tested base, PR head]``.  ``Check.test_sha`` is that commit and
+  ``Check.run_id`` the workflow run.  Timestamps, ``merge_commit_sha`` and
+  workflow-run PR metadata are never enough there: without proof ``base_sha`` is
+  None (a provably different metadata base is kept as stale evidence) and a
+  ``checkout-*`` issue whose detail contains ``NEEDS_JUDGMENT`` is reported.
+  Push and other non-merge events and non-Actions checks are head-only
+  (``base_sha`` None).
+* Trust boundary (``high``): job logs are produced by workflow code, which the
+  PR itself can change.  Only runner-structured text inside the checkout step's
+  segment is read and the commit it names is authenticated through
+  ``git/commits``; that it truly tested the commit is not cryptographically
+  provable.
 * ``PullRequest.head_repo == ""`` means the provider reports no head
   repository (for example a deleted fork).
 * ``GitHub(deadline=...)`` is an absolute ``time.monotonic()`` value.
@@ -157,6 +177,9 @@ CALL_TIMEOUT = 60.0
 MAX_LOG_BYTES = 16 * 1024 * 1024
 NO_DEADLINE_RETRY_CAP = 60.0
 MERGE_METHODS = ("merge", "squash", "rebase")
+#: Evidence strength of an observation: ``routine`` uses current provider
+#: evidence only; ``high`` additionally attests each Actions job's checkout.
+ASSURANCES = ("routine", "high")
 MERGE_TIMEOUT = 90.0
 CREATE_TIMEOUT = 60.0
 HELP_TIMEOUT = 15.0
@@ -188,6 +211,8 @@ _NETWORK_RE = re.compile(
 )
 _PR_EVENT_PREFIX = "pull_request"
 _ACTIONS_APP = "github-actions"
+#: Timeline events that move a PR to another base (manually or by GitHub itself).
+_BASE_CHANGE_EVENTS = ("base_ref_changed", "automatic_base_change_succeeded")
 
 # Classification of a failed ``gh pr merge``: only a positively recognised
 # refusal or pre-dispatch failure is "certain"; anything else may have reached GitHub.
@@ -400,6 +425,10 @@ class Check:
     test_sha: str | None = None
     run_id: int | None = None
     app_id: int | None = None
+    workflow_id: int | None = None
+    event: str | None = None
+    check_id: int | None = None
+    retargeted: bool = False
 
 
 @dataclass(frozen=True)
@@ -416,6 +445,9 @@ class Observation:
     require_current_base: bool = False
     required_apps: tuple[tuple[str, int], ...] = ()
     queue_required: bool = False
+    assurance: str = "routine"
+    head_contains_base: bool | None = None
+    base_changed_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1110,8 +1142,10 @@ class GitHub:
         _objects(rules, op, "rules")
         return bool(rules)
 
-    def observe(self, number: int) -> Observation:
+    def observe(self, number: int, *, assurance: str = "routine") -> Observation:
         _check_number(number)
+        if assurance not in ASSURANCES:
+            raise ValueError("assurance must be routine or high")
         op = f"observe:{self.full_name}#{number}"
         repo_path = _repo_path(self.full_name)
         issues: list[str] = []
@@ -1151,7 +1185,19 @@ class GitHub:
                 "the live base ref disagrees with pull request metadata; observe again",
             )
         methods = _merge_methods(repo_obj, policy, issues)
-        checks = self._checks(pr, canonical, op, issues)
+        changed_at = (
+            self._base_change(pr, canonical, op, issues)
+            if assurance == "routine" and pr.state == "OPEN"
+            else None
+        )
+        checks = self._checks(pr, canonical, op, issues, assurance, changed_at)
+        head_contains_base = (
+            self._head_contains_base(pr, issues)
+            if assurance == "routine"
+            and pr.state == "OPEN"
+            and policy.require_current_base
+            else None
+        )
         approvals, changes_requested, reviews_known = self._reviews(
             pr, author, canonical, op, issues
         )
@@ -1197,6 +1243,9 @@ class GitHub:
             require_current_base=policy.require_current_base,
             required_apps=tuple(sorted(policy.required_apps)),
             queue_required=policy.queue_required,
+            assurance=assurance,
+            head_contains_base=head_contains_base,
+            base_changed_at=None if changed_at is None else changed_at.isoformat(),
         )
 
     # -- existing-PR facts, queue state and the guarded merge ----------------
@@ -2003,7 +2052,13 @@ class GitHub:
     # -- checks ------------------------------------------------------------
 
     def _checks(
-        self, pr: PullRequest, repo: str, op: str, issues: list[str]
+        self,
+        pr: PullRequest,
+        repo: str,
+        op: str,
+        issues: list[str],
+        assurance: str,
+        changed_at: datetime | None,
     ) -> tuple[Check, ...]:
         repo_path = _repo_path(repo)
         head = pr.head_sha
@@ -2064,13 +2119,25 @@ class GitHub:
                 f"base-unverified: {count} check row(s) from app '{_clean(app, 80)}' carry no base association"
             )
 
-        rows = self._deduplicate(rows, repo_path, op, issues)
-        rows = self._prove_rows(rows, pr, repo, op, issues)
+        rows = self._settle_runs(rows, runs or [], pr, repo_path, op, issues)
+        rows = _latest_per_publisher(rows)
+        if assurance == "high":
+            rows = self._prove_rows(rows, pr, repo, op, issues)
+        else:
+            rows = [_routine_row(row, pr, changed_at) for row in rows]
         checks = [
             row.check for row in sorted(rows, key=lambda r: (r.check.name, r.check_id))
         ]
 
-        status_checks = [_status_check(item, head, op) for item in statuses or []]
+        latest_status: dict[str, _Obj] = {}
+        for item in statuses or []:
+            context = item.text("context")
+            current = latest_status.get(context)
+            if current is None or item.integer("id") > current.integer("id"):
+                latest_status[context] = item
+        status_checks = [
+            _status_check(item, head, op) for item in latest_status.values()
+        ]
         if status_checks:
             issues.append(
                 f"base-unverified: {len(status_checks)} commit status context(s) carry no base association"
@@ -2112,6 +2179,40 @@ class GitHub:
             )
         return list(collected.values())
 
+    def _base_change(
+        self, pr: PullRequest, repo: str, op: str, issues: list[str]
+    ) -> datetime | None:
+        """Time of the PR's latest base change; None if it was never retargeted.
+
+        Both a manual ``base_ref_changed`` and an ``automatic_base_change_succeeded``
+        (GitHub retargeting a stacked PR after its base branch merged) count.
+        """
+        latest: datetime | None = None
+
+        def read() -> None:
+            nonlocal latest
+            events = f"{op}:events"
+            raw = self._list(f"{_repo_path(repo)}/issues/{pr.number}/events", events)
+            for item in _objects(raw, events, "events"):
+                if item.text("event") not in _BASE_CHANGE_EVENTS:
+                    continue
+                moment = _timestamp(item.text("created_at"), events, "event created_at")
+                if latest is None or moment > latest:
+                    latest = moment
+
+        self._guard(issues, "retarget-freshness-unavailable", read)
+        return latest
+
+    def _head_contains_base(self, pr: PullRequest, issues: list[str]) -> bool | None:
+        """Whether the PR head already contains the current base commit (strict freshness)."""
+        proven: list[bool] = []
+
+        def read() -> None:
+            proven.append(self.landing_reachable(pr.base_sha, pr.head_sha))
+
+        self._guard(issues, "strict-base-unavailable", read)
+        return proven[0] if proven else None
+
     def _prove_rows(
         self, rows: list[_Row], pr: PullRequest, repo: str, op: str, issues: list[str]
     ) -> list[_Row]:
@@ -2119,7 +2220,7 @@ class GitHub:
         parents: dict[str, tuple[str, ...] | None] = {}
         proven: list[_Row] = []
         for row in rows:
-            if not row.integration:
+            if not row.integration or row.synthetic:
                 proven.append(row)
                 continue
             context = self._checkout_context(row, pr, repo, parents, op)
@@ -2299,69 +2400,159 @@ class GitHub:
             None,
             run.id if run else None,
             app_id,
+            run.workflow_id if run else None,
+            run.event if run else None,
+            raw.integer("id"),
         )
         return _Row(check, raw.integer("id"), run, integration, run_base)
 
-    def _deduplicate(
-        self, rows: list[_Row], repo_path: str, op: str, issues: list[str]
-    ) -> list[_Row]:
-        """Drop only rows superseded by a newer attempt/run of the same workflow job."""
-        dropped: set[int] = set()
-        by_run: dict[tuple[int, str], list[_Row]] = {}
-        for row in rows:
-            if row.run is not None:
-                by_run.setdefault((row.run.id, row.check.name), []).append(row)
-        attempts: dict[int, dict[int, int] | None] = {}
-        for (run_id, name), group in by_run.items():
-            if len(group) < 2:
-                continue
-            if run_id not in attempts:
-                attempts[run_id] = self._job_attempts(repo_path, run_id, op, issues)
-            job_attempts = attempts[run_id]
-            if job_attempts is None or any(
-                row.check_id not in job_attempts for row in group
-            ):
-                issues.append(
-                    f"attempt-unresolved: workflow run {run_id} has several '{_clean(name, 80)}' rows whose attempts "
-                    "cannot be proven; all are kept"
-                )
-                continue
-            newest = max(job_attempts[row.check_id] for row in group)
-            dropped.update(
-                row.check_id for row in group if job_attempts[row.check_id] < newest
-            )
-        remaining = [row for row in rows if row.check_id not in dropped]
-        newest_run: dict[tuple[int, str, str], tuple[int, int]] = {}
-        for row in remaining:
-            if row.run is not None:
-                key = (row.run.workflow_id, row.run.event, row.check.name)
-                newest_run[key] = max(
-                    newest_run.get(key, (0, 0)), (row.run.run_number, row.check_id)
-                )
-        return [
-            row
-            for row in remaining
-            if row.run is None
-            or newest_run[(row.run.workflow_id, row.run.event, row.check.name)][0]
-            == row.run.run_number
-        ]
-
-    def _job_attempts(
+    def _latest_jobs(
         self, repo_path: str, run_id: int, op: str, issues: list[str]
-    ) -> dict[int, int] | None:
-        result: dict[int, int] = {}
+    ) -> list[_Obj] | None:
+        """The provider's current jobs, keeping distinct IDs even when names repeat.
+
+        A partial rerun can carry jobs from earlier attempts. ``filter=latest``
+        defines membership; display names cannot supersede another current job.
+        """
+        listed: list[_Obj] = []
 
         def read() -> None:
             jobs = self._wrapped(
                 f"{repo_path}/actions/runs/{run_id}/jobs",
                 f"{op}:run-jobs",
                 "jobs",
-                {"filter": "all"},
+                {"filter": "latest"},
             )
             for job in jobs:
-                result[job.integer("id")] = job.integer("run_attempt")
+                job.integer("id")
+                job.text("name")
+                _attempt(job, f"{op}:run-jobs", "job")
+            listed.extend(jobs)
 
-        return result if self._guard(issues, "run-jobs-unavailable", read) else None
+        return listed if self._guard(issues, "run-jobs-unavailable", read) else None
+
+    def _settle_runs(
+        self,
+        rows: list[_Row],
+        runs: list[_Run],
+        pr: PullRequest,
+        repo_path: str,
+        op: str,
+        issues: list[str],
+    ) -> list[_Row]:
+        """Judge only the newest applicable run of each (workflow, event), current attempt only.
+
+        The newest run is derived from every observed applicable run of the PR
+        head, not from the check rows that happen to exist: a newer run that is
+        waiting, has no job, failed to start, or has not published a row for one
+        of its jobs supersedes an older success.  Rows of older runs, and of
+        earlier attempts of the newest run, are dropped.  The newest run's jobs
+        come from the provider's jobs listing whenever its state is not settled
+        by its rows alone; a listed job without a check row becomes a pending
+        placeholder, and a run without any job reports its own pending or failed
+        state.  The run's own known status is authoritative too: a run still
+        going, or finished unsuccessfully, with no current pending or failed row
+        reports itself, so stale or unpublished successful rows never cover it.
+        Nothing missing is ever turned into success; unreadable jobs are
+        reported as ``run-jobs-unavailable`` and keep every row.
+        """
+        newest: dict[tuple[int, str], _Run] = {}
+        applicable: list[_Run] = []
+        for run in runs:
+            if run.head_sha != pr.head_sha or not _membership(run, pr)[0]:
+                continue
+            applicable.append(run)
+            key = (run.workflow_id, run.event)
+            if key not in newest or (run.run_number, run.id) > (
+                newest[key].run_number,
+                newest[key].id,
+            ):
+                newest[key] = run
+        owned: dict[int, list[_Row]] = {}
+        kept: list[_Row] = []
+        for row in rows:
+            if row.run is None:
+                kept.append(row)
+            else:
+                owned.setdefault(row.run.id, []).append(row)
+        publisher = next(
+            (
+                row.check.app_id
+                for row in rows
+                if row.check.app_slug == _ACTIONS_APP and row.check.app_id is not None
+            ),
+            None,
+        )
+        for key, run in newest.items():
+            own = owned.get(run.id, [])
+            names = [row.check.name for row in own]
+            superseding = any(
+                other.id != run.id and (other.workflow_id, other.event) == key
+                for other in applicable
+            )
+            unsettled = (
+                run.status != "completed"
+                or run.run_attempt > 1
+                or superseding
+                or not own
+                or len(set(names)) != len(names)
+            )
+            settled: list[_Row] = []
+            jobs = self._latest_jobs(repo_path, run.id, op, issues) if unsettled else []
+            if jobs is None:
+                settled.extend(own)
+                if len(set(names)) != len(names):
+                    issues.append(
+                        f"attempt-unresolved: workflow run {run.id} has several rows of one job name whose "
+                        "attempts cannot be proven; all are kept"
+                    )
+            elif not unsettled:
+                settled.extend(own)
+            else:
+                current = {job.integer("id") for job in jobs}
+                listed = {job.text("name") for job in jobs}
+                for row in own:
+                    if row.check_id in current:
+                        settled.append(row)
+                    elif row.check.name in listed:
+                        continue  # an earlier attempt, superseded by the listed job
+                    else:
+                        settled.append(row)
+                        issues.append(
+                            f"attempt-unresolved: workflow run {run.id} job '{_clean(row.check.name, 80)}' "
+                            "is not in the provider's current job listing; it is kept"
+                        )
+                have = {row.check_id for row in own}
+                settled.extend(
+                    _job_placeholder(run, pr, job, publisher)
+                    for job in jobs
+                    if job.integer("id") not in have
+                )
+            # The run's own state is authoritative.  Rows may all be successes of an
+            # earlier attempt, or of jobs the provider has not republished yet, while
+            # the run is still going or has failed: then the run reports itself.
+            # Successful jobs a re-run legitimately carries over never trigger this
+            # while a current job is pending or failed, and a settled success needs
+            # no evidence.
+            if run.status == "completed":
+                contradicted = run.conclusion not in (
+                    None,
+                    "success",
+                    "skipped",
+                    "neutral",
+                ) and not any(
+                    row.check.status == "completed"
+                    and row.check.conclusion not in ("success", "skipped", "neutral")
+                    for row in settled
+                )
+            else:
+                contradicted = not any(
+                    row.check.status != "completed" for row in settled
+                )
+            if contradicted:
+                settled.extend(_run_placeholder(run, pr, publisher))
+            kept.extend(settled)
+        return kept
 
     # -- reviews -----------------------------------------------------------
 
@@ -2861,6 +3052,7 @@ class _RunPR:
     number: int
     head_sha: str | None
     base_sha: str | None
+    base_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -2876,6 +3068,10 @@ class _Run:
     created_at: datetime
     updated_at: str
     prs: tuple[_RunPR, ...]
+    status: str
+    run_attempt: int
+    conclusion: str | None = None
+    name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -2885,6 +3081,7 @@ class _Row:
     run: _Run | None
     integration: bool = False
     run_base: str | None = None
+    synthetic: bool = False
 
 
 @dataclass(frozen=True)
@@ -2895,6 +3092,18 @@ class _Context:
     test_sha: str | None
     issue: str | None
     head_only: bool
+
+
+def _attempt(o: _Obj, op: str, what: str) -> int:
+    """The provider's ``run_attempt`` of a workflow run or job: required, positive.
+
+    It selects the current attempt of a run, so a missing or non-positive value
+    is malformed evidence and is never defaulted to the first attempt.
+    """
+    attempt = o.integer("run_attempt")
+    if attempt <= 0:
+        raise _malformed(op, f"{what} run_attempt must be a positive integer")
+    return attempt
 
 
 def _parse_run(o: _Obj, op: str) -> _Run:
@@ -2908,6 +3117,7 @@ def _parse_run(o: _Obj, op: str) -> _Run:
                 item.integer("number"),
                 head.opt_sha("sha") if head else None,
                 base.opt_sha("sha") if base else None,
+                base.opt_text("ref") if base else None,
             )
         )
     return _Run(
@@ -2922,6 +3132,10 @@ def _parse_run(o: _Obj, op: str) -> _Run:
         created_at=_timestamp(o.text("created_at"), op, "run created_at"),
         updated_at=o.opt_text("updated_at") or o.text("created_at"),
         prs=tuple(prs),
+        status=o.text("status"),
+        conclusion=o.opt_text("conclusion"),
+        name=o.opt_text("name"),
+        run_attempt=_attempt(o, op, "workflow run"),
     )
 
 
@@ -3081,6 +3295,125 @@ def _status_check(item: _Obj, head: str, op: str) -> Check:
         item.opt_text("target_url") or "",
         updated,
     )
+
+
+def _publisher_key(check: Check) -> tuple[str, str]:
+    """Identity of a non-Actions check: its publisher app and name."""
+    publisher = str(check.app_id) if check.app_id is not None else check.app_slug
+    return publisher, check.name
+
+
+def _latest_per_publisher(rows: list[_Row]) -> list[_Row]:
+    """Keep the newest row per (publisher app, name) of checks no workflow run owns.
+
+    The app id, not the slug, is the publisher authority; rows owned by a
+    workflow run are settled by :meth:`GitHub._settle_runs` instead.
+    """
+    newest: dict[tuple[str, str], int] = {}
+    for row in rows:
+        if row.run is None and row.check.app_slug != _ACTIONS_APP:
+            key = _publisher_key(row.check)
+            newest[key] = max(newest.get(key, 0), row.check_id)
+    return [
+        row
+        for row in rows
+        if row.run is not None
+        or row.check.app_slug == _ACTIONS_APP
+        or newest[_publisher_key(row.check)] == row.check_id
+    ]
+
+
+def _pending_status(value: str | None) -> str:
+    """``in_progress`` or ``queued``; a job or run that is not finished is never completed."""
+    return "in_progress" if value == "in_progress" else "queued"
+
+
+def _job_placeholder(
+    run: _Run, pr: PullRequest, job: _Obj, publisher: int | None
+) -> _Row:
+    """A pending row for a job the provider lists but has published no check row for.
+
+    Whatever the job reports, the placeholder is pending: a missing row is never
+    turned into success.
+    """
+    job_id = job.integer("id")
+    _, integration, run_base, _ = _membership(run, pr)
+    check = Check(
+        job.text("name"),
+        pr.head_sha,
+        None,
+        _pending_status(job.opt_text("status")),
+        None,
+        _ACTIONS_APP,
+        job.opt_text("html_url") or "",
+        job.opt_text("started_at") or run.updated_at,
+        None,
+        run.id,
+        publisher,
+        run.workflow_id,
+        run.event,
+        job_id,
+    )
+    return _Row(check, job_id, run, integration, run_base, synthetic=True)
+
+
+def _run_placeholder(run: _Run, pr: PullRequest, publisher: int | None) -> list[_Row]:
+    """The only evidence of a current run with no job: pending, or its own failure.
+
+    A run that is still going is pending.  A finished run without jobs that did
+    not succeed (``startup_failure``, ``cancelled``...) reports that conclusion;
+    a successful job-less run has nothing to report.
+    """
+    if run.status == "completed":
+        if run.conclusion in (None, "success"):
+            return []
+        status, conclusion = "completed", run.conclusion
+    else:
+        status, conclusion = _pending_status(run.status), None
+    _, integration, run_base, _ = _membership(run, pr)
+    check = Check(
+        run.name or f"workflow-{run.workflow_id}",
+        pr.head_sha,
+        None,
+        status,
+        conclusion,
+        _ACTIONS_APP,
+        "",
+        run.updated_at,
+        None,
+        run.id,
+        publisher,
+        run.workflow_id,
+        run.event,
+        -run.id,
+    )
+    return [_Row(check, -run.id, run, integration, run_base, synthetic=True)]
+
+
+def _routine_row(row: _Row, pr: PullRequest, changed_at: datetime | None) -> _Row:
+    """Attach the provider-reported merge context of a ``pull_request`` job.
+
+    Head-only rows (push and other events, statuses, other apps) keep no base.
+    A ``pull_request`` job is *retargeted* (stale for the current base) when its
+    run still names another base ref, or when its run was triggered before the
+    PR's latest base change.  The trigger time (``run.created_at``) is immutable:
+    a re-run of an old run keeps its original event commit and ref yet starts
+    new jobs later, so job timestamps prove nothing.  The run metadata's base
+    association is mutable and never proves that an older run tested the new
+    base, even when both bases share a commit.
+    """
+    if not row.integration or row.run is None:
+        return row
+    entry = next((item for item in row.run.prs if item.number == pr.number), None)
+    other_base = (
+        entry is not None
+        and entry.base_ref is not None
+        and entry.base_ref != pr.base_ref
+    )
+    before_change = changed_at is not None and row.run.created_at < changed_at
+    retargeted = other_base or before_change
+    base = None if retargeted else row.run_base
+    return replace(row, check=replace(row.check, base_sha=base, retargeted=retargeted))
 
 
 # --------------------------------------------------------------------------

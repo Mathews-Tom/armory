@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Literal
 
 import graph
+from changeset import GatePolicy
 from git_ops import GitError
 from github_ops import (
     Check,
@@ -337,7 +338,7 @@ class GraphForge(GitHub):
     def read_pr(self, number: int) -> PullRequest:
         return self.current(number)
 
-    def observe(self, number: int) -> Observation:
+    def observe(self, number: int, *, assurance: str = "routine") -> Observation:
         pr = self.current(number)
         self.contexts.append((number, pr.head_sha, pr.base_sha))
         tested: str | None = pr.base_sha
@@ -367,6 +368,7 @@ class GraphForge(GitHub):
             changes_requested=False,
             policy_known=True,
             issues=(),
+            assurance=assurance,
         )
 
     def queue_state(self, number: int, expected_head: str) -> QueueState:
@@ -954,22 +956,32 @@ class GraphWorld:
         )
 
     def run(
-        self, plan: StackPlan, endpoint: Endpoint, *, wait: float = 120.0
+        self,
+        plan: StackPlan,
+        endpoint: Endpoint,
+        *,
+        wait: float = 120.0,
+        gates: GatePolicy | None = None,
     ) -> tuple[Result, int]:
         """A new graph run, exactly as ``--stack-plan`` starts one."""
         return graph.execute_graph(
-            self.git, self.forge, plan, endpoint, wait, self.store()
+            self.git, self.forge, plan, endpoint, wait, self.store(), gates=gates
         )
 
     def resume(
-        self, run_id: str, endpoint: Endpoint, *, wait: float = 120.0
+        self,
+        run_id: str,
+        endpoint: Endpoint,
+        *,
+        wait: float = 120.0,
+        gates: GatePolicy | None = None,
     ) -> tuple[Result, int]:
         """Resume graph run ``run_id`` from its journal, as ``--resume`` does."""
         store = self.store()
         journal = store.load_graph(run_id)
         plan = graph.journal_plan(journal)
         return graph.execute_graph(
-            self.git, self.forge, plan, endpoint, wait, store, journal
+            self.git, self.forge, plan, endpoint, wait, store, journal, gates=gates
         )
 
     def journal(self, run_id: str) -> GraphJournal:

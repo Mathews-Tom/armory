@@ -57,7 +57,14 @@ from pathlib import Path
 from typing import Literal, NoReturn, cast
 
 import lifecycle
-from changeset import digest
+from changeset import (
+    ChangesetStop,
+    GatePolicy,
+    PlanError,
+    check_outgoing,
+    digest,
+    parse_gates,
+)
 from git_ops import GitError, GitRefused, GitRepository
 from git_ops import Promotion as SliceProof
 from github_ops import GitHub, ProviderError, PullRequest
@@ -559,7 +566,7 @@ def _check_base(
 
 
 def _decision_json(decision: Decision) -> dict[str, object]:
-    return {
+    row: dict[str, object] = {
         "sources": list(decision.sources),
         "expected_checks": list(decision.expected_checks),
         "merge_method": decision.merge_method,
@@ -569,6 +576,17 @@ def _decision_json(decision: Decision) -> dict[str, object]:
         "protected_refs": list(decision.protected_refs),
         "ci_free": decision.ci_free,
     }
+    # Only a stricter level is spelled out, so every routine (and every historical)
+    # decision keeps the identity it was saved with; an absent key is "routine".
+    if decision.assurance != "routine":
+        row["assurance"] = decision.assurance
+    if (
+        decision.assurance == "routine"
+        and not decision.expected_checks
+        and not decision.ci_free
+    ):
+        row.pop("expected_checks")
+    return row
 
 
 def _node_json(node: PlanNode) -> dict[str, object]:
@@ -1131,6 +1149,8 @@ def execute_graph(
     wait_timeout: float,
     store: Store,
     journal: GraphJournal | None = None,
+    *,
+    gates: GatePolicy | None = None,
 ) -> tuple[dict[str, object], int]:
     """Continue the selected nodes of ``plan`` parent-first through ``endpoint``.
 
@@ -1139,13 +1159,18 @@ def execute_graph(
     (:func:`resumed_plan`). Returns the structured result and its exit code
     (``lifecycle.EXIT_CODES``; 130 after a cancellation whose journal was
     preserved). Ordinary failures become statuses. ``pr`` only observes, writing
-    nothing; a completed run is re-verified without any write.
+    nothing; a completed run is re-verified without any write. ``gates`` is the
+    explicit local validation decision: it runs before each rewrite push, is saved
+    in the journal and, absent on a resume, is reused from it; a different one than
+    the saved run's is refused.
     """
     if (provider.host, provider.full_name.lower()) != (plan.host, plan.repo.lower()):
         raise ValueError("the provider is not bound to the stack plan repository")
     if journal is not None:
         resumed_plan(journal, plan)
-    return _GraphRun(git, provider, plan, endpoint, wait_timeout, store, journal).run()
+    return _GraphRun(
+        git, provider, plan, endpoint, wait_timeout, store, journal, gates
+    ).run()
 
 
 class _GraphRun:
@@ -1173,6 +1198,7 @@ class _GraphRun:
         wait_timeout: float,
         store: Store,
         journal: GraphJournal | None,
+        gates: GatePolicy | None = None,
     ) -> None:
         self.git = git
         self.provider = provider
@@ -1196,6 +1222,8 @@ class _GraphRun:
         self.stopped: int | None = None
         self.initialized = False
         self.mutation_attempted = False
+        self.gates = gates
+        self.local_validation: dict[int, list[dict[str, object]]] = {}
         self.mutation_confirmed = False
         self.cancelled = False
 
@@ -1299,6 +1327,7 @@ class _GraphRun:
             0.0,
             self.store,
             self.journal,
+            gates=self.gates,
         )
         owner.deadline = self.deadline
         return owner
@@ -1353,6 +1382,8 @@ class _GraphRun:
                 code_identity=self.code,
                 created_at=_now(),
             )
+            journal.assurance = self._assurance()
+            journal.gates = None if self.gates is None else self.gates.canonical()
             for row in journal.nodes:
                 if not row.selected:
                     row.state = "RETAINED"
@@ -1381,11 +1412,120 @@ class _GraphRun:
                 "saved graph actions belong to different controller sources",
                 "review the new sources and resume with a refreshed --stack-plan",
             )
+        if journal.status == "COMPLETE":
+            if refreshed or (
+                self.gates is not None and self.gates.canonical() != journal.gates
+            ):
+                raise _Stop(
+                    "NEEDS_JUDGMENT",
+                    "a completed graph cannot adopt new policy or unexercised gates",
+                    "resume with its saved inputs to reverify, or start a new run",
+                )
+            return True
+        changed = self._admit_assurance(journal)
+        changed = self._admit_gates(journal) or changed
         if not refreshed:
+            if changed:
+                with self.store.mutation_lock():
+                    self._save()
             return journal.status == "COMPLETE"
         self._refresh(journal)
         with self.store.mutation_lock():
             self._save()
+        return False
+
+    def _assurance(self) -> str:
+        """The highest assurance any selected node's decision asks for."""
+        high = any(
+            node.decision is not None and node.decision.assurance == "high"
+            for node in self.plan.selected_nodes()
+        )
+        return "high" if high else "routine"
+
+    def _admit_assurance(self, journal: GraphJournal) -> bool:
+        """Never narrow any saved node decision; a historical run must be decided.
+
+        A journal that predates assurance levels was validated under checkout
+        attestation: it resumes only when every selected decision explicitly asks
+        for ``high``. Otherwise each selected node keeps at least the level its
+        saved decision had, node by node: one node staying ``high`` never excuses
+        another's downgrade. A routine run is only ever raised. ``True`` when the
+        journal's recorded level changed.
+        """
+        selected = self.plan.selected_nodes()
+        if journal.assurance is None:
+            routine = [
+                node.pr
+                for node in selected
+                if node.decision is None or node.decision.assurance != "high"
+            ]
+            if routine:
+                raise _Stop(
+                    "NEEDS_JUDGMENT",
+                    "this graph run predates assurance levels and was validated "
+                    "under checkout attestation; the decisions of "
+                    + ", ".join(f"#{number}" for number in routine)
+                    + ' do not explicitly set assurance to "high"',
+                    "resume with a stack plan whose every selected decision sets "
+                    'assurance to "high", or start a new graph run',
+                )
+        else:
+            saved_high = {
+                node.pr
+                for node in journal_plan(journal).selected_nodes()
+                if node.decision is not None and node.decision.assurance == "high"
+            }
+            narrowed = [
+                node.pr
+                for node in selected
+                if node.pr in saved_high
+                and (node.decision is None or node.decision.assurance != "high")
+            ]
+            if narrowed:
+                raise _Stop(
+                    "NEEDS_JUDGMENT",
+                    "this graph run saved high assurance for "
+                    + ", ".join(f"#{number}" for number in narrowed)
+                    + "; a decision must not narrow it",
+                    "resume with a stack plan whose decisions keep assurance "
+                    '"high", or start a new graph run',
+                )
+        wanted = self._assurance()
+        if journal.assurance == wanted:
+            return False
+        journal.assurance = wanted
+        return True
+
+    def _admit_gates(self, journal: GraphJournal) -> bool:
+        """Reuse the saved local validation decision; refuse a different one.
+
+        No ``--gates`` on a resume keeps the saved decision, so validation never
+        silently disappears. A run saved without gates adopts a supplied decision
+        (strictly more validation). A supplied decision whose identity differs from
+        the saved one is refused: the run already promised the saved one. ``True``
+        when the journal changed.
+        """
+        try:
+            saved = None if journal.gates is None else parse_gates(journal.gates)
+        except PlanError as error:
+            raise _Stop(
+                "NEEDS_JUDGMENT",
+                f"the saved gate decision is unusable: {_detail(error)}",
+                "start a new graph run with an explicit --gates decision",
+            ) from error
+        if self.gates is None:
+            self.gates = saved
+            return False
+        if saved is None:
+            journal.gates = self.gates.canonical()
+            return True
+        if saved.identity != self.gates.identity:
+            raise _Stop(
+                "NEEDS_JUDGMENT",
+                "the supplied gate decision differs from the one this graph run saved",
+                "resume without --gates to keep the saved decision, or start a new "
+                "graph run with the new one; nothing was pushed",
+            )
         return False
 
     def _refresh(self, journal: GraphJournal) -> None:
@@ -1661,7 +1801,15 @@ class _GraphRun:
         return self.git.is_ancestor(landing, pr.head_sha)
 
     def _promote(self, node: PlanNode, pr: PullRequest, parent: PullRequest) -> None:
-        """Prove ``node``'s own slice on the current trunk tip, then publish it once."""
+        """Prove ``node``'s own slice on the current trunk tip, then publish it once.
+
+        The proposal is frozen in the journal before any validation or push. A
+        later attempt against the same fork, old head and trunk tip (after a
+        definite refusal or a failed gate) reuses those exact commit objects once
+        they re-verify, so a retry never mints a new commit id from a new committer
+        timestamp. Requested local gates run between the freeze and the push, in
+        this process: never inside a Git hook and never under a Git deadline.
+        """
         row = self.record.node(node.pr)
         remote = self._remote(pr.head_repo, pr.number)
         landing = parent.merge_commit_sha
@@ -1691,15 +1839,10 @@ class _GraphRun:
                 )
             if self.git.resolve_ref(pr.head_sha) is None:
                 self._fetch_head(pr)
-            proof = self._prove(node, captured, pr.head_sha, tip)
-            published = self.git.remote_head(remote, pr.head_ref)
-            if published != pr.head_sha:
-                raise _Stop(
-                    "NEEDS_JUDGMENT",
-                    f"the published head of #{node.pr} is {published}, not "
-                    f"{pr.head_sha}; nothing was pushed",
-                    _REFRESH,
-                )
+            proof = self._frozen(row, captured, pr.head_sha, tip)
+            if proof is None:
+                proof = self._prove(node, captured, pr.head_sha, tip)
+            self._require_published(node, pr, remote)
             row.promotion = Promotion(
                 fork=proof.fork,
                 old_head=proof.old_head,
@@ -1711,6 +1854,20 @@ class _GraphRun:
                 verified=True,
             )
             row.state = "PROMOTED"
+            self._save()
+        self.local_validation[node.pr] = self._validate(proof.landing, proof.new_head)
+        with self.store.mutation_lock():
+            self._require_clean(node.pr, "pushed")
+            self._unchanged(pr)
+            self._require_published(node, pr, remote)
+            if self._trunk() != proof.landing:
+                raise _Stop(
+                    "WAITING",
+                    f"the trunk changed while #{node.pr}'s replay was validated; "
+                    "nothing was pushed",
+                    "resume to rebuild and validate the proposal on the current trunk",
+                )
+            self._require_room(1)
             intent = self._intent(
                 "rewrite-push",
                 node.pr,
@@ -1719,6 +1876,66 @@ class _GraphRun:
             )
             self._push(intent, remote)
         self._advance_local(node)
+
+    def _require_published(self, node: PlanNode, pr: PullRequest, remote: str) -> None:
+        """The remote still publishes exactly ``pr``'s head (the lock is held)."""
+        published = self.git.remote_head(remote, pr.head_ref)
+        if published != pr.head_sha:
+            raise _Stop(
+                "NEEDS_JUDGMENT",
+                f"the published head of #{node.pr} is {published}, not "
+                f"{pr.head_sha}; nothing was pushed",
+                _REFRESH,
+            )
+
+    def _frozen(
+        self, row: GraphNode, fork: str, head: str, tip: str
+    ) -> SliceProof | None:
+        """The journaled proposal when it still is this slice on this trunk tip.
+
+        It is reused only when its fork, old head and landing are unchanged and its
+        objects, provenance and tree re-verify; anything else is proved afresh.
+        """
+        saved = row.promotion
+        if (
+            saved is None
+            or not saved.verified
+            or self.git.signing_required()
+            or (saved.fork, saved.old_head, saved.landing) != (fork, head, tip)
+        ):
+            return None
+        proof = SliceProof(
+            fork=saved.fork,
+            old_head=saved.old_head,
+            landing=saved.landing,
+            expected_tree=saved.expected_tree,
+            new_head=saved.new_head,
+            commits=saved.commits,
+            slice_identity=saved.slice_identity,
+        )
+        try:
+            self.git.verify_promotion(proof)
+        except GitRefused:
+            return None
+        return proof
+
+    def _validate(self, base: str, head: str) -> list[dict[str, object]]:
+        """Run the requested local gates on ``base..head``; ``[]`` when none were.
+
+        Never inside a Git hook or under the mutation lock. A failing gate stops
+        the run before any dispatch. The elapsed time extends the monitoring
+        deadline, so validation never consumes the provider-evidence window.
+        """
+        if self.gates is None:
+            return []
+        started = time.monotonic()
+        try:
+            return check_outgoing(self.git, self.gates, base, head, run_gates=True)
+        except ChangesetStop as stop:
+            raise _Stop(stop.status, str(stop), stop.next_action) from stop
+        finally:
+            self.deadline += time.monotonic() - started
+            self.provider.deadline = self.deadline
 
     def _prove(self, node: PlanNode, fork: str, head: str, tip: str) -> SliceProof:
         """Replay and re-verify the slice ``fork..head`` onto ``tip``; never resolve."""
@@ -1749,9 +1966,9 @@ class _GraphRun:
                 if observed == intent.expected_old:
                     raise _Stop(
                         "BLOCKED",
-                        f"the remote refused the rewritten head of #{intent.pr}",
-                        "resolve the remote refusal (protection or hooks) and resume; "
-                        "the proof is renewed before any new push",
+                        f"the rewritten head of #{intent.pr} was not published",
+                        "resolve the hook, transport or protection failure and resume; "
+                        "the frozen promotion is re-verified before any new push",
                     ) from error
                 raise _Stop(
                     "NEEDS_JUDGMENT",
@@ -2207,6 +2424,10 @@ class _GraphRun:
                 if intent.kind == "rewrite-push" and intent.outcome == "CONFIRMED"
             ],
             "confirmed_prs": [pr.url for pr in self.prs.values()],
+            "local_validation": [
+                {"pr": number, "gates": rows}
+                for number, rows in self.local_validation.items()
+            ],
             "confirmed_merges": list(merges.values()),
             "verification": self._rows("verification"),
             "cleanup": {
@@ -2688,7 +2909,7 @@ class _Preview:
         decision = node.decision
         if decision is None:
             return None
-        observed = self.provider.observe(node.pr)
+        observed = self.provider.observe(node.pr, assurance=decision.assurance)
         return asdict(
             lifecycle.evaluate(observed, decision.bound(pr.head_sha, pr.base_sha))
         )

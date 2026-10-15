@@ -340,7 +340,9 @@ SCHEMA_REJECTS = [
     pytest.param(drop_key("issue"), id="missing-top-level-key"),
     pytest.param(set_key("schema_version", True), id="schema-version-bool"),
     pytest.param(set_key("schema_version", 1.0), id="schema-version-float"),
-    pytest.param(set_key("schema_version", 4), id="schema-version-future"),
+    pytest.param(set_key("schema_version", 5), id="schema-version-future"),
+    pytest.param(set_key("assurance", "medium"), id="unknown-assurance"),
+    pytest.param(drop_key("assurance"), id="missing-assurance"),
     pytest.param(set_key("publication", {}), id="publication-missing-fields"),
     pytest.param(set_key("number", None), id="partial-target"),
     pytest.param(set_key("changeset", {}), id="changeset-missing-fields"),
@@ -396,7 +398,10 @@ SCHEMA_REJECTS = [
     pytest.param(
         set_key("merge_verified", False), id="validation-without-verified-merge"
     ),
-    pytest.param(set_key("policy_identity", None), id="validation-without-policy"),
+    pytest.param(
+        mutate(lambda data: data.update(assurance="high", policy_identity=None)),
+        id="high-validation-without-policy",
+    ),
     pytest.param(
         set_key("validation_policy", DIGEST2), id="validation-for-another-policy"
     ),
@@ -498,6 +503,7 @@ def legacy_payload(receipt: Receipt) -> Payload:
     data = receipt.serialize()
     del data["changeset"]
     del data["publication"]
+    del data["assurance"]
     data["schema_version"] = 1
     return data
 
@@ -506,7 +512,16 @@ def changeset_payload(receipt: Receipt) -> Payload:
     """The exact schema 2 journal written before publication was journaled."""
     data = receipt.serialize()
     del data["publication"]
+    del data["assurance"]
     data["schema_version"] = 2
+    return data
+
+
+def publication_payload(receipt: Receipt) -> Payload:
+    """The exact schema 3 journal written before assurance levels."""
+    data = receipt.serialize()
+    del data["assurance"]
+    data["schema_version"] = 3
     return data
 
 
@@ -554,19 +569,25 @@ def test_v1_journal_migrates_exactly_and_saves_as_current_schema(
 
     loaded = Store(common).load(RUN)
 
-    assert loaded == receipt
+    assert loaded == replace(receipt, assurance=None)
     assert loaded.changeset is None and loaded.target == receipt.target
     store = Store(common)
     store.save(store.load(RUN))
     saved = json.loads((common / "armory" / "ship" / f"{RUN}.json").read_bytes())
-    assert saved == {**v1, "schema_version": 3, "changeset": None, "publication": None}
+    assert saved == {
+        **v1,
+        "schema_version": 4,
+        "changeset": None,
+        "publication": None,
+        "assurance": None,
+    }
 
 
 def test_schema_2_changeset_journal_migrates_exactly(common: Path) -> None:
     receipt = unbound_receipt()
     plant_payload(common, RUN, changeset_payload(receipt))
 
-    assert Store(common).load(RUN) == receipt
+    assert Store(common).load(RUN) == replace(receipt, assurance=None)
     with_publication = {**changeset_payload(receipt), "publication": None}
     with pytest.raises(ReceiptInputError):
         Receipt.parse(with_publication)
@@ -1664,3 +1685,97 @@ def test_each_request_outcome_keeps_confirmed_landings(
     assert loaded == journal
     assert loaded.native is not None
     assert [m.landing is not None for m in loaded.native.members] == [True, True, False]
+
+
+# -- assurance levels -------------------------------------------------------------
+
+
+def test_schema_3_journal_migrates_with_unrecorded_assurance(common: Path) -> None:
+    receipt = full_receipt()
+    plant_payload(common, RUN, publication_payload(receipt))
+
+    loaded = Store(common).load(RUN)
+
+    assert loaded == replace(receipt, assurance=None)
+    store = Store(common)
+    store.save(store.load(RUN))
+    saved = json.loads((common / "armory" / "ship" / f"{RUN}.json").read_bytes())
+    assert saved["schema_version"] == 4 and saved["assurance"] is None
+    assert Store(common).load(RUN).assurance is None
+    with pytest.raises(ReceiptInputError):
+        Receipt.parse({**publication_payload(receipt), "assurance": "routine"})
+
+
+@pytest.mark.parametrize("assurance", ["routine", "high"])
+def test_assurance_round_trips(common: Path, assurance: str) -> None:
+    receipt = replace(full_receipt(), assurance=assurance)
+    Store(common).save(receipt)
+    assert Store(common).load(RUN).assurance == assurance
+
+
+def provider_derived() -> Receipt:
+    """A routine run with no explicit decision, validated by provider-derived policy."""
+    return replace(full_receipt(), policy_identity=None, assurance="routine")
+
+
+def test_provider_derived_routine_run_binds_validation_to_its_own_policy(
+    common: Path,
+) -> None:
+    Store(common).save(provider_derived())
+    assert Store(common).load(RUN).policy_identity is None
+
+
+@pytest.mark.parametrize(
+    "receipt",
+    [
+        pytest.param(replace(provider_derived(), assurance="high"), id="high"),
+        pytest.param(replace(provider_derived(), assurance=None), id="historical"),
+        pytest.param(
+            replace(provider_derived(), validation_policy=None), id="unbound-validation"
+        ),
+    ],
+)
+def test_only_routine_runs_may_validate_without_an_explicit_decision(
+    common: Path, receipt: Receipt
+) -> None:
+    with pytest.raises(ReceiptInputError):
+        Receipt.parse(receipt.serialize())
+    with pytest.raises(ReceiptInputError):
+        Store(common).save(receipt)
+    assert list(common.iterdir()) == []
+
+
+def test_graph_journal_v1_migrates_with_unrecorded_assurance_and_no_gates(
+    common: Path,
+) -> None:
+    journal = native_journal()
+    legacy = journal.serialize()
+    del legacy["assurance"]
+    del legacy["gates"]
+    legacy["schema_version"] = 1
+
+    loaded = GraphJournal.parse(legacy)
+
+    assert (loaded.assurance, loaded.gates) == (None, None)
+    assert loaded == replace(journal, assurance=None, gates=None)
+    with pytest.raises(ReceiptInputError):
+        GraphJournal.parse({**legacy, "assurance": "routine"})
+
+
+def test_graph_journal_persists_assurance_and_canonical_gates(common: Path) -> None:
+    gates = {"schema_version": 1, "sources": ["ci"], "gates": [], "per_commit": False}
+    journal = replace(native_journal(), assurance="high", gates=gates)
+
+    Store(common).save_graph(journal)
+    loaded = Store(common).load_graph(RUN)
+
+    assert loaded == journal
+    assert (loaded.assurance, loaded.gates) == ("high", gates)
+    bad = journal.serialize()
+    bad["assurance"] = "medium"
+    with pytest.raises(ReceiptInputError):
+        GraphJournal.parse(bad)
+    bad = journal.serialize()
+    bad["gates"] = ["not", "an", "object"]
+    with pytest.raises(ReceiptInputError):
+        GraphJournal.parse(bad)

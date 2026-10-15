@@ -59,6 +59,8 @@ None of these is proof on its own: a plain rebase result, `git cherry`, patch ID
 
 The rewrite gets a new committer identity and timestamp. The executable replays with plumbing and never signs: it refuses the promotion, with nothing rewritten, when the effective `commit.gpgSign` is set or a slice commit is signed, and never disables signing. Whether the provider requires signed commits is not observable there; a remote that refuses the push while still holding `C` leaves the run `BLOCKED`. A hand-run replay re-signs only under the operator's own signing configuration; original signatures never carry over.
 
+The delegated controller freezes the proposed commit objects and reuses their exact IDs after a definite refusal when `F`, `C` and `L` remain unchanged; it re-proves their tree and unchanged provenance instead of recreating timestamps. Requested `--gates` run before push in isolated clean checkouts with independent deadlines; `per_commit: true` validates every replay commit. Hooks are preserved, not replaced by validation. Unknown push outcomes reconcile first. The standalone recipe below does not provide saved proposal/validation authority; use the delegated controller for post-landing shipping.
+
 ## Hand-Run Recipe
 
 Replay in a detached scratch worktree so no existing checkout, index or branch moves:

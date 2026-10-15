@@ -570,6 +570,28 @@ def test_verify_promotion_accepts_the_proof_and_rejects_each_tampered_identity(
             repo.verify_promotion(candidate)
 
 
+def test_a_frozen_promotion_still_verifies_after_the_committer_clock_moves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stack = build_stack(tmp_path)
+    repo = GitRepository(stack.repo)
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700000500 +0000")
+    frozen = repo.promote_slice(stack.fork, stack.head, stack.landing)
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "1700009999 +0000")
+
+    # Only the committer time differs, yet every commit id of a new replay does.
+    fresh = repo.promote_slice(stack.fork, stack.head, stack.landing)
+    assert fresh.new_head != frozen.new_head
+    assert fresh.expected_tree == frozen.expected_tree
+    assert range_commits(stack.repo, stack.landing, fresh.new_head) != range_commits(
+        stack.repo, stack.landing, frozen.new_head
+    )
+
+    # The earlier objects are untouched and re-prove from their identities alone.
+    repo.verify_promotion(frozen)
+    assert git(stack.repo, "cat-file", "-t", frozen.new_head) == "commit"
+
+
 @pytest.mark.parametrize("scope", ["repository", "environment"])
 def test_promote_slice_refuses_a_signing_policy_before_writing_anything(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str

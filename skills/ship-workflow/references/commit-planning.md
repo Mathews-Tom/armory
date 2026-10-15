@@ -29,13 +29,16 @@ Gates are a separate source-provenanced decision passed explicitly with `--gates
 {
   "schema_version": 1,
   "sources": ["justfile:34 test target", ".github/workflows/tests.yml:41"],
-  "gates": [{"name": "unit", "argv": ["uv", "run", "pytest", "-q"]}],
+  "gates": [{"name": "unit", "argv": ["uv", "run", "pytest", "-q"], "timeout": 1800}],
   "secret_scan": {"argv": ["gitleaks", "git", "--log-opts={base}..{head}", "."]},
-  "local_gates_free": false
+  "local_gates_free": false,
+  "per_commit": true
 }
 ```
 
 Names are simple identifiers. Every group references at least one gate unless `local_gates_free` is explicitly true, in which case no gates exist and groups reference none. `secret_scan` is mandatory; `{base}` and `{head}` are replaced with the validated parent and new commit identities, nothing else is substituted. A missing executable is `BLOCKED`, never replaced by a weaker check.
+
+`--gates` also validates existing outgoing commits and stack replay proposals before push. `per_commit: true` runs each declared gate on every commit of the outgoing/replayed range, oldest first; otherwise existing/replayed work validates at the tip. New logical commit-plan groups retain their explicit per-group validation. Each gate's optional `timeout` is a positive number of seconds (default 1800, maximum 86400), independent of Git's push timeout and the CI monitoring window. Validation runs in isolated clean clones, outside push and outside the mutation lock. Existing repository hooks remain unchanged and run normally. A failed or timed-out gate prevents dispatch. Stack journals save the packet, so bare resume retains the requested validation.
 
 ## Grouping draft
 

@@ -190,6 +190,7 @@ def run(
         "id": rid, "workflow_id": workflow, "event": event, "run_number": number, "check_suite_id": suite,
         "head_sha": head, "head_branch": "feat/x", "head_repository": {"full_name": REPO},
         "created_at": created, "updated_at": created, "pull_requests": prs,
+        "status": "completed", "conclusion": "success", "run_attempt": 1,
     }  # fmt: skip
 
 
@@ -314,8 +315,8 @@ def with_ci(
     return table
 
 
-def observe(table: dict[str, Route]) -> Observation:
-    return make(table)[0].observe(NUMBER)
+def observe(table: dict[str, Route], assurance: str = "high") -> Observation:
+    return make(table)[0].observe(NUMBER, assurance=assurance)
 
 
 def by_name(obs: Observation) -> dict[str, github_ops.Check]:
@@ -474,7 +475,7 @@ def test_check_runs_are_fully_paginated_with_count_proof() -> None:
     rows = [check_run(1000 + n, f"job-{n}") for n in range(250)]
     table = with_ci([run(10, suite=100)], rows)
     gh, fake, _ = make(table)
-    obs = gh.observe(NUMBER)
+    obs = gh.observe(NUMBER, assurance="high")
     assert len(obs.checks) == 250 and {c.name for c in obs.checks} == {
         f"job-{n}" for n in range(250)
     }
@@ -704,7 +705,7 @@ def test_gh_without_the_escape_flag_gets_one_plain_log_read() -> None:
             )
         return fake(argv, timeout)
 
-    obs = GitHub("github.com", REPO, runner=old_gh).observe(NUMBER)
+    obs = GitHub("github.com", REPO, runner=old_gh).observe(NUMBER, assurance="high")
     assert by_name(obs)["test"].base_sha == BASE
 
 
@@ -729,7 +730,7 @@ def test_job_record_must_match_the_checks_run_head_and_name_before_logs_are_read
     table[f"/repos/{REPO}/actions/jobs/1000"] = Reply(body={"id": 1000, "run_id": 999, "head_sha": HEAD, "name": "test",
                                                            "status": "completed"})  # fmt: skip
     gh, fake, _ = make(table)
-    obs = gh.observe(NUMBER)
+    obs = gh.observe(NUMBER, assurance="high")
     assert by_name(obs)["test"].base_sha is None and has_issue(
         obs, "checkout-job-mismatch"
     )
@@ -741,13 +742,19 @@ def test_job_that_has_not_completed_is_not_proven_and_logs_are_not_read() -> Non
 
     checks = [check_run(1000, "test", status="in_progress", conclusion=None)]
     gh, fake, _ = make(with_ci([run(10, suite=100)], checks))
-    obs = gh.observe(NUMBER)
+    obs = gh.observe(NUMBER, assurance="high")
     assert by_name(obs)["test"].base_sha is None and has_issue(
         obs, "checkout-proof-pending"
     )
     assert fake.count(f"/repos/{REPO}/actions/jobs/1000") == 0
     decision = Policy(
-        ("current fixture workflow",), ("test",), "squash", (), HEAD, BASE
+        ("current fixture workflow",),
+        ("test",),
+        "squash",
+        (),
+        HEAD,
+        BASE,
+        assurance="high",
     )
     assert evaluate(obs, decision).status == "WAITING"
 
@@ -763,7 +770,7 @@ def test_checkout_commit_is_looked_up_once_for_many_jobs_and_logs_use_escape_fla
 ):
     checks = [check_run(1000 + n, f"job-{n}") for n in range(5)]
     gh, fake, _ = make(with_ci([run(10, suite=100)], checks))
-    obs = gh.observe(NUMBER)
+    obs = gh.observe(NUMBER, assurance="high")
     assert {c.base_sha for c in obs.checks} == {BASE} and {
         c.test_sha for c in obs.checks
     } == {MERGE}
@@ -857,7 +864,7 @@ def test_newer_pending_duplicate_is_never_hidden_behind_older_success() -> None:
             check_run(1000, "test", suite=100),
             check_run(1002, "test", suite=102, status="in_progress", conclusion=None),
         ],
-    )
+    ) | run_jobs(12, job(1002, status="in_progress", conclusion=None))
     checks = observe(table).checks
     assert [(c.name, c.status, c.conclusion) for c in checks] == [
         ("test", "in_progress", None)
@@ -867,15 +874,16 @@ def test_newer_pending_duplicate_is_never_hidden_behind_older_success() -> None:
 def test_newer_failure_wins_over_older_success_and_newer_success_wins_over_failure() -> (
     None
 ):
+    runs = [run(10, suite=100, number=1), run(12, suite=102, number=2)]
     older_ok = observe(with_ci(
-        [run(10, suite=100, number=1), run(12, suite=102, number=2)],
+        runs,
         [check_run(1000, "test", suite=100), check_run(1002, "test", suite=102, conclusion="failure")],
-    ))  # fmt: skip
+    ) | run_jobs(12, job(1002, conclusion="failure")))  # fmt: skip
     assert [c.conclusion for c in older_ok.checks] == ["failure"]
     older_bad = observe(with_ci(
-        [run(10, suite=100, number=1), run(12, suite=102, number=2)],
+        runs,
         [check_run(1000, "test", suite=100, conclusion="failure"), check_run(1002, "test", suite=102)],
-    ))  # fmt: skip
+    ) | run_jobs(12, job(1002)))  # fmt: skip
     assert [c.conclusion for c in older_bad.checks] == ["success"]
 
 
@@ -887,11 +895,10 @@ def test_attempts_of_one_run_are_collapsed_only_with_authoritative_attempt_numbe
         check_run(1000, "build", conclusion="success"),
         check_run(1001, "build", conclusion="failure"),
     ]
-    attempts = {1000: 1, 1001: 2}
     table = with_ci([run(10, suite=100)], rows) | {
         jobs: wrapped(
             "jobs",
-            [{"id": i, "run_attempt": a, "name": "build"} for i, a in attempts.items()],
+            [{"id": 1001, "run_attempt": 2, "name": "build"}],
         )
     }
     assert [c.conclusion for c in observe(table).checks] == [
@@ -926,9 +933,9 @@ def test_same_named_jobs_in_one_attempt_are_both_kept() -> None:
     assert len(observe(table).checks) == 2
 
 
-def test_non_actions_checks_are_included_undeduplicated_with_base_issue() -> None:
-    rows = [check_run(2000, "scan", suite=300, app="security-bot", conclusion="failure"),
-            check_run(2001, "scan", suite=300, app="security-bot")]  # fmt: skip
+def test_non_actions_checks_are_included_with_base_issue() -> None:
+    rows = [check_run(2000, "scan", suite=300, app="security-bot"),
+            check_run(2001, "other", suite=300, app="security-bot")]  # fmt: skip
     obs = observe(with_ci([], rows))
     assert [(c.app_slug, c.base_sha) for c in obs.checks] == [
         ("security-bot", None)
@@ -1312,7 +1319,7 @@ def test_missing_gh_binary_blocks() -> None:
 def test_every_provider_call_is_a_credential_store_read() -> None:
     table = with_ci([run(10, suite=100)], [check_run(1000, "test")])
     gh, fake, _ = make(table)
-    gh.observe(NUMBER)
+    gh.observe(NUMBER, assurance="high")
     assert fake.argvs
     for argv in fake.argvs:
         assert argv[:4] == ("gh", "api", "--method", "GET")
@@ -1606,7 +1613,13 @@ def test_required_check_publisher_controls_landing_not_only_its_name(
             }
         )
     decision = Policy(
-        ("current workflow and provider policy",), ("test",), "squash", (), HEAD, BASE
+        ("current workflow and provider policy",),
+        ("test",),
+        "squash",
+        (),
+        HEAD,
+        BASE,
+        assurance="high",
     )
     result = evaluate(observe(table), decision)
     assert result.status == (
@@ -1646,7 +1659,9 @@ def test_missing_live_base_identity_cannot_authorize_a_completed_job() -> None:
 
     table = with_ci([run(10, suite=100)], [check_run(1000, "test")])
     table[f"/repos/{REPO}/branches/main"] = Reply(body={"protected": False})
-    decision = Policy(("current workflow",), ("test",), "squash", (), HEAD, BASE)
+    decision = Policy(
+        ("current workflow",), ("test",), "squash", (), HEAD, BASE, assurance="high"
+    )
     assert evaluate(observe(table), decision).status == "BLOCKED"
 
 
@@ -2818,6 +2833,7 @@ def test_permission_to_land_follows_the_queues_configured_method(
         (),
         HEAD,
         BASE,
+        assurance="high",
     )
     obs = observe(table)
     assert obs.queue_required is True
@@ -3979,3 +3995,633 @@ def test_direct_native_request_reports_the_selected_landing_only() -> None:
 
     assert (result.status, result.sha) == ("merged", NATIVE_LANDED[5])
     assert (lower.state, lower.merge_commit_sha) == ("MERGED", NATIVE_LANDED[4])
+
+
+# --------------------------------------------------------------------------
+# Routine assurance: current provider evidence only
+
+
+def app_check(cid: int, name: str, app_id: int, **over: Any) -> dict[str, Any]:
+    row = check_run(cid, name, suite=900 + cid, app="security-bot", **over)
+    row["app"]["id"] = app_id
+    return row
+
+
+def routine_table(
+    runs: list[dict[str, Any]],
+    checks: list[dict[str, Any]],
+    *,
+    events: list[dict[str, Any]] | None = None,
+    strict: bool = False,
+    contains: bool = True,
+    **extra: Route,
+) -> dict[str, Route]:
+    """Provider routes for a routine read: no job, log or git-commit routes exist."""
+    base = f"/repos/{REPO}"
+    table = routes()
+    table[f"{base}/actions/runs"] = wrapped("workflow_runs", runs)
+    table[f"{base}/commits/{HEAD}/check-runs"] = wrapped("check_runs", checks)
+    table[f"{base}/issues/{NUMBER}/events"] = paged(events or [])
+    if strict:
+        table[f"{base}/rules/branches/main"] = Reply(body=[{
+            "type": "required_status_checks",
+            "parameters": {
+                "required_status_checks": [{"context": "test"}],
+                "strict_required_status_checks_policy": True,
+            },
+        }])  # fmt: skip
+        table[f"{base}/compare/{BASE}...{HEAD}"] = (
+            compare(BASE, HEAD, "ahead", 2, 0, BASE)
+            if contains
+            else compare(BASE, HEAD, "behind", 0, 3, HEAD)
+        )
+    table.update(extra)
+    return table
+
+
+def retarget_event(at: str) -> dict[str, Any]:
+    return {"event": "base_ref_changed", "created_at": at}
+
+
+def job(
+    jid: int,
+    name: str = "test",
+    *,
+    attempt: int = 1,
+    status: str = "completed",
+    conclusion: str | None = "success",
+) -> dict[str, Any]:
+    return {
+        "id": jid,
+        "name": name,
+        "run_attempt": attempt,
+        "status": status,
+        "conclusion": conclusion,
+        "html_url": f"https://github.com/{REPO}/jobs/{jid}",
+        "started_at": AFTER_MERGE,
+    }
+
+
+def run_jobs(run_id: int, *jobs: dict[str, Any]) -> dict[str, Route]:
+    """The provider's ``filter=latest`` jobs listing of one workflow run."""
+    return {f"/repos/{REPO}/actions/runs/{run_id}/jobs": wrapped("jobs", list(jobs))}
+
+
+def newer(
+    rid: int = 12, number: int = 2, suite: int = 102, **fields: Any
+) -> dict[str, Any]:
+    """A later run of the same workflow and event as ``run(10, ...)``."""
+    later = run(rid, suite=suite, number=number)
+    if fields.get("status", "completed") != "completed":
+        later["conclusion"] = None
+    later.update(fields)
+    return later
+
+
+def test_routine_observation_trusts_provider_checks_and_reads_no_logs() -> None:
+    table = routine_table([run(10, suite=100)], [check_run(1000, "test")])
+    gh, fake, _ = make(table)
+    obs = gh.observe(NUMBER)
+    assert obs.assurance == "routine"
+    assert not [p for p in fake.paths() if "/actions/jobs" in p or "/git/commits" in p]
+    assert not [i for i in obs.issues if i.startswith("checkout-")]
+    check = by_name(obs)["test"]
+    assert (check.base_sha, check.event, check.workflow_id, check.check_id) == (
+        BASE,
+        "pull_request",
+        5,
+        1000,
+    )
+    assert check.retargeted is False and check.test_sha is None
+    assert obs.head_contains_base is None and obs.base_changed_at is None
+
+
+def test_observe_rejects_an_unknown_assurance() -> None:
+    with pytest.raises(ValueError, match="assurance"):
+        make(routes())[0].observe(NUMBER, assurance="medium")
+
+
+def test_high_observation_keeps_attestation_and_reads_no_routine_evidence() -> None:
+    gh, fake, _ = make(with_ci([run(10, suite=100)], [check_run(1000, "test")]))
+    obs = gh.observe(NUMBER, assurance="high")
+    assert obs.assurance == "high" and by_name(obs)["test"].test_sha == MERGE
+    assert not [p for p in fake.paths() if "/events" in p or "/compare/" in p]
+
+
+def test_same_named_rows_of_different_workflows_events_and_publishers_all_survive() -> (
+    None
+):
+    statuses = {
+        "sha": HEAD, "state": "success", "total_count": 1,
+        "statuses": [{"id": 1, "context": "test", "state": "success", "target_url": None, "updated_at": AFTER_MERGE}],
+    }  # fmt: skip
+    table = routine_table(
+        [run(10, suite=100), run(11, suite=101, event="push", workflow=6, prs=[])],
+        [
+            check_run(1000, "test", suite=100),
+            check_run(1001, "test", suite=101),
+            app_check(2000, "test", 500),
+        ],
+        **{f"/repos/{REPO}/commits/{HEAD}/status": Reply(body=statuses)},
+    )
+    obs = observe(table, "routine")
+    assert sorted(
+        (c.name, c.event or "", c.app_slug, c.workflow_id or 0) for c in obs.checks
+    ) == [
+        ("test", "", "commit-status", 0),
+        ("test", "", "security-bot", 0),
+        ("test", "pull_request", "github-actions", 5),
+        ("test", "push", "github-actions", 6),
+    ]
+    push = next(c for c in obs.checks if c.event == "push")
+    assert push.base_sha is None and push.retargeted is False
+
+
+def test_non_actions_checks_keep_the_latest_row_per_publisher_app_id() -> None:
+    rows = [
+        app_check(2000, "scan", 500, conclusion="failure"),
+        app_check(2001, "scan", 500),  # the later re-run replaces the failure
+        app_check(2002, "scan", 501, conclusion="failure"),  # another publisher
+        app_check(2003, "gate", 502),
+        app_check(2004, "gate", 502, status="in_progress", conclusion=None),
+        app_check(2005, "audit", 503),
+        app_check(2006, "audit", 503, conclusion="failure"),
+    ]
+    obs = observe(routine_table([], rows), "routine")
+    assert sorted((c.name, c.app_id, c.status, c.conclusion) for c in obs.checks) == [
+        ("audit", 503, "completed", "failure"),
+        ("gate", 502, "in_progress", None),
+        ("scan", 500, "completed", "success"),
+        ("scan", 501, "completed", "failure"),
+    ]
+
+
+def test_new_run_attempt_pending_or_failed_supersedes_older_success() -> None:
+    jobs = f"/repos/{REPO}/actions/runs/10/jobs"
+    attempts = [
+        {"id": 1001, "run_attempt": 2, "name": "test"},
+    ]
+    for newest, expected in (
+        (
+            check_run(1001, "test", status="in_progress", conclusion=None),
+            ("in_progress", None),
+        ),
+        (check_run(1001, "test", conclusion="failure"), ("completed", "failure")),
+    ):
+        table = routine_table(
+            [run(10, suite=100)],
+            [check_run(1000, "test"), newest],
+            **{jobs: wrapped("jobs", attempts)},
+        )
+        assert [(c.status, c.conclusion) for c in observe(table, "routine").checks] == [
+            expected
+        ]
+
+
+def test_queued_job_without_a_check_row_is_pending_never_invented_success() -> None:
+    new = newer(status="in_progress")
+    jobs = [
+        {
+            "id": 1500,
+            "name": "test",
+            "run_attempt": 1,
+            "status": "queued",
+            "html_url": "https://github.com/j",
+            "started_at": None,
+        },
+        {
+            "id": 1501,
+            "name": "lint",
+            "run_attempt": 1,
+            "status": "completed",
+            "html_url": "",
+            "started_at": None,
+        },
+    ]
+    table = routine_table(
+        [run(10, suite=100, number=1), new],
+        [check_run(1000, "test", suite=100)],
+        **{f"/repos/{REPO}/actions/runs/12/jobs": wrapped("jobs", jobs)},
+    )
+    obs = observe(table, "routine")
+    assert [(c.name, c.status, c.conclusion, c.run_id) for c in obs.checks] == [
+        ("lint", "queued", None, 12),
+        ("test", "queued", None, 12),
+    ]  # a completed job without a row is pending too
+    unreadable = table | {
+        f"/repos/{REPO}/actions/runs/12/jobs": Reply(
+            status=403, body={"message": "Forbidden"}
+        )
+    }
+    assert has_issue(observe(unreadable, "routine"), "run-jobs-unavailable")
+
+
+@pytest.mark.parametrize("contains", [True, False])
+def test_strict_policy_freshness_is_proven_by_the_head_containing_the_base(
+    contains: bool,
+) -> None:
+    table = routine_table(
+        [run(10, suite=100)], [check_run(1000, "test")], strict=True, contains=contains
+    )
+    obs = observe(table, "routine")
+    assert obs.require_current_base and obs.head_contains_base is contains
+
+
+def test_unreadable_strict_freshness_is_reported_not_assumed() -> None:
+    table = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        strict=True,
+        **{
+            f"/repos/{REPO}/compare/{BASE}...{HEAD}": Reply(
+                status=403, body={"message": "Forbidden"}
+            )
+        },
+    )
+    obs = observe(table, "routine")
+    assert obs.head_contains_base is None and has_issue(obs, "strict-base-unavailable")
+
+
+def test_run_started_before_a_retarget_is_stale_even_when_base_commits_coincide() -> (
+    None
+):
+    # The run's mutable PR metadata names the very same base commit and ref.
+    after = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        events=[retarget_event("2026-10-12T12:30:00Z")],
+    )
+    stale = by_name(observe(after, "routine"))["test"]
+    assert stale.retargeted is True and stale.base_sha is None
+    assert (observe(after, "routine").base_changed_at or "").startswith(
+        "2026-10-12T12:30:00"
+    )
+    renewed = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        events=[
+            retarget_event("2026-10-12T12:00:00Z"),
+            {"event": "labeled", "created_at": "2026-10-12T13:00:00Z"},
+        ],
+    )
+    fresh = by_name(observe(renewed, "routine"))["test"]
+    assert fresh.retargeted is False and fresh.base_sha == BASE
+
+
+def test_run_naming_another_base_ref_is_retargeted_without_any_event() -> None:
+    def named(ref: str) -> dict[str, Any]:
+        return run(
+            10,
+            suite=100,
+            prs=[
+                {
+                    "number": NUMBER,
+                    "head": {"sha": HEAD},
+                    "base": {"sha": BASE, "ref": ref},
+                }
+            ],
+        )
+
+    old = by_name(
+        observe(routine_table([named("release")], [check_run(1000, "test")]), "routine")
+    )["test"]
+    assert old.retargeted is True and old.base_sha is None
+    current = by_name(
+        observe(routine_table([named("main")], [check_run(1000, "test")]), "routine")
+    )["test"]
+    assert current.retargeted is False and current.base_sha == BASE
+
+
+def test_head_only_push_run_is_never_marked_retargeted() -> None:
+    table = routine_table(
+        [run(11, suite=101, event="push", workflow=6, prs=[])],
+        [check_run(1001, "test", suite=101)],
+        events=[retarget_event("2026-10-12T12:30:00Z")],
+    )
+    push = by_name(observe(table, "routine"))["test"]
+    assert push.retargeted is False and push.base_sha is None
+
+
+def test_unreadable_retarget_events_are_reported_not_assumed_fresh() -> None:
+    table = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        **{
+            f"/repos/{REPO}/issues/{NUMBER}/events": Reply(
+                status=403, body={"message": "Forbidden"}
+            )
+        },
+    )
+    assert has_issue(observe(table, "routine"), "retarget-freshness-unavailable")
+
+
+def test_waiting_run_without_jobs_supersedes_an_older_success() -> None:
+    table = routine_table(
+        [run(10, suite=100, number=1), newer(status="queued", name="CI")],
+        [check_run(1000, "test", suite=100)],
+        **run_jobs(12),
+    )
+    obs = observe(table, "routine")
+    assert [(c.name, c.status, c.conclusion, c.run_id) for c in obs.checks] == [
+        ("CI", "queued", None, 12)
+    ]
+
+
+def test_startup_failure_run_supersedes_an_older_success() -> None:
+    table = routine_table(
+        [
+            run(10, suite=100, number=1),
+            newer(status="completed", conclusion="startup_failure", name="CI"),
+        ],
+        [check_run(1000, "test", suite=100)],
+        **run_jobs(12),
+    )
+    obs = observe(table, "routine")
+    assert [(c.name, c.status, c.conclusion) for c in obs.checks] == [
+        ("CI", "completed", "startup_failure")
+    ]
+
+
+def test_job_less_successful_run_reports_nothing_and_drops_the_older_row() -> None:
+    table = routine_table(
+        [run(10, suite=100, number=1), newer(status="completed", conclusion="success")],
+        [check_run(1000, "test", suite=100)],
+        **run_jobs(12),
+    )
+    assert observe(table, "routine").checks == ()
+
+
+def test_new_completed_run_with_a_job_but_no_check_row_is_pending() -> None:
+    table = routine_table(
+        [
+            run(10, suite=100, number=1),
+            newer(status="completed", conclusion="success"),
+        ],
+        [check_run(1000, "test", suite=100)],
+        **run_jobs(12, job(1500, "test", conclusion="success")),
+    )
+    obs = observe(table, "routine")
+    assert [(c.name, c.status, c.conclusion, c.run_id) for c in obs.checks] == [
+        ("test", "queued", None, 12)
+    ]  # the provider's job report is never promoted to success
+
+
+def test_same_run_new_attempt_without_a_row_replaces_the_old_sole_row() -> None:
+    rerun = run(10, suite=100)
+    rerun.update(run_attempt=2, status="in_progress", conclusion=None)
+    table = routine_table(
+        [rerun],
+        [check_run(1000, "test")],
+        **run_jobs(
+            10,
+            job(1001, "test", attempt=2, status="in_progress", conclusion=None),
+        ),
+    )
+    obs = observe(table, "routine")
+    assert [(c.check_id, c.status, c.conclusion) for c in obs.checks] == [
+        (1001, "in_progress", None)
+    ]
+
+
+def test_unreadable_jobs_of_a_newer_run_are_reported_and_never_leave_the_old_success() -> (
+    None
+):
+    table = routine_table(
+        [run(10, suite=100, number=1), newer(status="in_progress", name="CI")],
+        [check_run(1000, "test", suite=100)],
+        **{
+            f"/repos/{REPO}/actions/runs/12/jobs": Reply(
+                status=403, body={"message": "Forbidden"}
+            )
+        },
+    )
+    obs = observe(table, "routine")
+    assert has_issue(obs, "run-jobs-unavailable")
+    # The older run's success is superseded; the newer run reports itself pending.
+    assert [(c.name, c.status) for c in obs.checks] == [("CI", "in_progress")]
+
+
+def test_a_run_of_another_workflow_is_not_superseded() -> None:
+    table = routine_table(
+        [
+            run(10, suite=100, number=1),
+            run(11, suite=101, workflow=6),
+            newer(status="queued", name="CI"),
+        ],
+        [check_run(1000, "test", suite=100), check_run(1001, "lint", suite=101)],
+        **run_jobs(12),
+    )
+    assert sorted(c.name for c in observe(table, "routine").checks) == ["CI", "lint"]
+
+
+def test_rerun_of_a_pre_retarget_run_started_after_the_base_change_is_stale() -> None:
+    row = check_run(1000, "test")
+    row["started_at"] = row["completed_at"] = "2026-10-12T13:00:00Z"
+    table = routine_table(
+        [run(10, suite=100, created="2026-10-12T12:05:00Z")],
+        [row],
+        events=[retarget_event("2026-10-12T12:30:00Z")],
+    )
+    stale = by_name(observe(table, "routine"))["test"]
+    assert stale.retargeted is True and stale.base_sha is None
+
+
+@pytest.mark.parametrize(
+    "event", ["base_ref_changed", "automatic_base_change_succeeded"]
+)
+def test_manual_and_automatic_base_changes_renew_the_context_with_coincident_shas(
+    event: str,
+) -> None:
+    table = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        events=[{"event": event, "created_at": "2026-10-12T12:30:00Z"}],
+    )
+    obs = observe(table, "routine")
+    assert by_name(obs)["test"].retargeted is True
+    assert (obs.base_changed_at or "").startswith("2026-10-12T12:30:00")
+    mixed = routine_table(
+        [run(10, suite=100)],
+        [check_run(1000, "test")],
+        events=[
+            retarget_event("2026-10-12T12:00:00Z"),
+            {
+                "event": "automatic_base_change_succeeded",
+                "created_at": "2026-10-12T12:30:00Z",
+            },
+        ],
+    )
+    assert by_name(observe(mixed, "routine"))["test"].retargeted is True
+
+
+def test_high_assurance_also_judges_only_the_newest_run() -> None:
+    for fields, expected in (
+        ({"status": "queued"}, ("CI", "queued", None)),
+        (
+            {"status": "completed", "conclusion": "startup_failure"},
+            ("CI", "completed", "startup_failure"),
+        ),
+    ):
+        table = with_ci(
+            [run(10, suite=100, number=1), newer(name="CI", **fields)],
+            [check_run(1000, "test", suite=100)],
+        ) | run_jobs(12)
+        obs = observe(table, "high")
+        assert obs.assurance == "high"
+        assert [(c.name, c.status, c.conclusion) for c in obs.checks] == [expected]
+        assert not has_issue(obs, "checkout-job-mismatch")
+
+
+def named_run(**fields: Any) -> dict[str, Any]:
+    current = run(10, suite=100)
+    if fields.get("status", "completed") != "completed":
+        current["conclusion"] = None
+    current.update({"name": "CI", **fields})
+    return current
+
+
+@pytest.mark.parametrize("assurance", ["routine", "high"])
+def test_running_attempt_two_is_not_covered_by_attempt_one_successes(
+    assurance: str,
+) -> None:
+    running = [named_run(run_attempt=2, status="in_progress")]
+    jobs = run_jobs(10, job(1000, "test"))  # the new attempt's jobs are not published
+    if assurance == "high":
+        table = with_ci(running, [check_run(1000, "test")]) | jobs
+    else:
+        table = routine_table(running, [check_run(1000, "test")], **jobs)
+    obs = observe(table, assurance)
+    assert sorted((c.name, c.status, c.conclusion) for c in obs.checks) == [
+        ("CI", "in_progress", None),
+        ("test", "completed", "success"),
+    ]
+
+
+@pytest.mark.parametrize("attempt", [1, 2])
+def test_failed_run_is_not_covered_by_stale_successful_jobs(attempt: int) -> None:
+    table = routine_table(
+        [named_run(run_attempt=attempt, status="completed", conclusion="failure")],
+        [check_run(1000, "test")],
+        **run_jobs(10, job(1000, "test")),  # the job API lags the run
+    )
+    obs = observe(table, "routine")
+    assert sorted((c.name, c.status, c.conclusion) for c in obs.checks) == [
+        ("CI", "completed", "failure"),
+        ("test", "completed", "success"),
+    ]
+
+
+def test_rerun_of_failed_jobs_only_keeps_carried_successes_without_extra_evidence() -> (
+    None
+):
+    carried = job(1000, "build")
+    pending = job(1501, "test", attempt=2, status="in_progress", conclusion=None)
+    table = routine_table(
+        [named_run(run_attempt=2, status="in_progress")],
+        [check_run(1000, "build")],
+        **run_jobs(10, carried, pending),
+    )
+    obs = observe(table, "routine")
+    assert sorted((c.name, c.status) for c in obs.checks) == [
+        ("build", "completed"),
+        ("test", "in_progress"),
+    ]
+    finished = routine_table(
+        [named_run(run_attempt=2, status="completed", conclusion="success")],
+        [check_run(1000, "build"), check_run(1501, "test")],
+        **run_jobs(10, carried, job(1501, "test", attempt=2)),
+    )
+    obs = observe(finished, "routine")
+    assert sorted((c.name, c.status, c.conclusion) for c in obs.checks) == [
+        ("build", "completed", "success"),
+        ("test", "completed", "success"),
+    ]
+
+
+@pytest.mark.parametrize("assurance", ["routine", "high"])
+@pytest.mark.parametrize(
+    "key, value",
+    [
+        ("run_attempt", None),
+        ("run_attempt", 0),
+        ("run_attempt", -1),
+        ("run_attempt", "2"),
+        ("run_attempt", True),
+        ("status", None),
+    ],
+)
+def test_run_without_current_attempt_or_status_evidence_is_incomplete(
+    assurance: str, key: str, value: Any
+) -> None:
+    broken = run(10, suite=100)
+    if value is None:
+        del broken[key]
+    else:
+        broken[key] = value
+    table = with_ci([broken], [check_run(1000, "test")])
+    table[f"/repos/{REPO}/issues/{NUMBER}/events"] = paged([])
+    obs = observe(table, assurance)
+    assert has_issue(obs, "actions-runs-unavailable")
+
+
+@pytest.mark.parametrize("value", [None, 0, "1"])
+def test_job_without_a_positive_run_attempt_is_unresolved_never_attempt_one(
+    value: Any,
+) -> None:
+    broken = job(1000, "build")
+    if value is None:
+        del broken["run_attempt"]
+    else:
+        broken["run_attempt"] = value
+    table = routine_table(
+        [run(10, suite=100)],
+        [
+            check_run(1000, "build"),
+            check_run(1001, "build", conclusion="failure"),
+        ],
+        **run_jobs(10, broken, job(1001, "build")),
+    )
+    obs = observe(table, "routine")
+    assert has_issue(obs, "run-jobs-unavailable")
+    assert has_issue(obs, "attempt-unresolved")
+    assert sorted(c.conclusion or "" for c in obs.checks) == ["failure", "success"]
+
+
+@pytest.mark.parametrize("assurance", ["routine", "high"])
+def test_same_named_current_jobs_from_different_attempts_are_all_authoritative(
+    assurance: str,
+) -> None:
+    from lifecycle import Policy, evaluate
+
+    rows = [
+        check_run(1000, "test", conclusion="failure"),
+        check_run(1001, "test"),
+    ]
+    current = [named_run(run_attempt=2)]
+    jobs = run_jobs(
+        10,
+        job(1000, "test", attempt=1, conclusion="failure"),
+        job(1001, "test", attempt=2),
+    )
+    table = (
+        with_ci(current, rows) | jobs
+        if assurance == "high"
+        else routine_table(current, rows, **jobs)
+    )
+
+    observed = observe(table, assurance)
+    decision = Policy(
+        ("repository workflows",),
+        ("test",),
+        "squash",
+        (),
+        HEAD,
+        BASE,
+        assurance=assurance,
+    )
+
+    assert sorted((check.check_id, check.conclusion) for check in observed.checks) == [
+        (1000, "failure"),
+        (1001, "success"),
+    ]
+    assert evaluate(observed, decision).status == "NEEDS_JUDGMENT"

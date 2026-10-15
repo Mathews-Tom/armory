@@ -24,6 +24,7 @@ import native_stack
 import pytest
 import ship
 import test_execution as execution
+from changeset import parse_gates
 from graph import inspect_graph, journal_plan
 from graph_world import (
     STACK_POLICY,
@@ -168,6 +169,100 @@ def assert_retained_upper_verified(world: GraphWorld, old_top: str) -> None:
 
 
 # -- the one request ----------------------------------------------------------------
+
+
+def test_requested_native_local_gate_failure_prevents_async_request(
+    world: GraphWorld,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    before = untouched(world)
+    gates = parse_gates(
+        {
+            "schema_version": 1,
+            "sources": ["CONTRIBUTING.md#acceptance"],
+            "gates": [
+                {
+                    "name": "acceptance",
+                    "argv": [sys.executable, "-c", "raise SystemExit(23)"],
+                    "timeout": 120,
+                }
+            ],
+            "secret_scan": {"argv": [sys.executable, "-c", "raise SystemExit(0)"]},
+            "per_commit": True,
+        }
+    )
+    packet = world.root / "native.json"
+    packet.write_text(json.dumps(world.packet(PARENTS, SELECTED)))
+    gate_packet = world.root / "gates.json"
+    gate_packet.write_text(json.dumps(gates.canonical()))
+    code, result = cli(
+        world,
+        monkeypatch,
+        capsys,
+        "--stack-plan",
+        str(packet),
+        "--gates",
+        str(gate_packet),
+        "--until",
+        "merged",
+    )
+
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert native(world).puts == []
+    assert native(world).requests == []
+    assert untouched(world) == before
+    assert record(world, run_id(result)).request.state == "PLANNED"
+
+
+def test_native_resume_validates_refreshed_heads_not_old_frozen_members(
+    world: GraphWorld,
+) -> None:
+    gates = parse_gates(
+        {
+            "schema_version": 1,
+            "sources": ["CONTRIBUTING.md#acceptance"],
+            "gates": [
+                {
+                    "name": "acceptance",
+                    "argv": [
+                        sys.executable,
+                        "-c",
+                        (
+                            "from pathlib import Path; import sys; "
+                            "sys.exit(9 if Path('top.txt').exists() "
+                            "and not Path('ready.txt').exists() else 0)"
+                        ),
+                    ],
+                }
+            ],
+            "secret_scan": {"argv": [sys.executable, "-c", "raise SystemExit(0)"]},
+        }
+    )
+    result, code = world.run(world.plan(PARENTS, {11, 12, 13}), "merged", gates=gates)
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert native(world).puts == []
+    store = world.store()
+    saved = store.load_graph(run_id(result))
+    old_head = native(world).current(13).head_sha
+    new_head = world.actor_push(
+        "stack/layer3", {"ready.txt": "accepted\n"}, "fix: satisfy acceptance gate"
+    )
+
+    resumed, resumed_code = graph.execute_graph(
+        world.git,
+        world.forge,
+        world.plan(PARENTS, {11, 12, 13}),
+        "merged",
+        120.0,
+        store,
+        saved,
+    )
+
+    assert new_head != old_head
+    assert (resumed_code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert native(world).puts == [(13, new_head, "squash", "direct_merge")]
+    assert record(world, run_id(result)).members[-1].head_sha == new_head
 
 
 def test_direct_prefix_lands_through_one_request_and_retains_the_upper(

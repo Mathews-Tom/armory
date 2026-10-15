@@ -11,11 +11,10 @@ import subprocess
 import tempfile
 import time
 import uuid
-from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from git_ops import (
     GitError,
@@ -26,7 +25,14 @@ from git_ops import (
     redact_credentials,
     worktree_activity,
 )
-from github_ops import GitHub, Observation, ProviderError, PullRequest
+from github_ops import (
+    ASSURANCES,
+    Check,
+    GitHub,
+    Observation,
+    ProviderError,
+    PullRequest,
+)
 from state_store import (
     LockBusy,
     Receipt,
@@ -52,6 +58,22 @@ EXIT_CODES: dict[str, int] = {
 OPEN_DEPENDENT_REASON = "an open PR uses this namespace/ref as head or base"
 
 
+#: ``sources`` of a decision derived from provider evidence alone.
+PROVIDER_SOURCES = ("provider",)
+
+
+def _fingerprint(data: dict[str, Any]) -> str:
+    """Identity of a decision; routine is the default level and adds nothing to it."""
+    if data.get("assurance") == "routine":
+        del data["assurance"]
+    decision = data.get("decision")
+    if isinstance(decision, dict) and decision.get("assurance") == "routine":
+        del decision["assurance"]
+    return hashlib.sha256(
+        json.dumps(data, sort_keys=True, ensure_ascii=True).encode()
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class Policy:
     """An explicit assistant/caller decision, not auto-loaded repository config."""
@@ -66,12 +88,11 @@ class Policy:
     head_only_checks: tuple[str, ...] = ()
     protected_refs: tuple[str, ...] = ()
     ci_free: bool = False
+    assurance: str = "routine"
 
     @property
     def fingerprint(self) -> str:
-        return hashlib.sha256(
-            json.dumps(asdict(self), sort_keys=True, ensure_ascii=True).encode()
-        ).hexdigest()
+        return _fingerprint(asdict(self))
 
 
 @dataclass(frozen=True)
@@ -130,6 +151,7 @@ _DECISION_FIELDS = {
     "head_only_checks",
     "protected_refs",
     "ci_free",
+    "assurance",
 }
 _OID_PATTERN = r"(?:[a-f0-9]{40}|[a-f0-9]{64})"
 
@@ -146,6 +168,7 @@ class Decision:
     head_only_checks: tuple[str, ...]
     protected_refs: tuple[str, ...]
     ci_free: bool
+    assurance: str = "routine"
 
     def bound(self, head_sha: str, base_sha: str) -> Policy:
         return Policy(
@@ -159,6 +182,7 @@ class Decision:
             self.head_only_checks,
             self.protected_refs,
             self.ci_free,
+            self.assurance,
         )
 
 
@@ -179,9 +203,7 @@ class Binding:
 
     @property
     def fingerprint(self) -> str:
-        return hashlib.sha256(
-            json.dumps(asdict(self), sort_keys=True, ensure_ascii=True).encode()
-        ).hexdigest()
+        return _fingerprint(asdict(self))
 
     def bind(self, head_sha: str, base_sha: str) -> Policy:
         return self.decision.bound(head_sha, base_sha)
@@ -254,15 +276,33 @@ def load_policy(path: Path) -> Policy:
 
 
 def parse_decision(raw: dict[str, object]) -> Decision:
-    sources = _strings(raw.get("sources"), "sources", empty=False)
-    expected = _strings(raw.get("expected_checks"), "expected_checks")
+    assurance = raw.get("assurance", "routine")
+    if assurance not in ASSURANCES:
+        raise ValueError("assurance must be routine or high")
+    # A routine packet needs only its merge decision: sources, expected checks and
+    # post-merge commands default to the provider's own evidence. High assurance
+    # attests an explicit source-backed packet, so everything stays required.
+    routine = assurance == "routine"
+    explicit_expected = "expected_checks" in raw
+    sources = _strings(
+        raw.get("sources", list(PROVIDER_SOURCES) if routine else None),
+        "sources",
+        empty=False,
+    )
+    expected = (
+        _strings(raw.get("expected_checks"), "expected_checks")
+        if explicit_expected or not routine
+        else ()
+    )
     skips = _strings(raw.get("allowed_skips", []), "allowed_skips")
     head_only = _strings(raw.get("head_only_checks", []), "head_only_checks")
     protected = _strings(raw.get("protected_refs", []), "protected_refs")
     ci_free = raw.get("ci_free", False)
     method = raw.get("merge_method")
-    commands = raw.get("post_merge_commands")
-    if not isinstance(ci_free, bool) or (not expected and not ci_free):
+    commands = raw.get("post_merge_commands", [] if routine else None)
+    if not isinstance(ci_free, bool) or (
+        not expected and not ci_free and (explicit_expected or not routine)
+    ):
         raise ValueError("empty expected_checks requires explicit ci_free=true")
     if ci_free and expected:
         raise ValueError("ci_free cannot contradict expected_checks")
@@ -277,8 +317,76 @@ def parse_decision(raw: dict[str, object]) -> Decision:
         for command in commands
     )
     return Decision(
-        sources, expected, str(method), argv, skips, head_only, protected, ci_free
+        sources,
+        expected,
+        str(method),
+        argv,
+        skips,
+        head_only,
+        protected,
+        ci_free,
+        str(assurance),
     )
+
+
+def decision_assurance(decision: Policy | Binding | None) -> str:
+    """The assurance a decision asks for; no decision is routine."""
+    if decision is None:
+        return "routine"
+    return (
+        decision.assurance
+        if isinstance(decision, Policy)
+        else decision.decision.assurance
+    )
+
+
+def assurance_refusal(saved: str | None, wanted: str) -> tuple[str, str] | None:
+    """``(reason, next action)`` when a saved run must not continue under ``wanted``.
+
+    A run saved before assurance levels (``None``) was validated under checkout
+    attestation and a ``high`` run needs it: neither silently continues under
+    routine evidence. Only an explicit ``high`` decision migrates or keeps them.
+    """
+    if saved is None and wanted != "high":
+        return (
+            "saved run predates assurance levels and was validated under checkout attestation",
+            'resume with a decision declaring assurance "high" to keep it, or start a new run for routine assurance',
+        )
+    if saved == "high" and wanted != "high":
+        return (
+            "saved run requires high assurance and cannot resume under routine",
+            'resume with the decision declaring assurance "high"',
+        )
+    return None
+
+
+def routine_policy(observation: Observation) -> Policy | None:
+    """The provider-derived routine decision, or None when a choice is still needed.
+
+    Routine assurance trusts the provider's own evidence: every current
+    applicable check, required reviews, protections and merge policy. Nothing
+    else is asserted, so no source packet is needed; the only thing the provider
+    cannot answer is a merge method when it allows several. A MERGED PR needs no
+    method (the landing is already confirmed), so its method is empty.
+    """
+    pr = observation.pr
+    if pr.state == "MERGED":
+        method = ""
+    elif len(observation.repo.allowed_merge_methods) == 1:
+        method = observation.repo.allowed_merge_methods[0]
+    else:
+        return None
+    return Policy(PROVIDER_SOURCES, (), method, (), pr.head_sha, pr.base_sha)
+
+
+def _identity(check: Check) -> dict[str, object]:
+    """What distinguishes a check row: its job name, publisher, workflow and event."""
+    return {
+        "check": check.name,
+        "publisher": check.app_slug,
+        "workflow_id": check.workflow_id,
+        "event": check.event,
+    }
 
 
 def evaluate(
@@ -289,6 +397,14 @@ def evaluate(
     ``native_stack`` is set only by the native stack owner evaluating one of its
     members' own head against its current base, under the same rules; any other
     native member is BLOCKED, and the native path evaluates only native members.
+
+    With ``policy=None`` a routine observation is judged by the provider-derived
+    decision (:func:`routine_policy`); a high-assurance observation always needs
+    an explicit decision. A decision and the observation it judges must share
+    one assurance level. Every applicable current row is judged on its own: rows
+    sharing a display name (push versus pull_request, different workflows or
+    publishers) are never merged or rejected as ambiguous, and any one failing or
+    pending row keeps the gate closed.
     """
     pr = observation.pr
     if pr.state == "CLOSED":
@@ -307,29 +423,48 @@ def evaluate(
                 "issues": list(observation.issues),
             },
         )
+    routine = observation.assurance == "routine"
     if policy is None:
+        if not routine:
+            return Gate(
+                "NEEDS_JUDGMENT",
+                "high assurance needs an explicit source-backed decision",
+                {"assurance": observation.assurance},
+            )
+        policy = routine_policy(observation)
+        if policy is None:
+            return Gate(
+                "NEEDS_JUDGMENT",
+                "choose the merge method; the provider allows several",
+                {
+                    "required_checks": list(observation.required_checks),
+                    "observed_checks": sorted({c.name for c in observation.checks}),
+                    "head_sha": pr.head_sha,
+                    "base_sha": pr.base_sha,
+                    "allowed_merge_methods": list(
+                        observation.repo.allowed_merge_methods
+                    ),
+                    "required_decision": [
+                        "merge method under repository conventions",
+                        "ci_free=true only if this repository truly has no CI",
+                    ],
+                },
+            )
+    elif policy.assurance != observation.assurance:
         return Gate(
             "NEEDS_JUDGMENT",
-            "resolve the source-backed validation policy",
-            {
-                "required_checks": list(observation.required_checks),
-                "observed_checks": sorted({check.name for check in observation.checks}),
-                "head_sha": pr.head_sha,
-                "base_sha": pr.base_sha,
-                "allowed_merge_methods": list(observation.repo.allowed_merge_methods),
-                "required_decision": [
-                    "expected applicable jobs and source references",
-                    "merge method under repository conventions",
-                    "explicit skip/head-only applicability, if any",
-                    "applicable post-merge argv commands",
-                ],
-            },
+            "observation assurance differs from the decision assurance",
+            {"decision": policy.assurance, "observation": observation.assurance},
         )
-    if policy.merge_method not in observation.repo.allowed_merge_methods:
+    if policy.merge_method and policy.merge_method not in (
+        observation.repo.allowed_merge_methods
+    ):
         return Gate(
             "BLOCKED", "requested merge method is disabled by the repository", {}
         )
-    if not set(observation.required_checks) <= set(policy.expected_checks):
+    if (policy.expected_checks or not routine) and not set(
+        observation.required_checks
+    ) <= set(policy.expected_checks):
         return Gate("BLOCKED", "decision packet omits provider-required checks", {})
     if pr.state == "MERGED":
         if not pr.merge_commit_sha or not pr.merged_at:
@@ -339,6 +474,8 @@ def evaluate(
         return Gate(
             "READY", "provider confirms landing; local verification remains", {}
         )
+    if not policy.merge_method:
+        return Gate("NEEDS_JUDGMENT", "no merge method has been decided", {})
     if policy.head_sha != pr.head_sha or policy.base_sha != pr.base_sha:
         return Gate(
             "NEEDS_JUDGMENT",
@@ -363,6 +500,8 @@ def evaluate(
             "head-repository-unavailable",
             "check-timestamp-unknown",
             "base-conflict",
+            "strict-base-unavailable",
+            "retarget-freshness-unavailable",
         }
     ]
     if incomplete:
@@ -378,15 +517,19 @@ def evaluate(
         for issue in observation.issues
         if issue.partition(":")[0].startswith("checkout-") and "NEEDS_JUDGMENT" in issue
     ]
-    if unresolved_checkout and any(
-        check.base_sha is None
-        and check.status == "completed"
-        and (
-            check.name not in policy.head_only_checks
-            or observation.require_current_base
-            and check.name in observation.required_checks
+    if (
+        not routine
+        and unresolved_checkout
+        and any(
+            check.base_sha is None
+            and check.status == "completed"
+            and (
+                check.name not in policy.head_only_checks
+                or observation.require_current_base
+                and check.name in observation.required_checks
+            )
+            for check in observation.checks
         )
-        for check in observation.checks
     ):
         return Gate(
             "NEEDS_JUDGMENT",
@@ -408,18 +551,11 @@ def evaluate(
                 "current": observation.approvals,
             },
         )
-    counts = Counter(check.name for check in observation.checks)
-    duplicates = sorted(name for name, count in counts.items() if count > 1)
-    if duplicates:
-        return Gate(
-            "NEEDS_JUDGMENT",
-            "ambiguous duplicate check identities",
-            {
-                "checks": duplicates,
-            },
-        )
-    present = set(counts)
-    missing = sorted(set(policy.expected_checks) - present)
+    present = {check.name for check in observation.checks}
+    expected = set(policy.expected_checks)
+    if routine:
+        expected |= set(observation.required_checks)
+    missing = sorted(expected - present)
     if missing:
         return Gate(
             "WAITING",
@@ -455,6 +591,19 @@ def evaluate(
                 "required_app_id": app_id,
             },
         )
+    strict = routine and observation.require_current_base
+    if strict and observation.head_contains_base is None:
+        return Gate(
+            "NEEDS_JUDGMENT",
+            "strict up-to-date policy could not be verified",
+            {"base_sha": pr.base_sha},
+        )
+    if strict and not observation.head_contains_base:
+        return Gate(
+            "WAITING",
+            "the PR head does not contain the current base required by strict policy",
+            {"base_sha": pr.base_sha},
+        )
     for check in observation.checks:
         if check.head_sha != pr.head_sha:
             return Gate(
@@ -464,40 +613,57 @@ def evaluate(
                     "check": check.name,
                 },
             )
-        requires_base = check.name not in policy.head_only_checks or (
-            observation.require_current_base
-            and check.name in observation.required_checks
-        )
-        if requires_base and check.base_sha != pr.base_sha:
-            return Gate(
-                "WAITING",
-                "current tested base association is missing or stale",
-                {
-                    "check": check.name,
-                    "tested_base": check.base_sha,
-                    "current_base": pr.base_sha,
-                },
+        if routine:
+            if check.retargeted:
+                return Gate(
+                    "WAITING",
+                    "check ran against a previous base; a run on the current base is needed",
+                    _identity(check),
+                )
+            if (
+                strict
+                and check.event == "pull_request"
+                and check.base_sha not in (None, pr.base_sha)
+            ):
+                return Gate(
+                    "WAITING",
+                    "pull_request job tested a previous base; a run on the current base is needed",
+                    {
+                        **_identity(check),
+                        "tested_base": check.base_sha,
+                        "current_base": pr.base_sha,
+                    },
+                )
+        else:
+            requires_base = check.name not in policy.head_only_checks or (
+                observation.require_current_base
+                and check.name in observation.required_checks
             )
+            if requires_base and check.base_sha != pr.base_sha:
+                return Gate(
+                    "WAITING",
+                    "current tested base association is missing or stale",
+                    {
+                        "check": check.name,
+                        "tested_base": check.base_sha,
+                        "current_base": pr.base_sha,
+                    },
+                )
         if check.status != "completed":
-            return Gate(
-                "WAITING", "applicable job is still pending", {"check": check.name}
-            )
+            return Gate("WAITING", "applicable job is still pending", _identity(check))
         if check.conclusion in ("skipped", "neutral"):
             if check.name not in policy.allowed_skips:
                 return Gate(
                     "NEEDS_JUDGMENT",
                     "skip/neutral has no applicability decision",
-                    {
-                        "check": check.name,
-                        "conclusion": check.conclusion,
-                    },
+                    {**_identity(check), "conclusion": check.conclusion},
                 )
         elif check.conclusion != "success":
             return Gate(
                 "NEEDS_JUDGMENT",
                 "applicable CI is not GREEN; diagnose ownership",
                 {
-                    "check": check.name,
+                    **_identity(check),
                     "conclusion": check.conclusion,
                     "url": check.url,
                     "required_decision": "repair change-owned failure or record inherited/permission blocker",
@@ -532,7 +698,9 @@ def inspection(
     policy: Policy | None,
 ) -> dict[str, object]:
     snapshot = git.snapshot()
-    observed = provider.observe(number)
+    observed = provider.observe(
+        number, assurance=policy.assurance if policy is not None else "routine"
+    )
     validate_namespace(
         git, observed.repo.host, (observed.pr.base_repo, observed.pr.head_repo)
     )
@@ -665,7 +833,9 @@ class _Execution:
         self.provider = provider
         self.number = number
         self.endpoint = endpoint
+        self.decision = policy
         self.policy = policy
+        self.assurance = policy.assurance if policy is not None else "routine"
         self.store = store
         self.receipt = receipt
         self.run_id = run_id
@@ -795,13 +965,32 @@ class _Execution:
         """The branch a landing is verified on: the native trunk, else the PR base."""
         return review_base if self.native is None else self.native.trunk
 
+    def _guard_assurance(self, record: Receipt) -> None:
+        """Refuse to resume a run under weaker evidence or a dropped decision.
+
+        Nothing is saved or reconciled before this stop, so pending intents are
+        preserved exactly.
+        """
+        refusal = assurance_refusal(record.assurance, self.assurance)
+        if (
+            refusal is None
+            and self.decision is None
+            and record.policy_identity is not None
+        ):
+            refusal = (
+                "saved run was authorized by an explicit decision packet",
+                "resume with that packet or a refreshed one; provider-derived routine evidence cannot replace it",
+            )
+        if refusal is not None:
+            raise _Stop("NEEDS_JUDGMENT", *refusal)
+
     def _initialize(self, pr: PullRequest) -> None:
         if self.receipt is None:
             self.receipt = Receipt(
                 self.run_id or uuid.uuid4().hex,
                 self.endpoint,
                 self.code,
-                self.policy.fingerprint if self.policy else None,
+                self.decision.fingerprint if self.decision else None,
                 self.initial.fingerprint,
                 Target(
                     self.provider.host,
@@ -813,6 +1002,7 @@ class _Execution:
                     pr.head_repo,
                     pr.base_ref,
                 ),
+                assurance=self.assurance,
             )
             self._facts(pr)
             with self.store.mutation_lock():
@@ -827,6 +1017,8 @@ class _Execution:
             raise ReceiptInputError(
                 "receipt target does not match the selected PR namespace"
             )
+        if record.status != "COMPLETE":
+            self._guard_assurance(record)
         dispatched = any(
             op["kind"] == "merge"
             and op["outcome"] in ("PENDING", "ACCEPTED", "CONFIRMED")
@@ -859,7 +1051,7 @@ class _Execution:
                 "reconcile the original merge outcome before narrowing the saved endpoint",
             )
         if record.code_identity != self.code and (
-            self.policy is None or self.policy.fingerprint == record.policy_identity
+            self.decision is None or self.decision.fingerprint == record.policy_identity
         ):
             raise _Stop(
                 "NEEDS_JUDGMENT",
@@ -867,8 +1059,8 @@ class _Execution:
                 "review the new sources and pass a refreshed applicability packet",
             )
         refreshed = (
-            self.policy is not None
-            and self.policy.fingerprint != record.policy_identity
+            self.decision is not None
+            and self.decision.fingerprint != record.policy_identity
         )
         if refreshed:
             if (
@@ -877,17 +1069,19 @@ class _Execution:
                     and op["outcome"] in ("PENDING", "ACCEPTED", "CONFIRMED")
                     for op in record.intents
                 )
-                and self.policy is not None
-                and (self.policy.head_sha != record.head_sha)
+                and self.decision is not None
+                and (self.decision.head_sha != record.head_sha)
             ):
                 raise _Stop(
                     "NEEDS_JUDGMENT",
                     "a dispatched merge remains bound to its original head",
                     "reconcile the original provider outcome before changing the head",
                 )
-            record.policy_identity = self.policy.fingerprint if self.policy else None
-            if record.publication is not None and self.policy is not None:
-                record.publication.decision_identity = self.policy.fingerprint
+            record.policy_identity = (
+                self.decision.fingerprint if self.decision else None
+            )
+            if record.publication is not None and self.decision is not None:
+                record.publication.decision_identity = self.decision.fingerprint
             record.validation_sha = None
             record.validation_policy = None
             record.code_identity = self.code
@@ -895,7 +1089,10 @@ class _Execution:
         narrowed = record.endpoint != self.endpoint
         if narrowed:
             record.endpoint = self.endpoint
-        if refreshed or narrowed:
+        reassured = record.status != "COMPLETE" and record.assurance != self.assurance
+        if reassured:
+            record.assurance = self.assurance
+        if refreshed or narrowed or reassured:
             with self.store.mutation_lock():
                 self._save()
 
@@ -916,6 +1113,11 @@ class _Execution:
     def _pending_merge(self) -> dict[str, object] | None:
         operations = [op for op in self.record.intents if op["kind"] == "merge"]
         return operations[-1] if operations else None
+
+    def _derive(self, observed: Observation) -> None:
+        """Without an explicit decision, judge by the provider-derived routine one."""
+        if self.decision is None:
+            self.policy = routine_policy(observed)
 
     def _await_or_merge(self) -> PullRequest:
         while True:
@@ -965,8 +1167,9 @@ class _Execution:
                     )
                 self._sleep(f"accepted merge is not MERGED yet ({state})")
                 continue
-            observed = self.provider.observe(self.number)
+            observed = self.provider.observe(self.number, assurance=self.assurance)
             self._facts(observed.pr)
+            self._derive(observed)
             gate = evaluate(observed, self.policy)
             self.last_gate = {
                 "status": gate.status,
@@ -999,8 +1202,9 @@ class _Execution:
                         "external local snapshot changed",
                         "re-inventory current work before authorizing the next mutation",
                     )
-                observed = self.provider.observe(self.number)
+                observed = self.provider.observe(self.number, assurance=self.assurance)
                 self._facts(observed.pr)
+                self._derive(observed)
                 gate = evaluate(observed, self.policy)
                 self.last_gate = {
                     "status": gate.status,
@@ -1063,12 +1267,10 @@ class _Execution:
         return self.git
 
     def _landing(self, pr: PullRequest) -> GitRepository:
-        if self.policy is None:
-            raise _Stop(
-                "NEEDS_JUDGMENT",
-                "post-merge acceptance has no applicability packet",
-                "provide explicit source-backed post-merge commands and cleanup policy",
-            )
+        if self.decision is None:
+            # The provider confirmed the landing; the derived post-merge policy
+            # names no commands, so acceptance is verification of the landing only.
+            self.policy = Policy(PROVIDER_SOURCES, (), "", (), pr.head_sha, pr.base_sha)
         if not pr.merge_commit_sha:
             raise _Stop(
                 "BLOCKED",
@@ -2088,6 +2290,15 @@ def execute(
     native: NativeLanding | None = None,
 ) -> tuple[dict[str, object], int]:
     """Reconcile PR ``number`` through ``endpoint``.
+
+    ``policy=None`` is routine assurance: the provider's current checks, reviews,
+    protections and merge policy decide, with no source packet; only a merge
+    method the provider leaves ambiguous needs a bounded decision. A ``Policy``
+    names its ``assurance`` (``routine`` or ``high`` checkout attestation) and an
+    explicit ``expected_checks`` stays authoritative. A saved run resumes only at
+    its recorded assurance or stronger (:func:`assurance_refusal`); a run saved
+    before assurance levels needs an explicit ``high`` decision, and a run saved
+    under an explicit decision is never continued by the provider-derived one.
 
     ``run_id`` preassigns the identity of the receipt a new run creates (a graph
     coordinator journals it before dispatch); with a saved ``receipt`` it must be

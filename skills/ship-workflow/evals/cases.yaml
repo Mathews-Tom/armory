@@ -78,27 +78,18 @@ cases:
         target: "gh pr merge"
         weight: 1.0
 
-  - id: finish_existing_pr_with_source_backed_policy
+  - id: finish_existing_pr_with_provider_policy
     prompt: "Finish PR 57: merge it once everything is green and clean up the branch and its worktree."
     fixtures: []
     rubric:
       - "treats finishing and cleaning an identified PR as the full clean lifecycle"
-      - "builds the applicability decision from cited workflow sources with expected checks, merge method and post-merge argv bound to the inspected head and base"
+      - "uses current provider checks, required reviews, branch protections and allowed merge policy without mandatory checkout attestation"
       - "merges only through the executable's head-bound path and leaves cleanup to its proof-based stage"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "--pr 57"
         weight: 1.0
-      - type: matches_regex
-        target: "--policy"
-        weight: 0.9
-      - type: matches_regex
-        target: "expected_checks"
-        weight: 0.8
-      - type: matches_regex
-        target: "head_sha"
-        weight: 0.6
       - type: not_contains
         target: "--admin"
         weight: 1.0
@@ -236,6 +227,67 @@ cases:
       - type: not_contains
         target: "git branch -D"
         weight: 1.0
+
+  - id: routine_duplicate_push_and_pr_checks
+    prompt: "Ship PR 73. Both push and pull_request workflows report a job named tests; the latest PR attempt is pending but an older attempt succeeded. Keep the repository CI and hooks unchanged."
+    fixtures: []
+    rubric:
+      - "uses routine assurance rather than requiring pinned checkout logs or renamed jobs"
+      - "distinguishes workflow, event, publisher, job and current attempt, and separates head-only push evidence from PR context"
+      - "waits for the latest pending PR attempt and never uses older success to authorize landing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(routine|provider)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(workflow|event|publisher|attempt)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(WAITING|pending)"
+        weight: 1.0
+
+  - id: replay_local_gates_before_push
+    prompt: "Merge and clean up stack PRs 21 and 22. Validate every replayed commit with our 90-second local gates. A push was definitely refused; retry with unchanged inputs and preserve our pre-push hook."
+    fixtures: []
+    rubric:
+      - "uses the explicit stack scope and parent-first controller path"
+      - "passes --gates with per_commit true and an appropriate independent gate timeout before push"
+      - "reuses the exact verified replay commit objects after refusal without caller-seeded committer dates or hook overrides"
+      - "keeps active, dirty, protected, unmerged and unknown work"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan"
+        weight: 1.0
+      - type: matches_regex
+        target: "--gates"
+        weight: 1.0
+      - type: matches_regex
+        target: "per_commit"
+        weight: 1.0
+      - type: matches_regex
+        target: "(exact|same|frozen|reuse)"
+        weight: 0.9
+
+  - id: resumed_high_assurance_is_not_downgraded
+    prompt: "Resume the saved high-assurance shipping run for PR 31. The controller changed, and routine assurance is its new default."
+    fixtures: []
+    rubric:
+      - "preserves the saved high assurance and endpoint instead of applying the new routine default"
+      - "reconciles pending intents before another mutation"
+      - "stops clearly for migration or explicit policy when saved authority cannot be preserved"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--resume"
+        weight: 1.0
+      - type: matches_regex
+        target: "(high|assurance)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(migration|policy|NEEDS_JUDGMENT|pending|reconcil)"
+        weight: 0.9
 
   - id: deploy_to_prod
     prompt: "Deploy this to production"

@@ -160,6 +160,7 @@ class Forge(GitHub):
         self.extra_open: list[PullRequest] = []
         self.protected_refs = {"main"}
         self.on_closed_listing: Callable[[], None] | None = None
+        self.methods: tuple[str, ...] = ("merge", "squash")
 
     @property
     def pull_ref(self) -> str:
@@ -234,11 +235,11 @@ class Forge(GitHub):
         self.read_log.append((pr.state, self.queue_polls))
         return pr
 
-    def observe(self, number: int) -> Observation:
+    def observe(self, number: int, *, assurance: str = "routine") -> Observation:
         assert number == self.number
         pr = self._pr()
         return Observation(
-            repo=Repository(REPO, HOST, "main", ("merge", "squash")),
+            repo=Repository(REPO, HOST, "main", self.methods),
             pr=pr,
             checks=(
                 Check(
@@ -258,6 +259,7 @@ class Forge(GitHub):
             changes_requested=False,
             policy_known=True,
             issues=(),
+            assurance=assurance,
         )
 
     def queue_state(self, number: int, expected_head: str) -> QueueState:
@@ -351,10 +353,20 @@ class World:
     def run(
         self, endpoint: Endpoint, *, run_id: str | None = None, wait: float = 30.0
     ) -> tuple[Result, int]:
+        return self.run_under(self.policy, endpoint, run_id=run_id, wait=wait)
+
+    def run_under(
+        self,
+        policy: Policy | None,
+        endpoint: Endpoint,
+        *,
+        run_id: str | None = None,
+        wait: float = 30.0,
+    ) -> tuple[Result, int]:
         store = self.store()
         receipt = store.load(run_id) if run_id is not None else None
         return execute(
-            self.git(), self.forge, 1, endpoint, self.policy, wait, store, receipt
+            self.git(), self.forge, 1, endpoint, policy, wait, store, receipt
         )
 
     def receipt(self, run_id: str) -> Receipt:
@@ -927,4 +939,94 @@ def test_optional_same_named_local_ref_with_different_upstream_can_remain(
     before = journal_state(world)
     resumed, code = world.run("clean", run_id=run_id(completed))
     assert (code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert journal_state(world) == before
+
+
+# -- routine provider-derived assurance and resume ------------------------------
+
+
+def test_routine_single_pr_lands_without_a_handcrafted_policy(world: World) -> None:
+    world.forge.methods = ("squash",)
+    result, code = world.run_under(None, "merged")
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    assert world.forge.merge_calls == [(1, world.head, "squash")]
+    saved = world.receipt(run_id(result))
+    assert (saved.assurance, saved.policy_identity) == ("routine", None)
+    assert saved.merge_verified and saved.validation_policy is not None
+    before = journal_state(world)
+    resumed, code = world.run_under(None, "merged", run_id=run_id(result))
+    assert (code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert world.forge.merge_calls == [(1, world.head, "squash")]
+    assert journal_state(world) == before
+
+
+def test_routine_without_one_merge_method_asks_instead_of_inferring(
+    world: World,
+) -> None:
+    result, code = world.run_under(None, "merged")
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert "merge method" in str(result["blocker"])
+    assert world.forge.merge_calls == []
+
+
+def test_historical_run_never_resumes_under_routine_even_with_changed_sources(
+    world: World, fast_polls: None
+) -> None:
+    world.forge.merge_mode = "uncertain_before"
+    waiting, code = world.run("clean", wait=0.002)
+    assert (code, waiting["status"]) == (3, "WAITING"), waiting
+    rid = run_id(waiting)
+    store = world.store()
+    saved = store.load(rid)
+    saved.assurance = None  # written before assurance levels existed
+    saved.code_identity = "0" * 64  # and by other controller sources
+    with store.mutation_lock():
+        store.save(saved)
+    before = journal_state(world)
+    for policy in (world.policy, None):
+        refused, code = world.run_under(policy, "clean", run_id=rid)
+        assert (code, refused["status"]) == (4, "NEEDS_JUDGMENT"), refused
+        assert "predates assurance levels" in str(refused["blocker"])
+        assert journal_state(world) == before
+    assert world.forge.merge_calls == [(1, world.head, "squash")]
+
+    high = replace(world.policy, assurance="high")
+    migrated, code = world.run_under(high, "clean", run_id=rid, wait=0.002)
+    assert "predates" not in str(migrated["blocker"]), migrated
+    receipt = world.receipt(rid)
+    assert receipt.assurance == "high"
+    assert merge_outcome(receipt) == "PENDING"
+    assert world.forge.merge_calls == [(1, world.head, "squash")]
+
+
+def test_high_run_cannot_narrow_to_routine_or_drop_its_decision(
+    world: World, fast_polls: None
+) -> None:
+    world.forge.merge_mode = "uncertain_before"
+    high = replace(world.policy, assurance="high")
+    waiting, code = world.run_under(high, "clean", wait=0.002)
+    assert (code, waiting["status"]) == (3, "WAITING"), waiting
+    rid = run_id(waiting)
+    assert world.receipt(rid).assurance == "high"
+    before = journal_state(world)
+    for policy in (world.policy, None):
+        refused, code = world.run_under(policy, "clean", run_id=rid)
+        assert (code, refused["status"]) == (4, "NEEDS_JUDGMENT"), refused
+        assert "requires high assurance" in str(refused["blocker"])
+        assert journal_state(world) == before
+    assert merge_outcome(world.receipt(rid)) == "PENDING"
+
+
+def test_routine_run_with_an_explicit_decision_cannot_fall_back_to_provider_derived(
+    world: World, fast_polls: None
+) -> None:
+    world.forge.methods = ("squash",)
+    world.forge.merge_mode = "uncertain_before"
+    waiting, code = world.run("clean", wait=0.002)
+    assert (code, waiting["status"]) == (3, "WAITING"), waiting
+    rid = run_id(waiting)
+    before = journal_state(world)
+    refused, code = world.run_under(None, "clean", run_id=rid)
+    assert (code, refused["status"]) == (4, "NEEDS_JUDGMENT"), refused
+    assert "explicit decision" in str(refused["blocker"])
     assert journal_state(world) == before
