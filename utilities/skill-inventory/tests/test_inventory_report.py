@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
+from inventory_claude import parse_file as parse_claude
+from inventory_codex import parse_file as parse_codex
 from inventory_report import build_report
 from inventory_types import (
     InstalledSkill,
@@ -340,3 +342,121 @@ def test_aggregate_usage_reports_tokens_without_disclosing_recorded_cost_values(
     measured = cast(dict[str, object], report["usage"])
     assert measured["counter_sums_separated_by_kind"] == {"per_message": {"input": 100}}
     assert measured["persisted_cost_estimate_fields"] == ["cost_input"]
+
+
+def test_dynamic_listings_cannot_dilute_the_initial_source_median() -> None:
+    initial = "- fictional-skill: " + "Detailed fictional description. " * 8
+    dynamic = "- fictional-skill"
+    records: list[dict[str, object]] = []
+    for index in range(4):
+        records.append(
+            {
+                "type": "attachment",
+                "uuid": f"fictional-listing-{index}",
+                "sessionId": "fictional-session",
+                "timestamp": "2025-01-25T10:00:00Z",
+                "version": "2.1.301",
+                "isSidechain": False,
+                "attachment": {
+                    "type": "skill_listing",
+                    "content": initial if index == 0 else dynamic,
+                    "names": ["fictional-skill"],
+                    "skillCount": 1,
+                    "isInitial": index == 0,
+                },
+            }
+        )
+    parsed = parse_claude(
+        records, inventory=Inventory(), file_key="opaque", cohort_hint="main"
+    )
+    report, _ = _report([parsed], harness="claude")
+    assert report["status"] == "complete"
+    exposure = cast(dict[str, object], report["exposure"])
+    monthly = cast(
+        dict[str, dict[str, dict[str, object]]], exposure["monthly_by_source"]
+    )
+    assert monthly["claude_skill_listing_initial"]["2025-01"][
+        "median_observed_block_chars"
+    ] == len(initial)
+    assert monthly["claude_skill_listing_dynamic"]["2025-01"][
+        "median_observed_block_chars"
+    ] == len(dynamic)
+
+
+def test_identical_codex_telemetry_values_do_not_collapse_distinct_observations() -> (
+    None
+):
+    values = {
+        "input_tokens": 10,
+        "cached_input_tokens": 3,
+        "output_tokens": 5,
+        "reasoning_output_tokens": 2,
+        "total_tokens": 15,
+    }
+    records: list[dict[str, object]] = [
+        {
+            "timestamp": "2025-01-25T10:00:00Z",
+            "type": "session_meta",
+            "payload": {
+                "id": "fictional-codex-session",
+                "timestamp": "2025-01-25T10:00:00Z",
+                "cli_version": "0.153.4",
+                "source": "cli",
+            },
+        }
+    ]
+    for minute in (1, 2):
+        records.append(
+            {
+                "timestamp": f"2025-01-25T10:0{minute}:00Z",
+                "type": "event_msg",
+                "payload": {
+                    "type": "token_count",
+                    "info": {"last_token_usage": values, "total_token_usage": values},
+                },
+            }
+        )
+    parsed = parse_codex(
+        records, inventory=Inventory(), file_key="opaque", cohort_hint="unknown"
+    )
+    report, _ = _report([parsed], harness="codex")
+    assert report["status"] == "complete"
+    usage = cast(dict[str, object], report["usage"])
+    totals = cast(dict[str, dict[str, int]], usage["counter_sums_separated_by_kind"])
+    assert totals["last"]["input_tokens"] == 20
+    assert totals["last"]["total_tokens"] == 30
+    maxima = cast(
+        dict[str, int], usage["cumulative_session_maxima_separate_not_billing"]
+    )
+    assert maxima["input_tokens"] == 10
+    assert maxima["total_tokens"] == 15
+    assert usage["cache_read_exposure"] == "persisted_token_count_telemetry_only"
+
+
+def test_private_counts_remain_unavailable_without_any_valid_input_schema() -> None:
+    inventory = Inventory(
+        entries=[
+            InstalledSkill(
+                "fictional-skill",
+                "Fictional description.",
+                Path("/fictional/SKILL.md"),
+                (),
+                "user",
+            )
+        ]
+    )
+    for harness in ("omp", "claude", "codex"):
+        _, private = build_report(
+            harness=harness,
+            parsed=[ParsedFile("opaque", "unknown", schema_supported=False)],
+            inventory=inventory,
+            as_of=CLOCK,
+            window_days=10,
+            snapshot={"valid": True, "files": 1},
+            input_issues=Counter(),
+        )
+        rows = cast(list[dict[str, object]], private["skills"])
+        assert rows[0]["observed_read_attempts"] is None
+        assert rows[0]["observed_invocation_attempts"] is None
+        assert rows[0]["first_read_date"] is None
+        assert rows[0]["last_read_date"] is None

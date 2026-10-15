@@ -65,11 +65,11 @@ def utc_time(value: object, code: str = "invalid_timestamp") -> datetime:
     raw = as_string(value, code)
     try:
         parsed = datetime.fromisoformat(raw)
-    except ValueError:
+        if parsed.tzinfo is None:
+            raise SchemaError(code)
+        return parsed.astimezone(UTC)
+    except (ValueError, OverflowError):
         raise SchemaError(code) from None
-    if parsed.tzinfo is None:
-        raise SchemaError(code)
-    return parsed.astimezone(UTC)
 
 
 def epoch_time(value: object) -> datetime:

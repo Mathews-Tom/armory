@@ -60,13 +60,13 @@ class Env:
         return path
 
     def measure(
-        self, *extra: str, window_days: int = 90
+        self, *extra: str, window_days: int = 90, harness: str = "omp"
     ) -> subprocess.CompletedProcess[str]:
         return run(
             self,
             "measure",
             "--harness",
-            "omp",
+            harness,
             "--as-of",
             AS_OF,
             "--window-days",
@@ -348,3 +348,89 @@ def test_bad_arguments_do_not_echo_private_paths(env: Env) -> None:
     for result in (proc, proc_value):
         assert result.returncode != 0
         assert "private-fictional-marker" not in result.stdout + result.stderr
+
+
+def test_codex_private_report_does_not_claim_zero_reads_or_invocations(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    env.write_log(
+        "p/session.jsonl",
+        [
+            {
+                "timestamp": "2026-09-01T10:00:00Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "fictional-codex-session",
+                    "timestamp": "2026-09-01T10:00:00Z",
+                    "cli_version": "0.153.4",
+                    "source": "cli",
+                },
+            }
+        ],
+    )
+    private = env.snapshot.parent / "installed-report.json"
+    result = env.measure("--private-report", str(private), harness="codex")
+    assert result.returncode == 0, result.stdout
+    report = json.loads(result.stdout)
+    assert report["events"]["all_observed"] is None
+    rows = json.loads(private.read_text())["skills"]
+    assert {row["name"] for row in rows} == {INSTALLED, OTHER_INSTALLED}
+    for row in rows:
+        assert row["observed_read_attempts"] is None
+        assert row["observed_invocation_attempts"] is None
+        assert row["first_read_date"] is None
+        assert row["last_read_date"] is None
+
+
+def test_unknown_native_registry_blocks_otherwise_valid_claude_measurement(
+    tmp_path: Path,
+) -> None:
+    env = Env(tmp_path)
+    env.write_log(
+        "p/session.jsonl",
+        [
+            {
+                "type": "attachment",
+                "uuid": "fictional-listing",
+                "sessionId": "fictional-claude-session",
+                "timestamp": "2026-09-01T10:00:00Z",
+                "version": "2.1.301",
+                "isSidechain": False,
+                "attachment": {
+                    "type": "skill_listing",
+                    "content": "- fictional-listed: Fictional description.",
+                    "names": ["fictional-listed"],
+                    "skillCount": 1,
+                    "isInitial": True,
+                },
+            }
+        ],
+    )
+    personal = env.home / ".claude/skills/fictional-personal"
+    personal.mkdir(parents=True)
+    (personal / "SKILL.md").write_text(
+        "---\nname: fictional-personal\ndescription: Fictional installed skill.\n---\n"
+    )
+    registry = env.home / ".claude/plugins/installed_plugins.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text('{"version":3,"plugins":{}}')
+    result = run(
+        env,
+        "measure",
+        "--harness",
+        "claude",
+        "--as-of",
+        AS_OF,
+        "--snapshot",
+        str(env.snapshot),
+        "--log-root",
+        str(env.logs),
+    )
+    report = json.loads(result.stdout)
+    assert result.returncode == 2
+    assert report["status"] == "incomplete"
+    assert report["diagnostics"]["catalog_plugin_registry_unsupported_version"] == 1
+    assert report["exposure"]["latest_available"]["block_chars"] == len(
+        "- fictional-listed: Fictional description."
+    )

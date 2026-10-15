@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 from urllib.parse import unquote
 
 import yaml
@@ -29,8 +30,18 @@ from inventory_io import (
     keyed_hasher,
     open_directory,
     open_regular,
+    strict_json_loads,
 )
-from inventory_types import Harness, InstalledSkill, Inventory, SchemaError, as_object
+from inventory_types import (
+    Harness,
+    InstalledSkill,
+    Inventory,
+    SchemaError,
+    as_int,
+    as_list,
+    as_object,
+    as_string,
+)
 
 OWNERSHIP_MANAGED = "managed"
 OWNERSHIP_USER = "user"
@@ -40,8 +51,18 @@ OWNERSHIP_UNKNOWN = "unknown"
 BLOCKING_COVERAGE = frozenset(
     {
         "alias_escape",
-        "default_roots_unavailable",
         "frontmatter_invalid",
+        "native_discovery_unreadable",
+        "native_discovery_limit",
+        "namespace_ambiguous",
+        "plugin_registry_unreadable",
+        "plugin_registry_invalid",
+        "plugin_registry_unsupported_version",
+        "plugin_manifest_unreadable",
+        "plugin_manifest_invalid",
+        "plugin_install_unreadable",
+        "plugin_install_invalid",
+        "plugin_install_unsupported_version",
         "reference_invalid",
         "reference_unreadable",
         "skill_file_oversize",
@@ -75,6 +96,10 @@ class _ConfiguredRoot:
     lexical: Path
     ownership: str
     visible: bool
+    recursive: bool = False
+    namespace: str | None = None
+    containment: Path | None = None
+    required: bool = False
 
 
 @dataclass
@@ -83,6 +108,8 @@ class _ApprovedRoot:
     ownership: str
     visible: bool
     lexicals: set[str]
+    recursive: bool = False
+    namespace: str | None = None
 
 
 @dataclass(frozen=True)
@@ -108,13 +135,188 @@ def _lexical(path: Path) -> Path:
     return Path(os.path.abspath(path))
 
 
-def _configured_roots(
-    harness: Harness, skill_roots: Sequence[Path] | None, coverage: Counter[str]
+def _json_metadata(
+    path: Path,
+    key: bytes,
+    role: Literal["plugin_registry", "plugin_manifest", "plugin_install"],
+    coverage: Counter[str],
+    evidence: list[str],
+    *,
+    optional: bool = False,
+    within: Path | None = None,
+) -> dict[str, object] | Literal[False] | None:
+    """False is confirmed optional absence; None is a blocking read/schema failure."""
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        evidence.append(f"{role}|{path}|missing")
+        coverage[f"{role}_missing" if optional else f"{role}_unreadable"] += 1
+        return False if optional else None
+    except OSError:
+        coverage[f"{role}_unreadable"] += 1
+        evidence.append(f"{role}|{path}|unreadable")
+        return None
+    real = Path(os.path.realpath(path))
+    if within is not None and not real.is_relative_to(within):
+        coverage["alias_escape"] += 1
+        evidence.append(f"{role}|{path}|escape")
+        return None
+    read = _read_file(real, key, role, MAX_REFERENCE_BYTES)
+    if read is None or read.data is None:
+        coverage[f"{role}_unreadable"] += 1
+        evidence.append(f"{role}|{path}|{real}|unreadable")
+        return None
+    evidence.append(f"{role}|{path}|{real}|{read.size}|{read.digest}")
+    try:
+        return as_object(strict_json_loads(read.data.decode("utf-8")))
+    except (SchemaError, UnicodeError):
+        coverage[f"{role}_invalid"] += 1
+        return None
+
+
+def _child_directories(
+    directory: Path,
+    coverage: Counter[str],
+    evidence: list[str],
+    *,
+    optional: bool = False,
+) -> list[Path]:
+    """Sorted native-cache directories; hidden staging and inner links are not roots."""
+    try:
+        fd = open_directory(directory)
+    except FileNotFoundError:
+        coverage[
+            "plugin_cache_missing" if optional else "native_discovery_unreadable"
+        ] += 1
+        evidence.append(f"discovery|{directory}|missing")
+        return []
+    except OSError:
+        coverage["native_discovery_unreadable"] += 1
+        evidence.append(f"discovery|{directory}|unreadable")
+        return []
+    directories: list[Path] = []
+    try:
+        with os.scandir(fd) as scan:
+            entries = sorted(scan, key=lambda entry: entry.name)
+        for entry in entries:
+            kind = _entry_kind(entry)
+            evidence.append(f"discovery|{directory}|{entry.name}|{kind}")
+            if entry.name.startswith("."):
+                continue
+            if kind == "link":
+                coverage["alias_escape"] += 1
+            elif kind == "dir":
+                directories.append(directory / entry.name)
+    except OSError:
+        coverage["native_discovery_unreadable"] += 1
+    finally:
+        os.close(fd)
+    return directories
+
+
+def _manifest_roots(
+    install: Path,
+    harness: Literal["claude", "codex"],
+    key: bytes,
+    coverage: Counter[str],
+    evidence: list[str],
+    *,
+    namespace: str | None = None,
+    within: Path | None = None,
 ) -> list[_ConfiguredRoot]:
-    """Explicit roots replace defaults; only OMP has defaults until Claude/Codex adapters land."""
+    base = Path(os.path.realpath(install))
+    if within is not None and not base.is_relative_to(within):
+        coverage["alias_escape"] += 1
+        return []
+    try:
+        base_fd = open_directory(base)
+    except OSError:
+        coverage["native_discovery_unreadable"] += 1
+        evidence.append(f"plugin-root|{install}|unreadable")
+        return []
+    else:
+        os.close(base_fd)
+    manifest_path = (
+        install
+        / (".claude-plugin" if harness == "claude" else ".codex-plugin")
+        / "plugin.json"
+    )
+    metadata = _json_metadata(
+        manifest_path,
+        key,
+        "plugin_manifest",
+        coverage,
+        evidence,
+        optional=harness == "claude",
+        within=base,
+    )
+    if metadata is None:
+        return []
+    try:
+        if metadata is False:
+            resources: object = []
+        else:
+            manifest_name = as_string(metadata.get("name"))
+            if harness == "codex":
+                namespace = manifest_name
+            resources = metadata.get("skills", [])
+        declared = [resources] if isinstance(resources, str) else as_list(resources)
+        # Claude supplements custom paths; Codex uses the convention only as fallback.
+        conventional = harness == "claude" or not declared
+        paths: list[object] = ["./skills"] if conventional else []
+        paths.extend(declared)
+        roots: list[_ConfiguredRoot] = []
+        for index, item in enumerate(paths):
+            declared_path = as_string(item)
+            relative = Path(declared_path)
+            if harness == "codex" and (
+                not declared_path.startswith("./") or not relative.parts
+            ):
+                raise SchemaError("plugin_manifest_invalid")
+            if relative.is_absolute() or ".." in relative.parts:
+                raise SchemaError("plugin_manifest_invalid")
+            lexical = install / relative
+            real = Path(os.path.realpath(lexical))
+            if not real.is_relative_to(base):
+                coverage["alias_escape"] += 1
+                continue
+            if conventional and index == 0:
+                # The conventional directory is optional for non-skill plugins.
+                try:
+                    os.lstat(lexical)
+                except FileNotFoundError:
+                    coverage["plugins_without_skill_directory"] += 1
+                    continue
+            roots.append(
+                _ConfiguredRoot(
+                    lexical,
+                    OWNERSHIP_PROTECTED,
+                    True,
+                    recursive=True,
+                    namespace=namespace,
+                    containment=base,
+                    required=True,
+                )
+            )
+        return roots
+    except (OSError, SchemaError):
+        coverage["plugin_manifest_invalid"] += 1
+        return []
+
+
+def _configured_roots(
+    harness: Harness,
+    skill_roots: Sequence[Path] | None,
+    coverage: Counter[str],
+    key: bytes,
+    evidence: list[str],
+) -> list[_ConfiguredRoot]:
+    """Installed file views are not proof of native enabled/disclosed visibility."""
     if skill_roots is not None:
         return [
-            _ConfiguredRoot(_lexical(root), OWNERSHIP_UNKNOWN, True)
+            _ConfiguredRoot(
+                _lexical(root), OWNERSHIP_UNKNOWN, True, recursive=harness != "omp"
+            )
             for root in skill_roots
         ]
     if harness == "omp":
@@ -127,8 +329,103 @@ def _configured_roots(
                 Path.home() / ".agents" / "skills", OWNERSHIP_PROTECTED, False
             ),
         ]
-    coverage["default_roots_unavailable"] += 1
-    return []
+    if harness == "claude":
+        home = Path.home()
+        roots = [
+            _ConfiguredRoot(
+                home / ".claude" / "skills", OWNERSHIP_USER, True, recursive=True
+            ),
+            _ConfiguredRoot(home / ".agents" / "skills", OWNERSHIP_PROTECTED, False),
+        ]
+        registry = _json_metadata(
+            home / ".claude" / "plugins" / "installed_plugins.json",
+            key,
+            "plugin_registry",
+            coverage,
+            evidence,
+        )
+        if registry is None or registry is False:
+            return roots
+        try:
+            if as_int(registry.get("version")) != 2:
+                coverage["plugin_registry_unsupported_version"] += 1
+                return roots
+            plugins = as_object(registry.get("plugins"))
+            for identity, records in sorted(plugins.items()):
+                namespace, separator, _marketplace = identity.partition("@")
+                if (
+                    not separator
+                    or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", namespace) is None
+                ):
+                    raise SchemaError("plugin_registry_invalid")
+                for raw in as_list(records):
+                    record = as_object(raw)
+                    install = Path(as_string(record.get("installPath")))
+                    if not install.is_absolute():
+                        raise SchemaError("plugin_registry_invalid")
+                    roots.extend(
+                        _manifest_roots(
+                            install,
+                            "claude",
+                            key,
+                            coverage,
+                            evidence,
+                            namespace=namespace,
+                        )
+                    )
+        except SchemaError:
+            coverage["plugin_registry_invalid"] += 1
+        coverage["native_enabled_visibility_unmeasured"] += 1
+        return roots
+    if harness == "codex":
+        home = Path.home()
+        roots = [
+            _ConfiguredRoot(
+                home / ".codex" / "skills", OWNERSHIP_PROTECTED, True, recursive=True
+            ),
+            _ConfiguredRoot(
+                home / ".codex" / "skills" / ".system",
+                OWNERSHIP_PROTECTED,
+                True,
+                recursive=True,
+            ),
+            _ConfiguredRoot(
+                home / ".agents" / "skills", OWNERSHIP_PROTECTED, True, recursive=True
+            ),
+        ]
+        cache = Path(os.path.realpath(home / ".codex" / "plugins" / "cache"))
+        for marketplace in _child_directories(cache, coverage, evidence, optional=True):
+            for plugin in _child_directories(marketplace, coverage, evidence):
+                marker = _json_metadata(
+                    plugin / ".codex-remote-plugin-install.json",
+                    key,
+                    "plugin_install",
+                    coverage,
+                    evidence,
+                    optional=True,
+                    within=cache,
+                )
+                if marker is None:
+                    continue
+                if marker is not False:
+                    try:
+                        if as_int(marker.get("schema_version")) != 1:
+                            coverage["plugin_install_unsupported_version"] += 1
+                            continue
+                        as_string(marker.get("remote_plugin_id"))
+                    except SchemaError:
+                        coverage["plugin_install_invalid"] += 1
+                        continue
+                for version in _child_directories(plugin, coverage, evidence):
+                    roots.extend(
+                        _manifest_roots(
+                            version, "codex", key, coverage, evidence, within=cache
+                        )
+                    )
+        coverage["native_enabled_visibility_unmeasured"] += 1
+        coverage["codex_cache_is_not_active_plugin_selection"] += 1
+        return roots
+    raise SchemaError("unsupported_harness")
 
 
 def _approve_roots(
@@ -138,6 +435,12 @@ def _approve_roots(
     approved: dict[Path, _ApprovedRoot] = {}
     for root in configured:
         resolved = Path(os.path.realpath(root.lexical))
+        if root.containment is not None and not resolved.is_relative_to(
+            root.containment
+        ):
+            coverage["alias_escape"] += 1
+            evidence.append(f"root|{root.lexical}|escape")
+            continue
         try:
             state = "dir" if stat.S_ISDIR(os.stat(resolved).st_mode) else "unusable"
         except FileNotFoundError:
@@ -145,11 +448,14 @@ def _approve_roots(
         except OSError:
             state = "unusable"
         evidence.append(
-            f"root|{root.lexical}|{resolved}|{root.ownership}|{int(root.visible)}|{state}"
+            f"root|{root.lexical}|{resolved}|{root.ownership}|{int(root.visible)}|{state}|"
+            f"{int(root.recursive)}|{root.namespace}"
         )
         if state == "missing":
             if root.visible:
                 coverage["skill_root_missing"] += 1
+            if root.required:
+                coverage["skill_root_unusable"] += 1
             continue
         if state == "unusable":
             coverage["skill_root_unusable"] += 1
@@ -161,12 +467,17 @@ def _approve_roots(
                 root.ownership,
                 root.visible,
                 {str(root.lexical), str(resolved)},
+                root.recursive,
+                root.namespace,
             )
             continue
         coverage["duplicate_root"] += 1
         existing.ownership = _stronger(existing.ownership, root.ownership)
         existing.visible = existing.visible or root.visible
         existing.lexicals.add(str(root.lexical))
+        existing.recursive = existing.recursive or root.recursive
+        if existing.namespace != root.namespace:
+            coverage["namespace_ambiguous"] += 1
     return approved
 
 
@@ -187,55 +498,90 @@ def _scan_root(
     evidence: list[str],
     found: dict[Path, list[_Sighting]],
 ) -> None:
-    """One directory level; resolve aliases only inside explicitly approved roots."""
-    try:
-        directory_fd = open_directory(root.resolved)
-    except OSError:
-        coverage["skill_root_unusable"] += 1
-        evidence.append(f"listing|{root.resolved}|unreadable")
-        return
-    try:
-        with os.scandir(directory_fd) as scan:
-            entries = sorted(scan, key=lambda item: item.name)
-        for entry in entries:
-            kind = _entry_kind(entry)
-            entry_path = root.resolved / entry.name
-            target = os.path.realpath(entry_path) if kind == "link" else ""
-            evidence.append(f"entry|{root.resolved}|{entry.name}|{kind}|{target}")
-            if entry.name.startswith("."):
-                coverage["hidden_entry_skipped"] += 1
-                continue
-            if kind not in ("dir", "link"):
-                continue
-            skill_file = entry_path / "SKILL.md"
-            try:
-                os.lstat(skill_file)
-            except FileNotFoundError:
-                coverage["non_skill_entry"] += 1
-                continue
-            except OSError:
-                coverage["skill_file_unusable"] += 1
-                evidence.append(f"file|{skill_file}|unreadable")
-                continue
-            real = Path(os.path.realpath(skill_file))
-            if not any(real.is_relative_to(base) for base in approved):
-                coverage["alias_escape"] += 1
-                continue
-            try:
-                regular = stat.S_ISREG(os.lstat(real).st_mode)
-            except OSError:
-                regular = False
-            if not regular:
-                coverage["skill_file_unusable"] += 1
-                continue
-            found.setdefault(real, []).append(
-                _Sighting(root.resolved, entry.name, kind == "link")
-            )
-    except OSError:
-        coverage["skill_root_unusable"] += 1
-        evidence.append(f"listing|{root.resolved}|unreadable")
-    finally:
-        os.close(directory_fd)
+    """Flat OMP views and bounded recursive native-resource views, without inner link walks."""
+    pending = [root.resolved]
+    visited: set[Path] = set()
+    while pending:
+        directory = pending.pop()
+        if directory in visited:
+            continue
+        visited.add(directory)
+        if (
+            len(visited) > _MAX_NODES
+            or len(directory.relative_to(root.resolved).parts) > _MAX_DEPTH
+        ):
+            coverage["native_discovery_limit"] += 1
+            return
+        try:
+            directory_fd = open_directory(directory)
+        except OSError:
+            coverage["skill_root_unusable"] += 1
+            evidence.append(f"listing|{directory}|unreadable")
+            continue
+        try:
+            locations: list[tuple[Path, str, bool]] = []
+            if root.recursive:
+                locations.append(
+                    (
+                        directory / "SKILL.md",
+                        str(directory.relative_to(root.resolved)),
+                        False,
+                    )
+                )
+            with os.scandir(directory_fd) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name)
+            for entry in entries:
+                kind = _entry_kind(entry)
+                entry_path = directory / entry.name
+                target = os.path.realpath(entry_path) if kind == "link" else ""
+                evidence.append(f"entry|{directory}|{entry.name}|{kind}|{target}")
+                if entry.name.startswith("."):
+                    coverage["hidden_entry_skipped"] += 1
+                    continue
+                if kind in ("dir", "link"):
+                    locations.append(
+                        (
+                            entry_path / "SKILL.md",
+                            str(entry_path.relative_to(root.resolved)),
+                            kind == "link",
+                        )
+                    )
+            for skill_file, relative, linked in locations:
+                try:
+                    os.lstat(skill_file)
+                except FileNotFoundError:
+                    if root.recursive and relative != "." and not linked:
+                        pending.append(skill_file.parent)
+                    elif root.recursive and linked:
+                        coverage["alias_escape"] += 1
+                    coverage["non_skill_entry"] += 1
+                    continue
+                except OSError:
+                    coverage["skill_file_unusable"] += 1
+                    evidence.append(f"file|{skill_file}|unreadable")
+                    continue
+                real = Path(os.path.realpath(skill_file))
+                if not any(real.is_relative_to(base) for base in approved):
+                    coverage["alias_escape"] += 1
+                    continue
+                try:
+                    regular = stat.S_ISREG(os.lstat(real).st_mode)
+                except OSError:
+                    regular = False
+                if not regular:
+                    coverage["skill_file_unusable"] += 1
+                    continue
+                found.setdefault(real, []).append(
+                    _Sighting(root.resolved, relative, linked)
+                )
+                if relative == ".":
+                    # A skill's resource subtree is not another discovery root.
+                    break
+        except OSError:
+            coverage["skill_root_unusable"] += 1
+            evidence.append(f"listing|{directory}|unreadable")
+        finally:
+            os.close(directory_fd)
 
 
 def _birth(info: os.stat_result) -> float | None:
@@ -527,7 +873,7 @@ def load_inventory(
         raise SchemaError("invalid_key")
     coverage: Counter[str] = Counter()
     evidence: list[str] = []
-    configured = _configured_roots(harness, skill_roots, coverage)
+    configured = _configured_roots(harness, skill_roots, coverage, key, evidence)
     approved = _approve_roots(configured, coverage, evidence)
     ordered = sorted(
         approved.values(),
@@ -557,6 +903,15 @@ def load_inventory(
             coverage["skill_file_oversize"] += 1
             continue
         name, description, headings = _skill_fields(canonical, read.data, coverage)
+        namespaces = {
+            root.namespace
+            for root in ordered
+            if any(sighting.root == root.resolved for sighting in sightings)
+        }
+        if len(namespaces) > 1:
+            coverage["namespace_ambiguous"] += 1
+        elif namespaces and (namespace := next(iter(namespaces))) is not None:
+            name = f"{namespace}:{name}"
         variants = _path_variants(canonical, sightings, ordered)
         for variant in sorted(variants):
             evidence.append(f"alias|{variant}|{canonical}")

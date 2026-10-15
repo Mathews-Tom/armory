@@ -172,7 +172,7 @@ def _exposure_row(item: Exposure) -> dict[str, object]:
     }
 
 
-def _exposure_summary(items: list[Exposure]) -> dict[str, object]:
+def _monthly_exposure(items: list[Exposure]) -> dict[str, object]:
     months: dict[str, list[Exposure]] = defaultdict(list)
     for item in items:
         months[item.timestamp.strftime("%Y-%m")].append(item)
@@ -189,6 +189,13 @@ def _exposure_summary(items: list[Exposure]) -> dict[str, object]:
             ),
             "median_observed_block_chars": _median(chars),
         }
+    return monthly
+
+
+def _exposure_summary(items: list[Exposure]) -> dict[str, object]:
+    sources: dict[str, list[Exposure]] = defaultdict(list)
+    for item in items:
+        sources[item.source].append(item)
     ordered = sorted(
         items,
         key=lambda item: (
@@ -198,13 +205,22 @@ def _exposure_summary(items: list[Exposure]) -> dict[str, object]:
             item.block_chars if item.block_chars is not None else -1,
         ),
     )
+    latest_by_source = {item.source: item for item in ordered}
     available = [item for item in ordered if item.block_chars is not None]
     return {
         "observations": len(items),
         "available": len(available),
         "unavailable": len(items) - len(available),
         "by_cohort": dict(sorted(Counter(item.cohort for item in items).items())),
-        "monthly": monthly,
+        "monthly": _monthly_exposure(items),
+        "by_source": {source: len(rows) for source, rows in sorted(sources.items())},
+        "monthly_by_source": {
+            source: _monthly_exposure(rows) for source, rows in sorted(sources.items())
+        },
+        "latest_by_source": {
+            source: _exposure_row(item)
+            for source, item in sorted(latest_by_source.items())
+        },
         "latest": _exposure_row(ordered[-1]) if ordered else None,
         "latest_available": _exposure_row(available[-1]) if available else None,
         "scope": "persisted_disclosure_observations_not_measured_transport_or_billing",
@@ -239,6 +255,7 @@ def _usage_summary(
             values,
         )
     totals: dict[str, dict[str, int | float]] = {}
+    by_source: dict[str, dict[str, dict[str, int | float]]] = {}
     cumulative: dict[tuple[str, str], dict[str, int | float]] = {}
     contexts: dict[str, list[int]] = defaultdict(list)
     cache_present = False
@@ -269,10 +286,17 @@ def _usage_summary(
                 continue
             target = totals.setdefault(item.counter_kind, {})
             target[name] = target.get(name, 0) + number
+            source_target = by_source.setdefault(item.source, {}).setdefault(
+                item.counter_kind, {}
+            )
+            source_target[name] = source_target.get(name, 0) + number
     cumulative_totals: dict[str, int | float] = {}
-    for counters in cumulative.values():
+    cumulative_by_source: dict[str, dict[str, int | float]] = {}
+    for (source, _session), counters in cumulative.items():
         for name, number in counters.items():
             cumulative_totals[name] = cumulative_totals.get(name, 0) + number
+            source_target = cumulative_by_source.setdefault(source, {})
+            source_target[name] = source_target.get(name, 0) + number
     return {
         "status": (
             "persisted_counters"
@@ -283,12 +307,18 @@ def _usage_summary(
         ),
         "deduplicated_observations": len(unique),
         "counter_sums_separated_by_kind": totals,
+        "counter_sums_by_source_and_kind": by_source,
         "cumulative_session_maxima_separate_not_billing": cumulative_totals,
+        "cumulative_session_maxima_by_source_not_billing": cumulative_by_source,
         "context_snapshot_medians_not_skill_attribution": {
             name: _median(numbers) for name, numbers in sorted(contexts.items())
         },
         "cache_read_exposure": (
-            "whole_request_fields_only" if cache_present else "unavailable"
+            "persisted_token_count_telemetry_only"
+            if harness == "codex" and cache_present
+            else "whole_request_fields_only"
+            if cache_present
+            else "unavailable"
         ),
         "skill_specific_cache_attribution": "unavailable",
         "skill_specific_dollars": "modeled_only_not_calculated",
@@ -296,6 +326,11 @@ def _usage_summary(
         "persisted_cost_estimate_fields": sorted(cost_fields),
         "cost_values": "not_disclosed_by_aggregate_report",
         "claude_stream_policy": "maximum_observed_cumulative_counter_per_message",
+        "codex_telemetry_scope": (
+            "physical_observations_not_new_requests_forks_and_compaction_may_repeat"
+            if harness == "codex"
+            else "not_applicable"
+        ),
     }
 
 
@@ -346,6 +381,7 @@ def _private_rows(
     attempts: list[ReadAttempt],
     invocations: list[Invocation],
     exposures: list[Exposure],
+    channels_available: bool,
 ) -> list[dict[str, object]]:
     reads: dict[str, list[datetime]] = defaultdict(list)
     invokes: dict[str, list[datetime]] = defaultdict(list)
@@ -391,15 +427,21 @@ def _private_rows(
                 ),
                 "first_read_date": _iso(times[0] if times else None),
                 "last_read_date": _iso(times[-1] if times else None),
-                "read_date_source": "tool_call_attempt_name_match_unverified",
-                "observed_read_attempts": len(times),
+                "read_date_source": (
+                    "unavailable_observation_channel"
+                    if not channels_available
+                    else "tool_call_attempt_name_match_unverified"
+                ),
+                "observed_read_attempts": len(times) if channels_available else None,
                 "first_invocation_date": _iso(
                     invocation_times[0] if invocation_times else None
                 ),
                 "last_invocation_date": _iso(
                     invocation_times[-1] if invocation_times else None
                 ),
-                "observed_invocation_attempts": len(invocation_times),
+                "observed_invocation_attempts": (
+                    len(invocation_times) if channels_available else None
+                ),
             }
         )
     return rows
@@ -523,6 +565,7 @@ def build_report(
         "snapshot": snapshot,
         "inventory": {
             "installed_entries": len(inventory.entries),
+            "scope": "approved_local_skill_files_not_native_enabled_or_disclosed_inventory",
             "by_ownership": dict(sorted(ownership.items())),
             "discovery_coverage": dict(sorted(inventory.coverage.items())),
             "dependency_references_matching_installed_names": len(
@@ -604,7 +647,13 @@ def build_report(
         "schema_version": 1,
         "status": report["status"],
         "scope": report["scope"],
-        "skills": _private_rows(inventory, attempts, invocations, exposures),
+        "skills": _private_rows(
+            inventory,
+            attempts,
+            invocations,
+            exposures,
+            channels_available=bool(valid) and harness != "codex",
+        ),
         "diagnostics": report["diagnostics"],
     }
     return report, private_report

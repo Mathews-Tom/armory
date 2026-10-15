@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import NoReturn, cast
 
 from inventory_catalog import load_inventory
+from inventory_claude import parse_file as parse_claude
+from inventory_codex import parse_file as parse_codex
 from inventory_io import BINDING_VERSION, SNAPSHOT_POLICY, Snapshot, write_private_json
 from inventory_omp import parse_file as parse_omp
 from inventory_report import build_report
@@ -35,7 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     measure = commands.add_parser(
         "measure", help="Measure frozen JSONL prefixes and installed skill metadata."
     )
-    measure.add_argument("--harness", choices=("omp",), required=True)
+    measure.add_argument("--harness", choices=("omp", "claude", "codex"), required=True)
     measure.add_argument("--as-of", required=True, help="Explicit UTC timestamp (Z).")
     measure.add_argument("--window-days", type=int, default=90)
     measure.add_argument(
@@ -72,7 +74,12 @@ def measure(args: argparse.Namespace) -> dict[str, object]:
     if window_days <= 0:
         raise SchemaError("invalid_window")
     roots = cast(list[Path] | None, args.log_root)
-    log_roots = roots or [Path.home() / ".omp" / "agent" / "sessions"]
+    defaults = {
+        "omp": Path.home() / ".omp" / "agent" / "sessions",
+        "claude": Path.home() / ".claude" / "projects",
+        "codex": Path.home() / ".codex" / "sessions",
+    }
+    log_roots = roots or [defaults[harness]]
     skill_roots = cast(list[Path] | None, args.skill_root)
     references = cast(list[Path] | None, args.reference) or []
     snapshot = Snapshot(
@@ -92,9 +99,10 @@ def measure(args: argparse.Namespace) -> dict[str, object]:
     )
     snapshot.bind_inventory(inventory.integrity)
     parsed: list[ParsedFile] = []
+    parse = {"omp": parse_omp, "claude": parse_claude, "codex": parse_codex}[harness]
     for frozen in snapshot.files:
         try:
-            result = parse_omp(
+            result = parse(
                 snapshot.records(frozen),
                 inventory=inventory,
                 file_key=frozen.key,
