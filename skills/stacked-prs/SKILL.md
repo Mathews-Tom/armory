@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization and optional GitHub-native stack support, or when an existing stack needs its topology, provenance and native membership resolved before its landing and cleanup are delegated to the ship-workflow lifecycle.'
 metadata:
-  version: 0.4.0
+  version: 0.5.0
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
@@ -183,7 +183,7 @@ Landing, post-landing promotion and retargeting, post-merge acceptance and clean
 
    ```bash
    uv run --no-project --python 3.12 python "<ship-workflow-dir>/scripts/ship.py" --stack-plan "/tmp/stack.X/stack.json" --dry-run
-   uv run --no-project --python 3.12 python "<ship-workflow-dir>/scripts/ship.py" --stack-plan "/tmp/stack.X/stack.json" --until merged
+   uv run --no-project --python 3.12 python "<ship-workflow-dir>/scripts/ship.py" --stack-plan "/tmp/stack.X/stack.json" --gates "/tmp/stack.X/gates.json" --until merged
    ```
 
    "Merge the stack" is `--until merged`; "merge and clean up" is the default `clean`. "Clean up" alone selects only nodes the provider already reports merged, so the run verifies and cleans them without landing anything new.
@@ -191,6 +191,8 @@ Landing, post-landing promotion and retargeting, post-merge acceptance and clean
 6. Relay the run's status, confirmed merges, retained dependents, cleanup dispositions and next action. `NEEDS_JUDGMENT` names a topology, provenance, scope or gate decision that belongs back here; `BLOCKED` names a missing prerequisite.
 
 The run enforces parent-first order, slice-preserving promotion, expected-old leases, fresh gates per node, open-base retention and landing proofs (`references/merge-discipline.md`), and lands a native selection with one guarded request (`references/github-native.md` § Landing policy).
+
+Routine delegated shipping uses the repository's current provider checks, reviews, protections and merge policy. A selected node can request `assurance: "high"` explicitly; routine nodes do not need pinned checkout logs or renamed CI jobs. Supply `--gates` when local validation is requested; use `per_commit: true` for every replayed commit and each gate's own timeout. Validation precedes push and preserves existing hooks. Definite refusals with unchanged inputs reuse the exact verified replay objects; uncertain mutations reconcile before retry. Saved assurance and validation survive resume; incompatible legacy authority stops for an explicit decision.
 
 ## Splitting One Branch Into A Stack
 

@@ -127,7 +127,7 @@ class StackForge(GitHub):
         self.reads.append(number)
         return self._pull(number)
 
-    def observe(self, number: int) -> Observation:
+    def observe(self, number: int, *, assurance: str = "routine") -> Observation:
         pr = self._pull(number)
         return Observation(
             repo=Repository(REPO, HOST, "main", ("merge", "squash")),
@@ -150,6 +150,7 @@ class StackForge(GitHub):
             changes_requested=False,
             policy_known=True,
             issues=(),
+            assurance=assurance,
         )
 
     def base_tip(self, base_ref: str) -> str:
@@ -373,7 +374,6 @@ OPEN_PARENT_STEPS = [
         ("--head-repo", "owner/repo"),
         ("--policy", "policy.json"),
         ("--plan", "plan.json"),
-        ("--gates", "gates.json"),
         ("--title", "t", "--body-file", "body.md"),
         ("--inventory",),
     ],

@@ -13,13 +13,21 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 from typing import cast
 
 import lifecycle
 import pytest
 import test_execution as execution
-from graph import inspect_graph, journal_plan
+from changeset import GatePolicy, parse_gates
+from graph import (
+    execute_graph,
+    inspect_graph,
+    journal_plan,
+    new_journal,
+    parse_stack_plan,
+)
 from graph_world import (
     STACK_POLICY,
     Change,
@@ -27,6 +35,7 @@ from graph_world import (
     LifecycleClock,
     Result,
     build_world,
+    commit,
     messages,
     tree_files,
 )
@@ -325,7 +334,9 @@ def test_green_checks_of_the_old_context_are_never_transplanted(
         # CI reran on the promoted head while its base was still the parent branch.
         world.forge.on_retarget = world.forge.report_ci
 
-    result, code = world.run(world.plan(PAIR, {12}), "merged")
+    result, code = world.run(
+        world.plan(PAIR, {12}, decisions={12: {"assurance": "high"}}), "merged"
+    )
 
     assert (code, result["status"]) == (3, "WAITING"), result
 
@@ -511,6 +522,43 @@ def test_completed_graph_rerun_is_an_evidence_backed_no_op(world: GraphWorld) ->
     assert mutations(world) == calls
     statuses = {row["pr"]: row["status"] for row in rows(again, "nodes")}
     assert statuses == {11: "COMPLETE", 12: "COMPLETE"}
+
+
+def test_routine_stack_without_a_manual_job_inventory_can_resume(
+    world: GraphWorld,
+) -> None:
+    parent_and_child(world)
+    packet = world.packet(PAIR, {11, 12})
+    for node in cast("list[dict[str, object]]", packet["nodes"]):
+        node["decision"] = {"merge_method": "squash"}
+
+    result, code = world.run(parse_stack_plan(packet), "merged")
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    saved = state(world.common() / "armory")
+    calls = mutations(world)
+
+    again, again_code = world.resume(run_id(result), "merged")
+
+    assert (again_code, again["status"]) == (0, "COMPLETE"), again
+    assert state(world.common() / "armory") == saved
+    assert mutations(world) == calls
+
+
+def test_completed_graph_rejects_unexercised_gates_without_rewriting_evidence(
+    world: GraphWorld,
+) -> None:
+    parent_and_child(world)
+    result, code = world.run(world.plan(PAIR, {11, 12}), "merged")
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    saved = state(world.common() / "armory")
+    calls = mutations(world)
+    new_gates = gate_policy(python_gate("acceptance", "raise SystemExit(0)"))
+
+    again, again_code = world.resume(run_id(result), "merged", gates=new_gates)
+
+    assert (again_code, again["status"]) == (4, "NEEDS_JUDGMENT"), again
+    assert state(world.common() / "armory") == saved
+    assert mutations(world) == calls
 
 
 # -- fork boundaries -------------------------------------------------------------------
@@ -897,6 +945,376 @@ def test_unknown_push_with_a_third_remote_head_needs_judgment_without_resend(
     assert world.remote("stack/c") == third
     assert world.forge.retarget_calls == [] and world.forge.merge_calls == []
     assert world.journal(run_id(result)).intents[-1].outcome == "PENDING"
+
+
+# -- frozen promotion and local gates --------------------------------------------------
+
+EARLY = "1700000500 +0000"
+LATE = "1700009999 +0000"
+# Records the isolated checkout's commit and what the remote publishes meanwhile.
+RECORD = (
+    "import pathlib, subprocess, sys\n"
+    "head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()\n"
+    "remote = subprocess.check_output(\n"
+    "    ['git', '--git-dir', sys.argv[2], 'rev-parse', 'refs/heads/stack/c'], text=True\n"
+    ").strip()\n"
+    "with pathlib.Path(sys.argv[1]).open('a') as out:\n"
+    "    out.write(head + ' ' + remote + '\\n')\n"
+)
+
+
+def gate_policy(*declared: dict[str, object], per_commit: bool = False) -> GatePolicy:
+    packet: dict[str, object] = {
+        "schema_version": 1,
+        "sources": ["test policy: repository gates"],
+        "gates": list(declared),
+        "secret_scan": {"argv": [sys.executable, "-c", "pass", "{base}", "{head}"]},
+        "local_gates_free": False,
+    }
+    if per_commit:
+        packet["per_commit"] = True
+    return parse_gates(packet)
+
+
+def python_gate(
+    name: str, code: str, *args: object, **extra: object
+) -> dict[str, object]:
+    return {
+        "name": name,
+        "argv": [sys.executable, "-c", code, *map(str, args)],
+        **extra,
+    }
+
+
+def rewrite_pushes(journal: GraphJournal) -> list[tuple[str, str | None]]:
+    return [
+        (intent.outcome, intent.actual)
+        for intent in journal.intents
+        if intent.kind == "rewrite-push"
+    ]
+
+
+def test_a_refused_push_is_republished_with_the_exact_frozen_commit_ids(
+    world: GraphWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, child = parent_and_child(world)
+    landing = world.forge.land(11, "squash")
+    deny = world.root / "deny-push"
+    deny.write_text("deny\n")
+    hook = world.bare / "hooks" / "pre-receive"
+    hook.write_text(
+        f'#!/bin/sh\nif [ -e "{deny}" ]; then echo "refused by test policy" >&2; '
+        "exit 1; fi\n"
+    )
+    hook.chmod(0o755)
+    monkeypatch.setenv("GIT_COMMITTER_DATE", EARLY)
+
+    result, _ = world.run(world.plan(PAIR, {12}), "merged")
+
+    assert result["status"] == "BLOCKED", result
+    [(branch, old, first)] = world.git.pushes
+    assert (branch, old) == ("stack/c", child)
+    assert world.remote("stack/c") == child
+    journal = world.journal(run_id(result))
+    assert rewrite_pushes(journal) == [("REJECTED", child)]
+    frozen = promotion(journal, 12)
+    assert frozen.new_head == first
+    chain = git(world.work, "rev-list", "--reverse", f"{landing}..{first}").split()
+    assert len(chain) == 2
+
+    deny.unlink()
+    monkeypatch.setenv("GIT_COMMITTER_DATE", LATE)
+    # The committer time is part of a commit id: a fresh replay now mints new ones.
+    fresh = world.git.promote_slice(frozen.fork, frozen.old_head, frozen.landing)
+    assert fresh.new_head != first
+
+    resumed, resumed_code = world.resume(run_id(result), "merged")
+
+    assert (resumed_code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert world.git.pushes == [(branch, old, first), (branch, old, first)]
+    assert world.remote("stack/c") == first
+    published = git(world.bare, "rev-list", "--reverse", f"{landing}..stack/c")
+    assert published.split() == chain
+    saved = world.journal(run_id(result))
+    assert promotion(saved, 12).new_head == first
+    assert rewrite_pushes(saved) == [("REJECTED", child), ("CONFIRMED", first)]
+
+
+def test_a_frozen_unsigned_proposal_does_not_bypass_a_new_signing_requirement(
+    world: GraphWorld,
+) -> None:
+    _, child = parent_and_child(world)
+    world.forge.land(11, "squash")
+    hook = world.bare / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    result, code = world.run(world.plan(PAIR, {12}), "merged")
+    assert (code, result["status"]) == (5, "BLOCKED"), result
+    dispatched = list(world.git.pushes)
+    git(world.work, "config", "commit.gpgSign", "true")
+    hook.unlink()
+
+    resumed, resumed_code = world.resume(run_id(result), "merged")
+
+    assert (resumed_code, resumed["status"]) == (4, "NEEDS_JUDGMENT"), resumed
+    assert world.git.pushes == dispatched
+    assert world.remote("stack/c") == child
+    assert world.forge.merge_calls == []
+    assert git(world.work, "config", "--bool", "commit.gpgSign") == "true"
+
+
+def test_trunk_movement_during_local_validation_prevents_stale_replay_push(
+    world: GraphWorld,
+) -> None:
+    _, child = parent_and_child(world)
+    tip = world.forge.land(11, "squash")
+    moved = commit(
+        world.bare,
+        world.root / "external-index",
+        tip,
+        Change({"new-trunk.txt": "new work\n"}, b"trunk: advance\n", PARENT_AUTHOR),
+    )
+    policy = gate_policy(
+        python_gate(
+            "acceptance",
+            "import subprocess, sys; subprocess.run("
+            "['git', '--git-dir', sys.argv[1], 'update-ref', 'refs/heads/main', "
+            "sys.argv[2], sys.argv[3]], check=True)",
+            world.bare,
+            moved,
+            tip,
+        )
+    )
+
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=policy)
+
+    assert (code, result["status"]) == (3, "WAITING"), result
+    assert world.remote("main") == moved
+    assert world.remote("stack/c") == child
+    assert world.git.pushes == []
+    assert world.forge.merge_calls == []
+    assert rewrite_pushes(world.journal(run_id(result))) == []
+
+
+def test_a_moved_trunk_tip_replays_afresh_instead_of_reusing_the_frozen_commits(
+    world: GraphWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, child = parent_and_child(world)
+    world.forge.land(11, "squash")
+    deny = world.root / "deny-push"
+    deny.write_text("deny\n")
+    hook = world.bare / "hooks" / "pre-receive"
+    hook.write_text(f'#!/bin/sh\nif [ -e "{deny}" ]; then exit 1; fi\n')
+    hook.chmod(0o755)
+    monkeypatch.setenv("GIT_COMMITTER_DATE", EARLY)
+    result, _ = world.run(world.plan(PAIR, {12}), "merged")
+    assert result["status"] == "BLOCKED", result
+    [(_, _, first)] = world.git.pushes
+    deny.unlink()
+    world.actor_push("main", {"unrelated.txt": "trunk moved\n"}, "trunk: move on")
+
+    resumed, resumed_code = world.resume(run_id(result), "merged")
+
+    assert (resumed_code, resumed["status"]) == (0, "COMPLETE"), resumed
+    saved = world.journal(run_id(result))
+    second = promotion(saved, 12)
+    assert second.new_head != first
+    assert (second.old_head, world.git.pushes[-1][1]) == (child, child)
+    assert rewrite_pushes(saved) == [
+        ("REJECTED", child),
+        ("CONFIRMED", second.new_head),
+    ]
+
+
+def test_an_unreported_push_is_reconciled_before_the_same_commit_is_resent(
+    world: GraphWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, child = parent_and_child(world)
+    world.forge.land(11, "squash")
+    world.git.push_fault = "lost"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", EARLY)
+
+    result, code = world.run(world.plan(PAIR, {12}), "merged")
+
+    assert (code, result["status"]) == (3, "WAITING"), result
+    [first] = world.git.pushes
+    assert world.journal(run_id(result)).intents[-1].outcome == "PENDING"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", LATE)
+
+    resumed, resumed_code = world.resume(run_id(result), "merged")
+
+    assert (resumed_code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert world.git.pushes == [first, first]
+    assert world.remote("stack/c") == first[2]
+    assert rewrite_pushes(world.journal(run_id(result))) == [
+        ("REJECTED", child),
+        ("CONFIRMED", first[2]),
+    ]
+
+
+def test_a_failing_gate_stops_before_any_push_and_saved_gates_stay_in_force(
+    world: GraphWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent_and_child(world)
+    world.forge.land(11, "squash")
+    failing = gate_policy(python_gate("unit", "raise SystemExit(3)"))
+    monkeypatch.setenv("GIT_COMMITTER_DATE", EARLY)
+
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=failing)
+
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert "gate unit failed" in str(result["blocker"])
+    assert world.git.pushes == [] and world.forge.merge_calls == []
+    journal = world.journal(run_id(result))
+    assert journal.gates == failing.canonical()
+    frozen = promotion(journal, 12)
+    assert (journal.node(12).state, outcomes(journal)) == (
+        "PROMOTED",
+        [("capture", 12, "CONFIRMED")],
+    )
+    monkeypatch.setenv("GIT_COMMITTER_DATE", LATE)
+
+    # A bare resume keeps the saved gates: validation never silently disappears.
+    again, again_code = world.resume(run_id(result), "merged")
+
+    assert (again_code, again["status"]) == (4, "NEEDS_JUDGMENT"), again
+    assert "gate unit failed" in str(again["blocker"])
+    assert world.git.pushes == []
+    assert promotion(world.journal(run_id(result)), 12) == frozen
+
+    passing = gate_policy(python_gate("unit", "pass"))
+    refused, refused_code = world.resume(run_id(result), "merged", gates=passing)
+
+    assert (refused_code, refused["status"]) == (4, "NEEDS_JUDGMENT"), refused
+    assert "differs" in str(refused["blocker"])
+    assert world.git.pushes == []
+    assert world.journal(run_id(result)).gates == failing.canonical()
+
+
+@pytest.mark.parametrize("per_commit", [True, False])
+def test_gates_run_before_the_push_on_every_replayed_commit_or_only_the_tip(
+    world: GraphWorld, per_commit: bool
+) -> None:
+    _, child = parent_and_child(world)
+    landing = world.forge.land(11, "squash")
+    log = world.root / "gate.log"
+    policy = gate_policy(
+        python_gate("unit", RECORD, log, world.bare), per_commit=per_commit
+    )
+
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=policy)
+
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    new = promotion(world.journal(run_id(result)), 12).new_head
+    chain = git(world.work, "rev-list", "--reverse", f"{landing}..{new}").split()
+    assert len(chain) == 2
+    seen = [line.split() for line in log.read_text().splitlines()]
+    assert [head for head, _ in seen] == (chain if per_commit else chain[-1:])
+    # Every run finished while the remote still published the old head.
+    assert {remote for _, remote in seen} == {child}
+    assert world.git.pushes == [("stack/c", child, new)]
+    [validation] = rows(result, "local_validation")
+    assert validation["pr"] == 12
+    evidence = cast("list[dict[str, object]]", validation["gates"])
+    assert [(row["name"], row["outcome"]) for row in evidence] == [
+        ("unit", "PASSED"),
+        *([("unit", "PASSED")] if per_commit else []),
+        ("@secret-scan", "PASSED"),
+    ]
+
+
+def test_a_gate_may_outlast_the_git_command_deadline(world: GraphWorld) -> None:
+    parent_and_child(world)
+    world.forge.land(11, "squash")
+    world.git.timeout = 1.0
+    slow = gate_policy(python_gate("slow", "import time; time.sleep(2.5)", timeout=60))
+
+    started = time.monotonic()
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=slow)
+
+    assert time.monotonic() - started > 2 * world.git.timeout
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    assert len(world.git.pushes) == 1
+
+
+def test_a_gate_is_bounded_by_its_own_deadline(world: GraphWorld) -> None:
+    _, child = parent_and_child(world)
+    world.forge.land(11, "squash")
+    stuck = gate_policy(
+        python_gate("stuck", "import time; time.sleep(60)", timeout=0.5)
+    )
+
+    started = time.monotonic()
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=stuck)
+
+    assert time.monotonic() - started < 30
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert "gate stuck timed_out" in str(result["blocker"])
+    assert world.git.pushes == [] and world.remote("stack/c") == child
+
+
+def test_local_gates_run_before_the_push_and_leave_the_hooks_untouched(
+    world: GraphWorld,
+) -> None:
+    parent_and_child(world)
+    world.forge.land(11, "squash")
+    order = world.root / "order.log"
+    hook = world.work / ".git" / "hooks" / "pre-push"
+    hook.write_text(f'#!/bin/sh\necho hook >> "{order}"\n')
+    hook.chmod(0o755)
+    before = (hook.read_bytes(), hook.stat().st_mode)
+    hooks_path = git(world.work, "config", "--get", "core.hooksPath", check=False)
+    policy = gate_policy(
+        python_gate(
+            "unit", "import sys; open(sys.argv[1], 'a').write('gate\\n')", order
+        )
+    )
+
+    result, code = world.run(world.plan(PAIR, {12}), "merged", gates=policy)
+
+    assert (code, result["status"]) == (0, "COMPLETE"), result
+    assert order.read_text().split() == ["gate", "hook"]
+    assert (hook.read_bytes(), hook.stat().st_mode) == before
+    assert (
+        git(world.work, "config", "--get", "core.hooksPath", check=False) == hooks_path
+    )
+
+
+@pytest.mark.parametrize("saved", ["high", None])
+def test_resume_never_narrows_or_assumes_any_selected_node_assurance(
+    world: GraphWorld, saved: str | None
+) -> None:
+    parent_and_child(world)
+    high: dict[str, object] = {"assurance": "high"}
+    strict = world.plan(PAIR, {11, 12}, decisions={11: high, 12: high})
+    journal = new_journal(
+        strict,
+        run_id="a" * 32,
+        endpoint="merged",
+        code_identity=lifecycle.code_identity(),
+        created_at="2026-10-15T00:00:00+00:00",
+    )
+    journal.assurance = saved
+    store = world.store()
+    store.save_graph(journal)
+    # #11 stays high, so an aggregate maximum would hide #12's downgrade.
+    mixed = world.plan(PAIR, {11, 12}, decisions={11: high})
+
+    result, code = execute_graph(
+        world.git,
+        world.forge,
+        mixed,
+        "merged",
+        120.0,
+        store,
+        store.load_graph("a" * 32),
+    )
+
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    blocker = str(result["blocker"])
+    assert "#12" in blocker and "#11" not in blocker
+    assert mutations(world) == ([], [], [], [])
+    assert world.journal("a" * 32).intents == []
 
 
 # -- retarget outcomes -----------------------------------------------------------------

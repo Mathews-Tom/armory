@@ -50,6 +50,7 @@ from dataclasses import asdict, dataclass
 from typing import cast
 
 import lifecycle
+from changeset import GatePolicy
 from git_ops import GitRefused, GitRepository
 from github_ops import (
     MIN_MUTATION_WINDOW,
@@ -572,8 +573,11 @@ class NativeRun(_GraphRun):
         wait_timeout: float,
         store: Store,
         journal: GraphJournal | None,
+        gates: GatePolicy | None = None,
     ) -> None:
-        super().__init__(git, provider, plan, endpoint, wait_timeout, store, journal)
+        super().__init__(
+            git, provider, plan, endpoint, wait_timeout, store, journal, gates=gates
+        )
         self.route: Route | None = None
         self.landed = False
         self.gate_rows: dict[int, dict[str, object]] = {}
@@ -701,7 +705,7 @@ class NativeRun(_GraphRun):
             decision = self.plan.node(number).decision
             if decision is None:
                 raise StateError(f"selected #{number} has no decision")
-            observed = self.provider.observe(number)
+            observed = self.provider.observe(number, assurance=decision.assurance)
             known = self.prs[number]
             if (observed.pr.state, observed.pr.head_sha, observed.pr.base_ref) != (
                 known.state,
@@ -752,6 +756,13 @@ class NativeRun(_GraphRun):
                 "nothing was requested",
             )
         with self.store.mutation_lock():
+            planned = self._freeze(route)
+        for member in planned.members:
+            if member.pr in route.scope:
+                self.local_validation[member.pr] = self._validate(
+                    member.slice_base, member.head_sha
+                )
+        with self.store.mutation_lock():
             if self.git.snapshot().fingerprint != snapshot.fingerprint:
                 raise _Stop(
                     "NEEDS_JUDGMENT",
@@ -768,6 +779,32 @@ class NativeRun(_GraphRun):
                         "requested",
                     )
             native = self._freeze(route)
+            validated = [
+                (
+                    member.pr,
+                    member.head_sha,
+                    member.slice_base,
+                    member.base_ref,
+                    member.base_sha,
+                )
+                for member in planned.members
+            ]
+            current = [
+                (
+                    member.pr,
+                    member.head_sha,
+                    member.slice_base,
+                    member.base_ref,
+                    member.base_sha,
+                )
+                for member in native.members
+            ]
+            if native.base_sha != planned.base_sha or current != validated:
+                raise _Stop(
+                    "NEEDS_JUDGMENT",
+                    "native member or base context changed during local validation",
+                    "resume to validate the current proposal; nothing was requested",
+                )
             if self.deadline - time.monotonic() < MIN_MUTATION_WINDOW:
                 raise _Stop(
                     "WAITING",
@@ -1547,7 +1584,7 @@ def _preview_gates(
         decision = plan.node(number).decision
         if decision is None:
             continue
-        observed = provider.observe(number)
+        observed = provider.observe(number, assurance=decision.assurance)
         gate = lifecycle.evaluate(
             observed,
             decision.bound(observed.pr.head_sha, observed.pr.base_sha),

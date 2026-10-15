@@ -1642,8 +1642,8 @@ class GitRepository:
                 return
             if observed == expected_old and not exc.uncertain:
                 raise GitRefused(
-                    f"{name} refused the push of {ref}; it still advertises the "
-                    f"expected revision: {exc}"
+                    f"the push did not publish {ref}; {name} still advertises the "
+                    f"expected revision (check hook, transport or provider diagnostics): {exc}"
                 ) from exc
             raise GitError(
                 f"the push of {ref} has an unknown outcome; {name} advertises {observed}",
@@ -2259,7 +2259,9 @@ class GitRepository:
         empty on the landing (it is never dropped silently), and a result whose
         tree is not the expected tree or whose ``landing..new_head`` is not one
         linear chain of exactly the slice's commit count. Repeated calls give the
-        same result except for the committer timestamp.
+        same result except for the committer timestamp, so a caller that must
+        republish the same commit ids freezes the result and re-proves it with
+        :meth:`verify_promotion` instead of replaying again.
         """
         start = self._require_commit(fork, "fork point")
         old = self._require_commit(head, "child head")

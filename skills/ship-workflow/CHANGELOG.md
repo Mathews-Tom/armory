@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Changed
+
+- Routine shipping uses current GitHub checks, required reviews, branch protections and merge policy; checkout-log attestation and immutable action pins are explicit `assurance: "high"` policy instead of default repository prerequisites.
+- Ordinary PRs can use a provider-derived policy when the merge method is unambiguous. Minimal routine packets select a merge method without enumerating CI; explicit inventories, justified skips and deliberately CI-free decisions remain authoritative.
+- Check evidence is qualified by workflow, event, publisher, job and current run/attempt. Provider-current job IDs preserve same-named carried jobs across partial reruns instead of collapsing them by name. Push-only strict repositories use provider-proven inclusion of the current base in the checked head, while observed PR-context checks remain independently authoritative.
+- Requested stack/publication gates run before push in isolated clean checkouts, with independent per-gate timeouts and optional `per_commit` validation. Repository hooks are preserved; validation does not consume the CI monitoring window.
+- Receipt schema 4 and graph journal schema 2 record assurance explicitly. Graph journals retain local gate packets; incompatible or historical assurance requires an explicit decision, never a silent downgrade. Endpoint authority and pending intents remain intact.
+- Condense the skill's standard path and refresh stacked-PR delegation, local-gate and recovery references.
+
+### Fixed
+
+- Freeze and reuse exact verified replay commit objects after definite push refusal with unchanged inputs; no caller-seeded committer date or temporary pre-push validation protocol.
+- Renew local gates and the outgoing secret scan after a refused or reconciled not-applied ordinary publication; validation cache hits cannot skip a requested retry check. Push diagnostics describe observed publication failure without misattributing local hooks or transport errors to the remote.
+- Recheck trunk/member inputs after local validation before dispatching a stack push or native request, and validate refreshed native heads rather than old journal members.
+- Invalidate pre-retarget CI by its original workflow trigger, including reruns and automatic base changes; newer runs or attempts with missing job evidence cannot inherit older success.
+- Preserve omitted routine check inventories when freezing graph plans, so minimal routine packets remain resumable. Completed runs do not record unexercised gates.
+- Publication previews expose an unresolved named base before planning pushes or PR creation.
+
 ### Tests
 
 - Cover reviews on later API pages superseding earlier approvals through dismissals, change requests, and stale-head approvals; the regression detects loss of later-page evidence.

@@ -38,6 +38,8 @@ import os
 import tempfile
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -335,6 +337,12 @@ class _Publish:
         receipt = self.receipt
         if receipt is None:
             return
+        if receipt.status != "COMPLETE":
+            refusal = lifecycle.assurance_refusal(
+                receipt.assurance, lifecycle.decision_assurance(self.request.decision)
+            )
+            if refusal is not None:
+                raise _Stop("NEEDS_JUDGMENT", *refusal)
         if receipt.code_identity != self.code and not self._reviewed_refresh(receipt):
             raise _Stop(
                 "NEEDS_JUDGMENT",
@@ -462,14 +470,15 @@ class _Publish:
         if self.request.branch not in (None, plan.branch):
             raise ReceiptInputError("--branch does not match the plan placement")
         self._admit_plan(plan)
-        outcome = execute_changeset(
-            self.git,
-            self.store,
-            plan,
-            self.request.gates,
-            self.request.endpoint,
-            self.receipt,
-        )
+        with self._local_gates():
+            outcome = execute_changeset(
+                self.git,
+                self.store,
+                plan,
+                self.request.gates,
+                self.request.endpoint,
+                self.receipt,
+            )
         self.attempted |= outcome.mutation_attempted
         self.performed |= outcome.mutation_performed
         self.receipt = outcome.receipt
@@ -943,6 +952,7 @@ class _Publish:
                 None,
                 self.git.snapshot().fingerprint,
                 None,
+                assurance=lifecycle.decision_assurance(self.request.decision),
             )
         publication = self.receipt.publication
         if publication is None:
@@ -1011,7 +1021,10 @@ class _Publish:
     def _validate_outgoing(
         self, publication: PublicationRecord, located: _Located, start: str
     ) -> None:
-        if publication.validated_head == located.head:
+        retrying = (
+            publication.push is not None and publication.push.outcome == "REJECTED"
+        )
+        if publication.validated_head == located.head and not retrying:
             return
         gates = self.request.gates
         if gates is None:
@@ -1027,13 +1040,14 @@ class _Publish:
             .stdout.decode("ascii", "replace")
             .split()
         )
-        check_outgoing(
-            self.git,
-            gates,
-            start,
-            located.head,
-            run_gates=any(commit not in created for commit in outgoing),
-        )
+        with self._local_gates():
+            check_outgoing(
+                self.git,
+                gates,
+                start,
+                located.head,
+                run_gates=retrying or any(commit not in created for commit in outgoing),
+            )
         with self.store.mutation_lock():
             publication.validated_head = located.head
             self._save()
@@ -1092,8 +1106,8 @@ class _Publish:
                 self._save()
                 raise _Stop(
                     "BLOCKED",
-                    f"the push was refused: {lifecycle._safe_error(error)}",
-                    "resolve the lease, hook or permission refusal; nothing was forced",
+                    f"the push did not publish the intended head: {lifecycle._safe_error(error)}",
+                    "resolve the lease, hook, transport or permission failure; nothing was forced",
                 ) from error
             except GitError as error:
                 if not error.uncertain:
@@ -1142,6 +1156,22 @@ class _Publish:
                 "a closed unmerged PR is not successful publication",
             )
         return candidates[0] if candidates else None
+
+    @contextmanager
+    def _local_gates(self) -> Iterator[None]:
+        """Local gate and secret-scan time is not CI monitoring time.
+
+        Both the monitoring window and the provider deadline move out by the
+        time the local commands ran, so a long gate never shortens the wait.
+        """
+        started = time.monotonic()
+        try:
+            yield
+        finally:
+            elapsed = time.monotonic() - started
+            self.deadline += elapsed
+            if self.provider.deadline is not None:
+                self.provider.deadline += elapsed
 
     def _sleep(self, reason: str, next_action: str) -> None:
         remaining = self.deadline - time.monotonic()
@@ -1571,6 +1601,7 @@ def preview(
 ) -> dict[str, object]:
     """Read-only plan of the actions an execution would take; writes nothing."""
     actions: list[dict[str, object]] = []
+    blockers: list[dict[str, object]] = []
     head: str | None = None
     head_repo = request.head_repo or request.base_repo
     if request.plan is not None:
@@ -1637,10 +1668,24 @@ def preview(
     elif reuse_merged:
         actions.append({"action": "reuse-pr", "number": merged[0]})
     elif not open_prs:
-        actions.append({"action": "create-pr", "head": f"{head_repo}:{branch}"})
+        if request.plan is None and (
+            not isinstance(request.decision, Binding)
+            or request.decision.base_ref is None
+        ):
+            blockers.append(
+                {
+                    "status": "NEEDS_JUDGMENT",
+                    "reason": "the intended base of a new PR is unknown",
+                    "next_action": "supply a schema 2 binding naming the head and base",
+                }
+            )
+            actions = [{"action": "resolve-base"}]
+        else:
+            actions.append({"action": "create-pr", "head": f"{head_repo}:{branch}"})
     else:
         actions.append({"action": "select-pr", "candidates": open_prs})
-    actions.append({"action": "lifecycle", "endpoint": request.endpoint})
+    if not blockers:
+        actions.append({"action": "lifecycle", "endpoint": request.endpoint})
     return {
         "schema_version": 1,
         "run_id": None,
@@ -1651,6 +1696,7 @@ def preview(
             "endpoint": request.endpoint,
         },
         "actions": actions,
+        "blockers": blockers,
         "remote_reads": ["git ls-remote", "GET pulls?head"],
         "mutation_performed": False,
     }

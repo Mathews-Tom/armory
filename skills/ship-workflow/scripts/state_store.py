@@ -16,11 +16,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
-from github_ops import MERGE_METHODS, NATIVE_MERGE_ACTIONS, NATIVE_MERGE_STATUSES
+from github_ops import (
+    ASSURANCES,
+    MERGE_METHODS,
+    NATIVE_MERGE_ACTIONS,
+    NATIVE_MERGE_STATUSES,
+)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _LEGACY_SCHEMA_VERSION = 1
 _CHANGESET_SCHEMA_VERSION = 2
+_PUBLICATION_SCHEMA_VERSION = 3
+#: A saved run's ``assurance`` is one of ``ASSURANCES``; ``None`` means it
+#: predates assurance levels (it was validated under checkout attestation) and
+#: must never be resumed under a weaker level without an explicit decision.
 _RUN_ID = re.compile(r"[0-9a-f]{32}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _OID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
@@ -132,7 +141,8 @@ _CLEANUP_KEYS = {
 }
 # Stack-graph master journals are a separate document kind with their own version,
 # stored in a subdirectory so receipt enumeration never meets them.
-GRAPH_SCHEMA_VERSION = 1
+GRAPH_SCHEMA_VERSION = 2
+_GRAPH_LEGACY_SCHEMA_VERSION = 1
 GRAPH_KIND = "stack-graph"
 GRAPH_NODE_STATES = ("PENDING", "PROMOTED", "LANDED", "RETAINED")
 GRAPH_INTENT_KINDS = ("capture", "rewrite-push", "retarget", "advance-local")
@@ -668,6 +678,7 @@ class Receipt:
     next_action: str = "reconcile current target facts"
     changeset: ChangesetRecord | None = None
     publication: PublicationRecord | None = None
+    assurance: str | None = "routine"
 
     def bound(self) -> Target:
         """The confirmed PR target; a pre-publication run has none to land."""
@@ -741,6 +752,7 @@ class Receipt:
         if type(version) is not int or version not in (
             _LEGACY_SCHEMA_VERSION,
             _CHANGESET_SCHEMA_VERSION,
+            _PUBLICATION_SCHEMA_VERSION,
             SCHEMA_VERSION,
         ):
             raise ReceiptInputError("unsupported receipt schema version")
@@ -748,7 +760,7 @@ class Receipt:
         if version == _LEGACY_SCHEMA_VERSION:
             # Exact v1 migration: PR-number receipts gain no changeset/publication
             # and keep a complete target; nothing else is defaulted or reinterpreted.
-            legacy = fields - {"changeset", "publication"}
+            legacy = fields - {"changeset", "publication", "assurance"}
             if set(raw) != legacy | {"schema_version"}:
                 raise ReceiptInputError("receipt fields are missing or unsupported")
             if any(raw[key] is None for key in TARGET_KEYS):
@@ -758,9 +770,20 @@ class Receipt:
             # Schema 2 had no publication journal; nothing was ever published by it.
             if "publication" in raw:
                 raise ReceiptInputError("receipt fields are missing or unsupported")
-            raw = {**raw, "schema_version": SCHEMA_VERSION, "publication": None}
+            raw = {**raw, "publication": None}
+        if version != SCHEMA_VERSION:
+            # Schemas 1-3 predate assurance levels. They were validated under
+            # checkout attestation, so the level stays unrecorded (None) and a
+            # resume must decide it explicitly instead of defaulting weaker.
+            if "assurance" in raw:
+                raise ReceiptInputError("receipt fields are missing or unsupported")
+            raw = {**raw, "assurance": None}
+        raw = {**raw, "schema_version": SCHEMA_VERSION}
         if set(raw) != fields | {"schema_version"}:
             raise ReceiptInputError("receipt fields are missing or unsupported")
+        assurance = raw["assurance"]
+        if assurance is not None and assurance not in ASSURANCES:
+            raise ReceiptInputError("receipt assurance must be routine, high or null")
         endpoint = _text(raw["endpoint"], "endpoint")
         status = _text(raw["status"], "status")
         if endpoint not in _ENDPOINTS or status not in _STATUSES:
@@ -800,10 +823,22 @@ class Receipt:
                 )
         if verified and raw["merge_sha"] is None:
             raise ReceiptInputError("verified merge needs a landing identity")
+        # A provider-derived routine run has no explicit decision: its validation is
+        # bound to the identity of the provider-derived policy it ran under.
+        provider_bound = (
+            raw["policy_identity"] is None
+            and assurance == "routine"
+            and raw["validation_policy"] is not None
+        )
         if raw["validation_sha"] is not None and (
             not verified
-            or raw["policy_identity"] is None
-            or raw["validation_policy"] != raw["policy_identity"]
+            or not (
+                provider_bound
+                or (
+                    raw["policy_identity"] is not None
+                    and raw["validation_policy"] == raw["policy_identity"]
+                )
+            )
         ):
             raise ReceiptInputError(
                 "validation must be bound to the verified merge and policy"
@@ -814,7 +849,7 @@ class Receipt:
             and (
                 not verified
                 or raw["validation_sha"] is None
-                or raw["policy_identity"] is None
+                or (raw["policy_identity"] is None and not provider_bound)
             )
         ):
             raise ReceiptInputError(
@@ -856,6 +891,7 @@ class Receipt:
             next_action=_text(raw["next_action"], "next_action"),
             changeset=changeset,
             publication=publication,
+            assurance=assurance,
         )
 
 
@@ -1054,6 +1090,8 @@ class GraphJournal:
     issue: str | None = None
     next_action: str | None = None
     native: NativeRecord | None = None
+    assurance: str | None = "routine"
+    gates: dict[str, object] | None = None
     kind: Literal["stack-graph"] = "stack-graph"
 
     def node(self, pr: int) -> GraphNode:
@@ -1072,11 +1110,33 @@ class GraphJournal:
     def parse(cls, value: object) -> GraphJournal:
         raw = _object(value, "graph journal")
         version = raw.get("schema_version")
-        if type(version) is not int or version != GRAPH_SCHEMA_VERSION:
+        if type(version) is not int or version not in (
+            _GRAPH_LEGACY_SCHEMA_VERSION,
+            GRAPH_SCHEMA_VERSION,
+        ):
             raise ReceiptInputError("unsupported graph journal schema version")
+        if version == _GRAPH_LEGACY_SCHEMA_VERSION:
+            # Schema 1 predates assurance levels and saved validation gates; its
+            # level stays unrecorded (None) so a resume must decide it explicitly.
+            if "assurance" in raw or "gates" in raw:
+                raise ReceiptInputError(
+                    "graph journal fields are missing or unsupported"
+                )
+            raw = {
+                **raw,
+                "schema_version": GRAPH_SCHEMA_VERSION,
+                "assurance": None,
+                "gates": None,
+            }
         manual = set(cls.__dataclass_fields__) - {"native"} | {"schema_version"}
         if set(raw) - {"native"} != manual:
             raise ReceiptInputError("graph journal fields are missing or unsupported")
+        assurance = raw["assurance"]
+        if assurance is not None and assurance not in ASSURANCES:
+            raise ReceiptInputError("graph assurance must be routine, high or null")
+        gates = None if raw["gates"] is None else _object(raw["gates"], "graph gates")
+        if gates is not None:
+            _json_value(gates)
         if raw["kind"] != GRAPH_KIND:
             raise ReceiptInputError("journal is not a stack-graph journal")
         host = _text(raw["host"], "graph host")
@@ -1116,6 +1176,8 @@ class GraphJournal:
             issue=_optional_text(raw["issue"], "issue"),
             next_action=_optional_text(raw["next_action"], "next_action"),
             native=_native_record(raw["native"]) if "native" in raw else None,
+            assurance=assurance,
+            gates=gates,
         )
         _check_graph_nodes(journal)
         _check_graph_intents(journal)

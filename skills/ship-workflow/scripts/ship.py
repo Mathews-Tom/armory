@@ -34,6 +34,7 @@ if sys.version_info < (3, 12):  # noqa: UP036 -- installed entrypoints run outsi
 
 from changeset import (
     ChangesetStop,
+    GatePolicy,
     PlanError,
     compile_draft,
     load_draft,
@@ -68,7 +69,6 @@ GRAPH_EXCLUDED = (
     ("--branch", "branch"),
     ("--plan", "plan"),
     ("--policy", "policy"),
-    ("--gates", "gates"),
     ("--head-repo", "head_repo"),
     ("--title", "title"),
     ("--body-file", "body_file"),
@@ -182,6 +182,7 @@ def stack_graph(
     args: argparse.Namespace,
     plan: StackPlan | None,
     journal: GraphJournal | None,
+    gates: GatePolicy | None = None,
 ) -> tuple[dict[str, object], int]:
     """Continue a manual or native stack graph from --stack-plan and/or its run id.
 
@@ -213,7 +214,7 @@ def stack_graph(
     if args.dry_run:
         return inspect_graph(git, provider, plan, endpoint, journal=journal), 0
     return execute_graph(
-        git, provider, plan, endpoint, args.wait_timeout, store, journal
+        git, provider, plan, endpoint, args.wait_timeout, store, journal, gates=gates
     )
 
 
@@ -356,7 +357,7 @@ def main() -> int:
         return planning(args.draft, args.gates)
     if args.stack_plan is not None and single_pr_selected(args):
         parser.error(
-            "--stack-plan excludes --pr, --branch, --plan, --policy, --gates, "
+            "--stack-plan excludes --pr, --branch, --plan, --policy, "
             "--head-repo, --title and --body-file"
         )
     if args.pr is not None and args.branch is not None:
@@ -383,7 +384,7 @@ def main() -> int:
         store = Store(git.snapshot().common_dir)
         graph_run: GraphJournal | None = None
         if stack_plan is not None:
-            result, code = stack_graph(git, store, args, stack_plan, None)
+            result, code = stack_graph(git, store, args, stack_plan, None, gates)
             print(json.dumps(result, ensure_ascii=True, sort_keys=True))
             return code
         receipt: Receipt | None = None
@@ -443,7 +444,7 @@ def main() -> int:
                             receipt.publication.base_repo,
                         )
         if graph_run is not None:
-            result, code = stack_graph(git, store, args, None, graph_run)
+            result, code = stack_graph(git, store, args, None, graph_run, gates)
             print(json.dumps(result, ensure_ascii=True, sort_keys=True))
             return code
         if selected is None:

@@ -298,7 +298,7 @@ def test_saved_graph_bytes_are_canonical_private_json(common: Path) -> None:
 
     path = journal_path(common)
     data = json.loads(path.read_bytes())
-    assert data["schema_version"] == 1
+    assert data["schema_version"] == 2
     assert data["kind"] == "stack-graph"
     assert (
         path.read_bytes()
@@ -413,7 +413,7 @@ def drop_intent(name: str) -> Change:
 
 
 SCHEMA_REJECTS: list[tuple[str, Change, str]] = [
-    ("schema-2", top("schema_version", 2), "unsupported graph journal schema version"),
+    ("schema-3", top("schema_version", 3), "unsupported graph journal schema version"),
     ("schema-missing", drop("schema_version"), "unsupported graph journal schema"),
     ("schema-bool", top("schema_version", True), "unsupported graph journal schema"),
     ("unknown-field", top("receipts", []), "graph journal fields are missing"),

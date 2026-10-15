@@ -237,7 +237,7 @@ class Hub(GitHub):
     def read_pr(self, number: int) -> PullRequest:
         return self._pr(number)
 
-    def observe(self, number: int) -> Observation:
+    def observe(self, number: int, *, assurance: str = "routine") -> Observation:
         pr = self._pr(number)
         return Observation(
             repo=Repository(BASE_REPO, HOST, "main", ("merge", "squash")),
@@ -260,6 +260,7 @@ class Hub(GitHub):
             changes_requested=False,
             policy_known=True,
             issues=(),
+            assurance=assurance,
         )
 
     def queue_state(self, number: int, expected_head: str) -> QueueState:
@@ -681,6 +682,71 @@ def test_unknown_push_outcome_is_reconciled_from_the_remote_not_resent(
     assert len(shop.hub.create_calls) == 1
 
 
+@pytest.mark.parametrize("outcome", ["rejected", "unknown-not-applied"])
+def test_retry_renews_each_commit_gate_and_scan_before_publishing_the_same_head(
+    shop: Shop, monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    git(shop.work, "switch", "-q", "-c", BRANCH)
+    (shop.work / "a.txt").write_text("alpha\nfirst\n")
+    git(shop.work, "commit", "-qam", "feat: first local commit")
+    first_commit = git(shop.work, "rev-parse", "HEAD")
+    (shop.work / "a.txt").write_text("alpha\nfirst\nsecond\n")
+    git(shop.work, "commit", "-qam", "feat: second local commit")
+    tip = git(shop.work, "rev-parse", "HEAD")
+    scan_marker = shop.root / "scans"
+    gates = replace(
+        shop.gates,
+        per_commit=True,
+        secret_scan=(sys.executable, "-c", RECORDER, str(scan_marker)),
+    )
+    decision = Binding(
+        Decision(("repository CI",), ("tests",), "squash", (), (), (), (), False),
+        None,
+        tip,
+        "main",
+        shop.base,
+    )
+    hook = shop.bare / "hooks" / "pre-receive"
+    if outcome == "rejected":
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+    attempts: list[str] = []
+    real_push = GitRepository.push_head
+
+    def push(
+        self: GitRepository,
+        remote: str,
+        branch: str,
+        new_oid: str,
+        expected_old: str | None,
+    ) -> None:
+        attempts.append(new_oid)
+        if outcome == "unknown-not-applied" and len(attempts) == 1:
+            raise GitError(
+                "transport ended without an observable outcome", uncertain=True
+            )
+        real_push(self, remote, branch, new_oid, expected_old)
+
+    monkeypatch.setattr(GitRepository, "push_head", push)
+    request = shop.request(branch=BRANCH, gates=gates, decision=decision)
+    first, code = shop.ship(request)
+    assert (code, first["status"]) == (
+        (5, "BLOCKED") if outcome == "rejected" else (3, "WAITING")
+    ), first
+    assert ref(shop.bare, f"refs/heads/{BRANCH}") is None
+    assert shop.gate_heads() == [first_commit, tip]
+    if hook.exists():
+        hook.unlink()
+
+    resumed, resumed_code = shop.ship(request, run_of(first))
+
+    assert (resumed_code, resumed["status"]) == (0, "COMPLETE"), resumed
+    assert attempts == [tip, tip]
+    assert shop.gate_heads() == [first_commit, tip, first_commit, tip]
+    assert scan_marker.read_text().split() == [tip, tip]
+    assert ref(shop.bare, f"refs/heads/{BRANCH}") == tip
+
+
 def test_flagged_outgoing_secret_scan_blocks_before_any_push(shop: Shop) -> None:
     git(shop.work, "switch", "-q", "-c", BRANCH)
     (shop.work / "a.txt").write_text("alpha\nhand-made\n")
@@ -793,6 +859,26 @@ def test_dry_run_preview_plans_publication_without_writes(shop: Shop) -> None:
     assert not (shop.work / ".git" / "armory").exists()
     assert ref(shop.bare, f"refs/heads/{BRANCH}") is None
     assert shop.hub.create_calls == []
+
+
+def test_publication_preview_names_an_unknown_base_before_planning_a_push(
+    shop: Shop,
+) -> None:
+    git(shop.work, "switch", "-q", "-c", BRANCH)
+    (shop.work / "a.txt").write_text("alpha\nfeature\n")
+    git(shop.work, "commit", "-qam", "feat: add local work")
+    refs_before = git(shop.work, "for-each-ref")
+
+    preview = publish.preview(shop.repo(), shop.hub, shop.request(branch=BRANCH))
+
+    assert preview["actions"] == [{"action": "resolve-base"}]
+    blockers = preview["blockers"]
+    assert isinstance(blockers, list)
+    assert blockers[0]["status"] == "NEEDS_JUDGMENT"
+    assert git(shop.work, "for-each-ref") == refs_before
+    assert ref(shop.bare, f"refs/heads/{BRANCH}") is None
+    assert shop.hub.create_calls == []
+    assert not (shop.work / ".git" / "armory").exists()
 
 
 # -- existing local history and published branches -----------------------------------
@@ -2044,7 +2130,7 @@ def test_accepted_unlisted_creation_across_source_versions_is_settled_not_recrea
     assert len(shop.hub.create_calls) == 1 and list(shop.hub.entries) == [1]
     shop.hub.entries[1].listed = True
 
-    resumed, code = shop.ship(shop.request(), run_id)
+    resumed, code = shop.ship(shop.request(decision=refreshed), run_id)
 
     assert (code, resumed["status"]) == (0, "COMPLETE"), resumed
     assert pending_creation(shop, resumed) == ("CONFIRMED", 1)
@@ -2126,6 +2212,69 @@ def test_refresh_leaves_an_unresolved_merge_to_lifecycle_reconciliation(
     assert journal(shop.receipt(first)) == before
     assert ref(shop.bare, f"refs/heads/{BRANCH}") == published
     assert shop.gate_heads() == gated and shop.hub.merge_calls == []
+
+
+def test_historical_receipt_never_adopts_new_sources_under_routine_assurance(
+    shop: Shop,
+) -> None:
+    dirty(shop)
+    plan = shop.plan()
+    first, code = shop.ship(shop.request(plan=plan, decision=lifecycle_decision(plan)))
+    assert (code, first["status"]) == (0, "COMPLETE"), first
+    run_id = run_of(first)
+    published = git(shop.work, "rev-parse", f"refs/heads/{BRANCH}")
+    local = commit_later(shop)
+    store = shop.store()
+    saved = store.load(run_id)
+    saved.code_identity = OLD_SOURCES
+    saved.assurance = None  # saved before assurance levels existed
+    saved.status = "WAITING"
+    saved.intents.append(
+        {
+            "key": "merge:1",
+            "kind": "merge",
+            "resource": "pull/1",
+            "expected_oid": published,
+            "outcome": "PENDING",
+            "actual_oid": None,
+            "created_at": "2026-10-12T00:00:00Z",
+            "namespace": None,
+            "required": True,
+            "ref": None,
+            "proof": None,
+        }
+    )
+    with store.mutation_lock():
+        store.save(saved)
+    before = journal(shop.receipt(first))
+    gated = shop.gate_heads()
+
+    for request in (
+        shop.request(decision=existing_decision(shop, local)),
+        shop.request(),
+    ):
+        result, code = shop.ship(request, run_id)
+        assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+        assert "predates assurance levels" in str(result["blocker"])
+        assert journal(shop.receipt(first)) == before
+        assert ref(shop.bare, f"refs/heads/{BRANCH}") == published
+        assert shop.gate_heads() == gated and shop.hub.merge_calls == []
+
+    attested = existing_decision(shop, local)
+    attested = Binding(
+        replace(attested.decision, assurance="high"),
+        attested.plan,
+        attested.head,
+        attested.base_ref,
+        attested.base_oid,
+    )
+    result, code = shop.ship(shop.request(decision=attested), run_id)
+    # The attested decision passes the assurance guard; the unresolved merge then
+    # stops the run exactly as it does for any refreshed decision.
+    assert (code, result["status"]) == (4, "NEEDS_JUDGMENT"), result
+    assert "dispatched merge is unresolved" in str(result["blocker"])
+    assert journal(shop.receipt(first)) == before
+    assert shop.hub.merge_calls == []
 
 
 def test_refresh_never_overwrites_a_concurrent_controllers_journal_change(

@@ -60,6 +60,7 @@ GATES_SCHEMA_VERSION = 1
 INVENTORY_SCHEMA_VERSION = 1
 SECRET_SCAN = "@secret-scan"
 GATE_TIMEOUT = 1800.0
+MAX_GATE_TIMEOUT = 86_400.0
 COMMIT_TIMEOUT = 1800.0
 CLONE_TIMEOUT = 600.0
 SCAN_BYTES = 1 << 20
@@ -593,37 +594,91 @@ def take_inventory(git: GitRepository) -> Inventory:
 # -- gate decision packet ---------------------------------------------------------------
 
 
+def _gate_timeout(value: object) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not 0 < value <= MAX_GATE_TIMEOUT
+    ):
+        raise PlanError(
+            f"gate timeout must be a positive number of seconds, at most {MAX_GATE_TIMEOUT:g}"
+        )
+    return float(value)
+
+
 @dataclass(frozen=True)
 class Gate:
+    """One declared gate: an argv vector run in an isolated checkout.
+
+    ``timeout`` is this gate's own deadline in seconds. It is independent of every
+    Git command deadline, so a gate may run far longer than any one Git command.
+    """
+
     name: str
     argv: tuple[str, ...]
+    timeout: float = GATE_TIMEOUT
 
     @property
     def identity(self) -> str:
-        return hashlib.sha256(
-            json.dumps([self.name, list(self.argv)], ensure_ascii=True).encode()
-        ).hexdigest()
+        # The deadline joins the identity only when it is not the default, so every
+        # gate identity recorded before the deadline became explicit stays valid.
+        row: list[object] = [self.name, list(self.argv)]
+        if self.timeout != GATE_TIMEOUT:
+            row.append(self.timeout)
+        return hashlib.sha256(json.dumps(row, ensure_ascii=True).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
 class GatePolicy:
-    """Source-provenanced gate and outgoing-secret-scan decision; never auto-loaded."""
+    """Source-provenanced gate and outgoing-secret-scan decision; never auto-loaded.
+
+    With ``per_commit`` every gate runs on every commit of an outgoing range, oldest
+    first; otherwise only on the range tip.
+    """
 
     sources: tuple[str, ...]
     gates: tuple[Gate, ...]
     secret_scan: tuple[str, ...]
     local_gates_free: bool = False
+    per_commit: bool = False
 
     @property
     def identity(self) -> str:
-        return digest(
-            {
-                "sources": list(self.sources),
-                "gates": [[gate.name, list(gate.argv)] for gate in self.gates],
-                "secret_scan": list(self.secret_scan),
-                "local_gates_free": self.local_gates_free,
-            }
-        )
+        # Optional fields join the digest only when set, for the reason Gate.identity
+        # gives.
+        body: dict[str, object] = {
+            "sources": list(self.sources),
+            "gates": [
+                [gate.name, list(gate.argv)]
+                if gate.timeout == GATE_TIMEOUT
+                else [gate.name, list(gate.argv), gate.timeout]
+                for gate in self.gates
+            ],
+            "secret_scan": list(self.secret_scan),
+            "local_gates_free": self.local_gates_free,
+        }
+        if self.per_commit:
+            body["per_commit"] = True
+        return digest(body)
+
+    def canonical(self) -> dict[str, object]:
+        """The normalized decision packet; :func:`parse_gates` rebuilds an equal policy."""
+        rows: list[dict[str, object]] = []
+        for gate in self.gates:
+            row: dict[str, object] = {"name": gate.name, "argv": list(gate.argv)}
+            if gate.timeout != GATE_TIMEOUT:
+                row["timeout"] = gate.timeout
+            rows.append(row)
+        packet: dict[str, object] = {
+            "schema_version": GATES_SCHEMA_VERSION,
+            "sources": list(self.sources),
+            "gates": rows,
+            "secret_scan": {"argv": list(self.secret_scan)},
+            "local_gates_free": self.local_gates_free,
+        }
+        if self.per_commit:
+            packet["per_commit"] = True
+        return packet
 
     def gate(self, name: str) -> Gate:
         for gate in self.gates:
@@ -650,7 +705,14 @@ def _argv(value: object, label: str) -> tuple[str, ...]:
 def parse_gates(raw: object) -> GatePolicy:
     if not isinstance(raw, dict) or any(not isinstance(key, str) for key in raw):
         raise PlanError("gate decision must be a JSON object")
-    allowed = {"schema_version", "sources", "gates", "secret_scan", "local_gates_free"}
+    allowed = {
+        "schema_version",
+        "sources",
+        "gates",
+        "secret_scan",
+        "local_gates_free",
+        "per_commit",
+    }
     if (
         set(raw) - allowed
         or type(raw.get("schema_version")) is not int
@@ -668,16 +730,23 @@ def parse_gates(raw: object) -> GatePolicy:
     free = raw.get("local_gates_free", False)
     if not isinstance(free, bool):
         raise PlanError("local_gates_free must be a boolean")
+    per_commit = raw.get("per_commit", False)
+    if not isinstance(per_commit, bool):
+        raise PlanError("per_commit must be a boolean")
     entries = raw.get("gates")
     if not isinstance(entries, list):
         raise PlanError("gates must be an explicit list")
     gates: list[Gate] = []
     for entry in entries:
-        gate = _object(entry, "gate", {"name", "argv"})
+        fields = dict(entry) if isinstance(entry, dict) else entry
+        timeout = GATE_TIMEOUT
+        if isinstance(fields, dict) and "timeout" in fields:
+            timeout = _gate_timeout(fields.pop("timeout"))
+        gate = _object(fields, "gate", {"name", "argv"})
         name = gate["name"]
         if not isinstance(name, str) or _NAME_RE.fullmatch(name) is None:
             raise PlanError("gate names must be simple identifiers")
-        gates.append(Gate(name, _argv(gate["argv"], f"gate {name} argv")))
+        gates.append(Gate(name, _argv(gate["argv"], f"gate {name} argv"), timeout))
     if len({gate.name for gate in gates}) != len(gates):
         raise PlanError("gate names must be unique")
     if free == bool(gates):
@@ -690,6 +759,7 @@ def parse_gates(raw: object) -> GatePolicy:
         tuple(gates),
         _argv(scan["argv"], "secret_scan argv"),
         free,
+        per_commit,
     )
 
 
@@ -1804,7 +1874,7 @@ class _Isolation:
                     gate.argv,
                     clone.path,
                     self.source.execution_environment(),
-                    GATE_TIMEOUT,
+                    gate.timeout,
                 )
             except FileNotFoundError as error:
                 raise ChangesetStop(
@@ -2484,6 +2554,15 @@ class _Run:
         return self._outcome(status, reason, next_action, **details)
 
 
+def outgoing_commits(git: GitRepository, base: str, head: str) -> tuple[str, ...]:
+    """Every commit of ``base..head``, oldest first (parents before children)."""
+    raw = git.run("rev-list", "--reverse", "--topo-order", f"{base}..{head}").stdout
+    commits = tuple(
+        _hex(line, "outgoing commit id") for line in raw.split(b"\n") if line
+    )
+    return commits or (head,)
+
+
 def check_outgoing(
     git: GitRepository, gates: GatePolicy, base: str, head: str, *, run_gates: bool
 ) -> list[dict[str, object]]:
@@ -2491,22 +2570,31 @@ def check_outgoing(
 
     The secret scan always covers ``base..head``. With ``run_gates`` every
     declared gate runs on ``head`` (commits this workflow did not create and
-    validate itself). Each runs in a fresh clean clone of ``head``.
+    validate itself), or, when the policy is ``per_commit``, on every commit of
+    ``base..head`` oldest first and the tip last. Each runs in a fresh clean clone
+    of the commit under its own deadline (:attr:`Gate.timeout`), never under a Git
+    command deadline, and never inside a Git hook.
     """
     isolation = _Isolation(GitRepository(git.path, timeout=COMMIT_TIMEOUT))
-    checks = list(gates.gates) if run_gates else []
-    checks.append(gates.scan(base, head))
+    targets = (
+        outgoing_commits(git, base, head) if run_gates and gates.per_commit else (head,)
+    )
+    checks: list[tuple[str, Gate]] = []
+    if run_gates:
+        checks.extend((commit, gate) for commit in targets for gate in gates.gates)
+    checks.append((head, gates.scan(base, head)))
     evidence: list[dict[str, object]] = []
-    for gate in checks:
-        result = isolation.gate(head, gate)
-        evidence.append(
-            {
-                "name": gate.name,
-                "identity": gate.identity,
-                "outcome": result.outcome,
-                "returncode": result.returncode,
-            }
-        )
+    for commit, gate in checks:
+        result = isolation.gate(commit, gate)
+        row: dict[str, object] = {
+            "name": gate.name,
+            "identity": gate.identity,
+            "outcome": result.outcome,
+            "returncode": result.returncode,
+        }
+        if gates.per_commit:
+            row["commit"] = commit
+        evidence.append(row)
         if result.outcome == "PASSED":
             continue
         if gate.name == SECRET_SCAN:
@@ -2516,13 +2604,19 @@ def check_outgoing(
                 "remove the secret or obtain an explicit owner decision; nothing was pushed",
                 {"head": head, "diagnostic": result.tail},
             )
+        where = "the outgoing head" if commit == head else f"outgoing commit {commit}"
         raise ChangesetStop(
             "NEEDS_JUDGMENT",
-            f"gate {gate.name} {result.outcome.lower()} on the outgoing head "
+            f"gate {gate.name} {result.outcome.lower()} on {where} "
             f"(exit {result.returncode})",
             "diagnose ownership: repair change-owned failures with a commit plan or "
             "record an inherited/permission blocker; nothing was pushed",
-            {"head": head, "gate": gate.name, "diagnostic": result.tail},
+            {
+                "head": head,
+                "commit": commit,
+                "gate": gate.name,
+                "diagnostic": result.tail,
+            },
         )
     return evidence
 
