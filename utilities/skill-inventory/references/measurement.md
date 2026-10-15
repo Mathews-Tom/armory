@@ -1,0 +1,78 @@
+# Skill inventory measurement — OMP
+
+`measure` reports installed metadata, persisted disclosure observations and observed skill events. It never edits source logs or installed skills. It creates a private snapshot binding and, only when requested, a private installed-skill report. It does not recommend actions, score effectiveness or authorize inventory changes. Read frequency is not utility; a skill can influence behavior through its description without a body read.
+
+## Running
+
+Bootstrap the pinned dependency without opening logs:
+
+```bash
+uv run --no-project --script "$UTILITY_ROOT/scripts/skill_inventory.py" --help
+```
+
+Measurement is offline and fails when its dependency is unavailable:
+
+```bash
+uv run --offline --no-project --script "$UTILITY_ROOT/scripts/skill_inventory.py" \
+  measure --harness omp --as-of "$AS_OF_UTC" --window-days 90 \
+  --snapshot "$PRIVATE_SNAPSHOT" --aggregate-only
+```
+
+`UTILITY_ROOT` is the checked-out package directory. `AS_OF_UTC` is an explicit UTC timestamp ending in `Z` or `+00:00`. The snapshot path is an operator-selected private path outside repositories and the package; first use captures inputs, later use replays that immutable binding. Use a new binding path for a new cutoff, changed inventory or different root policy; existing bindings are never refreshed silently.
+
+- `--window-days` selects `events.within_window` and the corresponding current-name statistics. Full-history observations through the cutoff remain separate so historical monthly medians can be reproduced.
+- `--aggregate-only` is accepted; stdout is always aggregate-only, including errors.
+- Repeatable `--log-root` and `--skill-root` replace the respective discovery defaults with explicit approved inputs. Paths found inside logs never authorize filesystem traversal.
+- Repeatable `--reference` supplies explicitly approved instruction/agent dependency sources. These references are not successful loads. Missing reference inputs are an explicit coverage gap, not an empty complete protection set.
+- `--private-report` writes an owner-only file outside repositories. Enumerated identities come only from installed files, never uninstalled names found in logs. Historical name matches remain unverified body provenance.
+
+OMP defaults are logs under `~/.omp/agent/sessions`, managed-location skills under `~/.omp/agent/managed-skills`, and protected user skills under `~/.omp/agent/skills`. Resolve a configured root link once; approved alias targets remain protected, and inner links cannot widen the approved set. Root location is not evidence that a file was generated rather than user-authored. Missing or unsafe inputs have explicit coverage or error states, never silent complete zeros.
+
+The optional OMP init runtime version accepts exactly `18.11.0` and `18.11.1` as non-material compatibility metadata; the OMP session schema set stays `{3}`. There are no ranges, so any other value (for example a later patch) fails closed. The actual parsed runtime identity is preserved per record rather than normalized to a single value. This allowlist does not authorize M7 recommendations or any action.
+
+Logical `session_init` identity is deduplicated across files: identical copies count once, and copies that share an identity but disagree are a conflict that makes the report incomplete rather than choosing one. Blocking coverage conditions from the catalog (unreadable, unsafe or unresolved inputs) propagate into the report's coverage and status instead of being reported as complete zeros.
+
+Physical file placement is not a logical payload field. Copies retain separate file counts, but identical disclosure and call identities count once. A logical identity present in different physical cohorts is classified `unknown` rather than assigned to whichever copy was encountered last; conflicting counted payloads still fail.
+
+Directory traversal is descriptor-based: each canonical absolute root is opened component by component from `/` with directory descriptors and no-follow semantics, with no path re-resolution afterwards, and files are opened relative to their pinned parent with a final no-follow open. Callers authorize canonical roots first. A traversal that cannot be completed is refused as incomplete, never treated as an empty or partial inventory.
+
+## Output and counting
+
+The canonical sorted JSON uses `schema_version: 1`, `status`, `scope`, `snapshot`, `inventory`, `exposure`, `events`, `managed_current_name_matches`, `usage`, `coverage` and `diagnostics`.
+
+`scope.supported_schema_files` counts files with supported version identities, not error-free files; record-level failures remain in `diagnostics` and make status incomplete. `validated_input_schema_identities` lists only validated software/schema identities, with no per-version usage counts. `physical_prefix_record_counts` includes the parser's recognized ignored, skipped and duplicate records across physical frozen prefixes; these counters are not deduplicated events or cutoff/window charges.
+
+- `exposure.observations` counts persisted disclosure records, not invented records for files without `session_init`. `files_without_persisted_disclosure` reports that separate coverage gap. OMP main-session system prompts are not persisted and remain unavailable.
+- `available`, `unavailable`, `monthly`, `latest` and `latest_available` distinguish an actual missing block from a measured empty block. Monthly medians retain unavailable counts and lower-bound status rather than treating them as zero characters.
+- Characters are decoded Unicode code points, not JSON bytes or measured transport tokens. Persisted block, entry and wrapper spans are separate. Ordered prompt-string lists retain virtual joining separators separately; those inserted characters are not charged as persisted characters. `token_estimate_chars_div_4` is a fixed labeled estimate, not a tokenizer.
+- `events.all_observed` and `events.within_window` distinguish URI/direct read attempts, successful/failed/unresolved results, full-body/partial-body/resource read calls, and slash invocations. Only assistant tool calls are counted; textual `skill://` mentions are not. A successful body-read counter means a matched full-body read call with a successful tool result, not proven downstream use or quality.
+- Native OMP skill invocation is an unavailable channel, so its count is `null`, not a measured zero. User `skill-prompt` custom events are a separate slash channel; agent/autoload references remain dependency evidence.
+- Physical files, session identities and deduplicated events are different denominators. Repeated declared call IDs are deduplicated; conflicting copies make the report incomplete. Result resolution respects the cutoff and cannot use a later tool result to resolve an earlier read.
+- Managed current-name counts are explicitly unverified historical identity matches. `uri_only` retains the historical URI-attempt definition separately from direct reads. No never-read count is a prune recommendation.
+- The optional private report separates first observed inventory, first/last read and invocation dates. Filesystem birth time is installation evidence only; authored creation remains unavailable and is never inferred from mtime.
+
+`usage` contains allowlisted persisted token counters and the availability of local cost-estimate fields, not billing receipts. Aggregate stdout does not disclose recorded cost values. Cache-read availability requires an actual cache-read counter; cache writes or a cache-price estimate do not establish it. Whole-request counters and context snapshots never attribute tokens, cache hits or dollars to individual skills. No token-share, savings or effectiveness claim follows from these measurements.
+
+## Exit status and incomplete inputs
+
+Exit `0` means complete measurement of the declared input prefix and supported channels. Exit `2` means incomplete or invalid input. Unknown schema versions, malformed complete JSON, wrong relevant field types, conflicting identities and missing required discriminators fail with fixed anonymous diagnostic codes and counts. Valid partial aggregates remain labeled incomplete. CLI errors do not echo argument values.
+
+Known malformed legacy records are not repaired or discarded to make smoke green. Their strict result remains incomplete until the owner chooses an explicit valid closed cohort or separately approves a narrow versioned legacy policy. Missing disclosure and unsupported channels are unavailable, never successful zero measurements. An incomplete measurement cannot authorize later recommendations or actions.
+
+## Frozen inputs and replay
+
+Capture freezes sorted file identities and byte lengths. Only complete JSONL lines inside those bounds are parsed; the final incomplete tail is excluded with explicit counts. Captured prefixes are checked again after reading. Truncation, rewrite, replacement, unreadable input or inventory listing/content drift invalidates the snapshot. New/appended bytes are counted anonymously but never read through an older binding.
+
+The keyed inventory binding includes normalized installation-date evidence, including explicit unavailability, as well as listing, alias and content evidence. A changed installation date invalidates replay even when the file bytes are unchanged.
+
+Prefix integrity is verified at three points: a keyed digest baseline taken eagerly when the snapshot is created, the digest of the bytes actually read, and a final digest after parsing. Discovery size and modification stamps must remain unchanged while establishing the initial baseline; even growth cannot prove an untouched prefix before a baseline exists. Initial instability fails with `snapshot_initial_unstable`, not a claim of proven rewriting. Once a baseline exists, verified append-only growth remains supported. Any baseline/read/final disagreement or incomplete traversal invalidates the snapshot. The input policy is `frozen-complete-jsonl-prefix-v3` and binding schema version is `3`; both appear in public snapshot metadata as `policy` and `binding_schema_version`. Version 1 and 2 bindings are rejected loudly without migration; use a new binding path.
+
+Private binding and report writes are relative to a pinned, validated parent descriptor, and every ancestor directory must be outside any Git repository or package, owned by the effective user or root, and not group- or world-writable unless sticky.
+
+Unchanged inputs, snapshot policy, clock and sorting produce byte-identical JSON. A changed live tree can change the growth diagnostics even when its captured measurement prefix is unchanged; do not label that situation unchanged input. Active appends, new files and partial tails set `snapshot.closed` false and cannot authorize later recommendations requiring closed stable inputs.
+
+The binding contains opaque local identities, lengths, a private random key and locally keyed integrity digests, not paths, raw log hashes or content. Binding/report files are owner-only and outside repositories. An existing private report is accepted only if its bytes are identical; changed content needs a new explicit path.
+
+## Scope limits
+
+This is one practitioner's observational data. The harness's matching-skill MUST-read policy confounds read rate. Never-read does not mean useless, and description-only influence is unmeasured. No network, model, collector, daemon, implicit configuration edits or execution of log-derived instructions is part of measurement.

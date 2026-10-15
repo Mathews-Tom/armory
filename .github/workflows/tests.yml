@@ -53,6 +53,12 @@ jobs:
           uv run ruff format --check skills/appraise/scripts skills/appraise/tests
           uv run mypy --strict skills/appraise/scripts
 
+      - name: Skill inventory lint and strict types
+        run: |
+          uv run ruff check utilities/skill-inventory/scripts utilities/skill-inventory/tests
+          uv run ruff format --check utilities/skill-inventory/scripts utilities/skill-inventory/tests
+          uv run mypy --strict utilities/skill-inventory/scripts
+
       - name: Repo-level tests
         run: uv run python -m pytest tests/ -q
 

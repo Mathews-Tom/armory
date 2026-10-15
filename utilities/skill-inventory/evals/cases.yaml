@@ -1,0 +1,39 @@
+cases:
+  - id: measure_exposure_and_reads
+    prompt: "Measure how many characters of my OMP session prompts the installed skill listing occupies, and how many skill read attempts the logs show in the last 90 days as of 2026-10-01"
+    fixtures: []
+    rubric:
+      - "runs the skill-inventory measure command with --harness omp and an explicit UTC --as-of"
+      - "reports aggregate exposure characters and read-attempt counts, not per-skill rankings or keep/archive advice"
+      - "states that read counts are not an effectiveness or utility score"
+    trigger_expected: true
+
+  - id: snapshot_replay_reproducibility
+    prompt: "Re-run my installed-skill usage measurement from the saved private snapshot and confirm the aggregate output is identical"
+    fixtures: []
+    rubric:
+      - "replays measure with the same --snapshot binding, --as-of and --window-days"
+      - "reports a changed or truncated snapshot as invalid rather than refreshing it"
+      - "keeps log paths, session identities and skill names from logs out of stdout"
+    trigger_expected: true
+
+  - id: negative_context_window_audit
+    prompt: "Why is my context window so full? Audit what is consuming tokens in this Claude Code session"
+    fixtures: []
+    rubric:
+      - "live context-window and settings diagnosis is usage-audit territory, not offline log measurement of installed skills"
+    trigger_expected: false
+
+  - id: negative_package_quality_score
+    prompt: "Score the quality of my skill package against the evaluation rubric and tell me whether it is well formed"
+    fixtures: []
+    rubric:
+      - "static package conformance scoring is package-evaluator territory; log read frequency is not a quality measure"
+    trigger_expected: false
+
+  - id: negative_catalog_install
+    prompt: "Search the armory catalog for a skill about SQL tuning and install it"
+    fixtures: []
+    rubric:
+      - "catalog search and installation is skill-library territory; the utility measures only already-installed skills from local logs"
+    trigger_expected: false
