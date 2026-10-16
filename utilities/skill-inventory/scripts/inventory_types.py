@@ -149,6 +149,7 @@ class Exposure:
     listed_names: int | None = None
     record_id: str | None = None
     fingerprint: str | None = None
+    main_task_group: str | None = None
 
 
 @dataclass(frozen=True)

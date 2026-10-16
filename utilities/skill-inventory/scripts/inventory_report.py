@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
@@ -50,10 +51,26 @@ def _deduplicate_exposures(
         previous = keyed.get(identity)
         if previous is None:
             keyed[identity] = observation
-        elif previous != replace(observation, cohort=previous.cohort):
+        elif previous != replace(
+            observation,
+            cohort=previous.cohort,
+            main_task_group=previous.main_task_group,
+        ):
             issues["conflicting_duplicate_disclosure"] += 1
-        elif previous.cohort != observation.cohort:
-            keyed[identity] = replace(previous, cohort="unknown")
+        else:
+            keyed[identity] = replace(
+                previous,
+                cohort=(
+                    previous.cohort
+                    if previous.cohort == observation.cohort
+                    else "unknown"
+                ),
+                main_task_group=(
+                    previous.main_task_group
+                    if previous.main_task_group == observation.main_task_group
+                    else None
+                ),
+            )
     return [*unkeyed, *keyed.values()]
 
 
@@ -376,24 +393,51 @@ def _managed_counts(
     }
 
 
+def _add_opportunity(
+    sessions: dict[str, tuple[datetime, str | None]], observation: Exposure
+) -> None:
+    previous = sessions.get(observation.session_id)
+    sessions[observation.session_id] = (
+        observation.timestamp
+        if previous is None
+        else min(previous[0], observation.timestamp),
+        observation.main_task_group
+        if previous is None or previous[1] == observation.main_task_group
+        else None,
+    )
+
+
 def _private_rows(
     inventory: Inventory,
     attempts: list[ReadAttempt],
     invocations: list[Invocation],
     exposures: list[Exposure],
     channels_available: bool,
-) -> list[dict[str, object]]:
+    window_start: datetime,
+    observed_references: set[str],
+) -> tuple[list[dict[str, object]], dict[str, int]]:
     reads: dict[str, list[datetime]] = defaultdict(list)
     invokes: dict[str, list[datetime]] = defaultdict(list)
     seen: dict[str, list[tuple[datetime, int]]] = defaultdict(list)
+    opportunities: dict[str, dict[str, tuple[datetime, str | None]]] = defaultdict(dict)
+    ordinary_sessions: dict[str, tuple[datetime, str | None]] = {}
     for item in attempts:
         if item.skill_name is not None:
             reads[item.skill_name].append(item.timestamp)
     for invocation in invocations:
         invokes[invocation.skill_name].append(invocation.timestamp)
     for exposure in exposures:
+        ordinary = (
+            exposure.source == "omp_session_init"
+            and exposure.status == "complete"
+            and exposure.cohort in ("sub", "nested")
+        )
+        if ordinary:
+            _add_opportunity(ordinary_sessions, exposure)
         for entry in exposure.entries:
             seen[entry.name].append((exposure.timestamp, entry.chars))
+            if ordinary and exposure.timestamp >= window_start:
+                _add_opportunity(opportunities[entry.name], exposure)
     rows: list[dict[str, object]] = []
     ambiguous = Counter(skill.name for skill in inventory.entries)
     for skill in sorted(
@@ -403,6 +447,14 @@ def _private_rows(
         times = sorted(reads.get(skill.name, [])) if resolved else []
         invocation_times = sorted(invokes.get(skill.name, [])) if resolved else []
         presence = sorted(seen.get(skill.name, [])) if resolved else []
+        uses = sorted(set(times + invocation_times))
+        window_uses = [stamp for stamp in uses if stamp >= window_start]
+        gaps = [
+            (end - start).total_seconds() / 86400
+            for start, end in itertools.pairwise(uses)
+        ]
+        present = opportunities.get(skill.name, {}) if resolved else {}
+        groups = [group for _, group in present.values() if group is not None]
         rows.append(
             {
                 "name": skill.name,
@@ -442,9 +494,39 @@ def _private_rows(
                 "observed_invocation_attempts": (
                     len(invocation_times) if channels_available else None
                 ),
+                "window_read_attempts": (
+                    sum(stamp >= window_start for stamp in times)
+                    if channels_available
+                    else None
+                ),
+                "window_invocation_attempts": (
+                    sum(stamp >= window_start for stamp in invocation_times)
+                    if channels_available
+                    else None
+                ),
+                "window_first_use_date": _iso(
+                    window_uses[0] if window_uses and channels_available else None
+                ),
+                "window_last_use_date": _iso(
+                    window_uses[-1] if window_uses and channels_available else None
+                ),
+                "largest_observed_inter_use_gap_days": (
+                    max(gaps) if gaps and channels_available else None
+                ),
+                "inventory_present_subagent_snapshots": len(groups),
+                "inventory_present_main_task_groups": len(set(groups)),
+                "inventory_presence_grouping_complete": (
+                    bool(present) and len(groups) == len(present)
+                ),
+                "log_observed_dependency": skill.name in observed_references,
             }
         )
-    return rows
+    daily = Counter(
+        stamp.date().isoformat()
+        for stamp, group in ordinary_sessions.values()
+        if group is not None and stamp >= window_start
+    )
+    return rows, dict(sorted(daily.items()))
 
 
 def build_report(
@@ -534,8 +616,10 @@ def build_report(
     ownership = Counter(skill.ownership for skill in inventory.entries)
     coverage_values: dict[str, set[str]] = defaultdict(set)
     references = inventory.reference_names.copy()
+    observed_references: set[str] = set()
     for item in valid:
         references.update(item.reference_names)
+        observed_references.update(item.reference_names)
         for channel, state in item.coverage.items():
             coverage_values[channel].add(state)
     installed_names = {skill.name for skill in inventory.entries}
@@ -643,16 +727,32 @@ def build_report(
             "reason": "native_skill_read_and_invocation_channels_unavailable",
         }
         report["managed_current_name_matches"] = None
+    rows, daily = _private_rows(
+        inventory,
+        attempts,
+        invocations,
+        exposures,
+        channels_available=bool(valid) and harness != "codex",
+        window_start=lower,
+        observed_references=observed_references,
+    )
     private_report: dict[str, object] = {
         "schema_version": 1,
         "status": report["status"],
         "scope": report["scope"],
-        "skills": _private_rows(
-            inventory,
-            attempts,
-            invocations,
-            exposures,
-            channels_available=bool(valid) and harness != "codex",
+        "skills": rows,
+        "inventory_observations_by_utc_day": daily,
+        "observed_activity_after_as_of": (
+            any(event.timestamp > as_of for item in valid for event in item.exposures)
+            or any(event.timestamp > as_of for item in valid for event in item.attempts)
+            or any(
+                event.timestamp > as_of for item in valid for event in item.invocations
+            )
+            or any(
+                result.timestamp is not None and result.timestamp > as_of
+                for item in valid
+                for result in item.results
+            )
         ),
         "diagnostics": report["diagnostics"],
     }

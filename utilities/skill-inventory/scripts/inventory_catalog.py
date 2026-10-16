@@ -729,7 +729,7 @@ def _dependency_names(documents: Sequence[object]) -> set[str] | None:
     return names
 
 
-def _reference_names(suffix: str, data: bytes) -> set[str] | None:
+def reference_names(suffix: str, data: bytes) -> set[str] | None:
     """Markdown: frontmatter structure plus body text. YAML/JSON: structure only."""
     try:
         text = data.decode("utf-8")
@@ -768,7 +768,7 @@ def _read_references(
         if read.data is None:
             coverage["reference_unreadable"] += 1
             continue
-        declared = _reference_names(lexical.suffix.lower(), read.data)
+        declared = reference_names(lexical.suffix.lower(), read.data)
         if declared is None:
             coverage["reference_invalid"] += 1
             continue

@@ -1,6 +1,6 @@
 # Execution Prompts — Armory Package Effectiveness and Skill Inventory
 
-Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. The owner approved build and the recommended R0 publication/green-CI landing followed by M6 measurement. Live archives remain withheld; regression and spend remain deferred. No product branch before R0 lands; show real M6 aggregate output and stop for acceptance before M7. DEVELOPMENT_PLAN.md §§9–16 contain the contracts.
+Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed and the owner accepted M6's actual aggregate output, authorizing M7 under unchanged incomplete-input refusal gates. Keep code commits local; no product publication/merge authority. Live archives remain withheld; regression/preregistration and spend remain deferred. DEVELOPMENT_PLAN.md §§9–16 contain the contracts.
 
 ## Global execution rules (apply to every goal)
 
@@ -149,6 +149,9 @@ DONE: Functional verified measurement and owner-visible aggregates; stop at this
 ```text
 /goal Deliver M7 utility only after the owner accepts M6's actual measurement output.
 CONTEXT: DEVELOPMENT_PLAN.md §6 M7 and §§9–11,13–15; M6 implementation/measurement accepted; approval (1) required. Approval (2) is separate and is not a package-build prerequisite.
+OWNER CHECKPOINT: M6 output accepted; implement the approved M7 package locally only. No live archive or study authority. Private inputs bind exact source/policy/proposal digests; historical and generated-only owner assertions are not cryptographic history proof. Unknown roots/aliases, policy/reference gaps or incomplete input remain keep/refusal.
+OPPORTUNITY PRECISION: Count distinct logical subagent sessions, not repeated inits. Main-task grouping requires a matching parent main file within captured inputs; unknown/conflicting grouping cannot inflate eligibility. Export aggregate counts only. Daily dwell evidence uses earliest complete observation per proven session, excluding old continuations. Revalidate metadata after recommendations and rebuild current proposals before any synthetic archive apply.
+COUNTER-EVIDENCE AND MOVE PRECISION: Missing/positive post-cutoff activity forces keep/refusal without changing historical M6 counts or M8 endpoints. Preserve recognized autoload/agent-injection dependencies as installed-name-only private booleans; true or unknown dependency evidence wins over merge/archive. Use native atomic no-replace moves, including empty recreated destinations, with no non-atomic fallback; journal replacement is a separate operation. Never-moved planned items with no archive copy may be closed in place without changing edited live bytes.
 OBJECTIVE: Conservative keep/archive/merge proposals and crash-recoverable, human-approved OMP managed-only archive/restore; ship self-contained utility, not an auto-loaded skill.
 RELEASE TRAIN: target=skill-inventory 1.0.0; members=M6,M7; preparation=complete reviewed merged train; artifacts=UTILITY.md version, package CHANGELOG, evals, manifest, README count/catalog; distribution=existing rolling latest only after separate publish/merge authority.
 PRE-IMPLEMENTATION DESIGN GATE: Apply global rules, read DEVELOPMENT_PLAN_HISTORY.md and accepted M6 snapshot/schema evidence; validate ownership/coverage/protection defaults. Review M8 if population changes. DESIGN GO — PLAN REVISION: none requires approved unchanged design; DESIGN NO-GO — REASON blocks missing measurement acceptance or unsafe ownership.
