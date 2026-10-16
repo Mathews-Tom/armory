@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 144](https://img.shields.io/badge/packages-144-informational)](manifest.yaml)
+[![packages: 145](https://img.shields.io/badge/packages-145-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -276,6 +276,7 @@ Skills below are superseded by base model capabilities or retired migration guid
 | ------------------------------------------------------- | -------------------------------------------------------- |
 | [arxiv-search](utilities/arxiv-search/)                 | Search arXiv for papers, output structured JSON metadata |
 | [dependency-tree](utilities/dependency-tree/)           | Visualize project dependency graph                       |
+| [skill-inventory](utilities/skill-inventory/) | Measure local skill exposure and propose reversible OMP quarantine |
 | [test-coverage-report](utilities/test-coverage-report/) | Coverage summary for changed files                       |
 
 ## Presets

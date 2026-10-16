@@ -434,5 +434,8 @@ excluded:
     name: arxiv-search
     rationale: Excluded from the fixed one-package utility stratum; its type is represented by the registered sample.
   - package_type: utility
+    name: skill-inventory
+    rationale: Excluded from the fixed one-package utility stratum; its type is represented by the registered sample.
+  - package_type: utility
     name: test-coverage-report
     rationale: Excluded from the fixed one-package utility stratum; its type is represented by the registered sample.

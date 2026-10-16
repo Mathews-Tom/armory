@@ -18,7 +18,7 @@ uv run --offline --no-project --script "$UTILITY_ROOT/scripts/skill_inventory.py
   --snapshot "$PRIVATE_SNAPSHOT" --aggregate-only
 ```
 
-`UTILITY_ROOT` is the checked-out package directory. `AS_OF_UTC` is an explicit UTC timestamp ending in `Z` or `+00:00`. The snapshot path is an operator-selected private path outside repositories and the package; first use captures inputs, later use replays that immutable binding. Use a new binding path for a new cutoff, changed inventory or different root policy; existing bindings are never refreshed silently.
+`UTILITY_ROOT` is the unpacked or installed package directory containing `scripts/`. `AS_OF_UTC` is an explicit UTC timestamp ending in `Z` or `+00:00`. The snapshot path is an operator-selected private path outside repositories and the package; first valid capture persists an immutable binding for later replay. Use a new binding path for a new cutoff, changed inventory or different root policy; existing bindings are never refreshed silently.
 
 - `--window-days` selects `events.within_window` and the corresponding current-name statistics. Full-history observations through the cutoff remain separate so historical monthly medians can be reproduced.
 - `--aggregate-only` is accepted; stdout is always aggregate-only, including errors.
@@ -34,6 +34,15 @@ Logical `session_init` identity is deduplicated across files: identical copies c
 
 Physical file placement is not a logical payload field. Copies retain separate file counts, but identical disclosure and call identities count once. A logical identity present in different physical cohorts is classified `unknown` rather than assigned to whichever copy was encountered last; conflicting counted payloads still fail.
 
+The report exposes different cohort populations; do not compare them as interchangeable totals:
+
+| Field | Population and interpretation |
+|---|---|
+| `snapshot.cohorts` | Capture-time physical file-placement hints. Non-OMP layouts can be entirely `unknown`; these hints do not assert logical session roles. |
+| `scope.files_by_cohort` | Decoder-resolved roles for parsed captured files, using supported payload identity and provenance. This can resolve main/sub roles even when placement hints are unknown. |
+| `exposure.by_cohort` | Deduplicated persisted disclosure observations, not physical files or requests. Copies with conflicting cohort evidence become unknown. |
+
+
 Directory traversal is descriptor-based: each canonical absolute root is opened component by component from `/` with directory descriptors and no-follow semantics, with no path re-resolution afterwards, and files are opened relative to their pinned parent with a final no-follow open. Callers authorize canonical roots first. A traversal that cannot be completed is refused as incomplete, never treated as an empty or partial inventory.
 
 ## Native inventory and disclosure views
@@ -47,6 +56,18 @@ Codex discovers protected files under `~/.codex/skills`, its `.system` component
 Codex plugin skills use the manifest name as their `plugin:skill` namespace. An absent or empty declared resource list uses optional `./skills` as a fallback, not a supplement; malformed values or paths fail closed instead of widening to the plugin directory. This matches the supported [plugin-root and namespace source](https://github.com/openai/codex/blob/97ebf2d94d62e2ff2045f3ea17b6e11eae9a21fb/codex-rs/core-plugins/src/loader.rs). Only `.codex-plugin/plugin.json` cache layouts are supported here; alternate manifest layouts fail as incomplete. Native command-derived skills and unapproved project roots are outside this file view.
 
 Native skill collections are traversed with bounded recursive, descriptor-based discovery. Manifest paths cannot escape their approved install base; inner aliases cannot authorize new roots. Unknown metadata schemas, missing required resources, unreadable metadata and namespace conflicts are anonymous blocking diagnostics, not fallback roots or successful zeros.
+
+### Blocking diagnostics and safe next actions
+
+| Code | Meaning | Safe operator action |
+|---|---|---|
+| `catalog_alias_escape` | An installed-file alias or declared resource resolves outside its approved containment boundary. | Inspect symlinks and manifest-declared resources privately within the already-approved installed-skill roots listed above. Reconcile the configuration and user-authorship boundary with the owner; never expand roots or suppress the diagnostic merely to obtain completion. |
+| `unknown_record_type` | A record shape is outside the adapter's explicit supported set. | Preserve the original corpus and request a vetted adapter update backed by synthetic field-shape evidence. Do not guess compatibility or delete records to improve coverage. |
+| `invalid_epoch_milliseconds`, `invalid_read_path`, `missing_session_header` | Typed event or session identity requirements were not met. | Retain the incomplete result; independently establish supported coverage before a fresh approved capture. Do not patch logs or invent missing values. |
+| `snapshot_initial_unstable` | The capture changed before a trustworthy prefix baseline existed. | Stop relevant writers outside the utility and create a fresh private capture after inputs are stable. Do not call this proven rewriting or reuse an absent binding. |
+
+Catalog diagnostics intentionally expose counts, not alias identities. The utility does not supply a path-level alias report; inspect approved installed files privately rather than deriving new paths from logs. A count alone cannot identify a particular alias. If no safe resolution is available, keep the report incomplete and every action blocked.
+
 
 Claude Code `attachment.type=skill_listing` observations retain initial and dynamic sources separately. Model-dependent renderer budgets can downgrade descriptions to names, and truncation markers, names/content mismatch or count disagreement make exposure a lower bound. There is no universal character cap. Noninitial listings are partial observations, not additive initial exposure; use `exposure.monthly_by_source` and `latest_by_source` rather than interpreting pooled medians as request cost. `Skill` calls are native invocations; `Read` calls count only paths matched against approved installed files. Validate optional argument/range types; results resolve only declared call identities. Streamed copies and declared fork origins are deduplicated, while conflicting copies fail.
 
@@ -84,6 +105,8 @@ Known malformed legacy records are not repaired or discarded to make smoke green
 ## Frozen inputs and replay
 
 Capture freezes sorted file identities and byte lengths. Only complete JSONL lines inside those bounds are parsed; the final incomplete tail is excluded with explicit counts. Captured prefixes are checked again after reading. Truncation, rewrite, replacement, unreadable input or inventory listing/content drift invalidates the snapshot. New/appended bytes are counted anonymously but never read through an older binding.
+
+The stdout `snapshot` object describes the attempted capture even when `snapshot.valid` is false. An invalid **initial** capture does not persist a reusable binding, so the requested `--snapshot` file can remain absent despite populated snapshot metadata and partial aggregate output. Do not fabricate that file or treat its requested pathname as proof of a saved snapshot. Preserve the incomplete aggregate result, obtain stable approved inputs and use a fresh explicit path for the next capture. A pre-existing replay binding is retained, never refreshed into a new capture.
 
 The keyed inventory binding includes normalized installation-date evidence, including explicit unavailability, as well as listing, alias and content evidence. A changed installation date invalidates replay even when the file bytes are unchanged.
 
