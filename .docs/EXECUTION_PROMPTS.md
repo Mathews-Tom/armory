@@ -1,6 +1,6 @@
 # Execution Prompts — Armory Package Effectiveness and Skill Inventory
 
-Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed and the owner accepted M6's actual aggregate output, authorizing M7 under unchanged incomplete-input refusal gates. Keep code commits local; no product publication/merge authority. Live archives remain withheld; regression/preregistration and spend remain deferred. Local M7 registration yields 145 catalog definitions, including four utilities; skill-inventory `1.0.0` remains unreleased. DEVELOPMENT_PLAN.md §§9–16 contain the contracts.
+Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed and the owner accepted M6's actual aggregate output, authorizing M7 under unchanged incomplete-input refusal gates. On 2026-10-17 the owner authorized publishing the M6/M7 stack as reviewed PRs and merging it root-to-leaf after green checks; that authority covers PR publication and merge only. Live archives remain withheld; regression/preregistration and spend remain deferred. M7 registration yields 145 catalog definitions, including four utilities; skill-inventory `1.0.0` remains unreleased. DEVELOPMENT_PLAN.md §§9–16 contain the contracts.
 
 ## Global execution rules (apply to every goal)
 

@@ -2,7 +2,7 @@
 
 ## 1. Context & Source Map
 
-Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed; the owner accepted the actual M6 checkpoint and authorized M7 under existing incomplete-input refusal gates. The owner explicitly chose to keep code commits local: no product PR publication or merge authority. Live archives remain withheld; regression and all study spend remain deferred. The local M7 catalog registration brings Armory to 145 definitions across seven types, including four utilities; skill-inventory `1.0.0` remains unreleased. Evaluation distinguishes static conformance from NOT_MEASURED effectiveness; read frequency does not establish utility.
+Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed; the owner accepted the actual M6 checkpoint and authorized M7 under existing incomplete-input refusal gates. The owner initially kept code commits local, then on 2026-10-17 authorized publishing the M6/M7 stack as reviewed PRs and merging it root-to-leaf after green checks; that authority covers PR publication and merge only. Live archives remain withheld; regression and all study spend remain deferred. The M7 catalog registration brings Armory to 145 definitions across seven types, including four utilities; skill-inventory `1.0.0` remains unreleased. Evaluation distinguishes static conformance from NOT_MEASURED effectiveness; read frequency does not establish utility.
 
 | Plan area | Source evidence |
 |---|---|
