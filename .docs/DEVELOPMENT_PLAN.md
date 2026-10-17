@@ -2,7 +2,7 @@
 
 ## 1. Context & Source Map
 
-Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed; the owner accepted the actual M6 checkpoint and authorized M7 under existing incomplete-input refusal gates. The owner explicitly chose to keep code commits local: no product PR publication or merge authority. Live archives remain withheld; regression and all study spend remain deferred. Armory has 144 catalog definitions across seven types before M7 package registration. Evaluation distinguishes static conformance from NOT_MEASURED effectiveness; read frequency does not establish utility.
+Revision `REV-20261015-skill-inventory`: DESIGN GO — PLAN REVISION: REV-20261015-skill-inventory. R0 #170 landed; the owner accepted the actual M6 checkpoint and authorized M7 under existing incomplete-input refusal gates. The owner initially kept code commits local, then on 2026-10-17 authorized publishing the M6/M7 stack as reviewed PRs and merging it root-to-leaf after green checks; that authority covers PR publication and merge only. Live archives remain withheld; regression and all study spend remain deferred. The M7 catalog registration brings Armory to 145 definitions across seven types, including four utilities; skill-inventory `1.0.0` remains unreleased. Evaluation distinguishes static conformance from NOT_MEASURED effectiveness; read frequency does not establish utility.
 
 | Plan area | Source evidence |
 |---|---|
@@ -182,7 +182,7 @@ graph TD
 | In / Out of scope | In: §11 classification/similarity/review, OMP archive/restore, package integration and §13 dogfood. Out: auto-merges, user-skill edits, deletion, any Claude/plugin/Codex mutation, model scoring or paid utility studies. |
 | Depends on | M6 |
 | Target release | `skill-inventory 1.0.0` |
-| Deliverables | Functional recommendations and synthetic-root archive/restore; utility `1.0.0`, package CHANGELOG, completed evals, manifest/catalog/count update, Cursor/Codex skips and Gemini utility-as-skill wrapper validation. |
+| Deliverables | Functional recommendations and synthetic-root archive/restore; utility `1.0.0`, package CHANGELOG, completed evals, manifest/catalog/count update, explicit exclusion from the existing SkillsBench sample, Cursor/Codex skips and Gemini utility-as-skill wrapper validation. |
 | Acceptance | No mutation by default; incomplete coverage/unknown age/pins/high-risk or dependent references stay kept; merge proposals never apply. Archive refuses protected roots, links, conflicts, changed hashes/listings, missing quiescence attestation and unapproved sets. Interrupted actions recover without overwrite. Live dogfood needs separate approval (2). |
 | Verification | §14 full local gates, temporary-root archive/crash/restore scenarios, independent unpacked-package fresh-context run, real aggregate smoke and privacy review; live archive not required for package correctness and never implicit. |
 | Design reevaluation | Require owner acceptance of M6 output before work starts. Reconfirm exact managed path, file ownership, quarantine set/size and restore procedure before any archive. Review M8 if ranking/population changes. |
@@ -355,7 +355,7 @@ End date is `final_move_UTC_date + 21 days`, not set before approval and executi
 uv run --offline --no-project --script "$UTILITY_ROOT/scripts/skill_inventory.py" measure --harness omp --aggregate-only --snapshot "$PRIVATE_SNAPSHOT" --as-of "$AS_OF_UTC" --window-days 90
 ```
 
-`UTILITY_ROOT`, snapshot and dates are operator inputs, not hardcoded repository examples or real-log fixture paths. Exact supported flags and output schema ship with M6; this is a proposed command, not a currently available product.
+`UTILITY_ROOT`, snapshot and dates are operator inputs, not hardcoded repository examples or real-log fixture paths. The command is executable from the local M6/M7 stack or its unpacked utility; local availability is not publication, complete input coverage or live-action authorization. Preserve previous bindings and choose fresh private output paths for a new capture.
 
 ## 14. PR Topology, Verification and Release
 
@@ -368,7 +368,7 @@ New work is **one docs-only reconciliation + five utility PRs + two optional stu
 | M6 PR-2 | `feat(skill-inventory): add Claude Code and Codex observations` | M6 PR-1 | Verified input adapters and explicit unavailable exposure; aggregate real smoke shown to owner |
 | M7 PR-1 | `feat(skill-inventory): propose conservative inventory actions` | M6 PR-2 **and owner acceptance of its output** | Deterministic classification/similarity; no automatic action |
 | M7 PR-2 | `feat(skill-inventory): archive and restore managed OMP skills` | M7 PR-1 | Reversible journaled operation exercised only on synthetic temporary roots |
-| M7 PR-3 | `feat(skill-inventory): publish self-contained utility package` | M7 PR-2 | Utility `1.0.0`, CHANGELOG, completed evals, manifest, README count from definitions, Gemini wrapper/Cursor-Codex skips, independent unpacked offline smoke |
+| M7 PR-3 | `feat(skill-inventory): publish self-contained utility package` | M7 PR-2 | Utility `1.0.0`, CHANGELOG, completed evals, manifest, excluded-only SkillsBench catalog classification, README count from definitions, Gemini wrapper/Cursor-Codex skips, independent unpacked offline smoke |
 | M8 PR-1 | `test(skill-utility): preregister paired replay protocol` | M6/M3/M4 prerequisites and approval3a only | Public protocol/salted commitment; private ranking builder/full-K eligibility, null-and-large-effect/noise preflight; no private ranking committed |
 | M8 PR-2 | `test(skill-utility): record authorized paired replay evidence` | PR-1; approval3b pilot, then3c sentinel, then3d continuation if eligible | Execution/analysis code; private receipts/report outside repo; committed result limited to anonymous crossing totals/verdict, never identities/per-skill rows |
 
@@ -412,6 +412,22 @@ Run the offline CLI on real local logs with aggregate-only stdout and anonymous 
 
 Finally, a fresh-context agent receives only the unpacked utility, fictional examples and an approved real read-only local target; it cannot read this plan/tests/previous results or modify target/utility. Report exact aggregate output, coverage, command/message usability defects and wall time. Owner runs gates; fix substantive defects and repeat with a new agent. No fresh agent can authorize live archives or paid runs. No efficacy, dollar-saving or “safe pruning” claim follows from conformance, smoke, read frequency or a small null result.
 
+### Local M7 validation checkpoint — 2026-10-16
+
+The approved five-prefix stack remains local; the topology, release train and separate live-action/study gates are unchanged. Independent eligibility and filesystem reviews closed the implementation findings as nonmaterial corrections under the accepted design. Temporary-root command scenarios exercised exact approved-subset moves, read-only list/dry-run, interrupted recovery, edited never-moved items, journal tamper refusal, per-item restoration, preserved bytes/modes and unchanged protected roots. Removing the atomic no-replace, never-moved reconciliation, unrelated-duplicate handling and replay-only guards independently caused their consumer-visible regressions to fail; restoring all guards passed the five selected positive-control cases.
+
+Two fresh-context rounds used only independently unpacked public utility artifacts and the respective approved OMP or Codex read-only target. No raw logs, installed identities, private bindings or real-log fixtures entered the repository. Anonymous stdout, exact commands, timings and private metadata remain outside Git and distribution artifacts. Both adapters returned incomplete results in both rounds; these results were retained rather than treated as permission to widen inputs, edit logs, suppress diagnostics or authorize archives.
+
+| Round | Observed surface | Disposition |
+|---|---|---|
+| First | Entrypoint usable; OMP initially unstable/nonclosed, Codex valid/closed but catalog-incomplete | Accept four documentation repairs: diagnostic-specific safe actions, physical/logical/observation population distinctions, missing binding after invalid initial capture, and unpacked/installed terminology |
+| Second, new agents | OMP valid/nonclosed and incomplete; Codex valid/closed and catalog-incomplete | Both observed no usability contradiction or workaround; retain incomplete results and unavailable channels without reinterpretation |
+
+The repaired operator references also distinguish full-history monthly exposure from the declared read window and from a prospective matched-session cohort. Path-level alias identification is deliberately unavailable in anonymous reports: any resolution requires private owner review within already-approved roots, not broader discovery. The final owner conformance, adapter, install, packaging and clean-checkout receipts are local delivery evidence, not provider CI, a published release, efficacy evidence or live-archive approval.
+
+Owner packaging proof passed static report-v2 conformance with effectiveness `NOT_MEASURED`; the eval dry-run validated structure and skipped all 22 live cases, not 22 successful model evaluations. The standalone ZIP was byte-reproducible and identical to the artifact used by the second fresh-agent round. Actual native installation into a fictional HOME, standalone unpacking and the generated Gemini wrapper each completed offline recommendation/archive/restore scenarios while preserving package files, protected roots and restored bytes/modes. Fresh generated outputs reconciled the 145-definition catalog with 89 Gemini skill wrappers; the new utility contributes one discovery entry and is omitted on Cursor/Codex. Exact GNU tar/gzip workflow flags produced byte-identical repeated artifacts for all three adapters in an offline Linux container. These checks do not publish or install into the live HOME.
+
+The first final-prefix clean-checkout run refused the missing SkillsBench classification for the newly registered utility. Repair only the existing catalog ledger's `excluded` list: its seven included samples stay unchanged. The actual strata validator accepts the expanded inventory; worktree-relative run-contract content and all three existing treatment condition hashes match the archive parent. No task corpus, model targets, treatment definitions, source digest pins, old evidence or study/spend authorization is changed or re-derived. This is package-registration maintenance, not a new M3/M4 matrix or M8 study.
 
 ## 16. Request Traceability and Review Disposition
 

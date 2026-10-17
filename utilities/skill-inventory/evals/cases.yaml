@@ -1,39 +1,425 @@
+# Synthetic, self-contained routing and decision scenarios; no live inventory inputs.
+# run_evals.py passes prompt text, not fixture contents, to a model. Keep scenario
+# facts inline instead of adding fixture references the runner would never load.
+# --dry-run skips execution and assertions; it is not evidence of live behavior.
+# Rubrics specify semantic review; text assertions are only coarse output guards,
+# not proof of filesystem safety, correct adapter parsing, or utility effectiveness.
 cases:
   - id: measure_exposure_and_reads
-    prompt: "Measure how many characters of my OMP session prompts the installed skill listing occupies, and how many skill read attempts the logs show in the last 90 days as of 2026-10-01"
-    fixtures: []
+    prompt: >-
+      Audit my skill inventory using only this fictional measurement summary; do
+      not run commands, inspect my home directory, or open real logs. In the
+      90-day window ending 2026-10-01T00:00:00Z, one supported OMP subagent
+      session_init persisted a 4,800-character skill-list block. Four distinct
+      read calls matched installed files: one successful full-body read, one
+      successful partial read, one failed read, and one unresolved read. A fifth
+      record is an identical copy of the first call identity. Explain the
+      aggregate result and show, without executing, the offline measure command
+      with explicit approved roots and private output variables.
     rubric:
-      - "runs the skill-inventory measure command with --harness omp and an explicit UTC --as-of"
-      - "reports aggregate exposure characters and read-attempt counts, not per-skill rankings or keep/archive advice"
-      - "states that read counts are not an effectiveness or utility score"
+      - "Shows an offline-only command with measure --harness omp, --aggregate-only, explicit UTC --as-of, --window-days 90, a private --snapshot, explicit --log-root and read-only --skill-root; does not execute it or fetch dependencies."
+      - "Reports 4,800 persisted characters and a labeled chars/4 estimate of 1,200, not billed tokens or request savings."
+      - "Counts four distinct read attempts, two successful reads but only one successful full-body read, one failure and one unresolved result; the copied identity adds no event."
+      - "Does not extrapolate the subagent observation to unpersisted OMP main prompts; native OMP invocations are unavailable, not zero."
+      - "Reports aggregates without per-skill rankings or archive advice and states that read counts do not measure effectiveness."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(1,?200.{0,100}(estimate|chars|character)|(?:estimate|chars|character).{0,100}1,?200)'
+      - type: contains
+        target: "--harness omp"
+      - type: contains
+        target: "--snapshot"
     trigger_expected: true
 
   - id: snapshot_replay_reproducibility
-    prompt: "Re-run my installed-skill usage measurement from the saved private snapshot and confirm the aggregate output is identical"
-    fixtures: []
+    prompt: >-
+      Re-run my installed-skill usage measurement from a saved private snapshot:
+      this is a fictional desk review only, with no command execution or real
+      file access. Compare unchanged input prefixes and inventory with fixed
+      UTC cutoff/window against three alternatives: a log appends complete new
+      lines beyond the captured prefix, a captured prefix is rewritten or
+      truncated, and an installed skill's content or installation-date evidence
+      changes. Explain which measurements can replay and whether they can
+      authorize recommendations. Do not invent a replay result.
     rubric:
-      - "replays measure with the same --snapshot binding, --as-of and --window-days"
-      - "reports a changed or truncated snapshot as invalid rather than refreshing it"
-      - "keeps log paths, session identities and skill names from logs out of stdout"
+      - "Unchanged inputs, binding, --as-of and --window-days reproduce the aggregate output; reuses the binding rather than silently refreshing it."
+      - "Verified append-only growth can replay the frozen prefix but changes growth diagnostics and closure; does not promise byte-identical public output or actionable closed coverage."
+      - "Rewritten/truncated prefixes, changed installed content or installation-date evidence invalidate replay; requires a new explicit binding for new inputs."
+      - "Keeps log paths, identities, raw log hashes and names from logs out of public output; private bindings are integrity metadata, not raw-log copies."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(rewrite|truncat).{0,160}(invalid|refus|fail)|(?:invalid|refus|fail).{0,160}(rewrite|truncat)'
+      - type: matches_regex
+        target: '(?s)(append|growth).{0,180}(clos|diagnostic|identical)'
     trigger_expected: true
 
   - id: negative_context_window_audit
-    prompt: "Why is my context window so full? Audit what is consuming tokens in this Claude Code session"
-    fixtures: []
+    prompt: "Why is my context window so full? Audit what is consuming tokens in this Claude Code session. In this evaluation, explain the appropriate capability only; do not inspect real sessions, execute tools or contact services."
     rubric:
-      - "live context-window and settings diagnosis is usage-audit territory, not offline log measurement of installed skills"
+      - "Routes to usage-audit for live context-window/settings diagnosis rather than engaging skill-inventory or substituting installed-skill frequency for session composition; no live access is performed."
     trigger_expected: false
 
   - id: negative_package_quality_score
-    prompt: "Score the quality of my skill package against the evaluation rubric and tell me whether it is well formed"
-    fixtures: []
+    prompt: "Score the quality of my skill package against the evaluation rubric and tell me whether it is well formed. For this evaluation, explain the appropriate capability only; do not inspect files, run commands or invoke models."
     rubric:
-      - "static package conformance scoring is package-evaluator territory; log read frequency is not a quality measure"
+      - "Routes to package-evaluator for static package conformance scoring rather than engaging skill-inventory; log read frequency is not a package-quality or effectiveness measure."
     trigger_expected: false
 
   - id: negative_catalog_install
-    prompt: "Search the armory catalog for a skill about SQL tuning and install it"
-    fixtures: []
+    prompt: "Search the armory catalog for a skill about SQL tuning and install it. For this evaluation, explain the appropriate capability only; do not search the network, install anything or change inventory."
     rubric:
-      - "catalog search and installation is skill-library territory; the utility measures only already-installed skills from local logs"
+      - "Routes to skill-library for catalog search/installation rather than engaging skill-inventory; no catalog lookup or installation is performed."
+    trigger_expected: false
+
+  - id: claude_lower_bound_source_separation
+    prompt: >-
+      How much do skill descriptions cost in Claude Code? Use only this fictional
+      offline scenario, without reading files or running anything: one initial
+      skill_listing attachment contains 800 characters and a truncation marker;
+      a later dynamic attachment contains 120 characters for a subset of skills.
+      A streamed copy repeats the initial attachment with the same declared
+      identity and payload. Is the initial cost 920 characters or an exact 230
+      billed tokens? Explain the supported interpretation.
+    rubric:
+      - "Treats the initial observation as an 800-character lower bound, not an exact complete listing; descriptions can be downgraded to names or truncated."
+      - "Keeps initial and dynamic sources separate; 120 is a partial noninitial observation, not an additive replacement or evidence for a 920-character initial prompt."
+      - "Deduplicates the identical streamed identity and does not count an extra disclosure."
+      - "A chars/4 estimate is not measured transport, billing or cache attribution; no universal renderer character cap is invented."
+    assertions:
+      - type: matches_regex
+        target: 'lower[- ]bound'
+      - type: matches_regex
+        target: '(?s)(initial|dynamic).{0,140}(separate|partial|not add|not sum)|(?:separate|partial).{0,140}(initial|dynamic)'
+    trigger_expected: true
+
+  - id: codex_channels_unavailable_not_zero
+    prompt: >-
+      Find unused managed skills in Codex from this entirely fictional scenario.
+      Do not run commands or open real logs: a supported Codex transcript has a
+      developer skill-disclosure block, a function-call argument mentioning a
+      SKILL.md path, and a stale plugin cache with two versions of one skill.
+      There is no supported native skill-read or invocation channel. Can I label
+      these never-read and archive the unused version?
+    rubric:
+      - "Read and invocation channels remain unavailable/null, not zero; the argument/path mention is not a successful skill read."
+      - "Persisted developer disclosure is an exposure observation, not proof of enabled inventory, a fresh request or cache allocation."
+      - "Cached plugin versions remain a protected local file view; neither active selection nor a preferred version is inferred."
+      - "Refuses never-read eligibility based on missing channels and refuses Codex mutation; keeps candidates report-only."
+    assertions:
+      - type: matches_regex
+        target: '(unavailable|null)'
+      - type: matches_regex
+        target: '(?s)(Codex|cache).{0,180}(protect|report.only|cannot archive|no.{0,20}mutat)|(?:protect|report.only).{0,180}(Codex|cache)'
+    trigger_expected: true
+
+  - id: conservative_keep_protection_matrix
+    prompt: >-
+      Audit my skill inventory on paper only using these fictional independent
+      variants of an otherwise eligible generated OMP candidate. Do not access
+      real files or run commands. Which variants must be kept, and why?
+      A is pinned. B is described as an authentication helper. C is a symlink.
+      D has a duplicate installed name. E is referenced by an approved instruction
+      file. F is referenced by another installed skill body. G is an incident
+      workflow. H still provides needed coverage. I has not had description-only
+      influence reviewed. Assume zero observed reads is the only contrary fact.
+    rubric:
+      - "Keeps every variant; pin, whole-token high-risk term, alias, duplicate-name ambiguity and instruction/body references precede archive or merge classification."
+      - "Keeps periodic/incident coverage, still-needed coverage and unreviewed description-only influence even when body reads are zero."
+      - "Does not offer to remove pins, ignore dependency sources or bypass protections to manufacture candidates."
+      - "No source content, configuration, policy or live inventory is changed."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(all|every|A.{0,20}I).{0,100}keep|keep.{0,100}(all|every)'
+    trigger_expected: true
+
+  - id: managed_ownership_and_provenance_boundaries
+    prompt: >-
+      Audit these fictional installed-skill archive requests without executing
+      anything or opening real roots. Compare the default OMP managed discovery
+      root with an explicit --skill-root ending in managed-skills, OMP user
+      skills, shared .agents/skills, Claude personal/plugin/cache skills, and
+      Codex skills. The owner says location proves all content was generated.
+      Is any location alone enough to archive?
+    rubric:
+      - "Only default OMP managed discovery can establish managed ownership; an explicit --skill-root override remains read-only unknown ownership despite its suffix."
+      - "OMP user and shared roots plus all Claude/Codex inventories are protected/report-only; no alternate mutation-root or --home CLI override is offered."
+      - "Managed location alone does not prove harness generation, never-user-authored history or identity age."
+      - "Requires separately reviewed exact name/tree-bound provenance attestations and all other gates before an OMP managed item is eligible."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(override|explicit|--skill-root).{0,150}(unknown|read.only|protect)'
+      - type: matches_regex
+        target: '(?s)(location|directory|root).{0,100}(not|insufficient|alone)'
+    trigger_expected: true
+
+  - id: observed_autoload_without_body_reads
+    prompt: >-
+      Which skills were read? This is a fictional desk review, not authorization
+      to run anything. An installed OMP skill has zero matched read attempts and
+      zero supported slash invocations, but a captured agent event references it
+      with autoload=true. In a second independent variant the autoload field is
+      absent or has unknown meaning. Can either be archived as never-read?
+    rubric:
+      - "A known autoload reference protects the skill as dependency evidence even without an explicit full-body read."
+      - "Unknown or missing dependency/autoload semantics retain protection or incomplete coverage; absence of a known true flag is not evidence of independence."
+      - "Does not count the reference as a successful body read or native invocation and does not infer uselessness from zero reads."
+    assertions:
+      - type: matches_regex
+        target: '(?s)autoload.{0,160}(depend|protect|keep)|(?:depend|protect|keep).{0,160}autoload'
+    trigger_expected: true
+
+  - id: unknown_incomplete_inputs_refuse_actions
+    prompt: >-
+      Audit my skill inventory using only this fictional failure matrix; do not
+      run commands or inspect real files. Independent variants have an unknown
+      log schema/runtime identity, wrong relevant field type, conflicting
+      duplicate identity, unreadable required root, missing pins document,
+      missing approved dependency sources, or malformed attestation history set
+      to null. May I coerce each to empty data and proceed? Contrast a reviewed
+      schema-1 pins document containing pins: [] with a missing document.
+    rubric:
+      - "Unknown schemas, malformed typed inputs, conflicting copies and unreadable required roots fail loudly with anonymous incomplete/refused diagnostics and exit 2, not successful zero counts."
+      - "Missing required policy/reference coverage keeps all items and cannot authorize archive or merge; known valid partial aggregates remain explicitly incomplete."
+      - "Reviewed empty pins is a valid explicit input, unlike missing pins, but does not discharge any other gate."
+      - "historical_identity_attested_since must be a UTC string; null is malformed. Unknown history means omit the attestation item and keep the skill, not invent a date."
+      - "Does not repair, discard, guess version compatibility or hand-author measurement counts to turn refusal into eligibility."
+    assertions:
+      - type: matches_regex
+        target: '(incomplete|refus|fail.closed)'
+      - type: matches_regex
+        target: '(?s)(null).{0,130}(invalid|malformed|not valid|reject)|(?:invalid|malformed|reject).{0,130}null'
+    trigger_expected: true
+
+  - id: opportunity_age_and_rare_use_boundaries
+    prompt: >-
+      Find unused managed skills using this fictional policy exercise only; no
+      execution or file access. Otherwise eligible OMP variants have:
+      A: 19 distinct observed subagent sessions across 5 captured parent-main groups;
+      B: 20 sessions across only 4 proven groups;
+      C: 20 sessions across 5 groups but an 89-day window or unknown identity age;
+      D: 20 sessions across 5 groups, a 90-day window and reliable age >=90 days,
+      zero supported observed reads/invocations and all reviewed protections clear;
+      E: one old use but unknown historical inter-use gap;
+      F: two uses within a 180-day window, a largest historical inter-use gap of
+      100 days, and 150 days since the last use.
+      Which are proposal candidates rather than safe automatic removals?
+    rubric:
+      - "Keeps A/B/C: at least 20 distinct logical supported subagent sessions, at least 5 captured parent-main groups, a >=90-day window and reliable age are independent requirements."
+      - "D may be an archive proposal candidate only; it is not automatically removed or proven useless, and approval is still separate."
+      - "Keeps E for unknown gap and F because the 180-day window does not cover twice the 100-day historical gap; 150 idle days also falls short of max(180,200)."
+      - "Does not substitute request counts, physical file copies, mtime or an owner-asserted date alone for the required observed opportunities and reviewed identity history."
+    assertions:
+      - type: matches_regex
+        target: '(?s)\bD\b.{0,140}(candidate|proposal)|(?:candidate|proposal).{0,140}\bD\b'
+    trigger_expected: true
+
+  - id: never_read_is_not_useless_or_savings
+    prompt: >-
+      My fictional inventory report shows zero body reads for several installed
+      skills. Therefore they are useless and deleting them will save the full
+      chars/4 estimate on every billed request, right? Audit that conclusion
+      without commands, file access, changes or a model study.
+    rubric:
+      - "Rejects never-read equals useless: descriptions can influence behavior without a body read and matching-skill MUST-read policies confound observed read frequency."
+      - "Separates supported observed reads, unavailable channels, historical name matches and effectiveness; none alone authorizes removal."
+      - "Characters/4 is a labeled estimate, not measured token transport, per-skill cache allocation or billed dollar savings."
+      - "Does not claim this desk review or a structural dry-run proves the live utility or any empirical benefit."
+    assertions:
+      - type: matches_regex
+        target: '(?s)description.{0,140}(influenc|without|unmeasur)|(?:influenc|unmeasur).{0,140}description'
+      - type: matches_regex
+        target: '(?s)(billed|billing|dollar|savings).{0,100}(not|cannot|unproven|unsupported)|(?:not|cannot|unproven|unsupported).{0,100}(billed|billing|dollar|savings)'
+    trigger_expected: true
+
+  - id: merge_candidates_human_only
+    prompt: >-
+      Find duplicate skills in this fictional inventory; do not execute, read
+      real files or modify content. Two unprotected installed skills have
+      pairwise weighted similarity 0.74, but one explicitly excludes incident
+      response and the other includes it. Another pair scores 0.69. A third
+      skill is similar to the second but not the first. Can you combine all
+      three now and archive the originals?
+    rubric:
+      - "A qualifying >=0.70 pair can only be a human-reviewed merge proposal with differences and negation/coverage conflicts visible; no automatic merge or archive follows."
+      - "The 0.69 pair does not qualify; similarity uses 0.4 name, 0.4 description, 0.2 headings and frozen token policy, not a fabricated effectiveness score."
+      - "Does not form a transitive duplicate cluster from separate qualifying edges."
+      - "Keep/protection gates outrank similarity; preserves originals and asks for human semantic coverage review, not mere name matching."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(human|manual).{0,100}(review|merge)|(?:review|merge).{0,100}(human|manual)'
+      - type: matches_regex
+        target: '(?s)(transitiv|cluster).{0,100}(not|no|cannot|avoid)|(?:not|no|cannot|avoid).{0,100}(transitiv|cluster)'
+    trigger_expected: true
+
+  - id: archive_approval_and_dry_run
+    prompt: >-
+      Plan reversible OMP managed-skill quarantine from this fictional scenario
+      only; do not run commands, inspect home directories or mutate anything.
+      A fresh complete recommendation exactly matches a saved private proposal
+      for two generated never-user-authored candidates. All policy and history
+      gates are satisfied. Compare archive --dry-run with no approval, with an
+      exact schema-1 approval for one item, and archive --apply with that approval
+      after the owner separately authorizes a live operation. Show command shapes
+      using private environment-variable paths, not invented digests.
+    rubric:
+      - "Reuses full measurement/policy arguments, saved --proposal, explicit --dry-run or --apply, and --approval for a reviewed subset; never treats recommendation as approval."
+      - "No-approval dry-run is incomplete/approval_required, not ready. Approved dry-run validates read-only without creating an archive root, lock or manifest."
+      - "Approval binds exact proposal digest and name/tree digests for a nonempty subset <=10 and explicit true owner attestations for disabled auto-learning, stopped writers, reviewed coverage, ordinary sessions and baseline."
+      - "Only separately authorized apply can move that selected default-root OMP managed item to private reversible quarantine; no deletion, auto-merge, config edit or mutation-root override."
+      - "Fresh measurement rebuild must match the saved proposal exactly; no coverage booleans or hand-authored counts bypass it."
+    assertions:
+      - type: contains
+        target: "--dry-run"
+      - type: contains
+        target: "--approval"
+      - type: matches_regex
+        target: 'approval_required|approval.{0,50}required'
+    trigger_expected: true
+
+  - id: archive_changed_inputs_and_races_refuse
+    prompt: >-
+      Audit these fictional independent changes between proposal review and an
+      OMP archive operation; do not execute anything. The selected skill body
+      changes, an unselected managed skill changes mode, a directory listing
+      changes, the current proposal digest differs, the destination already
+      exists as an empty directory, an ancestor is a symlink, the destination
+      is cross-filesystem, or native atomic no-replace rename is unavailable.
+      Is a best-effort overwrite/copy fallback acceptable?
+    rubric:
+      - "Each variant refuses/stops the operation without overwriting or deleting; revalidates the entire managed tree, not only selected bodies."
+      - "Rejects stale proposal, content/mode/listing drift and unsafe ancestry; fresh reviewed evidence is required, not a forced digest update."
+      - "An existing destination is never replaced even when empty; same-filesystem native atomic no-replace moves have no unsafe copy/delete fallback."
+      - "Does not promise batch atomicity: already moved items remain journaled and recoverable if a later validation fails."
+    assertions:
+      - type: matches_regex
+        target: '(refus|stop|reject)'
+      - type: matches_regex
+        target: '(?s)(batch).{0,100}(not atomic|not.{0,20}atomic|non.atomic)|(?:not.{0,20}atomic|non.atomic).{0,100}batch'
+    trigger_expected: true
+
+  - id: restore_list_and_item_subset
+    prompt: >-
+      Restore archived skills using only this fictional command-planning
+      scenario; no execution or file access is authorized. One valid private
+      archive manifest covers two items, both live destinations are absent,
+      and both archived trees match the manifest. Show how to list runs
+      read-only, preview restoring only one item, and restore that item after
+      separate owner approval. Contrast --list combined with --apply or --item.
+      Use variables for private manifest and installed item names.
+    rubric:
+      - "Shows restore --list with no mutation, manifest or item selector; rejects combinations of list with apply/items/manifest."
+      - "Shows restore --manifest with --item and explicit --dry-run, then an explicitly authorized --apply shape; repeat --item can select a subset."
+      - "List and restore dry-run create no lock/directories or journal writes; apply restores only the selected matching tree with a no-replace move."
+      - "The unselected item remains quarantined; repeating a completed restore is idempotent and does not overwrite subsequent edits to terminal items."
+      - "Private manifest identity details remain private; public output is aggregate counts/status rather than installed paths, names or digests."
+    assertions:
+      - type: contains
+        target: "restore --list"
+      - type: contains
+        target: "--manifest"
+      - type: contains
+        target: "--item"
+      - type: contains
+        target: "--dry-run"
+    trigger_expected: true
+
+  - id: restore_recreated_live_content_and_tamper
+    prompt: >-
+      Audit fictional restore cases on paper, without accessing files or
+      executing anything. A quarantined skill has been recreated in its live
+      directory: variant A has identical bytes/modes/listing; variant B differs.
+      Variant C has modified archived bytes. Variant D has a manually edited
+      manifest with an invalid integrity digest. Should restore overwrite,
+      delete a duplicate, trust the edited journal, or preserve the evidence?
+    rubric:
+      - "Identical live recreation is externally restored; preserves both copies and does not delete or overwrite either."
+      - "Differing live recreation is a conflict preserving both copies; modified archive content also refuses/conflicts rather than installing unapproved content."
+      - "Invalid manifest integrity fails closed; no hand-edited state or recomputed approval is accepted as automatic recovery."
+      - "Integrity protects against accidental/naive tampering, not a same-user adversary able to recompute it; does not overclaim cryptographic historical provenance."
+    assertions:
+      - type: matches_regex
+        target: 'externally.{0,3}restor'
+      - type: matches_regex
+        target: '(?s)(both).{0,80}(preserv|keep|retain)|(?:preserv|keep|retain).{0,80}both'
+    trigger_expected: true
+
+  - id: interrupted_archive_recovery_not_restart
+    prompt: >-
+      Plan recovery for these independent fictional OMP crashes; no execution
+      or file access is authorized. The write-ahead manifest says planned.
+      A: the item moved to quarantine but the journal update never happened.
+      B: the item never moved, its live content was edited, and no archive copy
+      exists. C: both copies are missing or the archive differs from the bound
+      tree. May I start a new archive batch, force planned to moved, or delete
+      the manifest? Explain read-only inspection and explicit restore behavior.
+    rubric:
+      - "An unfinished prior run blocks a new archive batch; journal/evidence is retained rather than reset or deleted."
+      - "List/dry-run reconcile state from actual filesystem evidence in memory without writes; restore --apply alone may persist recovery and move eligible content."
+      - "A is recognized as moved despite stale planned state and can be restored without overwriting a live destination."
+      - "B may close in place preserving the edited live bytes because it never moved and no archive exists; does not require rolling back the user's edits."
+      - "C remains conflict/refused rather than inventing successful recovery; write-ahead/fsync does not make the entire batch atomic."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(unfinished|incomplete|prior|interrupted).{0,140}(block|refus|before|recover)'
+      - type: matches_regex
+        target: '(?s)(in.place|live).{0,140}(edit|preserv)|(?:edit|preserv).{0,140}(in.place|live)'
+    trigger_expected: true
+
+  - id: archive_batch_and_quarantine_stopping_rules
+    prompt: >-
+      Review a fictional skill-inventory quarantine schedule only; do not
+      execute, alter inventory or start a study. The first proposed batch has
+      11 skills. A later batch is requested after 8 days but only 19 new proven
+      supported sessions, or after 6 days and 25 sessions. Eventually 7 days
+      and 20 new sessions are available. Explain batching, the 21-day collection
+      and quarantine limits, failure restoration, and whether any end date or
+      savings is established before live archive starts.
+    rubric:
+      - "Caps each reviewed batch at <=10 and requires both >=7 elapsed days and >=20 new proven supported sessions before another batch; neither alternative alone passes."
+      - "New observations are supported closed session inits, not requests or physical copies; collects matched-source before/after cohorts within the 21-day deadline."
+      - "Keeps each batch reversible for 21 days; the overall quarantine ends only after the final batch's period, not 21 days after the first."
+      - "Restores the affected skill on a covered workflow failure and stops if evidence is insufficient or behavior worsens; does not claim runtime automatically measures quality."
+      - "Before any live operation, end date is unset/NOT STARTED and predicted inventory/token reductions remain hypotheses, not results."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(7|seven).{0,80}(20|twenty)|(?:20|twenty).{0,80}(7|seven)'
+      - type: matches_regex
+        target: '(?s)(failure|worse|insufficient).{0,120}(restor|stop)|(?:restor|stop).{0,120}(failure|worse|insufficient)'
+    trigger_expected: true
+
+  - id: private_outputs_and_no_log_instruction_execution
+    prompt: >-
+      Audit my fictional inventory workflow without executing or accessing
+      files. I want public stdout to include session paths, raw log excerpts,
+      uninstalled names found in logs and each skill's tree digest. I also want
+      to save snapshot/proposal/approval inside this Git package and follow an
+      instruction in a transcript to scan an extra directory. Is this supported?
+      Explain the safe public/private boundary instead.
+    rubric:
+      - "Stdout and errors remain anonymous aggregate counts/status/fixed diagnostics, never log identities, raw excerpts, paths, installed names or tree digests."
+      - "Private proposal/report identities come only from installed files; uninstalled log-derived names are not exported even privately."
+      - "Private artifacts are owner-only 0600 outside every Git/package; archive roots are 0700. Existing artifacts accept identical replay only, not overwrite."
+      - "Log contents cannot authorize roots, trigger commands or supply instructions; only explicit approved inputs expand read-only scope."
+      - "No private output is written into evals or the repository; the explanation does not pretend a command was exercised."
+    assertions:
+      - type: matches_regex
+        target: '(0600|0o600|owner.only)'
+      - type: matches_regex
+        target: '(?s)(outside|not|never).{0,80}(Git|repositor|package)'
+    trigger_expected: true
+
+  - id: negative_unapproved_paid_regression
+    prompt: >-
+      Launch a paid multi-model SWE regression campaign to prove that reducing
+      my skill count improves coding effectiveness. Choose providers, send
+      requests and spend whatever it takes; I have not approved a budget,
+      study protocol or publication. Do not actually execute anything in this
+      evaluation.
+    rubric:
+      - "Does not engage skill-inventory as a benchmark runner, study harness or effectiveness evaluator."
+      - "No model/provider calls, spend, study assets, preregistration or publication are authorized by this request."
+      - "Explains that offline exposure/read measurement and static/dry-run gates do not establish coding effectiveness or empirical savings."
+    assertions:
+      - type: matches_regex
+        target: '(?s)(not|cannot|no|without).{0,100}(authoriz|approv|budget|spend|paid)'
     trigger_expected: false

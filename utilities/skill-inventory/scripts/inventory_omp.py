@@ -74,6 +74,7 @@ ISSUE_CODES: Final = frozenset(
         "invalid_custom_message",
         "invalid_epoch_milliseconds",
         "invalid_list",
+        "invalid_mcp_tool_selection",
         "invalid_message",
         "invalid_message_content",
         "invalid_message_role",
@@ -348,6 +349,17 @@ class _Parser:
             events = self._message(raw, entry_id)
         elif kind == "custom_message":
             events = self._custom_message(raw, entry_id)
+        elif kind == "mcp_tool_selection":
+            # Historical MCP discovery state is not skill evidence.
+            utc_time(raw.get("timestamp"))
+            selected = as_list(
+                raw.get("selectedToolNames"), "invalid_mcp_tool_selection"
+            )
+            for tool_name in selected:
+                if not isinstance(tool_name, str):
+                    raise SchemaError("invalid_mcp_tool_selection")
+            events = _Events()
+            events.counts["ignored_records"] += 1
         elif kind in _IGNORED_TYPES:
             if "timestamp" in raw:
                 utc_time(raw["timestamp"])

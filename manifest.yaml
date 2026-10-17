@@ -2325,6 +2325,24 @@ packages:
     - packages
     category: visualization
     difficulty: intermediate
+  - name: skill-inventory
+    version: 1.0.0
+    description: Measures installed skill metadata exposure and observed reads or invocations from local OMP, Claude Code
+      and Codex logs. Use this utility when you ask "audit my skill inventory", "how much do skill descriptions cost?", "find
+      unused managed skills", "which skills were read?", "find duplicate skills", or "restore archived skills". Covers offline
+      measurement, conservative archive/merge proposals and reversible OMP managed-skill quarantine. NOT for general session/context
+      audits (usage-audit), catalog installation (skill-library), or static package quality/effectiveness scoring (package-evaluator).
+    path: utilities/skill-inventory
+    source: https://github.com/Mathews-Tom/armory/blob/main/utilities/skill-inventory/UTILITY.md
+    runtime: python
+    tags:
+    - skills
+    - inventory
+    - exposure
+    - privacy
+    - quarantine
+    category: workflow
+    difficulty: advanced
   - name: test-coverage-report
     version: 1.0.0
     description: Summarizes test coverage for recently changed files by comparing git diffs against existing test files. Runs
