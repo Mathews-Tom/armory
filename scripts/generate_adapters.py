@@ -531,9 +531,19 @@ class GeminiAdapter(AdapterGenerator):
     def generate(self, packages: dict[str, list[PackageContent]]) -> None:
         gemini_dir = self.output_dir / ".gemini"
 
-        # Skills → .gemini/skills/{name}/SKILL.md (near 1:1 copy)
+        # Skills → .gemini/skills/{name}/SKILL.md (near 1:1 copy). A same-name
+        # utility is wrapped into the same directory below, so the utility wins.
+        utility_names = {pkg.name for pkg in packages.get("utility", [])}
+        shadowed = [p for p in packages.get("skill", []) if p.name in utility_names]
         for pkg in packages.get("skill", []):
-            self._generate_skill(gemini_dir / "skills" / pkg.name, pkg)
+            if pkg.name not in utility_names:
+                self._generate_skill(gemini_dir / "skills" / pkg.name, pkg)
+        if shadowed:
+            print(
+                f"  gemini: skipped {len(shadowed)} skill(s) replaced by a "
+                "same-name utility wrapper",
+                file=sys.stderr,
+            )
 
         # Agents → .gemini/agents/{name}.md
         agents = packages.get("agent", [])
