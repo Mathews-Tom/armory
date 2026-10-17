@@ -256,14 +256,14 @@ def _package_identity() -> tuple[int, int] | None:
 
 
 @dataclass(frozen=True)
-class _PrivateParent:
+class PrivateParent:
     fd: int
     name: str
     directory: Path
     identity: tuple[int, int]
 
 
-def _open_private_parent(path: Path | str) -> _PrivateParent:
+def _open_private_parent(path: Path | str) -> PrivateParent:
     """Walk the resolved parent by descriptors, vetting every ancestor, and keep it pinned.
 
     Every directory from ``/`` down must be outside Git repositories and the package,
@@ -307,7 +307,7 @@ def _open_private_parent(path: Path | str) -> _PrivateParent:
             raise SchemaError("private_path_in_repository")
         if unsafe:
             raise SchemaError("private_parent_unsafe")
-        return _PrivateParent(fd, name, Path(directory), (info.st_dev, info.st_ino))
+        return PrivateParent(fd, name, Path(directory), (info.st_dev, info.st_ino))
     except OSError:
         if fd >= 0:
             os.close(fd)
@@ -319,9 +319,9 @@ def _open_private_parent(path: Path | str) -> _PrivateParent:
 
 
 @contextmanager
-def _private_parent(
+def private_parent(
     path: Path | str, pinned: tuple[int, int] | None = None
-) -> Iterator[_PrivateParent]:
+) -> Iterator[PrivateParent]:
     parent = _open_private_parent(path)
     try:
         if pinned is not None and parent.identity != pinned:
@@ -344,7 +344,26 @@ def _read_private_at(directory_fd: int, name: str) -> bytes | None:
             raise SchemaError("private_file_unsafe")
         if info.st_size > MAX_PRIVATE_BYTES:
             raise SchemaError("private_file_too_large")
-        return handle.read(MAX_PRIVATE_BYTES + 1)
+        data = handle.read(MAX_PRIVATE_BYTES + 1)
+        after = os.fstat(handle.fileno())
+        endpoint = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        stamps = (
+            "st_dev",
+            "st_ino",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+            "st_uid",
+            "st_mode",
+            "st_nlink",
+        )
+        if (
+            len(data) != info.st_size
+            or any(getattr(info, field) != getattr(after, field) for field in stamps)
+            or any(getattr(info, field) != getattr(endpoint, field) for field in stamps)
+        ):
+            raise SchemaError("private_file_changed")
+        return data
 
 
 def _create_exclusive_at(directory_fd: int, name: str, payload: bytes) -> None:
@@ -383,7 +402,7 @@ def _create_exclusive_at(directory_fd: int, name: str, payload: bytes) -> None:
             os.unlink(temporary, dir_fd=directory_fd)
 
 
-def _store_private(parent: _PrivateParent, payload: bytes) -> None:
+def _store_private(parent: PrivateParent, payload: bytes) -> None:
     """Create the file; identical existing bytes are an unchanged update, anything else is refused."""
     existing = _read_private_at(parent.fd, parent.name)
     if existing is None:
@@ -399,8 +418,22 @@ def write_private_json(path: Path, data: object) -> None:
     update, anything else is refused.
     """
     payload = canonical_json(data)
-    with _private_parent(path) as parent:
+    with private_parent(path) as parent:
         _store_private(parent, payload)
+
+
+def read_private_json(path: Path) -> dict[str, object]:
+    """Read a stable owner-only JSON object through the existing private boundary."""
+    with private_parent(path) as parent:
+        data = _read_private_at(parent.fd, parent.name)
+    if data is None:
+        raise SchemaError("private_input_missing")
+    try:
+        return as_object(
+            strict_json_loads(data.decode("utf-8")), "private_input_invalid"
+        )
+    except UnicodeError:
+        raise SchemaError("private_input_invalid") from None
 
 
 # --------------------------------------------------------------------------- binding
@@ -439,7 +472,7 @@ def _bound_hex(value: object, length: int) -> str:
     return text
 
 
-def _load_binding(raw: bytes) -> _Binding:
+def load_binding(raw: bytes) -> _Binding:
     try:
         document = as_object(strict_json_loads(raw.decode("utf-8")))
         if (
@@ -689,14 +722,14 @@ class Snapshot:
         self._harness: Harness = harness
         self._as_of = as_of.astimezone(UTC)
         self._window = window_days
-        with _private_parent(binding_path) as parent:
+        with private_parent(binding_path) as parent:
             self._binding_path = parent.directory / parent.name
             self._binding_identity = parent.identity
             self._roots = tuple(sorted({_resolve(root) for root in roots}, key=str))
             if any(_contains(root, self._binding_path) for root in self._roots):
                 raise SchemaError("snapshot_binding_in_log_root")
             raw = _read_private_at(parent.fd, parent.name)
-        self._bound = None if raw is None else _load_binding(raw)
+        self._bound = None if raw is None else load_binding(raw)
         self._inventory: str | None = None
         self._finished = False
         if self._bound is None:
@@ -846,6 +879,30 @@ class Snapshot:
             if self._bound is None:
                 raise SchemaError("inventory_already_bound")
             self._inventory_drift = True
+
+    def main_task_groups(self) -> dict[str, str]:
+        """RAM-only groups proven by a captured OMP parent-main file, never log paths."""
+        if self._harness != "omp":
+            return {}
+        captured = {file.path: file for file in self.files}
+        groups: dict[str, str] = {}
+        for file in self.files:
+            if file.cohort not in ("sub", "nested"):
+                continue
+            for root in self._roots:
+                if not file.path.is_relative_to(root):
+                    continue
+                parts = file.path.relative_to(root).parts
+                if len(parts) not in (3, 4):
+                    continue
+                parent = root / parts[0] / (parts[1] + ".jsonl")
+                main = captured.get(parent)
+                if main is not None and main.cohort == "main":
+                    groups[file.key] = keyed_digest(
+                        self.key, "main-task-group", os.fsencode(parent)
+                    )
+                    break
+        return groups
 
     # ------------------------------------------------------------------ digests
 
@@ -1119,9 +1176,9 @@ class Snapshot:
         if self._bound is None:
             return False
         try:
-            with _private_parent(self._binding_path, self._binding_identity) as parent:
+            with private_parent(self._binding_path, self._binding_identity) as parent:
                 raw = _read_private_at(parent.fd, parent.name)
-            return raw is None or _load_binding(raw).seal != self._bound.seal
+            return raw is None or load_binding(raw).seal != self._bound.seal
         except SchemaError:
             return True
 
@@ -1148,5 +1205,5 @@ class Snapshot:
         }
         seal = keyed_digest(self.key, "seal", canonical_json(body))
         payload = canonical_json({**body, "seal": seal})
-        with _private_parent(self._binding_path, self._binding_identity) as parent:
+        with private_parent(self._binding_path, self._binding_identity) as parent:
             _store_private(parent, payload)
