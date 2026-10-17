@@ -141,15 +141,8 @@ def test_explicit_roots_replace_defaults_and_stay_unknown_ownership(
         ]
         assert inventory.approved_roots == (explicit,)
 
-    for harness in ("claude", "codex"):
-        none = load_inventory(harness, key=KEY)
-        assert none.entries == []
-        assert none.coverage["default_roots_unavailable"] == 1
-        assert none.coverage["skill_roots_unavailable"] == 1
-
     empty = load_inventory("omp", key=KEY, skill_roots=[])
     assert empty.coverage["skill_roots_unavailable"] == 1
-    assert empty.coverage["default_roots_unavailable"] == 0
 
 
 def test_short_keys_are_refused(base: Path) -> None:

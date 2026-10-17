@@ -1,4 +1,4 @@
-# Skill inventory measurement — OMP
+# Skill inventory measurement — OMP, Claude Code and Codex
 
 `measure` reports installed metadata, persisted disclosure observations and observed skill events. It never edits source logs or installed skills. It creates a private snapshot binding and, only when requested, a private installed-skill report. It does not recommend actions, score effectiveness or authorize inventory changes. Read frequency is not utility; a skill can influence behavior through its description without a body read.
 
@@ -36,6 +36,26 @@ Physical file placement is not a logical payload field. Copies retain separate f
 
 Directory traversal is descriptor-based: each canonical absolute root is opened component by component from `/` with directory descriptors and no-follow semantics, with no path re-resolution afterwards, and files are opened relative to their pinned parent with a final no-follow open. Callers authorize canonical roots first. A traversal that cannot be completed is refused as incomplete, never treated as an empty or partial inventory.
 
+## Native inventory and disclosure views
+
+`--harness` accepts `omp`, `claude` and `codex`. Claude Code reads logs under `~/.claude/projects`; Codex reads `~/.codex/sessions`. Additional project or archived roots require explicit `--log-root` / `--skill-root`. A path mentioned by a log is never a discovery root.
+
+The installed catalog is an **approved local skill-file view**, not proof that a harness enabled, disclosed or loaded every file. Claude Code discovers protected personal skills under `~/.claude/skills` and plugin resources through the exact version-2 registry `~/.claude/plugins/installed_plugins.json`. Plugin `.claude-plugin/plugin.json` metadata is optional; default `./skills` and custom `skills` directories are supplementary, not replacements. A resource may be a skill directory or a recursive collection. Registry-qualified plugin namespaces remain distinct. See the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference). A missing explicitly declared resource or an unknown registry version blocks complete measurement.
+
+Codex discovers protected files under `~/.codex/skills`, its `.system` component, shared `~/.agents/skills`, and manifest-declared skill resources in the versioned `~/.codex/plugins/cache` layout. Cached versions are **not the active plugin selection**: disabled or stale caches can remain visible in this local file catalog. Do not interpret these counts as native enabled inventory or deduplicate different versions by picking one. `.codex-plugin/plugin.json` declares skill directories; a present remote-install marker requires its exact schema version `1`. Hidden staging outside that cache layout is not scanned. Claude Code, plugin, shared, system and explicit unknown-ownership roots remain protected; no mutation operation exists in M6.
+
+Codex plugin skills use the manifest name as their `plugin:skill` namespace. An absent or empty declared resource list uses optional `./skills` as a fallback, not a supplement; malformed values or paths fail closed instead of widening to the plugin directory. This matches the supported [plugin-root and namespace source](https://github.com/openai/codex/blob/97ebf2d94d62e2ff2045f3ea17b6e11eae9a21fb/codex-rs/core-plugins/src/loader.rs). Only `.codex-plugin/plugin.json` cache layouts are supported here; alternate manifest layouts fail as incomplete. Native command-derived skills and unapproved project roots are outside this file view.
+
+Native skill collections are traversed with bounded recursive, descriptor-based discovery. Manifest paths cannot escape their approved install base; inner aliases cannot authorize new roots. Unknown metadata schemas, missing required resources, unreadable metadata and namespace conflicts are anonymous blocking diagnostics, not fallback roots or successful zeros.
+
+Claude Code `attachment.type=skill_listing` observations retain initial and dynamic sources separately. Model-dependent renderer budgets can downgrade descriptions to names, and truncation markers, names/content mismatch or count disagreement make exposure a lower bound. There is no universal character cap. Noninitial listings are partial observations, not additive initial exposure; use `exposure.monthly_by_source` and `latest_by_source` rather than interpreting pooled medians as request cost. `Skill` calls are native invocations; `Read` calls count only paths matched against approved installed files. Validate optional argument/range types; results resolve only declared call identities. Streamed copies and declared fork origins are deduplicated, while conflicting copies fail.
+
+Codex disclosure sources are developer `response_item` messages, separate developer/user instruction fields in `turn_context`, `session_meta.payload.base_instructions.text`, and developer `input_text` messages in `compacted.replacement_history`. These are physical persisted instruction observations, including repeated/forked/compacted context, not new requests or proven transport. Only recognized skill blocks are reduced; surrounding text is discarded. Native read and invocation channels are unavailable (`null`), including in the private report: function-call arguments or a `SKILL.md` mention do not prove either.
+
+A Codex compaction requires a string `message`, which is discarded without inspection. Absent or null `replacement_history` is valid summary-only output with no disclosure observation; a present value must be a list with recognized developer content. This is counted separately from measured empty skill blocks. Unknown or malformed relevant fields remain blocking.
+
+Each adapter admits an exact client/schema allowlist, never a version range. The aggregate `validated_input_schema_identities` identifies accepted software metadata; unknown identities fail closed. Installed visibility, persisted disclosure coverage, observed reads and native invocations are separate denominators.
+
 ## Output and counting
 
 The canonical sorted JSON uses `schema_version: 1`, `status`, `scope`, `snapshot`, `inventory`, `exposure`, `events`, `managed_current_name_matches`, `usage`, `coverage` and `diagnostics`.
@@ -52,6 +72,8 @@ The canonical sorted JSON uses `schema_version: 1`, `status`, `scope`, `snapshot
 - The optional private report separates first observed inventory, first/last read and invocation dates. Filesystem birth time is installation evidence only; authored creation remains unavailable and is never inferred from mtime.
 
 `usage` contains allowlisted persisted token counters and the availability of local cost-estimate fields, not billing receipts. Aggregate stdout does not disclose recorded cost values. Cache-read availability requires an actual cache-read counter; cache writes or a cache-price estimate do not establish it. Whole-request counters and context snapshots never attribute tokens, cache hits or dollars to individual skills. No token-share, savings or effectiveness claim follows from these measurements.
+
+Claude Code usage is deduplicated by declared message identity rather than streamed chunks. Codex token-count `last` and `cumulative` observations remain separate; identical values at separate physical positions are retained, and fork-lineage telemetry has a separate source. `counter_sums_by_source_and_kind` and `cumulative_session_maxima_by_source_not_billing` preserve that distinction. Cumulative values are summarized by per-session maxima, never added to last counters. Compaction and forks can repeat context-sized values: these are persisted telemetry observations, not newly billed requests. Codex cache-read exposure is labeled `persisted_token_count_telemetry_only`, not a skill-specific cache allocation.
 
 ## Exit status and incomplete inputs
 
