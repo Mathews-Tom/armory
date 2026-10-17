@@ -141,6 +141,8 @@ _IGNORED_ROLES: Final = frozenset(
         "compactionSummary",
     }
 )
+# Stop reasons of interrupted generation: streamed tool-call arguments may be partial.
+_INTERRUPTED_STOPS: Final = frozenset({"aborted", "error", "length"})
 _EPOCH_REQUIRED_ROLES: Final = frozenset({"user", "developer"})
 _IGNORED_BLOCKS: Final = frozenset(
     {"text", "thinking", "redacted_thinking", "redactedThinking", "image"}
@@ -547,19 +549,26 @@ class _Parser:
     ) -> _Events:
         epoch = epoch_time(message.get("timestamp"))
         events.counts["assistant_messages"] += 1
+        stop = message.get("stopReason")
+        interrupted = isinstance(stop, str) and stop in _INTERRUPTED_STOPS
         content = as_list(message.get("content"), "invalid_message_content")
         for block in content:
             item = as_object(block, "invalid_content_block")
             block_type = as_string(item.get("type"), "invalid_content_block")
             if block_type == "toolCall":
-                self._tool_call(item, epoch, events)
+                self._tool_call(item, epoch, events, interrupted=interrupted)
             elif block_type not in _IGNORED_BLOCKS:
                 raise SchemaError("unknown_content_block")
         self._usage(message, entry_id, epoch, events)
         return events
 
     def _tool_call(
-        self, block: dict[str, object], epoch: datetime, events: _Events
+        self,
+        block: dict[str, object],
+        epoch: datetime,
+        events: _Events,
+        *,
+        interrupted: bool,
     ) -> None:
         call_id = as_string(block.get("id"), "invalid_tool_call")
         name = as_string(block.get("name"), "invalid_tool_call")
@@ -569,6 +578,12 @@ class _Parser:
             events.counts["other_tool_calls"] += 1
             return
         arguments = as_object(block.get("arguments"), "invalid_read_path")
+        if interrupted and arguments.get("path", "") == "":
+            # Generation stopped before the streamed path arrived; never a skill read.
+            events.counts["interrupted_read_calls"] += 1
+            fingerprint = payload_fingerprint({"tool": "read", "interrupted": True})
+            events.read_calls.append(_ReadCall(call_id, fingerprint, None))
+            return
         path = as_string(arguments.get("path"), "invalid_read_path")
         attempt = self._attempt(call_id, path, epoch)
         if attempt is None:
