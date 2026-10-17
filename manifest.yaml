@@ -587,11 +587,12 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: html-video
-    version: 1.0.0
+    version: 1.0.1
     description: 'Use when the user wants a video authored as HTML and CSS and rendered with Hyperframes: "html video", "hyperframes",
       "render html to mp4", "animate html css to video", "title sequence from html", "html caption video", "side by side comparison
       video in html", "diagram explainer video in html". NOT for React or Remotion compositions, Manim animations, analysing
-      an existing video, or ordinary web pages with no video output.'
+      an existing video, ordinary web pages with no video output, or planning a launch video from the current project (use
+      launch-video, which renders through this package).'
     path: skills/html-video
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/html-video/SKILL.md
     tags:
@@ -605,6 +606,7 @@ packages:
     category: visualization
     difficulty: intermediate
     complements:
+    - launch-video
     - watch
   - name: humanize
     version: 2.1.0
@@ -670,6 +672,28 @@ packages:
     category: data
     difficulty: advanced
     phase: build
+  - name: launch-video
+    version: 1.0.0
+    description: 'Turn the project in the current directory into a 15-25 second launch video: a project-specific story, real
+      UI recreated in HTML/CSS, optional user-supplied music, a poster baked into frame 0, and postable share copy with any
+      required credits. Rendering goes through the html-video package. Triggers on: "/brag", "let''s brag about this", "make
+      a launch video", "launch video for this project", "turn this project into a video", "promo video for what I built".
+      NOT for explaining a concept, algorithm or topic with no project behind it, use animate; NOT for an explicit React or
+      Remotion composition, use remotion-video; NOT for an HTML video whose content is already scripted, use html-video.'
+    path: skills/launch-video
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/launch-video/SKILL.md
+    complements:
+    - html-video
+    - linkedin-post-style
+    tags:
+    - video
+    - launch
+    - promo
+    - share-copy
+    - storyboard
+    - hyperframes
+    category: visualization
+    difficulty: intermediate
   - name: lightpanda-browser
     version: 1.0.1
     description: 'Lightweight headless browser automation via Lightpanda and agent-browser CLI: 9x lower memory, 11x faster
@@ -698,6 +722,8 @@ packages:
     - content
     category: review
     difficulty: intermediate
+    complements:
+    - launch-video
   - name: literature-review
     version: 1.0.1
     description: 'Systematic literature review workflow: scope, search (arXiv, Semantic Scholar, Google Scholar), screen,

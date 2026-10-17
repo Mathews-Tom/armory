@@ -293,6 +293,9 @@ excluded:
     name: kg-builder
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
+    name: launch-video
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
     name: lightpanda-browser
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
