@@ -210,6 +210,61 @@ def test_aliases_deduplicate_and_never_widen_roots(base: Path) -> None:
         assert inventory.resolve_direct(str(escaped)) is None
 
 
+def test_approved_alias_targets_admit_escaping_links_as_protected_skills(
+    home: Path, base: Path
+) -> None:
+    managed = home / ".omp" / "agent" / "managed-skills"
+    shared = home / ".agents" / "skills"
+    user = home / ".omp" / "agent" / "skills"
+    shared.mkdir(parents=True)
+    user.parent.mkdir(parents=True)
+    user.symlink_to(shared, target_is_directory=True)
+    checkout = base / "checkout" / "skills"
+    simple(managed, "alpha")
+    simple(checkout, "linked")
+    simple(checkout, "unlinked")
+    simple(base / "elsewhere", "stray")
+    (shared / "linked").symlink_to(checkout / "linked", target_is_directory=True)
+    (managed / "stray").symlink_to(base / "elsewhere" / "stray", True)
+
+    before = load_inventory("omp", key=KEY)
+    assert list(by_name(before)) == ["alpha"]
+    assert before.coverage["alias_escape"] == 2
+
+    inventory = load_inventory("omp", key=KEY, alias_targets=[checkout / "linked"])
+
+    skills = by_name(inventory)
+    assert list(skills) == ["alpha", "linked"]
+    assert skills["linked"].ownership == "protected"
+    assert skills["linked"].path == checkout / "linked" / "SKILL.md"
+    assert inventory.coverage["alias_escape"] == 1
+    linked_view = shared / "linked" / "SKILL.md"
+    assert inventory.resolve_direct(str(linked_view)) == "linked"
+    assert inventory.resolve_direct(str(checkout / "unlinked" / "SKILL.md")) is None
+    assert inventory.integrity != before.integrity
+
+
+def test_alias_targets_add_protected_containment_to_explicit_roots(
+    base: Path,
+) -> None:
+    root = base / "skills"
+    target = base / "checkout"
+    simple(root, "plain")
+    simple(target, "linked")
+    (root / "linked").symlink_to(target / "linked", target_is_directory=True)
+
+    inventory = load_inventory(
+        "omp", key=KEY, skill_roots=[root], alias_targets=[target]
+    )
+
+    skills = by_name(inventory)
+    assert list(skills) == ["linked", "plain"]
+    assert skills["linked"].ownership == "protected"
+    assert skills["plain"].ownership == "unknown"
+    assert inventory.coverage["alias_escape"] == 0
+    assert set(inventory.approved_roots) == {root, target}
+
+
 def test_managed_skills_reached_through_links_are_protected(home: Path) -> None:
     managed = home / ".omp" / "agent" / "managed-skills"
     simple(managed, "alpha")

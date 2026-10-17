@@ -866,14 +866,23 @@ def load_inventory(
     *,
     key: bytes,
     skill_roots: Sequence[Path] | None = None,
+    alias_targets: Sequence[Path] = (),
     reference_paths: Sequence[Path] = (),
 ) -> Inventory:
-    """Catalog installed skills from approved roots with a keyed drift-detecting digest."""
+    """Catalog installed skills from approved roots with a keyed drift-detecting digest.
+
+    Alias targets are owner-approved, never-scanned protected containment roots: an
+    inner link resolving inside one is installed and protected instead of escaping.
+    """
     if len(key) < _MIN_KEY_BYTES:
         raise SchemaError("invalid_key")
     coverage: Counter[str] = Counter()
     evidence: list[str] = []
     configured = _configured_roots(harness, skill_roots, coverage, key, evidence)
+    configured.extend(
+        _ConfiguredRoot(_lexical(target), OWNERSHIP_PROTECTED, False)
+        for target in alias_targets
+    )
     approved = _approve_roots(configured, coverage, evidence)
     ordered = sorted(
         approved.values(),

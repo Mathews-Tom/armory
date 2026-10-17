@@ -73,6 +73,12 @@ def _measurement_arguments(
         help="Explicit read-only skill root.",
     )
     command.add_argument(
+        "--alias-target",
+        type=Path,
+        action="append",
+        help="Owner-approved protected target of an installed skill link.",
+    )
+    command.add_argument(
         "--reference", type=Path, action="append", help="Approved dependency source."
     )
     if private_report:
@@ -85,6 +91,7 @@ def _measurement_arguments(
 
 def _inventory(args: argparse.Namespace, snapshot: Snapshot) -> Inventory:
     skill_roots = cast(list[Path] | None, args.skill_root)
+    alias_targets = cast(list[Path] | None, args.alias_target) or []
     references = cast(list[Path] | None, args.reference) or []
     return load_inventory(
         cast(Harness, args.harness),
@@ -92,6 +99,7 @@ def _inventory(args: argparse.Namespace, snapshot: Snapshot) -> Inventory:
         skill_roots=(
             [path.expanduser() for path in skill_roots] if skill_roots else None
         ),
+        alias_targets=[path.expanduser() for path in alias_targets],
         reference_paths=[path.expanduser() for path in references],
     )
 
