@@ -313,18 +313,17 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 
 **Option 1 — Skills CLI (recommended)**
 
-Install any package directly using [`npx skills`](https://github.com/vercel-labs/skills):
+Install any skill directly using [`npx skills`](https://github.com/vercel-labs/skills):
 
 ```bash
-# Install all packages
+# Install all skills
 npx skills add Mathews-Tom/armory
 
-# Install a specific skill or agent
+# Install a specific skill
 npx skills add Mathews-Tom/armory -s architecture-reviewer
 npx skills add Mathews-Tom/armory -s codebase-advisor
-npx skills add Mathews-Tom/armory -s codebase-auditor
 
-# List available packages without installing
+# List available skills without installing
 npx skills add Mathews-Tom/armory -l
 ```
 
@@ -366,12 +365,12 @@ This uses Claude Code's native plugin system and loads a subset of armory's cata
 | skills       | ✅ yes                            |
 | agents       | ✅ yes                            |
 | commands     | ✅ yes                            |
-| hooks        | ❌ no — requires `npx skills` or the profile installer |
+| hooks        | ❌ no — requires the profile installer |
 | rules        | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | utilities    | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | presets      | ❌ no — use `just install-profile` instead |
 
-For the full catalog across all seven package types, use Option 1 (Skills CLI) or Option 2 (profile installer).
+The Skills CLI (Option 1) installs only `SKILL.md` packages, so it skips agents, hooks, rules, commands, utilities and presets; the `skill-inventory` skill can install the same-name utility from the rolling release. For the full catalog across all seven package types, use Option 2 (profile installer).
 
 **Option 4 — Manual**
 
