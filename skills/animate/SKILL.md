@@ -1,8 +1,8 @@
 ---
 name: animate
-description: 'Create Manim (Python) animated explainers: algorithm step-throughs, math and equation walkthroughs, pipeline and data-flow diagrams, comparisons and timelines, rendered to MP4, WebM or GIF with optional audio overlay. Includes a template path that renders validated config data with no model call, plus output checks (ffprobe duration, fps, dimensions, full decode, sampled-frame review receipt). Use when asked to "create a video", "animate this", "make an explainer", "manim animation", "animate this algorithm", or "motion graphic". NOT for HTML/CSS/GSAP or Hyperframes video, and NOT for React or Remotion video.'
+description: 'Create Manim (Python) animated explainers: algorithm step-throughs, math and equation walkthroughs, pipeline and data-flow diagrams, comparisons and timelines, rendered to MP4, WebM or GIF with optional audio overlay. Includes a template path that renders validated config data with no model call, plus output checks (ffprobe duration, fps, dimensions, full decode, sampled-frame review receipt). Use when asked to "create a video", "animate this", "make an explainer", "manim animation", "animate this algorithm", or "motion graphic". NOT for HTML/CSS/GSAP or Hyperframes video, NOT for React or Remotion video, and NOT for a launch or promo video of the user''s own project, use launch-video.'
 metadata:
-  version: 2.0.0
+  version: 2.0.1
   category: visualization
   tags: [video, manim, animation, explainer]
   difficulty: advanced
