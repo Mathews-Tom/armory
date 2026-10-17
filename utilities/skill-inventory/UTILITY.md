@@ -54,7 +54,7 @@ After the guide's environment setup, these are offline command patterns:
 "${INV[@]}" restore --list
 ```
 
-The guide supplies complete setup and separate reviewed-policy, archive and per-item restore commands. `--log-root`, `--skill-root` and `--reference` are repeatable approved read inputs, not mutation authorization. No utility-specific environment variables are required; shell variables above are operator conveniences.
+The guide supplies complete setup and separate reviewed-policy, archive and per-item restore commands. `--log-root`, `--skill-root`, `--alias-target` and `--reference` are repeatable approved read inputs, not mutation authorization. No utility-specific environment variables are required; shell variables above are operator conveniences.
 
 ## Output
 

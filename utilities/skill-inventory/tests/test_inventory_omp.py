@@ -592,6 +592,69 @@ def test_malformed_read_path_is_an_issue_and_never_a_silent_skip(
     assert not parsed.attempts
 
 
+@pytest.mark.parametrize("stop", ["aborted", "error", "length"])
+@pytest.mark.parametrize("arguments", [{}, {"path": ""}])
+def test_interrupted_read_without_a_path_is_counted_not_an_issue(
+    stop: str, arguments: Record
+) -> None:
+    block: Record = {"type": "toolCall", "id": "c1", "name": "read"}
+    block["arguments"] = arguments
+    records = [
+        header(),
+        assistant("m1", block, stopReason=stop),
+        result("r1", "c1", is_error=True),
+    ]
+    parsed = parse(records)
+    assert not parsed.issues
+    assert not parsed.attempts
+    assert parsed.counts["interrupted_read_calls"] == 1
+    assert parsed.counts["non_skill_reads"] == 0
+
+
+@pytest.mark.parametrize(
+    ("stop", "arguments"),
+    [
+        ("aborted", {"path": 5}),
+        ("aborted", {"path": None}),
+        ("aborted", None),
+        ("toolUse", {}),
+        ("stop", {"path": ""}),
+        (None, {}),
+        (["aborted"], {}),
+    ],
+)
+def test_pathless_reads_outside_interrupted_generation_remain_issues(
+    stop: object, arguments: object
+) -> None:
+    block: Record = {"type": "toolCall", "id": "c1", "name": "read"}
+    block["arguments"] = arguments
+    message = {} if stop is None else {"stopReason": stop}
+    parsed = parse([header(), assistant("m1", block, **message)])
+    assert only_issue(parsed) == "invalid_read_path"
+    assert parsed.counts["interrupted_read_calls"] == 0
+
+
+def test_interrupted_message_with_a_streamed_path_still_counts_its_attempt() -> None:
+    parsed = parse(
+        [header(), assistant("m1", call("c1", "skill://alpha"), stopReason="aborted")]
+    )
+    assert not parsed.issues
+    assert [attempt.skill_name for attempt in parsed.attempts] == ["alpha"]
+    assert parsed.counts["interrupted_read_calls"] == 0
+
+
+def test_interrupted_read_call_ids_still_detect_conflicting_duplicates() -> None:
+    pathless: Record = {"type": "toolCall", "id": "c1", "name": "read", "arguments": {}}
+    parsed = parse(
+        [
+            header(),
+            assistant("m1", pathless, stopReason="aborted"),
+            assistant("m2", call("c1", "skill://alpha")),
+        ]
+    )
+    assert only_issue(parsed) == "conflicting_duplicate_call"
+
+
 @pytest.mark.parametrize(
     "block",
     [
