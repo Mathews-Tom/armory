@@ -1246,6 +1246,69 @@ def test_session_identity_comes_from_the_header_not_the_entry_ids() -> None:
 
 
 @pytest.mark.parametrize(
+    "selected", [[], [""], ["alpha", "skill://alpha", "mcp__fictional_read"]]
+)
+def test_legacy_mcp_selection_is_metadata_not_skill_evidence(
+    selected: list[str],
+) -> None:
+    records = [
+        header(),
+        init("<skills>\n- alpha: description\n</skills>"),
+        assistant("a1", call("c1", "skill://alpha"), usage=USAGE),
+        result("r1", "c1"),
+    ]
+    baseline = parse(records)
+    selection: Record = {
+        "type": "mcp_tool_selection",
+        "id": "selection-1",
+        "parentId": None,
+        "timestamp": TS,
+        "selectedToolNames": selected,
+    }
+    parsed = parse([*records[:2], selection, *records[2:]])
+    assert not parsed.issues
+    assert parsed.attempts == baseline.attempts
+    assert parsed.results == baseline.results
+    assert parsed.exposures == baseline.exposures
+    assert parsed.invocations == baseline.invocations
+    assert parsed.usage == baseline.usage
+    assert parsed.counts["ignored_records"] == baseline.counts["ignored_records"] + 1
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"selectedToolNames": None},
+        {"selectedToolNames": "alpha"},
+        {"selectedToolNames": {}},
+        {"selectedToolNames": [None]},
+        {"selectedToolNames": ["alpha", 1]},
+    ],
+)
+def test_legacy_mcp_selection_rejects_malformed_payload(payload: Record) -> None:
+    record: Record = {
+        "type": "mcp_tool_selection",
+        "id": "selection-1",
+        "timestamp": TS,
+        **payload,
+    }
+    assert only_issue(parse([header(), record])) == "invalid_mcp_tool_selection"
+
+
+@pytest.mark.parametrize("timestamp", [None, "not-a-timestamp", EPOCH])
+def test_legacy_mcp_selection_requires_valid_timestamp(timestamp: object) -> None:
+    record: Record = {
+        "type": "mcp_tool_selection",
+        "id": "selection-1",
+        "selectedToolNames": [],
+    }
+    if timestamp is not None:
+        record["timestamp"] = timestamp
+    assert only_issue(parse([header(), record])) == "invalid_timestamp"
+
+
+@pytest.mark.parametrize(
     "kind",
     [
         "model_usage",
