@@ -20,10 +20,17 @@ from typing import NoReturn, cast
 # Wrapped utility installations are skills too; imports must not create bytecode there.
 sys.dont_write_bytecode = True
 
+import inventory_archive
 from inventory_catalog import load_inventory
 from inventory_claude import parse_file as parse_claude
 from inventory_codex import parse_file as parse_codex
-from inventory_io import BINDING_VERSION, SNAPSHOT_POLICY, Snapshot, write_private_json
+from inventory_io import (
+    BINDING_VERSION,
+    SNAPSHOT_POLICY,
+    Snapshot,
+    read_private_json,
+    write_private_json,
+)
 from inventory_omp import parse_file as parse_omp
 from inventory_policy import recommend
 from inventory_report import build_report
@@ -46,7 +53,9 @@ class _Measurement:
     window_days: int
 
 
-def _measurement_arguments(command: argparse.ArgumentParser) -> None:
+def _measurement_arguments(
+    command: argparse.ArgumentParser, *, private_report: bool = True
+) -> None:
     command.add_argument("--harness", choices=("omp", "claude", "codex"), required=True)
     command.add_argument("--as-of", required=True, help="Explicit UTC timestamp (Z).")
     command.add_argument("--window-days", type=int, default=90)
@@ -66,11 +75,12 @@ def _measurement_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--reference", type=Path, action="append", help="Approved dependency source."
     )
-    command.add_argument(
-        "--private-report",
-        type=Path,
-        help="Installed-file identities; never log identities.",
-    )
+    if private_report:
+        command.add_argument(
+            "--private-report",
+            type=Path,
+            help="Installed-file identities; never log identities.",
+        )
 
 
 def _inventory(args: argparse.Namespace, snapshot: Snapshot) -> Inventory:
@@ -86,6 +96,15 @@ def _inventory(args: argparse.Namespace, snapshot: Snapshot) -> Inventory:
     )
 
 
+def _policy_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--pins", type=Path, help="Private versioned pin document.")
+    command.add_argument(
+        "--attestations",
+        type=Path,
+        help="Private per-item generated-only attestations.",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = _Parser(description="Offline skill inventory; stdout is aggregate-only.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -97,24 +116,45 @@ def _parser() -> argparse.ArgumentParser:
         "recommend", help="Propose conservative actions; never move or merge skills."
     )
     _measurement_arguments(recommendations)
-    recommendations.add_argument(
-        "--pins", type=Path, help="Private versioned pin document."
-    )
-    recommendations.add_argument(
-        "--attestations",
-        type=Path,
-        help="Private per-item generated-only attestations.",
-    )
+    _policy_arguments(recommendations)
     recommendations.add_argument(
         "--proposal",
         type=Path,
         required=True,
         help="Private installed-skill proposal output.",
     )
+    archive = commands.add_parser(
+        "archive", help="Validate or apply an exact reviewed OMP-only proposal."
+    )
+    _measurement_arguments(archive, private_report=False)
+    _policy_arguments(archive)
+    archive.add_argument(
+        "--proposal", type=Path, required=True, help="Saved private proposal."
+    )
+    archive.add_argument("--approval", type=Path, help="Private exact-item approval.")
+    archive_mode = archive.add_mutually_exclusive_group(required=True)
+    archive_mode.add_argument("--dry-run", action="store_true")
+    archive_mode.add_argument("--apply", action="store_true")
+    restore = commands.add_parser(
+        "restore", help="List journals or restore all or selected archived OMP skills."
+    )
+    source = restore.add_mutually_exclusive_group(required=True)
+    source.add_argument("--list", action="store_true", dest="list_runs")
+    source.add_argument("--manifest", type=Path)
+    restore.add_argument(
+        "--item",
+        action="append",
+        help="One installed identity from the private journal.",
+    )
+    restore_mode = restore.add_mutually_exclusive_group()
+    restore_mode.add_argument("--dry-run", action="store_true")
+    restore_mode.add_argument("--apply", action="store_true")
     return parser
 
 
-def _measurement(args: argparse.Namespace) -> _Measurement:
+def _measurement(
+    args: argparse.Namespace, *, replay_only: bool = False
+) -> _Measurement:
     harness = cast(Harness, args.harness)
     raw_as_of = cast(str, args.as_of)
     if not raw_as_of.endswith(("Z", "+00:00")):
@@ -137,6 +177,8 @@ def _measurement(args: argparse.Namespace) -> _Measurement:
         as_of=as_of,
         window_days=window_days,
     )
+    if replay_only and snapshot.mode != "replayed":
+        raise SchemaError("snapshot_replay_required")
     inventory = _inventory(args, snapshot)
     snapshot.bind_inventory(inventory.integrity)
     parsed: list[ParsedFile] = []
@@ -196,8 +238,9 @@ def measure(args: argparse.Namespace) -> dict[str, object]:
     return measurement.report
 
 
-def recommendations(args: argparse.Namespace) -> dict[str, object]:
-    measurement = _measurement(args)
+def _proposal(
+    args: argparse.Namespace, measurement: _Measurement
+) -> tuple[dict[str, object], dict[str, object]]:
     report, proposal = recommend(
         measurement.report,
         measurement.private_report,
@@ -219,6 +262,12 @@ def recommendations(args: argparse.Namespace) -> dict[str, object]:
         != measurement.inventory.integrity
     ):
         raise SchemaError("inventory_changed_during_recommendation")
+    return report, proposal
+
+
+def recommendations(args: argparse.Namespace) -> dict[str, object]:
+    measurement = _measurement(args)
+    report, proposal = _proposal(args, measurement)
     write_private_json(cast(Path, args.proposal).expanduser(), proposal)
     private_path = cast(Path | None, args.private_report)
     if private_path is not None:
@@ -226,10 +275,44 @@ def recommendations(args: argparse.Namespace) -> dict[str, object]:
     return report
 
 
+def archive_skills(args: argparse.Namespace) -> dict[str, object]:
+    if args.harness != "omp" or not args.aggregate_only:
+        raise SchemaError("archive_requires_omp_aggregate_only")
+    saved = read_private_json(cast(Path, args.proposal).expanduser())
+    approval_path = cast(Path | None, args.approval)
+    approval = (
+        None if approval_path is None else read_private_json(approval_path.expanduser())
+    )
+    measurement = _measurement(args, replay_only=True)
+    _, current = _proposal(args, measurement)
+    return inventory_archive.archive(saved, current, approval, apply=bool(args.apply))
+
+
+def restore_skills(args: argparse.Namespace) -> dict[str, object]:
+    if args.list_runs:
+        if args.apply or args.dry_run or args.item:
+            raise SchemaError("invalid_arguments")
+    elif not (args.apply or args.dry_run):
+        raise SchemaError("explicit_restore_mode_required")
+    manifest = cast(Path | None, args.manifest)
+    return inventory_archive.restore(
+        manifest_path=None if manifest is None else manifest.expanduser(),
+        items=cast(list[str] | None, args.item),
+        apply=bool(args.apply),
+        list_runs=bool(args.list_runs),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = _parser().parse_args(argv)
-        report = measure(args) if args.command == "measure" else recommendations(args)
+        handlers = {
+            "measure": measure,
+            "recommend": recommendations,
+            "archive": archive_skills,
+            "restore": restore_skills,
+        }
+        report = handlers[args.command](args)
     except SchemaError as error:
         report = {
             "schema_version": 1,
