@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 145](https://img.shields.io/badge/packages-145-informational)](manifest.yaml)
+[![packages: 146](https://img.shields.io/badge/packages-146-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -109,6 +109,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |
 | [skill-library](skills/skill-library/)           | Agent-native catalog for browsing, installing, updating, syncing, and removing armory skills from within a Claude Code session                              |
+| [skill-inventory](skills/skill-inventory/) | Locate or checksum-verify install the skill-inventory utility, then hand off to its operator guide for skill exposure and read audits |
 | [env-validator](skills/env-validator/)           | Validate `.env` files against project requirements — missing vars, type mismatches, insecure defaults, `.env.example` drift                                 |
 | [handoff](skills/handoff/)                       | Maintain `.docs/handoff.md` as a 200-line session-continuity runbook for in-flight work, blockers, decisions, validation state, and resume steps           |
 

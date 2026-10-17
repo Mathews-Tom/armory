@@ -1,0 +1,60 @@
+# Synthetic routing scenarios; no live installs, downloads or log access.
+cases:
+  - id: audit_without_installed_utility
+    prompt: >-
+      Audit my skill inventory. I installed armory skills with the Skills CLI and
+      have never installed any armory utility. For this evaluation, describe the
+      steps you would take; do not run commands, download anything or open real
+      logs.
+    rubric:
+      - "Locates the utility first with scripts/ensure-utility.sh and treats exit 3 as not installed."
+      - "Asks the owner before running ensure-utility.sh --install, because it downloads and later runs release code."
+      - "After installation, exports UTILITY_ROOT, bootstraps --help and follows the utility's UTILITY.md and operator guide rather than inventing measurement commands."
+      - "Starts with a read-only measure --aggregate-only run; does not archive or restore without separate owner authorization."
+    assertions:
+      - type: contains
+        target: "ensure-utility.sh"
+      - type: matches_regex
+        target: '(?is)(ask|approv|permission).{0,120}(install|download)|(?:install|download).{0,120}(ask|approv|permission)'
+    trigger_expected: true
+
+  - id: existing_install_handoff
+    prompt: >-
+      Which skills were read in the last 90 days? The skill-inventory utility is
+      already installed by the armory profile installer. For this evaluation,
+      explain the steps only; do not execute anything or read real files.
+    rubric:
+      - "Uses ensure-utility.sh to locate the existing install under ~/.claude/utilities/skill-inventory and does not download or install a new copy."
+      - "Hands off to the utility's operator guide and measure command; does not treat read counts as usefulness."
+    assertions:
+      - type: contains
+        target: "ensure-utility.sh"
+    trigger_expected: true
+
+  - id: checksum_mismatch_stops
+    prompt: >-
+      Set up skill-inventory. In this fictional scenario the install script
+      reported "checksum mismatch for skill-inventory-1.0.0.utility". What do you
+      do next? Do not run commands.
+    rubric:
+      - "Stops and reports the mismatch to the owner; does not retry blindly, skip verification or install the archive by hand."
+      - "States that nothing was installed."
+    trigger_expected: true
+
+  - id: negative_context_window_audit
+    prompt: "Why is my context window so full in this Claude Code session? Explain the appropriate capability only; do not inspect real sessions or run tools."
+    rubric:
+      - "Routes to usage-audit for live context-window diagnosis rather than installing or running skill-inventory."
+    trigger_expected: false
+
+  - id: negative_catalog_install
+    prompt: "Search the armory catalog for an SQL tuning skill and install it. Explain the appropriate capability only; do not search the network or install anything."
+    rubric:
+      - "Routes to skill-library for catalog search and installation rather than engaging skill-inventory."
+    trigger_expected: false
+
+  - id: negative_package_quality
+    prompt: "Score my skill package against the armory evaluation rubric. Explain the appropriate capability only; do not run commands."
+    rubric:
+      - "Routes to package-evaluator for static package scoring rather than engaging skill-inventory."
+    trigger_expected: false
