@@ -31,7 +31,7 @@ macOS or Linux, Python 3.12+ and uv. The script pins PyYAML 6.0.3 in PEP 723 met
 uv run --no-project --script "$UTILITY_ROOT/scripts/skill_inventory.py" --help
 ```
 
-Subsequent commands use `uv run --offline --no-project --script`; no repository imports, model calls or collector are required. Missing cached dependencies fail, not fall back to a network fetch. Native Claude installation is `~/.claude/utilities/skill-inventory`; a standalone `.utility` is a ZIP to unpack. Cursor/Codex generated adapters omit utilities; Gemini wraps the utility as a skill and copies scripts, adding one discovery entry rather than zero overhead.
+Subsequent commands use `uv run --offline --no-project --script`; no repository imports, model calls or collector are required. Missing cached dependencies fail, not fall back to a network fetch. Native Claude installation is `~/.claude/utilities/skill-inventory`; agents that received armory through the Skills CLI or plugin marketplace can locate or install the released utility with the same-name `skill-inventory` skill; a standalone `.utility` is a ZIP to unpack. Cursor/Codex generated adapters omit utilities; Gemini wraps the utility as a skill and copies scripts, adding one discovery entry rather than zero overhead.
 
 ## Workflow
 

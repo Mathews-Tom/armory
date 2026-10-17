@@ -11,6 +11,7 @@ import scripts.generate_adapters as generate_adapters
 import scripts.package_types as package_types
 from scripts.generate_adapters import (
     CodexAdapter,
+    GeminiAdapter,
     load_packages,
     main,
 )
@@ -152,3 +153,44 @@ class TestCodexAdapter:
         assert root.exists()
         assert len(root.read_bytes()) <= adapter.SIZE_BUDGET_BYTES
         assert adapter.validate() == []
+
+
+class TestGeminiAdapter:
+    def test_same_name_utility_wrapper_replaces_skill(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo = tmp_path / "repo"
+        _write_skill(repo / "skills", "shared")
+        for subdir, filename in (("scripts", "launcher.sh"), ("references", "a.md")):
+            (repo / "skills" / "shared" / subdir).mkdir()
+            (repo / "skills" / "shared" / subdir / filename).write_text(
+                "skill-only\n", encoding="utf-8"
+            )
+        _write_skill(repo / "skills", "plain")
+        utility = repo / "utilities" / "shared"
+        (utility / "scripts").mkdir(parents=True)
+        (utility / "UTILITY.md").write_text(
+            "---\nname: shared\ndescription: Test utility shared.\n"
+            "utility: {runtime: python, entry_point: scripts/run.py}\n---\n\n"
+            "# Utility body\n",
+            encoding="utf-8",
+        )
+        (utility / "scripts" / "run.py").write_text("print()\n", encoding="utf-8")
+        monkeypatch.setattr(package_types, "REPO_ROOT", repo)
+        monkeypatch.setattr(generate_adapters, "REPO_ROOT", repo)
+        output_dir = tmp_path / "gemini"
+
+        GeminiAdapter(output_dir).generate(load_packages())
+
+        skills = output_dir / ".gemini" / "skills"
+        assert (skills / "plain" / "SKILL.md").is_file()
+        assert "# Utility body" in (skills / "shared" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        assert sorted(p.name for p in (skills / "shared").iterdir()) == [
+            "SKILL.md",
+            "scripts",
+        ]
+        assert sorted(p.name for p in (skills / "shared" / "scripts").iterdir()) == [
+            "run.py"
+        ]

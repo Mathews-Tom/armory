@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 145](https://img.shields.io/badge/packages-145-informational)](manifest.yaml)
+[![packages: 146](https://img.shields.io/badge/packages-146-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -109,6 +109,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |
 | [skill-library](skills/skill-library/)           | Agent-native catalog for browsing, installing, updating, syncing, and removing armory skills from within a Claude Code session                              |
+| [skill-inventory](skills/skill-inventory/) | Locate or checksum-verify install the skill-inventory utility, then hand off to its operator guide for skill exposure and read audits |
 | [env-validator](skills/env-validator/)           | Validate `.env` files against project requirements — missing vars, type mismatches, insecure defaults, `.env.example` drift                                 |
 | [handoff](skills/handoff/)                       | Maintain `.docs/handoff.md` as a 200-line session-continuity runbook for in-flight work, blockers, decisions, validation state, and resume steps           |
 
@@ -312,18 +313,17 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 
 **Option 1 — Skills CLI (recommended)**
 
-Install any package directly using [`npx skills`](https://github.com/vercel-labs/skills):
+Install any skill directly using [`npx skills`](https://github.com/vercel-labs/skills):
 
 ```bash
-# Install all packages
+# Install all skills
 npx skills add Mathews-Tom/armory
 
-# Install a specific skill or agent
+# Install a specific skill
 npx skills add Mathews-Tom/armory -s architecture-reviewer
 npx skills add Mathews-Tom/armory -s codebase-advisor
-npx skills add Mathews-Tom/armory -s codebase-auditor
 
-# List available packages without installing
+# List available skills without installing
 npx skills add Mathews-Tom/armory -l
 ```
 
@@ -365,12 +365,12 @@ This uses Claude Code's native plugin system and loads a subset of armory's cata
 | skills       | ✅ yes                            |
 | agents       | ✅ yes                            |
 | commands     | ✅ yes                            |
-| hooks        | ❌ no — requires `npx skills` or the profile installer |
+| hooks        | ❌ no — requires the profile installer |
 | rules        | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | utilities    | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | presets      | ❌ no — use `just install-profile` instead |
 
-For the full catalog across all seven package types, use Option 1 (Skills CLI) or Option 2 (profile installer).
+The Skills CLI (Option 1) installs only `SKILL.md` packages, so it skips agents, hooks, rules, commands, utilities and presets; the `skill-inventory` skill can install the same-name utility from the rolling release. For the full catalog across all seven package types, use Option 2 (profile installer).
 
 **Option 4 — Manual**
 

@@ -1215,6 +1215,23 @@ packages:
     category: development
     difficulty: advanced
     phase: build
+  - name: skill-inventory
+    version: 1.0.0
+    description: Locates or installs the armory skill-inventory utility, then hands off to its operator guide to measure installed
+      skill descriptions, observed reads and unused managed skills from local OMP, Claude Code and Codex logs. Use when you
+      ask "audit my skill inventory", "how much do skill descriptions cost?", "find unused skills", "which skills were read?",
+      "set up skill-inventory" or "run the skill inventory utility". Verifies the release checksum, asks before downloading
+      and never replaces an existing install. NOT for context-window audits (usage-audit) or catalog installs (skill-library).
+    path: skills/skill-inventory
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/skill-inventory/SKILL.md
+    tags:
+    - skills
+    - inventory
+    - utility
+    - installer
+    - exposure
+    category: operations
+    difficulty: beginner
   - name: skill-library
     version: 2.0.2
     description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update,
