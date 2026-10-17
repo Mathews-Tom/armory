@@ -1,0 +1,98 @@
+cases:
+  - id: brag_current_project
+    prompt: "/brag — make a launch video for the app in this repo so I can post it"
+    fixtures: []
+    rubric:
+      - "inspects the project's own code and copy, skipping .env and credential files, and answers the inspection rubric before planning"
+      - "writes a launch plan whose storyboard durations sum to 15-25 seconds and shows the product in use"
+      - "renders through the html-video package and its pinned toolchain, never npx hyperframes"
+      - "runs launch_video.py finish with a settled poster time and reports launch.mp4, poster.jpg and the share copy"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(storyboard|launch-plan)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)html-video"
+        weight: 0.8
+      - type: not_contains
+        target: "npx hyperframes"
+        weight: 1.0
+
+  - id: launch_video_with_cc_by_music
+    prompt: "Turn this project into a 20 second launch video, vertical, using this CC BY 4.0 track I downloaded from ende.app as the music"
+    fixtures: []
+    rubric:
+      - "uses vertical 1080x1920 by changing the root data-width/data-height, #root size and viewport together"
+      - "declares the track in PROVENANCE.json with its real source URL and CC-BY-4.0 licence"
+      - "adds a share-copy credit line containing the track's source and licence before running finish"
+      - "keeps the music bed at or below 0.5 data-volume"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(credit|attribution)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)PROVENANCE\\.json"
+        weight: 0.8
+
+  - id: yc_parody_promo
+    prompt: "Make a deadpan YC-style promo video for what I built here, something I can drop on X"
+    fixtures: []
+    rubric:
+      - "selects the yc-parody tone with hard cuts and one claim per scene"
+      - "uses the project's own claims and copy instead of invented metrics or testimonials"
+      - "writes postable share copy without generic launch language"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(yc-parody|deadpan)"
+        weight: 1.0
+
+  - id: cli_tool_terminal_launch
+    prompt: "Make a launch video for my command-line tool in this repo; there is no web UI, just the CLI"
+    fixtures: []
+    rubric:
+      - "treats the README's documented terminal output as the product in use instead of inventing a graphical UI or new output"
+      - "labels any trimmed or shortened terminal excerpt on screen"
+      - "provisions the monospace font under its own --alias rather than as another face of HV Text"
+      - "ends on the project's real install command"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(terminal|excerpt)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)--alias"
+        weight: 0.8
+
+  - id: scripted_title_sequence_goes_to_html_video
+    prompt: "Render this HTML title sequence I already wrote to an MP4 with Hyperframes; the copy and timings are final"
+    fixtures: []
+    rubric:
+      - "does not run the launch-video inspection, plan or share-copy workflow"
+      - "routes to html-video for rendering a scripted HTML composition"
+    trigger_expected: false
+
+  - id: algorithm_explainer_goes_to_animate
+    prompt: "Create a video explaining how Dijkstra's algorithm finds shortest paths"
+    fixtures: []
+    rubric:
+      - "does not treat a concept explainer as a project launch video"
+      - "routes to animate for an algorithm explainer"
+    trigger_expected: false
+
+  - id: remotion_composition_goes_to_remotion
+    prompt: "Build a product demo video as a Remotion React composition with TailwindCSS"
+    fixtures: []
+    rubric:
+      - "does not use launch-video when the user explicitly asks for React or Remotion"
+      - "routes to remotion-video"
+    trigger_expected: false
+
+  - id: analyse_existing_video
+    prompt: "Watch this launch video on YouTube and summarize what it shows"
+    fixtures: []
+    rubric:
+      - "does not create a video; analysing an existing video is out of scope"
+    trigger_expected: false

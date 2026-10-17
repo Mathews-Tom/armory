@@ -1,5 +1,10 @@
 # Changelog — HTML Video
 
+## 1.0.1
+
+- Route launch videos planned from the current project to `launch-video`, which renders through this package.
+- Document that `fonts add --family` is only the provenance name and that a second font family needs its own `--alias`; without it the file silently becomes another face of `HV Text`.
+
 ## 1.0.0
 
 - Add the package: author HTML/CSS videos and render them with a pinned, project-local Hyperframes CLI.

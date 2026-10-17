@@ -1,8 +1,8 @@
 ---
 name: html-video
-description: 'Use when the user wants a video authored as HTML and CSS and rendered with Hyperframes: "html video", "hyperframes", "render html to mp4", "animate html css to video", "title sequence from html", "html caption video", "side by side comparison video in html", "diagram explainer video in html". NOT for React or Remotion compositions, Manim animations, analysing an existing video, or ordinary web pages with no video output.'
+description: 'Use when the user wants a video authored as HTML and CSS and rendered with Hyperframes: "html video", "hyperframes", "render html to mp4", "animate html css to video", "title sequence from html", "html caption video", "side by side comparison video in html", "diagram explainer video in html". NOT for React or Remotion compositions, Manim animations, analysing an existing video, ordinary web pages with no video output, or planning a launch video from the current project (use launch-video, which renders through this package).'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: visualization
   tags: [video, html, css, hyperframes, mp4, offline, templates]
   difficulty: intermediate
@@ -36,7 +36,7 @@ python3 "$SKILL_DIR/scripts/html_video.py" init --list
 ## Workflow
 
 1. **Pick and copy a template.** `init TEMPLATE DEST` copies `title-sequence`, `comparison`, `diagram-explainer` or `captioned-sequence`. All are 1920x1080, text-editable and animated by finite CSS keyframes.
-2. **Get the font from the user.** Ask for a font file (woff2, woff, ttf or otf), its licence text, SPDX id and source. Never download or assume one; never bundle a system font. `fonts add PROJECT --font-file F --family NAME --license-id ID --license-file L --source S` copies it, records provenance, writes `fonts.css` in the project's assets directory, and updates compiler-visible inline `@font-face` declarations in `index.html`. Templates use the alias `HV Text`; no manual HTML edit is needed.
+2. **Get the font from the user.** Ask for a font file (woff2, woff, ttf or otf), its licence text, SPDX id and source. Never download or assume one; never bundle a system font. `fonts add PROJECT --font-file F --family NAME --license-id ID --license-file L --source S` copies it, records provenance, writes `fonts.css` in the project's assets directory, and updates compiler-visible inline `@font-face` declarations in `index.html`. Templates use the alias `HV Text`; no manual HTML edit is needed. `--family` is only the provenance name; the CSS family is `--alias` (default `HV Text`). Provision a second family, such as a monospace, with its own `--alias "HV Code"` on each of its faces and reference that alias in CSS, or it becomes another face of `HV Text`.
 3. **Bootstrap once.** `bootstrap PROJECT --browser-path PATH` pins an existing browser, or `--download-browser` runs the pinned CLI's own `browser ensure`. The package manager comes from the project lockfile (npm for a fresh project). The lock `.html-video/environment.json` records tool paths and actual versions, including the browser's own `--version`. Afterwards `doctor PROJECT` re-verifies offline.
 4. **Author.** Edit text and `data-start` / `data-duration` values; see the contract below. Keep the root `data-duration` equal to the last clip end.
 5. **Audit.** `audit PROJECT` rejects remote render-critical resources, path and symlink escapes, missing files, case mismatches, cycles, undeclared fonts and invalid timing. Fix every error.

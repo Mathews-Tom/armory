@@ -1,8 +1,8 @@
 ---
 name: remotion-video
-description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with voiceover". For math animations with no requested engine, use animate; explicit React/Remotion requests stay here. NOT for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition stays here).'
+description: 'Create motion graphics and videos using Remotion (React) with audio sync, web fonts, and TailwindCSS. Triggers on: "create a Remotion video", "React video", "motion graphics", "branded video", "product demo video", "video with voiceover". For math animations with no requested engine, use animate; explicit React/Remotion requests stay here. NOT for explicit Hyperframes or plain HTML/CSS video, use html-video (HTML inside a React/Remotion composition stays here). NOT for a launch video of the current project with no requested engine, use launch-video.'
 metadata:
-  version: 1.2.1
+  version: 1.2.2
   category: business
   tags: [video, react, remotion, motion-graphics]
   difficulty: advanced

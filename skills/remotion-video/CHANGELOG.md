@@ -1,5 +1,9 @@
 # Changelog — Remotion Video
 
+## 1.2.2
+
+- Route launch videos of the current project with no requested engine to `launch-video`. Explicit React/Remotion requests still stay here.
+
 ## 1.2.1
 
 - Rename the optional Manim video consumer to `animate` (2.0.0) in the math-animation boundary and routing evaluation. Explicit React/Remotion requests still stay here, including React math.

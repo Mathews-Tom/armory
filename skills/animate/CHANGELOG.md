@@ -1,5 +1,9 @@
 # Changelog — Animate
 
+## 2.0.1
+
+- Route launch or promo videos of the user's own project to `launch-video`.
+
 ## 2.0.0
 
 - BREAKING: rename the package from `concept-to-video` to `animate`. There is no alias, shim or old folder; routing, profiles, evaluation registration and generated catalogs move to the new name.
