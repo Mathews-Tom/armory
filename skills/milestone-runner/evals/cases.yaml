@@ -323,3 +323,176 @@ cases:
       - type: matches_regex
         target: "(do not tag|do not publish|not.*publish)"
         weight: 0.8
+
+  - id: opt_in_canonical_per_pr_issue_tracking
+    prompt: >
+      Run M3 with ISSUE_TRACKING=on in its prompt and two planned PRs. The current
+      design gate is GO. This is a resume: one issue already has the stable marker
+      for PR-1, but that issue is closed and no mapped PR has merged into its intended
+      base. Matching work-type labels exist. PR-2 will target PR-1's non-default stack
+      branch. Ensure each PR has its own tracking issue before its branch, without
+      duplicates or private plan content. Explain later design NO-GO, retargeting,
+      and merge outcomes, and how completed closed matches differ from pending work.
+    fixtures: []
+    rubric:
+      - "keeps tracking opt-in and default-off; only the canonical runner mutates issues"
+      - "searches open and closed issues by exact stable marker, reopens PR-1's pending closed match with one public-safe comment, and creates only PR-2's missing issue; a completed closed match is reused without reopening"
+      - "creates or reuses one issue per planned PR after DESIGN GO and before its branch"
+      - "applies existing matching labels without creating labels; requires Tracks linkage in every PR body and Closes when default-targeting, with canonical closure after default-branch integration and verified acceptance"
+      - "comments public-safe design NO-GO and observed PR merge outcomes idempotently"
+      - "excludes private plan content, local paths, and ignored-file references from titles, bodies, and comments"
+      - "passes issue mappings to lanes without authorizing them to create or edit issues"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(default[^\\n]*off|off[^\\n]*default)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)canonical[^\\n]*(issue|mutat)|(issue|mutat)[^\\n]*canonical"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(?:(open.*closed|closed.*open).*marker|marker.*(open.*closed|closed.*open))"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)reus[^\\n]*(PR-1|existing|match)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)DESIGN GO.*(create|reuse).*before[^\\n]*branch"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(each|per|one)[^\\n]*(planned PR|PR.*issue|issue.*PR)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(existing|matching)[^\\n]*label"
+        weight: 0.8
+      - type: matches_regex
+        target: "Closes #"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(comment.*NO-GO|NO-GO.*comment)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?is)(comment.*merge|merge.*comment)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(public.safe|private plan|local paths|ignored.file)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(lane|subagent)[^\\n]*(never|not|no)[^\\n]*(creat|edit|mutat)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)reopen[^\\n]*PR-1|PR-1[^\\n]*reopen"
+        weight: 1.0
+      - type: matches_regex
+        target: "Tracks #"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)default.branch.*acceptance|acceptance.*default.branch"
+        weight: 1.0
+
+  - id: tracking_absent_or_off_has_no_issue_mutations
+    prompt: >
+      Run independent M2 and M3 sequentially. M2 has no ISSUE_TRACKING setting;
+      M3 explicitly has ISSUE_TRACKING=off. No user override enables tracking.
+      Report only actions you will execute, without examples of disabled commands.
+    fixtures: []
+    rubric:
+      - "performs no issue creation, editing, labeling, closure, or comments for either milestone"
+      - "continues normal design and implementation gates without adding issue prerequisites"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(no|zero)[^\\n]*issue[^\\n]*mutat|issue tracking[^\\n]*off"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue create"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue edit"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue comment"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue close"
+        weight: 1.0
+
+  - id: tracking_uncertain_create_and_marker_conflict
+    prompt: >
+      M4 has tracking enabled and current DESIGN GO. Creating PR-1's issue timed
+      out without a definitive response. A subsequent complete lookup finds one
+      exact marker match. The repository has no matching labels. PR-2's lookup
+      returns two issues with its exact marker. Give the next actions for each
+      PR and whether either branch may be created.
+    fixtures: []
+    rubric:
+      - "repeats complete paginated open and closed exact-marker lookup before retrying an uncertain create"
+      - "reuses PR-1's single match without issuing another create and leaves it unlabeled"
+      - "blocks PR-2 before branching because duplicate markers require canonical resolution"
+      - "does not create labels or silently turn tracking off"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?is)(uncertain|timed out|timeout).*look.?up.*(open.*closed|closed.*open)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)PR-1[^\\n]*reus|reus[^\\n]*PR-1"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(unlabeled|without[^\\n]*label)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)PR-2[^\\n]*(block|stop)|(?:block|stop)[^\\n]*PR-2"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(duplicate|two|multiple)[^\\n]*marker"
+        weight: 1.0
+      - type: not_contains
+        target: "gh label create"
+        weight: 1.0
+
+  - id: tracking_revision_sync_and_reproducible_keys
+    prompt: >
+      Tracking is enabled by user override on an old M5 prompt without issue keys.
+      Its repository, milestone title and ID, ordered PR positions, and first planned
+      commit subjects are authoritative. The ignored ledger is missing. Design
+      reconciliation is required for a second time after the first reconciliation
+      PR merged, and a closed reconcile-1 issue exists in repository history. The
+      revised plan removes one product PR, reorders surviving PRs, and changes a
+      surviving PR's first commit subject and acceptance. Explain issue actions
+      now and after PLAN REVISION none, including a lane that later needs an extra PR.
+    fixtures: []
+    rubric:
+      - "creates only the second ordinal reconciliation issue now and defers product-PR issues until the no-revision gate"
+      - "derives fallback keys only when no keys are present, deterministically from pre-revision authoritative content; reconciliation writes in-use plan/milestone/PR keys into revised issue slots and preserves surviving work's keys rather than recomputing them by the new positions or subjects"
+      - "rewrites reused issue titles/bodies preserving markers and comments/closes removed-key issues as superseded"
+      - "tells lanes that the runner owns the milestone, they are not the canonical owner, they must use the provided mapping, and they may not create/edit/comment/label/close issues; they stop/report extra PRs before branching"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)reconcile-2"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(defer|only after)[^\\n]*product.*PLAN REVISION[^\\n]*none"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(deterministic|SHA-?256).*(repository|owner/name).*(title).*(position).*(commit subject)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(rewrit|updat)[^\\n]*(title|body)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)comment.*clos.*superseded"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(extra|another) PR.*stop.*report.*before[^\\n]*branch"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(writ|persist)[^\\n]*(key|identit)[^\\n]*(prompt|slot)|(?:prompt|slot)[^\\n]*(persist|in.use)[^\\n]*key"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(preserv|retain)[^\\n]*(surviv|key)|surviv[^\\n]*(preserv|retain)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(lane|you)[^\\n]*not[^\\n]*canonical owner"
+        weight: 1.0
