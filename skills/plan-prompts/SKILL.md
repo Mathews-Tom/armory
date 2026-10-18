@@ -2,7 +2,7 @@
 name: plan-prompts
 description: 'Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository design. Not for discovering an uncertain destination or unresolved decisions; use decision-map. Not for auditing an existing plan; use plan-review. Not for executing a stack; use stacked-prs.'
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   category: development
   tags: [planning, execution-prompts, milestones, adaptive-planning, stacked-prs, release-management, docs, subagents]
   difficulty: advanced
@@ -23,7 +23,7 @@ Convert source documents into a plan that remains valid as milestones merge:
 - `.docs/EXECUTION_PROMPTS.md` — the committed, authoritative `/goal` contract for each milestone.
 - `.docs/DEVELOPMENT_PLAN_HISTORY.md` — the single local, append-only design-evidence ledger. It must be gitignored.
 
-This skill plans from documents only. Do not implement product code, create branches, open PRs, or execute the generated prompts.
+This skill plans from documents only. Do not implement product code, create issues or branches, open PRs, or execute the generated prompts.
 
 ## Scope Boundary
 
@@ -48,6 +48,7 @@ Optional context:
 | `REPO_CONTEXT` | Target repo path or description; inspect its current structure, tooling, CI, style, release conventions, and partial implementation. | Greenfield planning if absent. |
 | `GLOBAL_CONSTRAINTS` | Cross-cutting constraints absent from source docs. | None. |
 | `STACK_DEPTH_HINT` | Maximum PRs per milestone stack. | 6. |
+| `ISSUE_TRACKING` | Opt in to per-planned-PR GitHub issue stubs and runner instructions; `on` or `off`. Planning never mutates GitHub. | `off`. |
 
 ## Context isolation and delegation
 
@@ -154,6 +155,14 @@ Planning rules:
 
 Create one `/goal` block per milestone. It must trace to that milestone’s objective, deliverables, acceptance, verification, design-reevaluation row, and release train. Do not invent scope.
 
+#### Opt-in per-PR issue tracking
+
+Emit `ISSUE_TRACKING: off` in every goal unless explicitly enabled. When `on`, include a public-safe, stable plan key shared by its goals, a stable milestone key per goal (never derived from the milestone ID, so renumbering cannot change it) and, under every `PLANNED STACK` PR (including the conditional reconciliation PR), a stable PR key, issue title, and short body stub describing observable behavior, scope, acceptance, and verification. Preserve the plan, milestone and product-PR keys across regeneration, milestone renumbering and stack reordering; allocate a new product-PR key only for genuinely new work. Give each distinct reconciliation a public-safe ordinal key such as `reconcile-1`, `reconcile-2`; retain its ordinal on retries and recover it from authoritative prompts and repository issue/PR history, not only the ignored ledger.
+
+Issue text follows the same public-content rules as tracked content, even in a private repository: self-contained, behavior-level, and public-safe, with no private plan content, local paths, or ignored-file references. Summarize the intended outcome rather than copying source documents or the local ledger.
+
+For enabled goals, emit the conditional execution rule shown below. The canonical session that owns the milestone performs `milestone-runner` Step 3a; this is the runner session when present and the direct `/goal` owner otherwise. `plan-prompts` emits instructions and stubs only; it never creates the issues. Omit issue slots when tracking is off.
+
 ```markdown
 # Execution Prompts — <System>
 
@@ -175,6 +184,7 @@ Create one `/goal` block per milestone. It must trace to that milestone’s obje
 CONTEXT: DEVELOPMENT_PLAN.md §6 M1 + source docs. Preconditions: <none | Mx merged>. Repo: <language, package manager, test runner, type/lint/CI surface>.
 OBJECTIVE: <objective and acceptance criteria as the success contract>.
 RELEASE TRAIN: target=<named version | unversioned | none | > GAP: unresolved>; included milestones=<Mx>; preparation trigger=<all included milestones externally merged>; required artifacts=<version update | CHANGELOG.md | both | none>; release verification=<exact command or binary manual check>; publication=<required command/workflow | not requested>.
+ISSUE_TRACKING: <off | on; plan=<public-safe-stable-key>>.
 
 PRE-IMPLEMENTATION DESIGN GATE:
 1. Read this milestone, its source-map rows, current prompt, and `.docs/DEVELOPMENT_PLAN_HISTORY.md` when present.
@@ -187,10 +197,15 @@ PRE-IMPLEMENTATION DESIGN GATE:
 
 RECONCILIATION RULE: A material revision opens `docs(plan): reconcile M1 design` as a docs-only prerequisite PR. It contains no product code, must be reviewed, green, and externally merged before any code PR, and must not be folded into an implementation PR.
 
+ISSUE EXECUTION RULE (include only when on): The canonical milestone owner performs milestone-runner Step 3a before branches. When a milestone-runner launches this goal in an implementation lane, that runner owns the milestone; the lane is not the canonical owner, must use the provided issue mapping, and must never create, edit, comment on, label, or close issues. Only a direct /goal session not launched as a lane and with no owning runner is the canonical owner itself. After DESIGN GO — PLAN REVISION: <entry IDs>, create/reuse only the current reconciliation issue; defer product-PR issues until DESIGN GO — PLAN REVISION: none. Then find/reuse/create one issue per planned product PR by exact stable marker. On reuse, rewrite title/body to the current public-safe stub while preserving the marker; reopen a closed match with an idempotent public-safe comment if its work lacks a merged PR whose change is in the intended base, and reuse completed work without reopening. Comment and close removed-key issues as superseded. Each distinct reconciliation gets its own ordinal key, retained on retries. Every reconciliation of an override-enabled prompt writes the plan/milestone/PR keys currently in use into the revised issue slots, preserving surviving work's identity across title/position/subject changes; derive fallback keys only when the prompt carries none. Every PR body includes Tracks #N for its own issue and adds Closes #N when targeting the default branch; closing keywords are ignored for non-default-targeting stacked children. After retargeting to the default branch, the canonical owner adds Closes #N; alternatively, it closes the issue only after the change reaches the default branch and acceptance is verified. If a lane needs an extra PR, it must stop and report the proposed PR before branching it; the canonical owner reconciles the stack and creates/reuses its issue before a new lane launch.
+
 PLANNED STACK (refine only to keep PRs reviewable):
 0. Conditional prerequisite `docs(plan): reconcile M1 design` — scope: authoritative plan/prompt updates only; gate: reviewed, green, and merged before the implementation stack.
+   issue (on only): plan=<stable-plan-key>; milestone=<stable-milestone-key>; key=reconcile-<ordinal>; title=<public-safe reconciliation outcome>; body=<behavior-level scope, acceptance, verification; no private content or local/ignored-file references>
 1. PR-1 <purpose> — scope: <areas>; commits: <c1>, <c2>; verification: <PR-specific command if narrower than milestone command>
+   issue (on only): plan=<stable-plan-key>; milestone=<stable-milestone-key>; key=<stable-pr-1-key>; title=<public-safe behavior>; body=<scope, acceptance, verification; no private content or local/ignored-file references>
 2. PR-2 <purpose, on PR-1> — scope: <areas>; commits: <c1>, <c2>
+   issue (on only): plan=<stable-plan-key>; milestone=<stable-milestone-key>; key=<stable-pr-2-key>; title=<public-safe behavior>; body=<scope, acceptance, verification; no private content or local/ignored-file references>
 
 CONSTRAINTS: no scope leakage, minimal dependencies, repo style, no version/changelog updates before the release-train trigger unless source-traceable.
 VERIFICATION (must pass): <exact command(s) and expected result>.
@@ -233,6 +248,7 @@ Before yielding, check and fix:
 - Every capability maps to a milestone; the DAG is acyclic; every milestone has binary acceptance and command-backed verification.
 - Every milestone has an explicit release target and design-reevaluation row.
 - Every prompt includes the design gate, dependency-impact propagation, local-history treatment, docs-only reconciliation rule, per-PR/whole-stack review, both verdict formats, and a concrete `NEXT STEPS` contract.
+- Issue tracking is explicitly off unless requested; enabled goals contain per-PR issue slots, stable plan, milestone and product keys and distinct reconciliation ordinals, canonical-owner-only Step 3a instructions (including direct `/goal` ownership), revision-aware issue synchronization, extra-PR stop/report instructions, and explicit `Tracks #N` plus default-targeting `Closes #N` linkage without private content.
 - Release preparation is assigned once per train and only after every train milestone merges.
 - `.docs/DEVELOPMENT_PLAN_HISTORY.md` exists, is the only history ledger, and is ignored by an exact or broader verified rule.
 - Only the two authoritative artifacts, the one local history ledger, and the minimum `.gitignore` update required to ignore it are written.

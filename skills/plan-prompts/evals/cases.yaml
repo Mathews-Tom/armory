@@ -265,3 +265,88 @@ cases:
     rubric:
       - "Does not activate; unresolved pre-planning decisions belong to decision-map"
     trigger_expected: false
+
+  - id: opt_in_per_pr_issue_stubs
+    prompt: >
+      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for a solo developer with
+      ISSUE_TRACKING=on. M3 has two planned implementation PRs. Include separate public-safe
+      issue stubs that the canonical owner can use for tracking and later factory intake.
+      The goals may run directly without milestone-runner. Account for repeated design
+      reconciliation and a lane discovering an extra PR. Do not create any GitHub issues,
+      branches, or PRs while planning.
+    fixtures: []
+    rubric:
+      - "emits ISSUE_TRACKING on explicitly and states that the default is off"
+      - "puts one issue title and short behavior-level body stub with a stable key under each planned PR"
+      - "assigns issue operations to the canonical milestone owner, including direct goal execution without a runner"
+      - "defers product-PR issues until PLAN REVISION none and uses distinct reconciliation ordinals"
+      - "includes an issue key, title, and body slot under every planned PR in the goal template"
+      - "instructs lanes to stop and report extra PRs before branching"
+      - "requires Tracks linkage in every PR body and Closes when default-targeting, and prevents lanes from mutating issues"
+      - "keeps issue text public-safe without private plan content, local paths, or ignored-file references"
+      - "only generates planning artifacts and never creates issues, branches, or PRs"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)ISSUE_TRACKING[^\\n]*on"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(default[^\\n]*off|off[^\\n]*default)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?is)PLANNED STACK.*PR-1.*issue[^\\n]*title.*(body|stub).*PR-2.*issue[^\\n]*title.*(body|stub)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(stable[^\\n]*(key|marker)|(key|marker)[^\\n]*stable)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?is)DESIGN GO.*(create|reuse).*before[^\\n]*branch"
+        weight: 1.0
+      - type: matches_regex
+        target: "Closes #"
+        weight: 1.0
+      - type: matches_regex
+        target: "Tracks #"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(direct[^\\n]*/goal|/goal[^\\n]*(owner|session)|no runner|without[^\\n]*runner)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(public.safe|private plan|local paths|ignored.file)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(never|not|no)[^\\n]*(creat|mutat)[^\\n]*(issue|GitHub)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)reconcile-(1|<ordinal>|[0-9])"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?is)(defer|only after)[^\\n]*product.*PLAN REVISION: none"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(extra|another) PR.*stop.*report.*before[^\\n]*branch"
+        weight: 1.0
+
+  - id: default_off_emits_no_issue_work
+    prompt: >
+      Generate the plan and execution goals for M2 from its source documents.
+      ISSUE_TRACKING is not provided. Show only the emitted execution actions,
+      not examples of disabled GitHub commands.
+    fixtures: []
+    rubric:
+      - "emits ISSUE_TRACKING off with no issue stubs or issue mutation actions"
+      - "keeps planning limited to the authoritative artifacts and ignored local evidence"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)ISSUE_TRACKING[^\\n]*off"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue create"
+        weight: 1.0
+      - type: not_contains
+        target: "gh issue edit"
+        weight: 1.0
+      - type: not_contains
+        target: "issue (on only):"
+        weight: 0.9
