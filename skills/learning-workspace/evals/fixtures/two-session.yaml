@@ -58,6 +58,13 @@ sessions:
         status: active
         misconception_id: MC-01
         misconception_state: open
+    optional_coverage_record:
+      id: LR-0003
+      concept_id: duplicate-key-selection
+      evidence_kind: covered
+      result: not_assessed
+      status: active
+      scope: Teacher feedback only; no learner retry and no misconception correction.
     expected_projection:
       aggregation: Self-reported only; no grouping work inspected.
       duplicate-key-selection: Needs practice; explanation covered but MC-01 unresolved.
@@ -79,6 +86,7 @@ sessions:
       - kind: inspected_learner_answer
         text: Three customers C, D and E. customer_id is the key; both C rows belong to the same customer.
         support: Task visible; no notes or hints used in the supplied synthetic event.
+    default_expectations_when: S01 optional_coverage_record was not created.
     expected_records:
       - id: LR-0003
         concept_id: duplicate-key-selection
@@ -95,6 +103,25 @@ sessions:
         preserve: Original incorrect answer, date, feedback and scope.
       LR-0001:
         preserve: Active self-report; never upgrade aggregation to demonstrated.
+    with_optional_s01_coverage:
+      expected_records:
+        - id: LR-0004
+          concept_id: duplicate-key-selection
+          evidence_kind: demonstrated
+          result: correct
+          status: active
+          misconception_id: MC-01
+          misconception_state: corrected
+          supersedes: [LR-0002]
+      expected_prior_record_edits:
+        LR-0002:
+          status: superseded
+          superseded_by: LR-0004
+          preserve: Original incorrect answer, date, feedback and scope.
+        LR-0001:
+          preserve: Active self-report; never upgrade aggregation to demonstrated.
+        LR-0003:
+          preserve: Active coverage record; never overwrite it or upgrade it to demonstrated.
     expected_projection:
       aggregation: Still self-reported only; a new lesson would add coverage, not demonstration.
       duplicate-key-selection: Demonstrated on the supplied examples; MC-01 corrected in scope, not global mastery.
@@ -108,4 +135,4 @@ sessions:
       - No retention gain or durable mastery is inferred from elapsed time.
 counterfactual:
   replacement_s02_input: I understand now.
-  expected: Self-report only; no LR-0003 correction, no supersession, MC-01 remains unresolved, next task still customer-key practice.
+  expected: Self-report only; no demonstrated correction at LR-0003 (without S01 coverage) or LR-0004 (with S01 coverage), no supersession, MC-01 remains unresolved, next task still customer-key practice.

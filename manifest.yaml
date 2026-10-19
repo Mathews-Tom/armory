@@ -669,7 +669,7 @@ packages:
     category: review
     difficulty: intermediate
   - name: intake
-    version: 1.0.0
+    version: 1.0.1
     description: Use when preparing an asynchronous discovery questionnaire for one external recipient whose expertise the
       sender needs, including clarifying the recipient or needed decisions before drafting; not live interrogation, survey
       analytics or repository onboarding.
@@ -722,7 +722,7 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: learning-workspace
-    version: 1.0.0
+    version: 1.0.1
     description: Use when a human wants a persistent learning workspace across sessions, resumes lessons from recorded evidence,
       reports practice or a misconception to revisit, or changes an ongoing learning mission. Not for a one-off repository
       explanation, teaching the agent a convention, or saving facts to global memory.
@@ -1525,7 +1525,7 @@ packages:
     complements:
     - chart-clarity
   - name: walkthrough
-    version: 1.0.0
+    version: 1.0.1
     description: Use when an unavoidable human-only operation needs a repeatable guided procedure, such as dashboard consent,
       physical access, credential entry, or an irreversible cutover approval. Not for repository tutoring or setup the agent
       can perform with available tools and authority.
@@ -1891,7 +1891,7 @@ packages:
     category: operations
     difficulty: advanced
   - name: test-engineer
-    version: 1.0.1
+    version: 1.0.2
     description: 'Co-evolutionary skill evolution agent that orchestrates generate-verify-refine loops to produce high-quality
       skill packages. Implements EvoSkills Algorithm 1: a Generator (Opus) writes multi-file skill packages, a Surrogate Verifier
       (Sonnet) generates test assertions and failure diagnostics in an informationally isolated session, and a Ground-Truth

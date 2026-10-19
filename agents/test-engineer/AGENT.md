@@ -19,7 +19,7 @@ description:
 model: opus
 color: yellow
 metadata:
-  version: 1.0.1
+  version: 1.0.2
   category: development
   execution_phase: on-demand
   priority: 60
@@ -158,17 +158,16 @@ failures, and the generator refines the skill.
 - `max_oracle_rounds = 5` (or budget override)
 - `max_surrogate_retries = 15`
 - `best_skill = current skill`
-- `best_score = 0`
+- `best_score = null` until an executed oracle produces a score
 
 **Loop:**
 
-1. **Oracle execution:** Run `scripts/run_evals.py --package skills/<name>` to execute
-   eval cases against a live Claude session with the skill loaded
-   - If `claude` CLI is unavailable, simulate by reading the skill and producing
-     expected output manually, then checking assertions
-2. **Check oracle verdict:**
-   - If all cases pass (oracle_verdict = "pass" for every case): **accept the skill, exit loop**
-   - If aggregate score > best_score: update `best_skill` and `best_score`
+1. **Oracle execution:** Run `scripts/run_evals.py --package skills/<name>` against an authorized live session with the skill loaded.
+   - If the required CLI/session is unavailable, execution is not authorized, or cases were skipped rather than executed, record oracle `NOT_MEASURED`, report the exact missing prerequisite, and exit the loop without oracle acceptance or a ground-truth score.
+   - Manual simulation may inform authored review only; it is not oracle execution or measured evidence.
+2. **Check an executed oracle verdict:**
+   - Accept only when every case actually executed and passed, and the current candidate still satisfies Phase 4.
+   - Update `best_skill` and `best_score` only from an executed oracle score when `best_score` is null or the new score is higher.
 3. **Surrogate diagnostics:** For each failed case, spawn the `surrogate-verifier` in an
    **isolated session** (same isolation as Phase 3) with:
    - The SKILL.md
@@ -197,7 +196,7 @@ failures, and the generator refines the skill.
 
 ### Phase 6: Finalization
 
-1. Write the final skill package (either converged or best-scoring)
+1. Write the final skill package (converged, best-scoring, or explicitly unaccepted when oracle execution was unavailable).
 2. Run all validation steps:
    - `uv run python scripts/validate_evals.py`
    - `uv run python scripts/validate_frontmatter.py`
@@ -210,8 +209,8 @@ failures, and the generator refines the skill.
      initiated: <ISO timestamp>
      total_oracle_rounds: <N>
      total_surrogate_retries: <N>
-     final_verdict: pass | fail | budget_exhausted
-     best_score: <0.0-1.0>
+     final_verdict: pass | fail | budget_exhausted | NOT_MEASURED
+     best_score: <0.0-1.0, or null when no oracle executed>
      iterations:
        - round: 1
          oracle_verdict: fail
@@ -235,7 +234,7 @@ failures, and the generator refines the skill.
    - New cheatsheet strategies that improved the skill
    - New antibodies for error patterns detected
 5. Report the final state to the user:
-   - Package path, actual static conformance, separate authored findings, live NOT_MEASURED and oracle verdict
+   - Package path, actual static conformance, separate authored findings, live NOT_MEASURED, and the executed oracle verdict or oracle NOT_MEASURED with its missing prerequisite
    - Number of evolution rounds completed
    - Key improvements made during refinement
 
@@ -265,7 +264,7 @@ When spawned by another agent (e.g., `team-lead`, or `paper-to-skill`):
 
 - Returns the path to the generated skill directory
 - Returns the evolution log summarizing refinement iterations
-- Returns actual static conformance and its evidence, separate authored findings, live NOT_MEASURED, and the independently measured oracle verdict
+- Returns actual static conformance and its evidence, separate authored findings, live NOT_MEASURED, and the independently measured oracle verdict only when executed; otherwise returns oracle NOT_MEASURED, the missing prerequisite and an unaccepted candidate. Leave the score null if no oracle executed; identify any earlier measured best score as historical, not evidence for the unexecuted candidate.
 - If budget exhausted without convergence, returns the best oracle-scoring iteration with a clear warning: "Budget exhausted after N rounds. Best oracle score: X. Manual review recommended." Re-evaluate that selected package under Phase 4; report gate failures or unavailable evidence without labeling it accepted.
 
 ---
