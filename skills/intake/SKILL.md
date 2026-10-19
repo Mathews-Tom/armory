@@ -2,7 +2,7 @@
 name: intake
 description: Use when preparing an asynchronous discovery questionnaire for one external recipient whose expertise the sender needs, including clarifying the recipient or needed decisions before drafting; not live interrogation, survey analytics or repository onboarding.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: business
   tags: [questionnaire, discovery, async, recipient]
   difficulty: intermediate

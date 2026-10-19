@@ -669,7 +669,7 @@ packages:
     category: review
     difficulty: intermediate
   - name: intake
-    version: 1.0.0
+    version: 1.0.1
     description: Use when preparing an asynchronous discovery questionnaire for one external recipient whose expertise the
       sender needs, including clarifying the recipient or needed decisions before drafting; not live interrogation, survey
       analytics or repository onboarding.

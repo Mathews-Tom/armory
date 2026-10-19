@@ -21,9 +21,9 @@ Please answer directly beneath each question. Partial answers and “I don't kno
 
 ## {{Most important theme, if themes help}}
 
-### Q1. {{One neutral question addressing the highest-priority outcome?}}
-
 {{Optional one-line explanation of why this matters, only if needed to interpret the question.}}
+
+### Q1. {{One neutral question addressing the highest-priority outcome?}}
 
 > Answer:
 
