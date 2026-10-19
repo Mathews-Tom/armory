@@ -1,5 +1,10 @@
 # Changelog — test-engineer
 
+## 1.0.2
+
+- Withhold oracle acceptance and scores when live cases did not execute; report the missing prerequisite and oracle NOT_MEASURED separately from static conformance and authored review.
+- Keep manual simulation in authored review and propagate unmeasured outcomes through finalization and handoff.
+
 ## 1.0.1
 
 - Correct package-evaluator consumption to its 2.0.0 contract: actual report-v2 static PASS and no unresolved CRITICAL/HIGH authored findings, with separate evidence sources and live effectiveness NOT_MEASURED.

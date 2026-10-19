@@ -1891,7 +1891,7 @@ packages:
     category: operations
     difficulty: advanced
   - name: test-engineer
-    version: 1.0.1
+    version: 1.0.2
     description: 'Co-evolutionary skill evolution agent that orchestrates generate-verify-refine loops to produce high-quality
       skill packages. Implements EvoSkills Algorithm 1: a Generator (Opus) writes multi-file skill packages, a Surrogate Verifier
       (Sonnet) generates test assertions and failure diagnostics in an informationally isolated session, and a Ground-Truth
