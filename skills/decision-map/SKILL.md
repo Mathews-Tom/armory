@@ -1,8 +1,8 @@
 ---
 name: decision-map
-description: 'Maps the unresolved architecture, policy, and scope decisions that must be answered before planning can start: one durable decision ticket per question on the issue tracker, typed and blocker-linked under a parent map, with fog-of-war, out-of-scope, a computed frontier, and one decision resolved per invocation. Triggers on: "map the decisions", "what do we need to decide", "identify the unknowns", "not ready to plan yet", "decision map", "chart this effort", "work the next decision ticket", "wayfinder". Use when the destination is still uncertain. NOT for implementation slices of a known feature, use task-decomposer. NOT for milestone plans, use plan-prompts.'
+description: 'Use when mapping unresolved architecture, policy, or scope decisions before planning, working one decision ticket, or testing one unresolved state-model or UI question with throwaway prototype evidence. Also applies to "map the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general UI generation, or adopting experimental code into production.'
 metadata:
-  version: 1.0.1
+  version: 1.1.0
   category: development
   tags: [planning, issue-tracker, decisions, discovery, frontier, pre-planning]
   difficulty: advanced
@@ -38,7 +38,7 @@ Do not turn vague hopes into implementation tasks merely to make progress appear
 
 A map is one parent tracker item with five sections: `Destination`, `Notes`, `Decisions so far`, `Not yet specified`, and `Out of scope`. It is an index, not a duplicate store. A decision exists in exactly one ticket; the map holds only resolution pointers and scope boundaries.
 
-A ticket holds one question, exactly one type label, exactly one interaction label, blockers, visible owner, session claim, and closure state. Refer to maps and tickets by linked title, never a bare identifier. Type labels are `decision-map:discussion`, `decision-map:research`, `decision-map:prototype`, and `decision-map:unblock`. Interaction labels are authoritative: exactly one of `decision-map:hitl` or `decision-map:afk`; ticket bodies must not restate the interaction mode.
+A ticket holds one question, exactly one type, exactly one interaction mode, blockers, visible owner, session claim, and closure state. Refer to maps and tickets by linked title, never a bare identifier. Types are `decision-map:discussion`, `decision-map:research`, `decision-map:prototype`, and `decision-map:unblock`; interaction is exactly one of `decision-map:hitl` or `decision-map:afk`. On GitHub, labels are authoritative and are not duplicated in the body. Local tickets instead require the existing `Type:`, `Interaction:`, `Status:`, and `Blocked by:` headers. Read `references/ticket-types.md` before creating either backend's ticket body.
 
 ## Prerequisites
 
@@ -52,7 +52,7 @@ Probe GitHub capability before using native relationships. When older GitHub Ent
 1. Name the destination before discussing its route. Use one concrete either-or question at a time and reuse the effort's vocabulary.
 2. Sweep breadth-first for policy, architecture, scope, evidence, access, and design questions. If no fog surfaces, stop: the effort needs no decision map.
 3. Ensure labels and the selected backend schema exist. Create the map with all five sections.
-4. Create every question already sharp enough to ticket. Give every ticket exactly one type label and exactly one interaction label.
+4. Create every question already sharp enough to ticket. Give every ticket exactly one type and interaction mode through the selected backend's labels or required local headers.
 5. Wire blocker edges only after ticket creation, because the backend needs ticket identifiers before it can connect them.
 6. Put the remaining unformulated uncertainty in `Not yet specified`; record conscious exclusions with a reason in `Out of scope`.
 7. Compute the frontier and map state with `frontier.py`; report created topology and stop.
@@ -61,11 +61,14 @@ Charting resolves nothing, runs no research, implements nothing, and never colla
 
 ### Mode B — Work Through the Map
 
-1. Load only the map body, select the requested frontier ticket or the first item returned by `frontier.py`, and establish visible ownership.
-2. Acquire and verify the session claim before substantive work. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment.
-3. Resolve exactly one ticket by its type. A HITL ticket requires the human's judgment; an agent answering it alone has broken the ticket.
-4. Record one closure path: `RESOLVED`, `OUT_OF_SCOPE`, or `INVALIDATED`. Write the decision or evidence in the ticket, close it with the matching backend path, and add only a pointer in `Decisions so far` or `Out of scope`.
-5. Create newly surfaced sharp questions, graduate them out of fog, and remove only the graduated fog patch. Recompute frontier and state.
+1. Load the map body and select the requested ticket or the first frontier item returned by `frontier.py`. A continuation may return to this session's already-claimed open ticket; verify that claim rather than acquiring a second one. Establish visible ownership.
+2. Acquire and verify the session claim before substantive work, or re-verify the existing claim on continuation. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment.
+3. Work exactly one ticket by its type. A HITL ticket requires the human's judgment; an agent answering it alone has broken the ticket.
+   For a `prototype` ticket, read `references/prototyping.md` before creating an artifact: it selects one shareable logic/state HTML versus structurally different UI variants and defines browser evidence and scratch-only boundaries. The prototype tests only this ticket's question; its interaction mode still controls who may give the verdict.
+4. Record the outcome using `references/tracker-operations.md`:
+   - Answered or legitimately retired: choose `RESOLVED`, `OUT_OF_SCOPE`, or `INVALIDATED`, record the decision/evidence, close through the matching backend path, and add only a pointer in `Decisions so far` or `Out of scope`.
+   - Still unanswered: report `UNRESOLVED_WITH_EVIDENCE`, append partial evidence and the exact pending human/browser/input prerequisite, and retain the ticket `OPEN` with its existing claim held. This is a work outcome, not a new tracker status or closure path. Preserve the map's resolution sections and blocker edges; do not create or select a second ticket. Continue the same ticket within the existing claim when the prerequisite arrives, subject to normal stale-claim rules.
+5. After a closure only, create newly surfaced sharp questions, graduate them out of fog, and remove only the graduated fog patch. Recompute frontier and state for either outcome.
 6. Report and stop without selecting another ticket.
 
 `unblock` work is restricted to evidence, access, measurement, setup, or a minimal experiment that makes a decision answerable. It never implements a product feature.
@@ -78,13 +81,15 @@ Report map title and identifier, tickets with type and interaction labels, block
 
 ### Work Output
 
-Report the resolved ticket, closure path, recorded decision or evidence, new tickets, changed blocker edges, resulting frontier, state, and stop condition. When the state is `COMPLETE`, recommend `plan-prompts` for implementation planning. Do not create an inline plan.
+Report the worked ticket, outcome, recorded decision or evidence, ticket status, claim disposition, new tickets, changed blocker edges, resulting frontier, computed state, and stop condition. A closed outcome includes its closure path. `UNRESOLVED_WITH_EVIDENCE` includes `ticket: OPEN`, `claim: held`, the exact pending prerequisite, and continuation on the same ticket; with no other actionable tickets, the map is `WAITING`, not complete. If other tickets remain actionable, preserve the state ladder's `ACTIVE` result without working them. When the state is `COMPLETE`, recommend `plan-prompts` for implementation planning. Do not create an inline plan.
+
+For prototype work, include the question, artifact pointer and run/open instructions, observed browser evidence, inferred or untested limits, and verdict (including any pending human judgment). An artifact alone does not justify closure; use the unresolved outcome if its question remains unanswered.
 
 ## Claim Protocol
 
 Visible ownership and session claim are separate requirements. On GitHub, a claim comment begins with `decision-map claim`, includes `session:` and `claimed-at:`, and is re-read before work. The lowest non-stale database comment identifier, encoded in the issue-comment URL, wins. A loser withdraws, removes its assignee if it added one, recomputes the frontier, and selects another ticket. A claim older than the map's configured TTL, default 24 hours, can be preempted with a recorded reason.
 
-Local maps use an exclusive claims lock. See `references/claim-protocol.md` for exact arbitration, stale-claim, and release rules.
+Local maps use an exclusive claims lock. Read `references/claim-protocol.md` for exact arbitration and stale-claim rules. Pausing an unanswered ticket retains the existing claim on either backend; local lock removal is for recorded resolution, not an invented pause/release operation.
 
 ## Map States
 
@@ -121,7 +126,7 @@ Bare issue numbers in narration, maps that repeat ticket content, sharp question
 
 ## Verification
 
-Confirm all five map sections exist; every open ticket is a child of the map and has exactly one type and interaction label; every blocker edge is native or documented as degraded; ownership and claim were verified before substantive action; each closure used one valid path and reached the correct map section; and the reported state matches `frontier.py`.
+Confirm all five map sections exist; every open ticket is a child of the map and has exactly one type and interaction mode through GitHub labels or required local headers; every blocker edge is native or documented as degraded; ownership and claim were verified before substantive action; each closure used one valid path and reached the correct map section; unresolved work preserved the open ticket, claim and pending prerequisite without a resolution pointer; evidence writes preserved backend metadata; and the reported state matches `frontier.py`.
 
 ```bash
 uv run python skills/decision-map/scripts/frontier.py --map 42
@@ -140,4 +145,7 @@ uv run python skills/decision-map/scripts/frontier.py --local .docs/decision-map
 | `references/tracker-operations.md` | GitHub, degraded, and local backend operations |
 | `references/elicitation.md` | Discovery questions and vocabulary discipline |
 | `references/research-resolution.md` | Self-contained AFK research protocol |
+| `references/prototyping.md` | When working a prototype ticket: question-first logic/UI selection, scratch artifacts, browser evidence and verdict |
 | `scripts/frontier.py` | Normalized frontier and state computation |
+| `references/upstream/provenance.md` | When reviewing the original wayfinder/tracker attribution or manually comparing that source |
+| `references/upstream/prototype-provenance.md` | When reviewing prototype attribution or manually comparing the separately pinned prototype source |

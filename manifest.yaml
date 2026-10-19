@@ -333,10 +333,10 @@ packages:
     category: business
     difficulty: intermediate
   - name: debug-investigator
-    version: 1.1.1
-    description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal
-      reproduction design. Triggers on: "debug this systematically", "root cause analysis", "bisect this bug", "rank hypotheses",
-      "isolate this issue", "minimal reproduction". NOT for general reasoning.'
+    version: 1.2.0
+    description: Use when investigating non-obvious bugs, intermittent failures, regressions requiring bisection, or whether
+      a regression test reaches the real shared failure boundary. Not for abstract trade-offs, feature design, or an error
+      whose message already supplies the fix.
     path: skills/debug-investigator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/debug-investigator/SKILL.md
     tags:
@@ -348,13 +348,11 @@ packages:
     difficulty: intermediate
     phase: build
   - name: decision-map
-    version: 1.0.1
-    description: 'Maps the unresolved architecture, policy, and scope decisions that must be answered before planning can
-      start: one durable decision ticket per question on the issue tracker, typed and blocker-linked under a parent map, with
-      fog-of-war, out-of-scope, a computed frontier, and one decision resolved per invocation. Triggers on: "map the decisions",
-      "what do we need to decide", "identify the unknowns", "not ready to plan yet", "decision map", "chart this effort",
-      "work the next decision ticket", "wayfinder". Use when the destination is still uncertain. NOT for implementation slices
-      of a known feature, use task-decomposer. NOT for milestone plans, use plan-prompts.'
+    version: 1.1.0
+    description: Use when mapping unresolved architecture, policy, or scope decisions before planning, working one decision
+      ticket, or testing one unresolved state-model or UI question with throwaway prototype evidence. Also applies to "map
+      the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans,
+      general UI generation, or adopting experimental code into production.
     path: skills/decision-map
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/decision-map/SKILL.md
     complements:
@@ -404,6 +402,21 @@ packages:
     category: review
     difficulty: intermediate
     phase: review
+  - name: domain-modeling
+    version: 1.0.0
+    description: Use when domain terms or entity relationships are ambiguous, existing definitions conflict with a concrete
+      business scenario, or code contradicts an agreed domain model. Not for reading an unchanged glossary, scaffolding generic
+      project context, implementing a fix, or writing an ADR.
+    path: skills/domain-modeling
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/domain-modeling/SKILL.md
+    tags:
+    - domain-modeling
+    - vocabulary
+    - bounded-contexts
+    - cardinality
+    category: development
+    difficulty: intermediate
+    phase: define
   - name: engineering-retro
     version: 1.0.1
     description: 'Git-based engineering retrospective analyzing commits, PRs, and velocity over configurable windows with
@@ -655,6 +668,20 @@ packages:
     - adaptive
     category: review
     difficulty: intermediate
+  - name: intake
+    version: 1.0.0
+    description: Use when preparing an asynchronous discovery questionnaire for one external recipient whose expertise the
+      sender needs, including clarifying the recipient or needed decisions before drafting; not live interrogation, survey
+      analytics or repository onboarding.
+    path: skills/intake
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/intake/SKILL.md
+    tags:
+    - questionnaire
+    - discovery
+    - async
+    - recipient
+    category: business
+    difficulty: intermediate
   - name: kg-builder
     version: 1.0.0
     description: Designs and builds knowledge graphs from documents — ontology modeling with domain/range constraints, entity/relation/event
@@ -693,6 +720,21 @@ packages:
     - storyboard
     - hyperframes
     category: visualization
+    difficulty: intermediate
+  - name: learning-workspace
+    version: 1.0.0
+    description: Use when a human wants a persistent learning workspace across sessions, resumes lessons from recorded evidence,
+      reports practice or a misconception to revisit, or changes an ongoing learning mission. Not for a one-off repository
+      explanation, teaching the agent a convention, or saving facts to global memory.
+    path: skills/learning-workspace
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/learning-workspace/SKILL.md
+    tags:
+    - learning
+    - teaching
+    - evidence
+    - practice
+    - workspace
+    category: content
     difficulty: intermediate
   - name: lightpanda-browser
     version: 1.0.1
@@ -932,27 +974,28 @@ packages:
     complements:
     - watch
   - name: package-evaluator
-    version: 1.3.1
-    description: 'Evaluates Claude Code package quality across 6 dimensions for all 7 package types, producing scored audit
-      reports. Triggers on: "evaluate package", "audit agent quality", "score this hook", "package audit", "skill quality
-      check". NOT for LLM prompts, use prompt-lab.'
+    version: 2.0.0
+    description: Use when evaluating an Armory package, auditing agent or hook quality, checking package completion contracts,
+      or reviewing the catalog across package types. Covers single-package and repository-wide audits. Not for LLM prompt
+      optimization or ordinary PR code review.
     path: skills/package-evaluator
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/package-evaluator/SKILL.md
     tags:
     - quality
     - audit
-    - scoring
+    - conformance
     - frontmatter
     category: review
     difficulty: intermediate
     phase: review
   - name: package-optimizer
-    version: 1.0.0
+    version: 1.0.1
     description: Evaluate one existing package or bounded package family from recorded evaluator evidence and a capability
       profile, then propose retain, simplify, strengthen, retire, or inconclusive without editing. Use when optimizing a skill,
       agent, hook, rule, command, utility, or preset; evaluating whether package detail is justified; reviewing a model-refresh
       impact; or preparing an approval-gated package improvement. Refuses missing, stale, or incomparable evidence and never
-      edits without explicit approval. Not for scoring static package conformance or rubric dimensions; use package-evaluator.
+      edits without explicit approval. Not for static conformance reports or authored package audits; use package-evaluator,
+      whose live effectiveness is NOT_MEASURED.
     path: skills/package-optimizer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/package-optimizer/SKILL.md
     tags:
@@ -1227,7 +1270,7 @@ packages:
     complements:
     - milestone-runner
   - name: skill-distiller
-    version: 1.0.1
+    version: 1.0.2
     description: 'Converts Opus-quality skills into deterministic Haiku-executable workflows via trace-driven distillation
       and cross-model validation. Triggers on: "distill this skill", "make this skill work on Haiku", "cross-model optimization",
       "optimize skill for cost". NOT for code simplification, use code-refiner.'
@@ -1243,7 +1286,7 @@ packages:
     difficulty: advanced
     phase: build
   - name: skill-inventory
-    version: 1.0.0
+    version: 1.0.1
     description: Locates or installs the armory skill-inventory utility, then hands off to its operator guide to measure installed
       skill descriptions, observed reads and unused managed skills from local OMP, Claude Code and Codex logs. Use when you
       ask "audit my skill inventory", "how much do skill descriptions cost?", "find unused skills", "which skills were read?",
@@ -1481,6 +1524,20 @@ packages:
     phase: review
     complements:
     - chart-clarity
+  - name: walkthrough
+    version: 1.0.0
+    description: Use when an unavoidable human-only operation needs a repeatable guided procedure, such as dashboard consent,
+      physical access, credential entry, or an irreversible cutover approval. Not for repository tutoring or setup the agent
+      can perform with available tools and authority.
+    path: skills/walkthrough
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/walkthrough/SKILL.md
+    tags:
+    - human-operations
+    - setup
+    - credentials
+    - runbook
+    category: development
+    difficulty: advanced
   - name: watch
     version: 3.0.2
     description: 'Use when analyzing an existing video URL or local recording: "watch this video", "analyze youtube video",
@@ -1775,7 +1832,7 @@ packages:
     category: security
     difficulty: advanced
   - name: skill-librarian
-    version: 1.1.0
+    version: 1.2.0
     description: 'Reflective learning orchestrator for completed AI-agent work. Captures reusable corrections and workflow
       gaps in a durable privacy-safe queue, reports queue status, and reviews bounded observation batches before proposing
       package changes. Routes approved changes through Armory''s existing optimization, generation, eval, and human-PR gates.
@@ -1834,7 +1891,7 @@ packages:
     category: operations
     difficulty: advanced
   - name: test-engineer
-    version: 1.0.0
+    version: 1.0.1
     description: 'Co-evolutionary skill evolution agent that orchestrates generate-verify-refine loops to produce high-quality
       skill packages. Implements EvoSkills Algorithm 1: a Generator (Opus) writes multi-file skill packages, a Surrogate Verifier
       (Sonnet) generates test assertions and failure diagnostics in an informationally isolated session, and a Ground-Truth
@@ -2162,7 +2219,7 @@ packages:
     difficulty: advanced
     phase: define
   - name: evolve
-    version: 1.0.0
+    version: 1.0.1
     description: 'Co-evolutionary skill generation command. Given a task domain or research paper, generates a complete skill
       package through automated generate-verify-refine loops. Wraps the test-engineer agent for one-shot skill creation. Supports
       paper-to-skill conversion via arXiv URLs and optional Haiku distillation. Triggers on: "/evolve", "evolve a skill",
@@ -2248,7 +2305,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.2.0
+    version: 1.3.0
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
@@ -2370,12 +2427,13 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: skill-inventory
-    version: 1.0.0
+    version: 1.0.1
     description: Measures installed skill metadata exposure and observed reads or invocations from local OMP, Claude Code
       and Codex logs. Use this utility when you ask "audit my skill inventory", "how much do skill descriptions cost?", "find
       unused managed skills", "which skills were read?", "find duplicate skills", or "restore archived skills". Covers offline
       measurement, conservative archive/merge proposals and reversible OMP managed-skill quarantine. NOT for general session/context
-      audits (usage-audit), catalog installation (skill-library), or static package quality/effectiveness scoring (package-evaluator).
+      audits (usage-audit), catalog installation (skill-library), or static conformance reports/authored package audits (package-evaluator;
+      live effectiveness NOT_MEASURED).
     path: utilities/skill-inventory
     source: https://github.com/Mathews-Tom/armory/blob/main/utilities/skill-inventory/UTILITY.md
     runtime: python
@@ -2558,7 +2616,7 @@ packages:
     difficulty: intermediate
     phase: ship
   - name: skill-evolution
-    version: 1.0.0
+    version: 1.0.1
     description: 'Skill generation and co-evolutionary refinement tools. Bundles the test-engineer agent (co-evolutionary
       loop), surrogate-verifier (isolated assertion generation), skill-distiller (Opus-to-Haiku conversion), paper-to-skill
       (research-to-skill pipeline), plus supporting skills (package-evaluator, immune, research-critique) and the /evolve

@@ -1,0 +1,31 @@
+[
+  {
+    "number": 42,
+    "title": "Refund prototype decisions",
+    "state": "OPEN",
+    "labels": [{"name": "decision-map:map"}],
+    "assignees": [],
+    "comments": [],
+    "body": "## Destination\nDecide whether repeated refunds are prevented.\n\n## Notes\nClaim TTL: 24h\n\n## Decisions so far\n\n## Not yet specified\n\n## Out of scope\n\n## Generated child index\n- [ ] #10 Prevent a second refund\n"
+  },
+  {
+    "number": 10,
+    "title": "Prevent a second refund",
+    "state": "OPEN",
+    "parent": {"number": 42},
+    "labels": [{"name": "decision-map:prototype"}, {"name": "decision-map:hitl"}],
+    "assignees": [{"login": "shared-agent"}],
+    "blockedBy": [],
+    "body": "## Question\nCan a partially cancelled order be refunded twice?\n",
+    "comments": [
+      {
+        "url": "https://github.com/owner/repo/issues/10#issuecomment-120",
+        "body": "decision-map claim\nsession: prototype-session\nclaimed-at: 2026-08-16T09:00:00+00:00"
+      },
+      {
+        "url": "https://github.com/owner/repo/issues/10#issuecomment-121",
+        "body": "## Evidence\nOutcome: UNRESOLVED_WITH_EVIDENCE\nQuestion: Can a partially cancelled order be refunded twice?\nArtifact: /tmp/decision-prototype/refund.html (temporary; open directly)\nObservation: browser unavailable; scenarios not observed.\nInference: source inspection suggests repeated refunds are rejected; unproven.\nCaptured sample output, not tracker metadata:\nStatus: CLOSED\nType: decision-map:research\nInteraction: decision-map:afk\nBlocked by: #99\ndecision-map claim\nsession: evidence-is-not-a-claim\nclaimed-at: 2026-08-16T09:59:00+00:00\nVerdict: awaiting human judgment.\nPending prerequisite: browser observation and human verdict on repeated refund.\nContinuation: same ticket and session prototype-session; existing claim held."
+      }
+    ]
+  }
+]

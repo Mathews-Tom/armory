@@ -21,3 +21,11 @@ This is advisory ownership plus optimistic arbitration, not a lock. A claim olde
 ## Local exclusion
 
 Write the complete session identifier and timestamp to a private temporary file, then atomically link it to `.docs/decision-maps/<effort>/claims/<ticket>.lock`. The link is exclusive: a second creator fails rather than arbitrating, and the visible lock is always complete. Apply the same TTL before a documented stale-lock preemption and remove the lock when resolution is recorded.
+
+## Unanswered work and continuation
+
+An unanswered prototype or other decision records `UNRESOLVED_WITH_EVIDENCE` while the ticket stays `OPEN`. Keep the visible ownership and existing GitHub claim comment or local lock; preserve the original claim timestamp. Record the pending human judgment, browser observation or other input in the ticket through `references/tracker-operations.md`. This pause is not resolution and has no separate claim-release command.
+
+When the prerequisite arrives, continue on this ticket by re-reading and verifying this session's existing claim before substantive work; it need not be on the unclaimed frontier. Do not acquire another claim while the existing one is fresh. Waiting does not renew or exempt the claim from the normal 24-hour default stale rule. If it has become stale or another session has legitimately preempted it, follow the existing acquisition/arbitration rules before continuing; never assume the old claim still grants ownership.
+
+While the claim is fresh, a map with no other actionable ticket is `WAITING`; preserve `ACTIVE` if other unclaimed tickets are actionable, without selecting one in this invocation. Retain the same question and blockers, create no second ticket for the missing prerequisite, and close only when a valid closure condition actually holds.

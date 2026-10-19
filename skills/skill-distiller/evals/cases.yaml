@@ -96,3 +96,13 @@ cases:
     rubric:
       - "Should NOT activate — this is skill creation for test-engineer agent"
     trigger_expected: false
+
+  - id: source_gate_is_not_cross_model_performance
+    prompt: "Distill this existing skill for Haiku. The source has report-v2 static PASS and live NOT_MEASURED, but an unresolved authored HIGH finding says its fallback output is missing. We also have measured target/source assertion scores of 0.7/1.0. Can the machine PASS bypass the finding, or does the 80% cross-model comparison replace the source prerequisite?"
+    fixtures: []
+    rubric:
+      - "Refuses trace collection and distillation until the authored HIGH finding is resolved despite actual static PASS"
+      - "Reports machine conformance and authored findings separately and retains live NOT_MEASURED"
+      - "Preserves the distinct existing target/source behavioral 80% comparison and identifies 0.7/1.0 as below that policy without treating it as an evaluator score"
+      - "Does not invent an evaluator quality percentage or launch new model calls to bypass the source gate"
+    trigger_expected: true

@@ -14,7 +14,7 @@ description:
 model: sonnet
 color: cyan
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   category: development
   execution_phase: on-demand
   priority: 55
@@ -61,7 +61,7 @@ This is the write half of the Memento-Skills read-write loop
 
 - Work is still in progress and no completed task boundary exists.
 - The user wants to refine a named package immediately; use `test-engineer`.
-- The user wants a static package score; use `package-evaluator`.
+- The user wants a static conformance report or authored package audit; use `package-evaluator` (live effectiveness is `NOT_MEASURED`).
 - The user wants to create a skill from a research paper; use
   `paper-to-skill`.
 - The user wants to reorganize or rename the package catalog.
@@ -88,6 +88,10 @@ The optional turn window is the last 20 turns or the prior explicit user-task
 boundary, whichever is shorter. An explicit transcript path replaces that
 window. Never search arbitrary historical sessions.
 
+These are language-guided modes, not an executable capture API. The existing
+`/librarian` command passes normalized inputs; do not invent a script, endpoint,
+queue field, or command flag to classify an environment failure.
+
 ## Composition Map
 
 | Component | Used in | Responsibility |
@@ -95,7 +99,7 @@ window. Never search arbitrary historical sessions.
 | `package-optimizer` | Existing-package review | Evidence-gated retain, simplify, strengthen, retire, or inconclusive proposal |
 | `paper-to-skill` | New-package review | Specification extraction only |
 | `test-engineer` | Approved implementation | Generate-verify-refine work on the approved package scope |
-| `package-evaluator` | Pre-PR gate | Static conformance and package quality evidence |
+| `package-evaluator` | Pre-PR gate | Static conformance report or authored package audit; live effectiveness `NOT_MEASURED` |
 
 ## Observation Store
 
@@ -183,7 +187,9 @@ complete record, never a partially written YAML document.
 
 ### Step 1 — Ingest one completed task
 
-1. Resolve the current-task boundary or read the explicit transcript.
+1. Resolve the current-task boundary or read the explicit transcript. If that
+   source is missing or inaccessible, report the missing prerequisite and stop
+   without retaining an observation; do not substitute another session.
 2. Identify packages invoked and the user correction, workaround, or reusable
    workflow that changed the outcome.
 3. Stop with `no_action` when no substantive task completed.
@@ -210,6 +216,48 @@ A lesson is reusable only when it:
 
 Project settings, temporary constraints, preferences already stored elsewhere,
 routine success, and novel-but-one-off work return `no_action`.
+
+#### Classify the environment failure
+
+For an evidenced environment failure, use the categories below to choose the
+smallest preventive action. Inspect only sources relevant to the completed task;
+this is not a repository-wide audit. Categories are analysis labels, not new
+`verdict` or `status` values.
+
+For attribution or a deliberate upstream comparison of these categories, read
+`references/upstream/provenance.md`; it records the source, adaptations and manual
+resync boundary without changing the queue contract.
+
+| Category and evidence | Bounded prevention to consider during review |
+| --- | --- |
+| **Navigation:** the task repeatedly searched for an existing source or missed a hidden dependency | Add or repair a conditional pointer to that source, stating when to load it and what it supplies; reuse existing docs rather than copy their content into always-loaded instructions |
+| **Automated checks:** a mechanical error escaped, or supplied evidence shows no guardrail runs the relevant check | Discover the repository's actual check command and its hook/CI wiring; repair an existing broken or unwired check first, otherwise propose the cheapest deterministic check for the observed failure |
+| **Coding standards:** review missed a concrete violation | For a fixed syntax, API, import or file-location constraint, use the automated-check path; for cross-file consistency or other genuine judgment, clarify the existing reviewer guidance with the evidenced decision and counterexample |
+| **Tool economy:** redundant or oversized tool output obscured needed evidence | Propose one scoped query, output filter or existing-tool invocation change and name the evidence it must preserve; observed call/output waste does not establish token or cost savings |
+| **No-ops:** a steering instruction demonstrably failed to change behavior or duplicates an existing authority | Propose removing or clarifying that specific instruction; source length alone is not evidence that a rule is ineffective |
+| **Information access:** a crucial log, document or service fact was unavailable | Propose a bounded read-only source or log exposure, with owner/permission prerequisite and privacy limits; do not obtain credentials, grant access or connect services |
+
+Before recommending any new check or rule, read the relevant package scripts or
+build configuration, existing lint/type/test definitions, and hook/CI wiring.
+Trace the discovered command to its consumer: a declared command is not evidence
+that it runs. Record whether the needed guardrail is **present and working**,
+**present but broken/unwired**, **missing**, or **unknown**, with source locators.
+Repair a broken rule, excluded path, ineffective assertion or missing invocation
+before inventing another rule or skill. A genuinely missing guardrail merits a
+deterministic-check proposal, not a new prose prohibition. When source or wiring
+cannot be inspected, name the missing prerequisite and keep the conclusion
+unverified; do not infer absence or claim the check executed.
+
+An environment finding still must meet all four reuse criteria above. An isolated
+repository repair with no reusable package-level lesson returns `no_action`;
+capture is not authority to edit that repository. For a reusable lesson, retain
+the existing verdict decision tree: the category selects prevention, not a new
+package by default. Put the generalized failure/prevention in `principle`, source
+locators in `evidence`, and category, guardrail state, bounded prevention intent
+and unresolved prerequisite in the existing free-text `disposition_reason`.
+Sanitize all of these in Step 3 before retaining or presenting them. Do not add
+schema keys or enum values. Capture records the lesson, not a drafted patch;
+review verifies and presents the bounded proposal for approval.
 
 For `candidate_new`, search `manifest.yaml` before recording. Significant
 existing coverage changes the verdict to `augment_existing`. Validate every
@@ -314,6 +362,11 @@ Distinct targets: <N>
 6. Establish package ownership from the artifact's source, attribution, and
    generator—not its install path. Route upstream-owned packages upstream
    rather than silently forking them.
+7. For environment findings, recheck the category's relevant sources from Capture
+   Step 2 and distinguish missing guardrails from existing broken/unwired ones.
+   Verify a repair-first prevention path before proposing another check or rule.
+   Keep unavailable sources explicit and park or mark inconclusive any proposal
+   that depends on them; do not manufacture evidence by running a repair.
 
 ### Step 3 — Present dispositions and ask
 
@@ -325,6 +378,13 @@ For each cluster, present:
 - disposition: `augment_existing`, `candidate_new`, `cross_cutting`,
   `decline`, `park`, or `inconclusive`;
 - exact next package and validation path.
+  Include the failure category, discovered source/wiring, guardrail state and
+  smallest preventive action in that proposal. A navigation pointer, check
+  repair, new deterministic check, reviewer clarification, scoped tool use,
+  instruction removal or permission-dependent read-only source are different
+  scopes, not interchangeable reasons to create a skill. Local environment work
+  outside Armory is a separately scoped proposal, never an implicit downstream
+  edit.
 
 Ask for explicit approval per cluster. A refusal, dismissal, or silence is not
 approval. In an unattended session, stop after the proposal report.
@@ -349,7 +409,7 @@ the `evoskills-in-progress` label. Return `deferred` on conflict.
 Require:
 
 1. relevant positive and negative behavioral eval cases;
-2. `package-evaluator` static conformance with no critical findings;
+2. `package-evaluator` report-v2 static conformance `PASS`, with authored package audit findings reported separately and live effectiveness `NOT_MEASURED`;
 3. the repository's frontmatter, reference, and eval validators;
 4. a privacy sweep over the diff and proposed PR body; and
 5. explicit evidence that the accepted observation is represented in the
@@ -395,8 +455,10 @@ Cluster <N>: <title>
 Observations: <uuid list>
 Disposition: <value>
 Target: <package or proposed package>
-Evidence: <sanitized summary>
-Next path: <optimizer | specification | decline | park>
+Evidence: <sanitized verified sources/wiring and privacy classification | unavailable source and prerequisite>
+Category/guardrail: <failure category | not applicable>; <present and working | present but broken/unwired | missing | unknown | not applicable>
+Prevention: <smallest bounded preventive action and package/validation path | unresolved prerequisite>
+Next path: <optimizer | specification | decline | park | inconclusive>
 Approval required: yes
 ```
 

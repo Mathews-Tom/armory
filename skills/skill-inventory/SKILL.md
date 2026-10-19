@@ -2,7 +2,7 @@
 name: skill-inventory
 description: 'Locates or installs the armory skill-inventory utility, then hands off to its operator guide to measure installed skill descriptions, observed reads and unused managed skills from local OMP, Claude Code and Codex logs. Use when you ask "audit my skill inventory", "how much do skill descriptions cost?", "find unused skills", "which skills were read?", "set up skill-inventory" or "run the skill inventory utility". Verifies the release checksum, asks before downloading and never replaces an existing install. NOT for context-window audits (usage-audit) or catalog installs (skill-library).'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: operations
   tags: [skills, inventory, utility, installer, exposure]
   difficulty: beginner
@@ -20,7 +20,7 @@ Make the `skill-inventory` utility available to this agent and hand off to its o
 |The utility is not installed, or you do not know where it is|—|
 |Diagnosing what fills the current context window|usage-audit|
 |Searching or installing armory packages|skill-library|
-|Scoring a package against the quality rubric|package-evaluator|
+|Static conformance report or authored package audit; live effectiveness `NOT_MEASURED`|package-evaluator|
 
 Triggers group into inventory audits ("audit my skill inventory", "find unused skills", "which skills were read?"), cost questions ("how much do skill descriptions cost?") and setup ("set up skill-inventory", "run the skill inventory utility").
 

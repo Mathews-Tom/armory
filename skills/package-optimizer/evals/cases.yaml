@@ -86,5 +86,5 @@ cases:
       depth, integrity, and contributing compliance.
     fixtures: []
     rubric:
-      - "static rubric scoring belongs to package-evaluator"
+      - "Routes to package-evaluator for a static conformance report or authored package audit, not weighted rubric scoring; live effectiveness remains NOT_MEASURED"
     trigger_expected: false

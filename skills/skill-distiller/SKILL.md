@@ -2,7 +2,7 @@
 name: skill-distiller
 description: 'Converts Opus-quality skills into deterministic Haiku-executable workflows via trace-driven distillation and cross-model validation. Triggers on: "distill this skill", "make this skill work on Haiku", "cross-model optimization", "optimize skill for cost". NOT for code simplification, use code-refiner.'
 metadata:
-  version: 1.0.1
+  version: 1.0.2
   category: development
   tags: [distillation, cross-model, optimization, haiku, deterministic]
   difficulty: advanced
@@ -26,9 +26,10 @@ without improvising.
 
 ## Prerequisites
 
-- The source skill must exist and pass `package-evaluator` at >= 70%
+- The source skill must exist and satisfy the current `package-evaluator` 2.0.0 contract: actual report-v2 `static_conformance.status: PASS` AND no unresolved CRITICAL or HIGH authored findings. Keep machine evidence and authored findings separate; `live_effectiveness.status` remains NOT_MEASURED.
 - Access to both the source model (Opus) and target model (Haiku/Sonnet) for validation
 - The `surrogate-verifier` skill for cross-model assertion checking
+- If the evaluator or required authored review is unavailable, report the missing prerequisite and stop before trace collection; do not fabricate a score or skip this gate. This prerequisite does not establish cross-model behavioral performance.
 
 ## Workflow
 
@@ -143,7 +144,8 @@ Produce the final comparison:
 
 | Error                               | Resolution                                                    |
 | ----------------------------------- | ------------------------------------------------------------- |
-| Source skill scores below 70%       | Refuse distillation; recommend evolution via test-engineer     |
+| Source static conformance FAIL or unresolved CRITICAL/HIGH authored findings | Refuse distillation; report each evidence source separately and recommend source repair via test-engineer |
+| Source evaluator or authored review unavailable | Report the exact missing prerequisite; withhold gate completion and trace collection |
 | No execution traces available       | Generate synthetic tasks and collect traces before proceeding  |
 | Target model fails all assertions   | Skill may be too complex for target model; report with detail  |
 | Distilled skill longer than source  | Review distillation; patterns may need consolidation           |

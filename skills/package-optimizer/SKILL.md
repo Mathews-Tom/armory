@@ -1,8 +1,8 @@
 ---
 name: package-optimizer
-description: 'Evaluate one existing package or bounded package family from recorded evaluator evidence and a capability profile, then propose retain, simplify, strengthen, retire, or inconclusive without editing. Use when optimizing a skill, agent, hook, rule, command, utility, or preset; evaluating whether package detail is justified; reviewing a model-refresh impact; or preparing an approval-gated package improvement. Refuses missing, stale, or incomparable evidence and never edits without explicit approval. Not for scoring static package conformance or rubric dimensions; use package-evaluator.'
+description: 'Evaluate one existing package or bounded package family from recorded evaluator evidence and a capability profile, then propose retain, simplify, strengthen, retire, or inconclusive without editing. Use when optimizing a skill, agent, hook, rule, command, utility, or preset; evaluating whether package detail is justified; reviewing a model-refresh impact; or preparing an approval-gated package improvement. Refuses missing, stale, or incomparable evidence and never edits without explicit approval. Not for static conformance reports or authored package audits; use package-evaluator, whose live effectiveness is NOT_MEASURED.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   phase: review
   tags: [package, optimization, evaluation, evidence, approval]
@@ -35,7 +35,9 @@ starts a benchmark run.
 4. **Decision question** — what behavior should be retained, simplified, or
    strengthened.
 
-Do not infer effectiveness from package length, heading count, or static score.
+Do not infer effectiveness from package length, heading count, or a static
+conformance report/authored package audit. Report-v2 static conformance is
+`PASS` or `FAIL`; its live effectiveness remains `NOT_MEASURED`.
 
 ## Evidence validity
 

@@ -22,3 +22,13 @@ cases:
     rubric:
       - "Should NOT activate — this is the security-engineer preset"
     trigger_expected: false
+
+  - id: explain_evaluator_evidence_boundary
+    prompt: "Explain the skill-evolution preset's package-evaluator role before installation. Does static PASS establish a six-dimensional quality score or prove the generated skill effective?"
+    fixtures: []
+    rubric:
+      - "Describes report-v2 static conformance and separate evidence-backed authored review rather than six-dimensional quality scoring"
+      - "Explains that unresolved CRITICAL/HIGH authored findings block acceptance even with static PASS"
+      - "Retains live effectiveness NOT_MEASURED and distinguishes independent oracle assertion results"
+      - "Does not install packages or launch evaluations merely to answer the question"
+    trigger_expected: true

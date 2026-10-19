@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 146](https://img.shields.io/badge/packages-146-informational)](manifest.yaml)
+[![packages: 151](https://img.shields.io/badge/packages-151-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -28,7 +28,7 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 | Situation | Package | Output |
 |---|---|---|
-| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, and recorded decisions |
+| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and a disposable prototype when uncertainty needs executable evidence |
 | Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` |
 | Feature is specified and needs implementation slices | [task-decomposer](skills/task-decomposer/) | Phased task board with dependencies and test matrix |
 | Existing plan needs a pre-implementation challenge | [plan-review](skills/plan-review/) | Severity-ranked plan review |
@@ -36,11 +36,15 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 `decision-map` stops at resolved decisions. It recommends `plan-prompts` after a complete map and never creates implementation milestones or tasks.
 
+Disposable prototypes are evidence within `decision-map`, not a separate package or a substitute for production implementation.
+
 ---
 
 
 
 ## Package Catalog
+
+151 package definitions across seven types. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -101,9 +105,11 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [test-harness](skills/test-harness/)             | Comprehensive pytest suite generation — happy path, edge cases, error conditions, fixtures, mocks, async, parametrized tests                                |
 | [debug-investigator](skills/debug-investigator/) | Systematic debugging framework — hypothesis-driven investigation with bisection, log analysis, instrumentation, and minimal reproduction                    |
 | [project-context-setup](skills/project-context-setup/) | Scaffold repo-local agent context — issue tracker rules, triage labels, domain glossary layout, ADR lookup, agent brief conventions                  |
+| [domain-modeling](skills/domain-modeling/) | Challenge ambiguous domain terms, cardinalities, and code/model contradictions; capture agreed vocabulary without generic context scaffolding or ADR writing |
+| [walkthrough](skills/walkthrough/) | Deliver sourced, repeatable procedures for unavoidable human-only operations; keep agent-doable setup and repository onboarding with the agent |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
 | [plan-prompts](skills/plan-prompts/)             | Generate adaptive development plans, execution prompts, and an ignored local design-evidence ledger from source docs |
-| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions before implementation planning begins |
+| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones through serialized design reconciliation, reviewed PR gates, CI, cleanup, and release preparation |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
@@ -123,6 +129,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [notebooklm](skills/notebooklm/)               | Google NotebookLM automation via notebooklm-py — create notebooks, add sources, chat, generate podcasts, videos, infographics, quizzes, flashcards, and more      |
 | [research-critique](skills/research-critique/) | Critical analysis of research papers — methodology evaluation, claims-evidence alignment, contribution assessment with collegial analytical posture               |
 | [immune](skills/immune/)                       | Hybrid adaptive memory with Cheatsheet (positive patterns) and Immune (negative patterns) — Hot/Cold tiered memory, multi-domain antibody scanning, auto-learning |
+| [learning-workspace](skills/learning-workspace/) | Persistent human learning with user-owned mission, lessons, practice evidence, and misconception history across sessions; not one-off repo tutoring or agent memory |
 
 ### Skills — Review & Quality
 
@@ -142,7 +149,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [manuscript-provenance](skills/manuscript-provenance/) | Computational provenance audit verifying every number, table, and figure in a manuscript traces back to code                                        |
 | [manuscript-typography](skills/manuscript-typography/) | Academic typography audit — booktabs, captions, units, references, page layout, visual hierarchy, and LaTeX polish                                  |
 | [repo-sentinel](skills/repo-sentinel/)                 | Security audit and enforcement for public repos — 12 attack surfaces, pre-release readiness, history scrubbing, CI gates                            |
-| [package-evaluator](skills/package-evaluator/)         | Evaluate package quality across 6 weighted dimensions with type-specific signals — frontmatter, triggers, structure, depth, consistency, compliance |
+| [package-evaluator](skills/package-evaluator/)         | Report-v2 static PASS/FAIL and live NOT_MEASURED interpretation, with separate authored findings and authorized behavioral evidence |
 | [devils-advocate](skills/devils-advocate/)             | Challenges AI-generated plans, code, designs, and decisions — pre-mortem, inversion, Socratic questioning with steel-manning and clear verdicts     |
 | [dependency-audit](skills/dependency-audit/)           | Dependency risk assessment — license compliance, maintenance health scoring, CVE detection, bloat identification, supply chain analysis             |
 | [qa-systematic](skills/qa-systematic/)                 | Systematic web QA testing with 8-category health scoring, issue taxonomy, and regression tracking — full, quick, and regression modes               |
@@ -194,6 +201,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [market-analyzer](skills/market-analyzer/)           | Market sizing and trend analysis — TAM/SAM/SOM calculation, Rogers adoption curve, data triangulation, timing assessment                      |
 | [competitive-analyzer](skills/competitive-analyzer/) | Competitive landscape analysis — Porter's Five Forces, feature/pricing matrices, positioning maps, moat taxonomy                              |
 | [feasibility-assessor](skills/feasibility-assessor/) | Financial and technical feasibility — unit economics (CAC/LTV), revenue modeling, break-even, technical risk scoring, build-vs-buy            |
+| [intake](skills/intake/) | Draft one external recipient's asynchronous discovery questionnaire with outcome coverage; not live elicitation, survey analytics, or repository onboarding |
 
 ### Skills — AI/ML & Planning
 
@@ -423,16 +431,13 @@ Packages activate when Claude detects a matching intent. Each package defines tr
 
 ## Package Quality
 
-Every package is evaluated against 6 shared dimensions using the [package-evaluator](skills/package-evaluator/), with type-specific signals for agents, hooks, rules, commands, utilities, and presets:
+The [package-evaluator](skills/package-evaluator/) separates three evidence sources:
 
-| Dimension               | Weight | What it measures                                                 |
-| ----------------------- | ------ | ---------------------------------------------------------------- |
-| Frontmatter Quality     | 20%    | Description length, trigger phrases, "Use when" clause           |
-| Trigger Coverage        | 18%    | Synonym breadth, implied contexts, interrogative forms           |
-| Structural Completeness | 20%    | Workflow, error handling, output format, type-specific metadata  |
-| Content Depth           | 22%    | Decision frameworks, multi-step workflows, type-specific signals |
-| Consistency & Integrity | 12%    | Name matching, file references, description-body alignment       |
-| CONTRIBUTING Compliance | 8%     | Naming conventions, length limits, YAML validity                 |
+- **Machine conformance:** `scripts/evaluate_package.py --path skills/my-skill-name --json` emits report-v2 records with static conformance `PASS` or `FAIL` and live effectiveness `NOT_MEASURED`. Static checks do not establish routing or task outcomes.
+- **Authored findings:** source-backed review of observable completion, distinct invocation branches, conditional reference loading, configuration discovery and type-specific contracts. These findings remain separate from machine status.
+- **Authorized behavioral evidence:** actual invocations, artifacts, observations and limits, recorded only when execution is separately authorized. Unexercised behavior stays unmeasured; a static pass or authored case does not establish effectiveness.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#quality-gate--static-conformance-and-authored-review) for submission requirements and the current evaluator interface. There is no weighted package-quality score or percentage acceptance threshold.
 
 ---
 

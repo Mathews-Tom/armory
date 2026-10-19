@@ -1,5 +1,7 @@
 # Contributing
 
+Authoring guidance on context pointers, invocation branches, completion criteria and environment discovery is adapted from Matt Pocock's [writing-for-agents](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/productivity/writing-for-agents/SKILL.md) and [SKILL-MECHANICS.md](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/productivity/writing-for-agents/SKILL-MECHANICS.md), pinned at `49dd158d1076134a641b33efb035946536778336`. Copyright (c) 2026 Matt Pocock; MIT notice: [package-evaluator/LICENSE](skills/package-evaluator/LICENSE). For attribution review or deliberate upstream resync, read the [adaptation provenance](skills/package-evaluator/references/upstream/provenance.md). Armory's metadata, report-v2 evidence boundaries and harness compatibility rules remain local adaptations.
+
 ## Package Types
 
 Armory supports seven package types. Each lives in its own top-level directory with a definition file:
@@ -25,7 +27,7 @@ Definition frontmatter must be a YAML mapping; empty, scalar, and list-valued fr
 ```yaml
 ---
 name: my-skill-name
-description: What this skill does in plain language.
+description: Use when a request falls within this skill's task domain.
 metadata:
   version: 1.0.0
   category: development
@@ -39,10 +41,15 @@ metadata:
 ```yaml
 ---
 name: my-agent-name
-description: What this agent does.
+description: Use when an autonomous agent must carry out this task domain's multi-step investigation.
 type: agent
+model: sonnet
+color: blue
 metadata:
   version: 1.0.0
+  category: development
+  tags: [investigation, automation, workflow]
+  difficulty: intermediate
 ---
 ```
 
@@ -51,10 +58,13 @@ metadata:
 ```yaml
 ---
 name: my-rule-name
-description: What this rule enforces.
+description: Use when reviewing or applying this rule's concrete constraints within its declared scope.
 type: rule
 metadata:
   version: 1.0.0
+  category: development
+  tags: [constraints, standards, review]
+  difficulty: intermediate
 ---
 ```
 
@@ -63,10 +73,16 @@ metadata:
 ```yaml
 ---
 name: my-command-name
-description: What this command does.
+description: Use when explicitly invoking this command's documented operation with its supported arguments.
 type: command
+command:
+  syntax: /my-command-name
+  handler: inline
 metadata:
   version: 1.0.0
+  category: development
+  tags: [command, automation, workflow]
+  difficulty: intermediate
 ---
 ```
 
@@ -75,11 +91,18 @@ metadata:
 ```yaml
 ---
 name: my-hook-name
-description: What this hook does.
+description: Use when configuring this event-driven hook and its documented handler input and output contract.
 type: hook
-trigger: pre-commit # or post-commit, pre-edit, etc.
+hook:
+  events: [PreToolUse]
+  handler:
+    type: command
+    command: ./handler.sh
 metadata:
   version: 1.0.0
+  category: operations
+  tags: [hook, events, automation]
+  difficulty: intermediate
 ---
 ```
 
@@ -88,10 +111,15 @@ metadata:
 ```yaml
 ---
 name: my-utility-name
-description: What this utility does.
+description: Use when invoking this standalone utility to produce its documented output from supported inputs.
 type: utility
+utility:
+  runtime: python
 metadata:
   version: 1.0.0
+  category: development
+  tags: [utility, automation, output]
+  difficulty: intermediate
 ---
 ```
 
@@ -100,14 +128,18 @@ metadata:
 ```yaml
 ---
 name: my-preset-name
-description: What this preset bundles.
+description: Use when selecting this package bundle for its documented combined workflow and supported targets.
 type: preset
-packages:
-  - skills/some-skill
-  - rules/some-rule
-  - hooks/some-hook
+preset:
+  packages:
+    - skills/some-skill
+    - rules/some-rule
+    - hooks/some-hook
 metadata:
   version: 1.0.0
+  category: operations
+  tags: [preset, bundle, workflow]
+  difficulty: intermediate
 ---
 ```
 
@@ -124,7 +156,7 @@ Packages use [semantic versioning](https://semver.org/) via the `metadata.versio
 | Change Type | Bump | Example | Concrete examples |
 | --- | --- | --- | --- |
 | Breaking change to behavior or schema | MAJOR | `1.0.0` -> `2.0.0` | Removed workflow step, renamed command, changed output format |
-| New capability, backward-compatible | MINOR | `1.0.0` -> `1.1.0` | Added workflow step, new reference file, expanded trigger coverage |
+| New capability, backward-compatible | MINOR | `1.0.0` -> `1.1.0` | Added workflow step, new reference file, support for a distinct invocation branch |
 | Bug fix, typo, clarification | PATCH | `1.0.0` -> `1.0.1` | Typo fix, description improvement, eval case addition |
 
 After changing a version, regenerate the manifest:
@@ -148,7 +180,7 @@ For packages with active development (frequent updates across multiple PRs), add
 ## 1.1.0
 
 - Added reference file for edge cases
-- Expanded trigger phrases for activation coverage
+- Added a distinct configuration-discovery invocation branch with its own output and completion criteria
 ```
 
 Changelogs are optional. Single-version packages and packages with only a few changes do not need them — the git history suffices.
@@ -168,7 +200,7 @@ Packages must be standalone. Every file a package references must live within it
 - Absolute paths to files outside the package directory
 - References to files that only exist in other packages
 
-**Why:** Packages are distributed individually via `npx skills add` and archive files. Cross-package references break when a package is installed without its dependency. The skill-evaluator flags this as a CRITICAL D5 finding.
+**Why:** Packages are distributed individually via `npx skills add` and archive files. Cross-package file references break when a package is installed without its dependency. Check this with `scripts/validate_references.py` and package-content review; the report-v2 static evaluator does not inspect reference targets.
 
 **Shared content:** If multiple packages need the same reference file, use the template sync system (see below). Each package gets its own physical copy, managed by `scripts/sync_templates.py`.
 
@@ -206,45 +238,45 @@ Current templates:
 
 ## Description Rules
 
-- Maximum 1024 characters (sweet spot: 200-800 characters)
-- No angle brackets (`<`, `>`)
-- No pushy trigger language ("always use", "you must", "never do")
-- Include trigger phrases users would type to activate the package
-- Include a "Use this skill when..." clause describing activation contexts
+- Keep descriptions within the current validator's 50–1024 character range. These are static format limits, not evidence of effectiveness.
+- No angle brackets (`<`, `>`) or pushy trigger language ("always use", "you must", "never do").
+- Describe concrete invocation contexts and the boundary with adjacent packages, using a "Use when..." clause or equivalent.
+- Cover each distinct invocation branch. Repeated synonyms for one task do not cover a different task.
+- Preserve the required `description` field even for explicit user invocation. Invocation flags and router behavior are harness-specific: discover support in the target adapter/configuration rather than copying another harness's frontmatter.
 
-## Writing an Effective Description
+### Writing a discoverable description
 
-The frontmatter description controls whether Claude activates your package. A package with deep content but a weak description delivers zero value.
-
-**Include in every description:**
-
-1. What the package does (functional summary)
-2. Key operations or subcommands covered
-3. Trigger phrases across synonym families (e.g., "review", "audit", "critique", "evaluate")
-4. A "Use this skill when..." clause listing concrete activation scenarios
-5. Domain-specific terms users associate with the task
-
-**Example (good):**
+The description is a context pointer: it tells an agent or person when to reach the package. Put the triggering situation before implementation details. State capabilities only as needed to distinguish the task; keep the workflow in the body.
 
 ```yaml
 description: >
-  Architecture reviews across 7 dimensions: structural integrity, scalability,
-  security, performance, enterprise readiness, operational excellence, and data
-  architecture. Produces scored reports with prioritized recommendations.
-  Triggers on: "review architecture", "critique design", "audit system",
-  "evaluate codebase", "assess scalability". Use this skill when the user
-  provides a system design document or codebase and asks for feedback.
+  Use when reviewing a system design document or codebase for architecture risks,
+  or comparing proposed architectures before implementation. For a line-level
+  code diff review, use the PR review workflow instead.
 ```
 
-**Example (insufficient):**
+This example names distinct document/codebase and comparison branches and an adjacent boundary. Whether it routes correctly requires observed invocation cases; wording, phrase counts and character counts cannot establish that.
 
-```yaml
-description: "Review architecture and provide feedback."
-```
+## Observable Authoring Contracts
+
+For each supported invocation, identify its input, selected branch, required reference/configuration, observable output and completion criterion. A criterion must be checkable and exhaustive: "every changed model has a migration decision and evidence pointer" rather than "understand the models" or merely "write a summary." Each step ends with the artifact, observed state or explicit unresolved prerequisite that distinguishes done from not done.
+
+Keep instructions every branch needs in the definition file. Put branch-only detail behind a package-local pointer stating **when to load it** and **what it supplies**. For example, "For a CLI-backed export, read `references/cli-export.md` before selecting flags; it defines export/error evidence." A config-only invocation should not have to read that reference. A references table with filenames alone is not a loading contract. Keep a concept's rules and caveats together and retain one authoritative source for each requirement.
+
+Discover mutable facts from the environment: package scripts, configuration files, directory layout and the installed tool's help/implementation. Record the source of chosen commands, config keys and precedence. Explain only conventions or gotchas that those sources cannot reveal; do not cache a repository's current test command as a universal instruction. If a required tool or config source is missing, name it, report which branch is blocked and complete independent work without inventing flags or successful execution.
+
+Use a branch matrix, not a synonym inventory:
+
+| Invocation branch (illustrative) | Conditional material/config discovery | Observable completion evidence |
+| --- | --- | --- |
+| Export through an installed CLI | Load the CLI export reference; inspect installed help and the project script selecting that CLI | Artifact path, exact sourced command, exit result and artifact inspection; or exact missing CLI prerequisite |
+| Export through a config-only integration | Load the config integration reference; inspect the active config and its loader/precedence | Config source/key and resulting artifact or observed configuration effect; or exact missing loader/config prerequisite |
+
+These filenames and commands are illustrative, not files to create for every package. Provide real local pointers and package-specific evidence for every branch actually promised. Split a branch into a separate package only when independent invocation earns a separate discovery surface, not merely to shorten source. Source shortening and structural conformance do not prove better agent behavior.
 
 ## Metadata Fields
 
-Every package should include `category`, `tags`, and `difficulty` under `metadata:` in frontmatter.
+Every package must include `category`, `tags`, and `difficulty` under `metadata:` in frontmatter. These authoring requirements are broader than report-v2's minimal static checks.
 
 Maintain these fields directly in each package definition. The manifest generator mirrors declared metadata; it does not infer categories, tags, or difficulty.
 
@@ -355,7 +387,7 @@ write time and at retrieval time.
 
 ## Optional Content Sections
 
-Skills and agents may include three optional sections that improve agent compliance. These are recommended for review, quality, and security packages.
+Skills and agents may include these optional sections when they address a concrete execution risk. Their presence alone does not establish agent compliance.
 
 ### Rationalizations
 
@@ -388,7 +420,7 @@ Observable patterns indicating the skill isn't being followed correctly during e
 
 ### Verification
 
-Concrete evidence requirements proving the skill was executed correctly. Demands artifacts (test output, build logs, scores), not subjective assessment.
+Concrete evidence requirements distinguish completed work from an assertion of success. Require artifacts (test output, build logs, inspected output) covering every applicable acceptance criterion, and identify unexercised cases explicitly.
 
 ```markdown
 ## Verification
@@ -400,33 +432,29 @@ Concrete evidence requirements proving the skill was executed correctly. Demands
 
 **When to include:** Recommended for skills that produce measurable outcomes (testing, review, deployment).
 
-## Quality Gate — Skill Evaluator
+## Quality Gate — Static Conformance and Authored Review
 
-Before submitting a PR, run the [skill-evaluator](skills/skill-evaluator/) against your package:
+Run the current repository interface before submitting a PR:
 
 ```bash
-claude --add-dir skills/skill-evaluator --add-dir skills/my-skill-name
-# Then: "Run a quick audit on skills/my-skill-name"
+uv run python scripts/evaluate_package.py --path skills/my-skill-name --json
 ```
 
-The evaluator scores 6 dimensions:
+`scripts/evaluate_package.py` emits a JSON **list** of report-v2 package records (`report_version: 2`). Each record separates:
 
-| Dimension                   | Weight | Minimum for PR |
-| --------------------------- | ------ | -------------- |
-| D1: Frontmatter Quality     | 20%    | 3/5            |
-| D2: Trigger Coverage        | 18%    | 3/5            |
-| D3: Structural Completeness | 20%    | 3/5            |
-| D4: Content Depth           | 22%    | 3/5            |
-| D5: Consistency & Integrity | 12%    | 4/5            |
-| D6: CONTRIBUTING Compliance | 8%     | 4/5            |
+- `static_conformance.status`: `PASS` or `FAIL`, with `requirements` and `findings`. It checks definition/frontmatter presence, type-required fields, name/directory agreement, kebab-case directory naming and version syntax when a version is present.
+- `live_effectiveness.status`: `NOT_MEASURED`, with the designated runner and type-specific dimensions. A static pass does not measure activation, task outcomes or configuration effects.
+- Top-level `status` and `findings`: mirrors of static conformance, not a second quality verdict.
 
-**Minimum overall score for PR acceptance: 70% (Adequate).**
+The command exits 1 for a static failure or invalid requested path and 0 when all evaluated records pass. It has `--path` and `--json`; omitting `--path` evaluates the catalog. Type filtering is a reviewer-selected scope, not a `--type` evaluator flag.
 
-Packages scoring below 70% need improvement before review. Packages with CRITICAL findings (missing frontmatter, name mismatch) are automatically rejected.
+Run the separate frontmatter, reference and eval-schema validators as well: the static evaluator does not enforce every authoring policy (including the description cap), inspect reference targets or execute helpers. Use the [package-evaluator](skills/package-evaluator/SKILL.md) for an evidence-backed authored review of branch contracts, reference loading, configuration discovery and type-specific behavior. Keep authored findings distinct from machine output; do not rewrite the machine status to incorporate them.
+
+There is no weighted package-quality score, percentage acceptance threshold or scorecard in this interface. Attach actual conformance output, remaining authored findings and the scope/limits of behavioral evidence to the PR. A conformant package is not thereby effective. Existing effectiveness roadmap requirements, including M4/M8 experimental gates, remain binding; this static gate does not clear them.
 
 ## Eval Cases
 
-Every skill must have eval cases in `skills/<name>/evals/cases.yaml`. These define trigger accuracy — does the skill activate on the right queries and stay silent on the wrong ones?
+Every active package must have `evals/cases.yaml` within its own directory. Cases specify intended invocation and task behavior, including adjacent tasks that should leave the package inactive. Authored cases are coverage specifications, not observed successes.
 
 **Schema:**
 
@@ -445,17 +473,19 @@ cases:
 
 | Skill Status | Positive Cases (trigger_expected: true) | Negative Cases (trigger_expected: false) |
 | ------------ | --------------------------------------- | ---------------------------------------- |
-| Active       | 1+ (recommended: 2+)                    | 2+                                       |
+| Active       | 2+; cover every distinct invocation branch | 2+                                    |
 | Deprecated   | 0 (must be zero)                        | 2+                                       |
 
 **Deprecating a skill:** Set `metadata.status: deprecated`, then move the package from `skills/<name>/` to `archive/skills/<name>/` (no deprecated skill may remain under `skills/`). Archived skills are retained for reference only and are excluded from discovery, installation, the manifest, and adapters. After moving, regenerate the manifest and adapters and move its row in `README.md` to the "Skills — Deprecated (Archived)" table with an `archive/skills/` link.
 
 **Guidelines:**
 
-- Positive cases should use natural language a real user would type
-- Negative cases should test plausible but incorrect triggers (adjacent tasks the skill should NOT handle)
-- Each case needs a unique `id` (snake_case)
-- Rubric items describe what a correct response looks like, not implementation details
+- Positive cases use natural language a real user would type and cover every distinct invocation branch, not just synonyms of one branch.
+- Negative cases test plausible adjacent tasks the package should not handle.
+- Each case needs a unique `id` (snake_case), `prompt`, `fixtures: []` when no fixture is supplied, `rubric` and boolean `trigger_expected`.
+- Rubric items specify observable artifacts/evidence and exhaustive completion, including the selected reference/config path and behavior when a prerequisite is missing.
+- Include adversarial conditional-reference and differing CLI/config-environment cases when applicable. A file existing does not show that the right branch loads it.
+- Keep authored rubrics, structural validation/dry-runs, deterministic helper tests and separately authorized live invocation results distinct. Assertions matching words or formats do not establish task success by themselves.
 
 **Validation:**
 
@@ -467,13 +497,9 @@ CI runs this on every PR. Skills without valid evals will fail the pipeline.
 
 ## Testing Locally
 
-Point Claude Code at the package directory:
+Discover the current harness setup and runner modes from configuration, implementation and help before selecting an invocation. Only run model sessions when authorized. Record the package/case identity, environment, actual invocation, output/artifact and observed result; do not infer activation from a directory being accessible.
 
-```bash
-claude --add-dir skills/my-skill-name
-```
-
-Verify the package loads and behaves as expected before submitting a PR.
+`scripts/run_evals.py` normally launches live Claude sessions. Its `--dry-run` skips execution, so skipped cases (even a printed summary saying PASS) are structure-only evidence, not activation or effectiveness. Keep evaluator `live_effectiveness` as `NOT_MEASURED`; attach separately authorized measured evidence without relabeling the static report.
 
 ## Packaging
 
@@ -500,15 +526,15 @@ Before opening a PR, confirm:
 - [ ] Definition file has valid YAML frontmatter with `name`, `description`, and `metadata.version`
 - [ ] Version bumped according to semver (MAJOR/MINOR/PATCH)
 - [ ] Manifest regenerated: `uv run scripts/generate_manifest.py`
-- [ ] Package name is kebab-case, under 64 characters
-- [ ] Description is 200-1024 characters with trigger phrases and "Use when" clause
+- [ ] Package name is kebab-case, at most 64 characters
+- [ ] Description satisfies the current 50–1024 character validator range and names distinct invocation contexts and adjacent boundaries
 - [ ] No angle brackets or pushy language in description
 - [ ] No secrets, credentials, or internal URLs in any file
-- [ ] Tested locally with Claude Code
+- [ ] Actual authorized local checks and behavioral evidence recorded, with unmeasured/skipped cases and prerequisites explicit
 - [ ] All file references in the definition file resolve to existing files within the package directory
 - [ ] No cross-package references (`../other-package/`) — package is fully self-contained
-- [ ] Eval cases exist in `evals/cases.yaml` with 1+ positive and 2+ negative triggers (for skills)
-- [ ] Evals pass: `uv run python scripts/validate_evals.py`
+- [ ] Eval cases exist in `evals/cases.yaml` with 2+ positive cases covering every distinct invocation branch and 2+ adjacent negatives
+- [ ] Eval schema validated: `uv run python scripts/validate_evals.py` (not a behavioral pass)
 - [ ] Templates synced (if using shared templates): `uv run python scripts/sync_templates.py`
-- [ ] Skill evaluator score is 70% or above (paste the scorecard in your PR)
-- [ ] No CRITICAL or HIGH findings from skill evaluator
+- [ ] Report-v2 static conformance is PASS; actual output and separate authored findings attached
+- [ ] Frontmatter/reference validation and applicable authored-review findings resolved; effectiveness claims limited to separately measured evidence

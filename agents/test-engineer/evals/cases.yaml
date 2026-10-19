@@ -11,7 +11,7 @@ cases:
     trigger_expected: true
 
   - id: improve_existing_skill
-    prompt: "This skill for API documentation generation only scores 55% on the package evaluator. Improve it through automated co-evolutionary refinement until it passes the 70% threshold."
+    prompt: "Improve the existing API documentation skill through co-evolutionary refinement. Its report-v2 static conformance is FAIL, with a separately authored HIGH finding for an undefined completion artifact."
     fixtures: []
     rubric:
       - "Reads the existing skill as baseline v0"
@@ -46,8 +46,18 @@ cases:
     trigger_expected: false
 
   - id: not_package_evaluator
-    prompt: "Score this skill's frontmatter quality and check if it meets the 70% threshold"
+    prompt: "Evaluate this skill's static conformance and authored instruction quality; do not evolve it."
     fixtures: []
     rubric:
       - "Should NOT activate — this is package metadata evaluation for package-evaluator skill"
     trigger_expected: false
+
+  - id: gate_requires_independent_evidence
+    prompt: "Refine this existing skill. Its oracle assertions all pass and the report-v2 static result is PASS with live effectiveness NOT_MEASURED, but authored review has an unresolved HIGH finding for a missing promised output. The next evaluator invocation is unavailable. Can we accept it using the oracle score instead?"
+    fixtures: []
+    rubric:
+      - "Withholds acceptance despite static PASS and passing oracle assertions because the authored HIGH finding remains unresolved"
+      - "Keeps actual report-v2 status, authored findings and oracle assertion results as separate evidence sources"
+      - "Reports the unavailable evaluator prerequisite and requires fresh gate evidence for the repaired candidate rather than skipping Phase 4 or inventing a score"
+      - "Retains live effectiveness NOT_MEASURED without initiating additional live calls merely to fill the evidence gap"
+    trigger_expected: true

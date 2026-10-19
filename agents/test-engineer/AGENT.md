@@ -19,7 +19,7 @@ description:
 model: opus
 color: yellow
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   execution_phase: on-demand
   priority: 60
@@ -77,7 +77,7 @@ convergence.
 | Component           | Type  | Invoked In    | Purpose                                                              |
 | ------------------- | ----- | ------------- | -------------------------------------------------------------------- |
 | surrogate-verifier  | skill | Phase 3, 5    | Generate assertions and failure diagnostics (isolated session)       |
-| package-evaluator   | skill | Phase 4       | Score generated skill against 6-dimensional quality rubric           |
+| package-evaluator   | skill | Phase 4       | Report-v2 static conformance and separate authored findings          |
 | immune              | skill | Phase 2, 5    | Cheatsheet injection (pre-gen) and antibody scan (post-gen)          |
 
 ---
@@ -110,7 +110,7 @@ The generator produces the first version of the skill package. Emit complete fil
    - Extract positive patterns that improve skill quality
    - Inject these as context for generation
 2. Generate the complete skill package following armory conventions:
-   - `SKILL.md` with YAML frontmatter (name, description with 6+ trigger phrases, metadata)
+   - `SKILL.md` with YAML frontmatter (name, description covering relevant distinct invocation branches within the current 1024-character cap, metadata)
    - `evals/cases.yaml` with 3+ positive cases and 3+ negative cases
    - `references/` directory with supporting documents if the domain requires them
 3. Apply structural patterns from `NEW_PACKAGE_CHECKLIST.md`:
@@ -140,14 +140,13 @@ The verifier generates test assertions without access to the generator's reasoni
 
 ### Phase 4: Quality Gate
 
-1. Run the `package-evaluator` skill on the generated package
-2. Check the 6-dimensional score:
-   - **Must pass:** Overall >= 70%, zero CRITICAL findings
-   - **Should pass:** D1 (Frontmatter) >= 3/5, D2 (Triggers) >= 3/5
-3. If below threshold:
-   - Collect all findings (CRITICAL, HIGH, MEDIUM)
-   - Feed findings to Phase 5 as additional refinement context
-4. If the package-evaluator cannot run (e.g., files not written yet), skip to Phase 5
+1. Run the `package-evaluator` skill on the generated package using its current 2.0.0 contract.
+2. Record independent evidence sources:
+   - Actual report-v2 `static_conformance.status`: PASS or FAIL, with command/output evidence.
+   - Authored review findings: severity, evidence and resolution; these are not machine report fields.
+   - Report-v2 `live_effectiveness.status`: NOT_MEASURED; this does not establish oracle success.
+3. Proceed only when static conformance is PASS AND no unresolved CRITICAL or HIGH authored findings remain. Send failures and evidenced findings to refinement, then repeat Phase 4 before oracle execution or acceptance.
+4. If the evaluator or required authored review is unavailable, report the exact missing prerequisite and withhold gate completion. Do not skip the gate, invent a score or infer PASS from oracle results.
 
 ### Phase 5: Oracle Execution and Refinement Loop
 
@@ -182,8 +181,9 @@ failures, and the generator refines the skill.
 5. **Refinement:** Feed the following back to the generator context:
    - Surrogate verifier's diagnostics (root causes + remediation suggestions)
    - Immune system's antibody matches (if any)
-   - Package evaluator findings from Phase 4 (if applicable)
+   - Static failures and authored findings from Phase 4, kept separate from oracle assertions
    - Apply the specific remediations to the SKILL.md and supporting files
+   - After package edits, repeat Phase 4 on the current candidate before further oracle execution; unresolved or unavailable evidence blocks acceptance
 6. **Test escalation check:** If the surrogate verifier's assertions all passed but the
    oracle failed, the tests were too easy. Signal the verifier (in its next isolated
    invocation) to escalate assertion difficulty:
@@ -215,7 +215,16 @@ failures, and the generator refines the skill.
      iterations:
        - round: 1
          oracle_verdict: fail
-         package_evaluator_score: 62
+         package_evaluator:
+           report_version: 2
+           static_conformance: FAIL
+           live_effectiveness: NOT_MEASURED
+           evidence: "<actual command/output artifact>"
+         authored_review:
+           unresolved_findings:
+             - severity: HIGH
+               evidence: "<file/section and demonstrated issue>"
+               remedy: "<required correction>"
          assertions_passed: "4/7"
          diagnostics_summary: "Missing error handling section, format mismatch"
          changes_made:
@@ -226,7 +235,7 @@ failures, and the generator refines the skill.
    - New cheatsheet strategies that improved the skill
    - New antibodies for error patterns detected
 5. Report the final state to the user:
-   - Package path, quality score, oracle verdict
+   - Package path, actual static conformance, separate authored findings, live NOT_MEASURED and oracle verdict
    - Number of evolution rounds completed
    - Key improvements made during refinement
 
@@ -238,7 +247,7 @@ failures, and the generator refines the skill.
 | ------------------- | -------- | --------------------------------------------------------------- |
 | Skill package       | Files    | Complete `skills/<name>/` directory with SKILL.md, evals, refs  |
 | Evolution log       | YAML     | `evals/evolution-log.yaml` with per-round iteration history     |
-| Quality scorecard   | Markdown | Package evaluator 6-dimension score summary                     |
+| Evaluation evidence | Markdown | Actual report-v2 status/evidence and separate authored review findings |
 
 ---
 
@@ -256,9 +265,8 @@ When spawned by another agent (e.g., `team-lead`, or `paper-to-skill`):
 
 - Returns the path to the generated skill directory
 - Returns the evolution log summarizing refinement iterations
-- Returns the final quality score and oracle verdict
-- If budget exhausted without convergence, returns the best-scoring iteration with a
-  clear warning: "Budget exhausted after N rounds. Best score: X. Manual review recommended."
+- Returns actual static conformance and its evidence, separate authored findings, live NOT_MEASURED, and the independently measured oracle verdict
+- If budget exhausted without convergence, returns the best oracle-scoring iteration with a clear warning: "Budget exhausted after N rounds. Best oracle score: X. Manual review recommended." Re-evaluate that selected package under Phase 4; report gate failures or unavailable evidence without labeling it accepted.
 
 ---
 
@@ -269,7 +277,7 @@ When spawned by another agent (e.g., `team-lead`, or `paper-to-skill`):
 | Max oracle rounds      | 5       | Input budget         | Hard cap on ground-truth evaluation cycles    |
 | Max surrogate retries  | 15      | Input budget         | Max verifier invocations per oracle round     |
 | Context cap            | 0.7     | Not overridable      | Max context utilization before forcing output |
-| Quality threshold      | 70%     | Not overridable      | Min package-evaluator score to proceed        |
+| Package gate           | Required | Not overridable      | Static PASS AND no unresolved CRITICAL/HIGH authored findings |
 
 ---
 
@@ -281,7 +289,7 @@ When spawned by another agent (e.g., `team-lead`, or `paper-to-skill`):
 4. Every evolution round writes to the evolution log before proceeding
 5. If budget exhausts without convergence, output the best-scoring iteration with a warning
 6. Generated skills must follow all conventions in `NEW_PACKAGE_CHECKLIST.md`
-7. Never skip the quality gate (Phase 4) — even if oracle passes, the package-evaluator must score >= 70%
+7. Never skip Phase 4: acceptance requires actual report-v2 static PASS AND no unresolved CRITICAL/HIGH authored findings on the selected final package, even if the oracle passes. Missing evidence blocks acceptance; live effectiveness remains NOT_MEASURED.
 8. Test escalation triggers only when surrogate passes but oracle fails — not on every failure
 9. Immune system feedback is advisory — the generator decides which patterns to apply
 10. The evolution log is append-only within a session — never overwrite prior iteration records

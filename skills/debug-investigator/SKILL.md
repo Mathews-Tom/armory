@@ -1,8 +1,8 @@
 ---
 name: debug-investigator
-description: 'Hypothesis-driven debugging with ranked hypotheses, git bisect strategy, instrumentation planning, and minimal reproduction design. Triggers on: "debug this systematically", "root cause analysis", "bisect this bug", "rank hypotheses", "isolate this issue", "minimal reproduction". NOT for general reasoning.'
+description: 'Use when investigating non-obvious bugs, intermittent failures, regressions requiring bisection, or whether a regression test reaches the real shared failure boundary. Not for abstract trade-offs, feature design, or an error whose message already supplies the fix.'
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   category: development
   tags: [debugging, root-cause, hypothesis, bisect]
   difficulty: intermediate
@@ -31,12 +31,18 @@ step so dead ends are never revisited.
 | `references/bisection-guide.md`        | git bisect workflow, binary search debugging, narrowing techniques            | Bug appeared after a change     |
 | `references/log-analysis.md`           | Log pattern extraction, anomaly detection, timeline correlation               | Log output available            |
 | `references/instrumentation-points.md` | Strategic logging placement, breakpoint strategy, state inspection techniques | Investigation plan needed       |
+| `references/upstream/provenance.md`     | Source pin, adaptation boundaries, MIT notice and manual resync policy         | Attribution/license review or deliberate upstream resync |
 
 ## Prerequisites
 
 - **git** — for bisection and history analysis
 - **Access to source code** — cannot debug opaque binaries
 - **Reproducible environment** — or at minimum, error output (stacktrace, logs)
+
+Discover reproduction and test commands from project scripts, test configuration, and installed
+tool help before selecting invocations; record their source and relevant environment settings.
+Run only checks and mutations authorized by the task. If access, tools, or execution authority
+are missing, record the affected evidence as unobserved and complete independent analysis.
 
 ## Project Context
 
@@ -66,6 +72,9 @@ Before touching code, document the observable problem:
 5. **Environment** — Python version, OS, dependency versions, configuration differences
    between working and broken environments.
 
+Keep the original input, setup, caller sequence, and expected outcome available separately from
+any later minimized reproduction; these define the final original-scenario check.
+
 ### Phase 2: Build a Feedback Loop
 
 Create a fast, deterministic pass/fail signal for the reported bug before ranking hypotheses
@@ -73,7 +82,8 @@ or changing production code. The loop must reproduce the user's symptom, not a n
 
 Try these seams in order:
 
-1. Failing test at the smallest public interface that reaches the bug.
+1. Failing test at the smallest public interface that reaches the complete bug pattern,
+   including interactions between callers when relevant.
 2. CLI or script invocation with fixture input and asserted output.
 3. Curl or HTTP request against a local server with asserted response, logs, or state.
 4. Browser automation for UI bugs with DOM, console, and network assertions.
@@ -178,14 +188,67 @@ Execute the investigation plan, updating hypotheses as evidence arrives:
 4. **Know when to escalate** — If all hypotheses are exhausted, the bug is in a
    category you haven't considered. Step back and re-examine assumptions.
 
-### Phase 7: Resolution Documentation
+### Phase 7: Fix and Regression Proof
 
-After finding the root cause:
+Once evidence identifies the cause, select the regression boundary **before the fix**:
 
-1. **Root cause** — What was actually wrong, precisely.
-2. **Fix** — What was changed and why.
-3. **Prevention** — How to prevent recurrence (test, lint rule, type check, etc.).
-4. **Lessons** — What was learned that applies beyond this specific bug.
+1. **Trace the real interaction.** Record the affected callers, shared state or dependency,
+   and ordering/concurrency that triggers the defect. Choose a seam that executes that
+   interaction through the real implementation, not merely the nearest callable function.
+   For example, if preview and submit callers share a cache with an incomplete key, exercise
+   both callers against the same cache and assert each caller's correct result. A fresh-cache
+   test of preview alone cannot prove that the shared-cache bug is covered.
+2. **Assess candidate seams.** Check whether each candidate preserves those callers, state,
+   and sequence. Reject a shallow single-caller test or a mock that replaces the defective
+   boundary. Keep the smallest seam that reproduces the actual pattern, not the smallest test
+   at any cost.
+3. **If a correct seam exists, prove red then green.** Turn the minimized reproduction into
+   a regression test before changing the implementation. Run it on the defective source and
+   capture the actual failure: expected/actual values or state must identify this defect.
+   Import errors, setup failures, arbitrary exceptions, test names, or execution alone are
+   not red evidence. Fix the causal boundary and rerun the same defect-specific assertions;
+   record the observed pass. Exercise every implicated caller, including unaffected/control
+   behavior needed to distinguish the defect from a blanket workaround.
+4. **If no correct seam exists, report that finding.** List the candidate seams attempted,
+   the interaction each cannot reach, and the architectural or access limitation. Distinguish
+   an architecture with no usable seam from a seam whose execution is blocked by missing
+   tools, fixtures, permission, or environment access. Do not invent a shallow regression
+   test or claim regression protection. With a credible Phase 2 loop and established cause,
+   a fix may still be evaluated through that loop; absence of a regression seam remains an
+   explicit limitation, not an excuse for speculative success.
+
+**Conditional forced-red check:** A natural pre-fix red needs no mutation. If intentionally
+reintroducing a defect or mutating a fixture to assess test sensitivity, preserve a pristine
+pre-mutation copy of the actual current source/fixture (including unrelated edits). Compare
+the mutated content against that copy **before interpreting any test outcome**, and identify
+the intended changed lines and exercised path. A no-op replacement, changed unused file, or
+unrelated difference is invalid mutation evidence, even when a test passes or fails. Repair
+the mutation and establish the comparison before retrying, or report sensitivity unproven.
+A valid mutation must fail on the defect-specific assertion, not a syntax/setup error.
+Restore the exact pre-mutation content afterward, including after interruption or failure;
+compare against the preserved copy and rerun the restored test. Report any restoration or
+execution block explicitly. Mutation supplements, rather than substitutes for, natural
+pre-fix red/green evidence; do not require it for every fix.
+
+### Phase 8: Original Scenario, Cleanup and Resolution
+
+Before declaring the bug resolved:
+
+1. **Original scenario** — Rerun the saved, unminimized Phase 2 scenario with its original
+   caller sequence and relevant environment, asserting the Phase 1 expected outcome.
+   A passing minimized/unit test alone is insufficient. If this cannot run, state the
+   missing prerequisite and mark original-scenario resolution unverified.
+2. **Cleanup** — Remove temporary diagnostic logging, breakpoints, probes and throwaway
+   harnesses. Inspect the touched paths for the instrumentation identifiers used; preserve
+   unrelated/user instrumentation. Keep the permanent regression test and necessary fixtures.
+   After cleanup, rerun the regression (when a seam exists) and original scenario against the
+   final source so temporary instrumentation cannot be the reason they passed.
+3. **Resolution evidence** — State the confirmed cause, causal fix, regression boundary and
+   observed red/green results (or explicit no-seam/blocked finding), original-scenario outcome,
+   and cleanup/restoration status. Separate executed evidence from proposed commands and
+   inferred outcomes. Never report an unrun or invalid check as success.
+4. **Prevention and lessons** — Explain how recurrence is covered or what architectural
+   limitation prevents coverage, and what was learned beyond this specific bug.
 
 ## Output Format
 
@@ -249,16 +312,20 @@ After finding the root cause:
 ```{language}
 # Minimal code that triggers the bug
 {code}
-````
+```
 
 ### Resolution
 
 **Root cause:** {What was wrong}
 **Fix:** {What was changed — file:line, diff summary}
-**Prevention:** {Test added, lint rule, type annotation, etc.}
+**Regression boundary:** {Callers, shared state, trigger sequence, and why this seam reaches them; or attempted seams and explicit limitation}
+**Red / green:** {Observed defect-specific pre-fix failure and post-fix result; or blocked/unobserved}
+**Forced mutation, if used:** {Pristine comparison, exercised change, assertion outcome, restoration comparison and restored result}
+**Original scenario:** {Unminimized invocation, expected/actual outcome on final source; or missing prerequisite}
+**Cleanup:** {Temporary instrumentation/harness removal and final-source rerun results}
+**Prevention:** {Permanent regression coverage or documented no-seam limit}
 **Lessons:** {What generalizes beyond this bug}
-
-```text
+````
 
 ## Configuring Scope
 
@@ -302,4 +369,3 @@ Push back if:
 - The "bug" is actually a feature request or design disagreement — redirect to ADR or discussion
 - The code is not under the user's control (third-party SaaS, managed service) — file a support ticket instead
 - The user wants to debug generated/minified code — debug the source, not the output
-```

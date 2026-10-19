@@ -56,5 +56,5 @@ cases:
   - id: negative_package_quality
     prompt: "Score my skill package against the armory evaluation rubric. Explain the appropriate capability only; do not run commands."
     rubric:
-      - "Routes to package-evaluator for static package scoring rather than engaging skill-inventory."
+      - "Routes to package-evaluator for a static conformance report or authored package audit rather than engaging skill-inventory; does not promise a score, and live effectiveness remains NOT_MEASURED"
     trigger_expected: false

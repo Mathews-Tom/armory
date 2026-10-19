@@ -14,7 +14,7 @@ description:
 
   '
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: meta
   tags: [evolution, skill-generation, co-evolutionary, pipeline]
   difficulty: advanced
@@ -50,7 +50,7 @@ until convergence.
 | Skill   | surrogate-verifier   | Generates assertions and diagnostics in isolated sessions |
 | Skill   | skill-distiller      | Converts Opus skills to Haiku-executable workflows        |
 | Skill   | paper-to-skill       | Extracts methodologies from papers into skill specs       |
-| Skill   | package-evaluator    | 6-dimensional quality scoring for all package types       |
+| Skill   | package-evaluator    | Report-v2 static conformance and separate authored review |
 | Skill   | immune               | Adaptive cheatsheet/antibody memory system                |
 | Skill   | research-critique    | Critical analysis of research papers                      |
 | Command | evolve               | One-shot skill generation via `/evolve <domain>`          |
@@ -63,7 +63,7 @@ until convergence.
 4. **Test** — Ground-truth oracle executes the skill and checks assertions
 5. **Refine** — Diagnostics from failed assertions drive targeted improvements
 6. **Distill** — Optional `--distill` flag produces Haiku-compatible version
-7. **Ship** — Final package passes all validators and the package-evaluator quality gate
+7. **Finalize** — Final package passes validators, actual report-v2 static conformance is PASS, and no CRITICAL/HIGH authored findings remain. Live effectiveness stays NOT_MEASURED; oracle assertion results are separate evidence, not evaluator scores.
 
 ## When to Install
 
