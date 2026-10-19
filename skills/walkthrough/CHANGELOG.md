@@ -1,5 +1,9 @@
 # Changelog — walkthrough
 
+## 1.0.1
+
+- Terminate the forked PTY test child with exit 127 on setup or exec failure instead of unwinding into the caller; exercise failure paths in isolated subprocesses.
+
 ## 1.0.0
 
 - Add standalone human-only operational procedure guidance, a Bash 3.2 launcher and a Python 3.9+ POSIX helper adapted from the pinned Matt Pocock wizard workflow.

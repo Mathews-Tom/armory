@@ -2,7 +2,7 @@
 name: walkthrough
 description: Use when an unavoidable human-only operation needs a repeatable guided procedure, such as dashboard consent, physical access, credential entry, or an irreversible cutover approval. Not for repository tutoring or setup the agent can perform with available tools and authority.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [human-operations, setup, credentials, runbook]
   difficulty: advanced

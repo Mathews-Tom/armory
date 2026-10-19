@@ -91,16 +91,19 @@ class Session:
         self.master, slave = pty.openpty()
         self.pid = os.fork()
         if self.pid == 0:
-            os.close(self.master)
-            os.setsid()
-            fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
-            for fd in (0, 1, 2):
-                os.dup2(slave, fd)
-            if slave > 2:
-                os.close(slave)
-            env = dict(os.environ, ENV_FILE=str(root / ".env"))
-            env.update(environment)
-            os.execve("/bin/bash", ["bash", str(SHELL), "run", str(plan)], env)
+            try:
+                os.close(self.master)
+                os.setsid()
+                fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+                for fd in (0, 1, 2):
+                    os.dup2(slave, fd)
+                if slave > 2:
+                    os.close(slave)
+                env = dict(os.environ, ENV_FILE=str(root / ".env"))
+                env.update(environment)
+                os.execve("/bin/bash", ["bash", str(SHELL), "run", str(plan)], env)
+            finally:
+                os._exit(127)
         os.close(slave)
         self.output = b""
         self.reaped = False
@@ -165,6 +168,44 @@ class Session:
             os.kill(self.pid, signal.SIGKILL)
             os.waitpid(self.pid, 0)
         os.close(self.master)
+
+
+@pytest.mark.parametrize("failure_point", ["setsid", "ioctl", "dup2", "execve"])
+def test_child_setup_failure_exits_without_unwinding(
+    workspace: Path, failure_point: str
+) -> None:
+    probe = """
+import importlib.util
+import os
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("walkthrough_tests", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+root = Path(sys.argv[2])
+marker = root / "escaped-child"
+def fail(*args, **kwargs):
+    raise OSError("injected child setup failure")
+owner = module.fcntl if sys.argv[3] == "ioctl" else module.os
+setattr(owner, sys.argv[3], fail)
+try:
+    session = module.Session(root, [module.stage()])
+except OSError:
+    marker.write_text("child unwound into caller")
+    os._exit(42)
+with session:
+    status = session.finish()
+assert status == 127 and not marker.exists(), (status, marker.exists())
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe, __file__, str(workspace), failure_point],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_secret_roundtrip_modes_and_upsert(workspace: Path) -> None:
