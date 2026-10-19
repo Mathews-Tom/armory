@@ -7,7 +7,7 @@ description: >
   teaching the agent a convention, or saving facts to global memory.
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: content
   tags: [learning, teaching, evidence, practice, workspace]
   difficulty: intermediate

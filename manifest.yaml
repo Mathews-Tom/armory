@@ -722,7 +722,7 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: learning-workspace
-    version: 1.0.0
+    version: 1.0.1
     description: Use when a human wants a persistent learning workspace across sessions, resumes lessons from recorded evidence,
       reports practice or a misconception to revisit, or changes an ongoing learning mission. Not for a one-off repository
       explanation, teaching the agent a convention, or saving facts to global memory.
