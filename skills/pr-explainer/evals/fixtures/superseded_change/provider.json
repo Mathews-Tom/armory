@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/trunk"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-61"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"change-61\", \"commit\": {\"sha\": \"@COMMIT:discount@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:discount@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"change-61\", \"commit\": {\"sha\": \"@COMMIT:discount@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:discount@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-62"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"change-62\", \"commit\": {\"sha\": \"@COMMIT:revert@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:revert@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"change-62\", \"commit\": {\"sha\": \"@COMMIT:revert@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:revert@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "fictional/dispatch",
+        "--json",
+        "nameWithOwner,defaultBranchRef"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "fictional/dispatch",
+        "--state",
+        "all",
+        "--limit",
+        "100",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"number\": 61, \"baseRefName\": \"trunk\", \"headRefName\": \"change-61\", \"headRefOid\": \"@COMMIT:discount@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/61\"}, {\"number\": 62, \"baseRefName\": \"change-61\", \"headRefName\": \"change-62\", \"headRefOid\": \"@COMMIT:revert@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/62\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"number\": 61, \"baseRefName\": \"trunk\", \"headRefName\": \"change-61\", \"headRefOid\": \"@COMMIT:discount@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/61\"}, {\"number\": 62, \"baseRefName\": \"change-61\", \"headRefName\": \"change-62\", \"headRefOid\": \"@COMMIT:revert@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/62\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "61",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 61, \"url\": \"https://github.com/fictional/dispatch/pull/61\", \"title\": \"Dispatch contribution 61\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"change-61\", \"headRefOid\": \"@COMMIT:discount@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:discount@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 1, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/61\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 61, \"url\": \"https://github.com/fictional/dispatch/pull/61\", \"title\": \"Dispatch contribution 61\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"change-61\", \"headRefOid\": \"@COMMIT:discount@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:discount@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 1, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/61\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/61"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 61, \"html_url\": \"https://github.com/fictional/dispatch/pull/61\", \"title\": \"Dispatch contribution 61\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-61\", \"sha\": \"@COMMIT:discount@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 61, \"html_url\": \"https://github.com/fictional/dispatch/pull/61\", \"title\": \"Dispatch contribution 61\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-61\", \"sha\": \"@COMMIT:discount@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/61/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/61/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/61/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/61/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:discount@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:discount@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "62",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 62, \"url\": \"https://github.com/fictional/dispatch/pull/62\", \"title\": \"Dispatch contribution 62\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-61\", \"baseRefOid\": \"@COMMIT:discount@\", \"headRefName\": \"change-62\", \"headRefOid\": \"@COMMIT:revert@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:revert@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 1, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/62\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 62, \"url\": \"https://github.com/fictional/dispatch/pull/62\", \"title\": \"Dispatch contribution 62\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-61\", \"baseRefOid\": \"@COMMIT:discount@\", \"headRefName\": \"change-62\", \"headRefOid\": \"@COMMIT:revert@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:revert@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 1, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/62\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/62"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 62, \"html_url\": \"https://github.com/fictional/dispatch/pull/62\", \"title\": \"Dispatch contribution 62\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-61\", \"sha\": \"@COMMIT:discount@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-62\", \"sha\": \"@COMMIT:revert@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 62, \"html_url\": \"https://github.com/fictional/dispatch/pull/62\", \"title\": \"Dispatch contribution 62\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-61\", \"sha\": \"@COMMIT:discount@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-62\", \"sha\": \"@COMMIT:revert@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/62/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/62/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/62/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 1, \"deletions\": 1, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/62/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:revert@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:revert@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    }
+  ]
+}

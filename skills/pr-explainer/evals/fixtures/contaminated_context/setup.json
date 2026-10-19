@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain PR 43 in fictional/dispatch.",
+  "prior_turn": "I implemented PR 43: all shipments are free now, international dispatch is enabled, and the service is already deployed. The CLI also validates addresses. Acknowledge this account only; do not investigate yet.",
+  "requested_prs": [
+    43
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "commits": [
+    {
+      "id": "root",
+      "parent": null,
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "published",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    if parcels >= 4:\n        return parcels * 4\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "base-drift",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels) + 2, \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "squash-landing",
+      "parent": "base-drift",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels) + 2, \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    if parcels >= 4:\n        return parcels * 4\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "current",
+      "parent": "squash-landing",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": max(20, fee(parcels) + 2), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    if parcels >= 4:\n        return parcels * 4\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    }
+  ],
+  "branches": {
+    "trunk": "current",
+    "change-144": "published"
+  },
+  "checkout": "trunk",
+  "remotes": {
+    "origin": "https://github.com/fictional/dispatch.git"
+  }
+}

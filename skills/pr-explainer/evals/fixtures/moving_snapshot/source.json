@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "commits": [
+    {
+      "id": "root",
+      "parent": null,
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "initial",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    if parcels >= 4:\n        return parcels * 4\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "later-head",
+      "parent": "initial",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 4\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "later-base",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\nOperators label records manually.\n"
+      }
+    }
+  ],
+  "branches": {
+    "trunk": "root",
+    "change-101": "initial"
+  },
+  "checkout": "change-101",
+  "remotes": {
+    "origin": "https://github.com/fictional/dispatch.git"
+  }
+}

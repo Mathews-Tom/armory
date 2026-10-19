@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "commits": [
+    {
+      "id": "root",
+      "parent": null,
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "parent-published",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n\ndef quote(parcels, express=False):\n    return fee(parcels) + (3 if express else 0)\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "parent-squash",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n\ndef quote(parcels, express=False):\n    return fee(parcels) + (3 if express else 0)\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "child",
+      "parent": "parent-squash",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels, express=False):\n    return submit(address, parcels, express)\n",
+        "dispatch/service.py": "from dispatch.policy import quote\n\ndef submit(address, parcels, express=False):\n    return {\"address\": address, \"charge\": quote(parcels, express), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n\ndef quote(parcels, express=False):\n    return fee(parcels) + (3 if express else 0)\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "closed-child",
+      "parent": "parent-squash",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit, return_parcel\n\ndef main(address, parcels):\n    return submit(address, parcels)\n\ndef cancel(record):\n    return return_parcel(record)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n\ndef return_parcel(record):\n    return {**record, \"status\": \"returned\", \"refund\": record[\"charge\"]}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n\ndef quote(parcels, express=False):\n    return fee(parcels) + (3 if express else 0)\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n"
+      }
+    },
+    {
+      "id": "trunk-current",
+      "parent": "parent-squash",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n\ndef quote(parcels, express=False):\n    return fee(parcels) + (3 if express else 0)\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\nQueue entries can be inspected by operators.\n"
+      }
+    }
+  ],
+  "branches": {
+    "trunk": "trunk-current",
+    "change-82": "child",
+    "change-83": "closed-child"
+  },
+  "checkout": "change-82",
+  "remotes": {
+    "origin": "https://github.com/fictional/dispatch.git"
+  }
+}

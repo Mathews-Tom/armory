@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "request": "Review PR 201 in fictional/dispatch for correctness and security defects. I want findings, not a functional briefing.",
+  "mode": "catalog-routing",
+  "catalog_candidates": [
+    "pr-explainer",
+    "pr-review",
+    "pre-landing-review",
+    "repo-tutor",
+    "stacked-prs",
+    "github"
+  ],
+  "tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "provider_access": false,
+  "receipt": "ARMORY_EVAL_ROUTE: engaged|inactive"
+}

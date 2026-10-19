@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain only PR 52's contribution within the stack containing PR 51 and PR 52 in fictional/dispatch.",
+  "requested_prs": [
+    52
+  ],
+  "context_prs": [
+    51
+  ],
+  "explicit_edges": [
+    [
+      51,
+      52
+    ]
+  ]
+}

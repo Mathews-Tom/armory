@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain PR 41 in fictional/dispatch.",
+  "tracking": {
+    "branch": "change-41",
+    "remote": "origin",
+    "merge": "refs/heads/change-41"
+  },
+  "requested_prs": [
+    41
+  ]
+}

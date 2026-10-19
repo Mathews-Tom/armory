@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 151](https://img.shields.io/badge/packages-151-informational)](manifest.yaml)
+[![packages: 152](https://img.shields.io/badge/packages-152-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -44,7 +44,7 @@ Disposable prototypes are evidence within `decision-map`, not a separate package
 
 ## Package Catalog
 
-151 package definitions across seven types. This is an unversioned rolling catalog; individual packages carry their own versions.
+152 package definitions across seven types. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -108,6 +108,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [domain-modeling](skills/domain-modeling/) | Challenge ambiguous domain terms, cardinalities, and code/model contradictions; capture agreed vocabulary without generic context scaffolding or ADR writing |
 | [walkthrough](skills/walkthrough/) | Deliver sourced, repeatable procedures for unavoidable human-only operations; keep agent-doable setup and repository onboarding with the agent |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
+| [pr-explainer](skills/pr-explainer/)             | Explain pushed PRs, whole stacks, or one stack member through source-grounded functional briefings and domain-knowledge updates; not defect review or merge approval |
 | [plan-prompts](skills/plan-prompts/)             | Generate adaptive development plans, execution prompts, and an ignored local design-evidence ledger from source docs |
 | [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones through serialized design reconciliation, reviewed PR gates, CI, cleanup, and release preparation |

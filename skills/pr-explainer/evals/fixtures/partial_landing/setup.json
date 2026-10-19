@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain the selected family PR 81, PR 82 and PR 83 in fictional/dispatch. PR 81 was their parent before retargeting.",
+  "requested_prs": [
+    81,
+    82,
+    83
+  ],
+  "explicit_edges": [
+    [
+      81,
+      82
+    ],
+    [
+      81,
+      83
+    ]
+  ]
+}

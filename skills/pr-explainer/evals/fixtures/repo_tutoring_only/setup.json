@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "request": "Teach me the entire fictional/dispatch repository from scratch: architecture, domain vocabulary and where a new contributor should start. There is no PR to explain.",
+  "mode": "catalog-routing",
+  "catalog_candidates": [
+    "pr-explainer",
+    "pr-review",
+    "pre-landing-review",
+    "repo-tutor",
+    "stacked-prs",
+    "github"
+  ],
+  "tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "provider_access": false,
+  "receipt": "ARMORY_EVAL_ROUTE: engaged|inactive"
+}

@@ -1066,6 +1066,22 @@ packages:
     complements:
     - decision-map
     - plan-prompts
+  - name: pr-explainer
+    version: 1.0.0
+    description: Use when a developer asks to explain a pushed PR, walk through a PR stack, understand one stack member, or
+      explain what an AI agent just pushed so they can connect code changes to end-to-end functionality and update domain
+      knowledge. Not for defect review, merge approval, PR-body authoring, or full-repository onboarding.
+    path: skills/pr-explainer
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/pr-explainer/SKILL.md
+    tags:
+    - pull-requests
+    - explanation
+    - domain-knowledge
+    - stacked-prs
+    - onboarding
+    category: development
+    difficulty: advanced
+    phase: review
   - name: pr-review
     version: 1.1.1
     description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality

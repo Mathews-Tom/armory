@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/trunk"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-91"],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-92"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"change-92\", \"commit\": {\"sha\": \"@COMMIT:child@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:child@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"change-92\", \"commit\": {\"sha\": \"@COMMIT:child@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:child@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "fictional/dispatch",
+        "--json",
+        "nameWithOwner,defaultBranchRef"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "fictional/dispatch",
+        "--state",
+        "all",
+        "--limit",
+        "100",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"number\": 91, \"baseRefName\": \"trunk\", \"headRefName\": \"change-91\", \"headRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/91\"}, {\"number\": 92, \"baseRefName\": \"change-91\", \"headRefName\": \"change-92\", \"headRefOid\": \"@COMMIT:child@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/92\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"number\": 91, \"baseRefName\": \"trunk\", \"headRefName\": \"change-91\", \"headRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/91\"}, {\"number\": 92, \"baseRefName\": \"change-91\", \"headRefName\": \"change-92\", \"headRefOid\": \"@COMMIT:child@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/92\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "91",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/91"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/91/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/91/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/91/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/91/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent metadata is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "92",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 92, \"url\": \"https://github.com/fictional/dispatch/pull/92\", \"title\": \"Dispatch contribution 92\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-91\", \"baseRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"headRefName\": \"change-92\", \"headRefOid\": \"@COMMIT:child@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/92\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 92, \"url\": \"https://github.com/fictional/dispatch/pull/92\", \"title\": \"Dispatch contribution 92\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-91\", \"baseRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"headRefName\": \"change-92\", \"headRefOid\": \"@COMMIT:child@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/92\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/92"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 92, \"html_url\": \"https://github.com/fictional/dispatch/pull/92\", \"title\": \"Dispatch contribution 92\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-91\", \"sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-92\", \"sha\": \"@COMMIT:child@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"stack\": {\"number\": 900}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 92, \"html_url\": \"https://github.com/fictional/dispatch/pull/92\", \"title\": \"Dispatch contribution 92\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-91\", \"sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-92\", \"sha\": \"@COMMIT:child@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"stack\": {\"number\": 900}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/92/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/92/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/92/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/92/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: parent comparison is not accessible (HTTP 403)",
+          "exit_code": 1
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/stacks/900"
+      ],
+      "responses": [
+        {
+          "stdout": "",
+          "stderr": "gh: stack endpoint unsupported (HTTP 404)",
+          "exit_code": 1
+        },
+        {
+          "stdout": "",
+          "stderr": "gh: stack endpoint unsupported (HTTP 404)",
+          "exit_code": 1
+        }
+      ]
+    }
+  ]
+}

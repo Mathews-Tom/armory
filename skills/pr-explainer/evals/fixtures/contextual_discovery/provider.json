@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/trunk"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/nora/dispatch/branches/discount"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"discount\", \"commit\": {\"sha\": \"@COMMIT:published@\", \"url\": \"https://api.github.com/repos/nora/dispatch/commits/@COMMIT:published@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"discount\", \"commit\": {\"sha\": \"@COMMIT:published@\", \"url\": \"https://api.github.com/repos/nora/dispatch/commits/@COMMIT:published@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "fictional/dispatch",
+        "--json",
+        "nameWithOwner,defaultBranchRef"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "fictional/dispatch",
+        "--state",
+        "all",
+        "--limit",
+        "100",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"number\": 42, \"baseRefName\": \"trunk\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/42\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"number\": 42, \"baseRefName\": \"trunk\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/42\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "42",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 42, \"url\": \"https://github.com/fictional/dispatch/pull/42\", \"title\": \"Dispatch contribution 42\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"nora/dispatch\", \"url\": \"https://github.com/nora/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"nora\"}, \"isCrossRepository\": true, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:published@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 2, \"deletions\": 0}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/42\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 42, \"url\": \"https://github.com/fictional/dispatch/pull/42\", \"title\": \"Dispatch contribution 42\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"nora/dispatch\", \"url\": \"https://github.com/nora/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"nora\"}, \"isCrossRepository\": true, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:published@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 2, \"deletions\": 0}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/42\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/42"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 42, \"html_url\": \"https://github.com/fictional/dispatch/pull/42\", \"title\": \"Dispatch contribution 42\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"discount\", \"sha\": \"@COMMIT:published@\", \"repo\": {\"full_name\": \"nora/dispatch\", \"html_url\": \"https://github.com/nora/dispatch\", \"owner\": {\"login\": \"nora\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 42, \"html_url\": \"https://github.com/fictional/dispatch/pull/42\", \"title\": \"Dispatch contribution 42\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"discount\", \"sha\": \"@COMMIT:published@\", \"repo\": {\"full_name\": \"nora/dispatch\", \"html_url\": \"https://github.com/nora/dispatch\", \"owner\": {\"login\": \"nora\"}}}, \"commits\": 1, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/42/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 0, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 0, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/42/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/42/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 0, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 0, \"changes\": 2}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/42/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:published@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:published@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "fictional/dispatch",
+        "--head",
+        "discount",
+        "--state",
+        "all",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"number\": 42, \"baseRefName\": \"trunk\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/42\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"number\": 42, \"baseRefName\": \"trunk\", \"headRefName\": \"discount\", \"headRefOid\": \"@COMMIT:published@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/42\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "nora/dispatch",
+        "--state",
+        "all",
+        "--limit",
+        "100",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "nora/dispatch",
+        "--json",
+        "nameWithOwner,defaultBranchRef"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"nameWithOwner\": \"nora/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"nameWithOwner\": \"nora/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    }
+  ]
+}

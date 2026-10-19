@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "commits": [
+    {
+      "id": "root",
+      "parent": null,
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n\nfrom dispatch.export import export\n\ndef dump(records):\n    return export(records)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n",
+        "dispatch/export.py": "def export(records):\n    return \"\\n\".join(r[\"address\"] for r in records)\n",
+        "dispatch/worker.py": "def retry(job):\n    job[\"attempts\"] += 1\n    return \"queued\"\n",
+        "dispatch/config.py": "MAX_ATTEMPTS = 3\n",
+        "docs/operators.txt": "Export contains addresses. Failed jobs are retried.\n"
+      }
+    },
+    {
+      "id": "published",
+      "parent": "root",
+      "files": {
+        "dispatch/cli.py": "from dispatch.service import submit\n\ndef main(address, parcels):\n    return submit(address, parcels)\n\nfrom dispatch.export import export\n\ndef dump(records):\n    return export(records)\n",
+        "dispatch/service.py": "from dispatch.policy import fee\n\ndef submit(address, parcels):\n    return {\"address\": address, \"charge\": fee(parcels), \"status\": \"queued\"}\n",
+        "dispatch/policy.py": "def fee(parcels):\n    return parcels * 5\n",
+        "config.toml": "currency = \"credits\"\n",
+        "README.txt": "Dispatch accepts an address and parcel count. A queued record includes charge in credits.\n",
+        "dispatch/export.py": "import json\n\ndef export(records):\n    return \"\\n\".join(json.dumps({\"address\": r[\"address\"], \"charge\": r[\"charge\"]}, sort_keys=True) for r in records)\n",
+        "dispatch/worker.py": "from dispatch.config import MAX_ATTEMPTS\n\ndef retry(job):\n    job[\"attempts\"] += 1\n    return \"dead\" if job[\"attempts\"] >= MAX_ATTEMPTS else \"queued\"\n",
+        "dispatch/config.py": "MAX_ATTEMPTS = 2\n",
+        "docs/operators.txt": "Export is JSON Lines with address and charge. Jobs become dead at the configured attempt limit.\n",
+        "tests/test_flows.py": "from dispatch.export import export\nfrom dispatch.worker import retry\n\ndef test_export():\n    assert '\"charge\": 5' in export([{\"address\": \"A\", \"charge\": 5}])\n\ndef test_dead():\n    assert retry({\"attempts\": 1}) == \"dead\"\n"
+      }
+    }
+  ],
+  "branches": {
+    "trunk": "root",
+    "change-121": "published"
+  },
+  "checkout": "change-121",
+  "remotes": {
+    "origin": "https://github.com/fictional/dispatch.git"
+  }
+}

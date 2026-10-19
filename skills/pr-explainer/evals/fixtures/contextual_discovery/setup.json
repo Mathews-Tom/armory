@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain what you just pushed.",
+  "tracking": {
+    "branch": "discount",
+    "remote": "origin",
+    "merge": "refs/heads/discount",
+    "remote_tracking_oid": "@COMMIT:published@"
+  },
+  "requested_prs": [
+    42
+  ]
+}
