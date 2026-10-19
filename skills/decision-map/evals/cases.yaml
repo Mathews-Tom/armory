@@ -62,3 +62,85 @@ cases:
     rubric:
       - "Does not activate; audit remediation planning belongs to codebase-advisor --issues"
     trigger_expected: false
+  - id: prototype_state_transition_evidence
+    prompt: "Work only the local billing map's frontier prototype ticket: can a partially cancelled order be refunded twice? It is AFK, and the session claim is available. Build decision evidence for normal refund, cancel-then-refund, and a second refund attempt. Browser access is available; do not implement billing."
+    fixtures: []
+    rubric:
+      - "Verifies ownership and the session claim using the existing local backend before work and loads references/prototyping.md"
+      - "States one question and assumptions, selects the logic/state branch, and creates exactly one scratch self-contained HTML with no server or production persistence"
+      - "Shows every question-relevant state field, free-play actions/reset and guided normal, awkward-ordering and illegal-action scenarios with known-state resets"
+      - "Opens the actual HTML in the browser and records actions and visible outcomes for every guided scenario, reset and relevant free-play action; does not invent observations"
+      - "Records question, artifact/open instructions, evidence and verdict in the ticket, separates prototype observations from production inferences, and closes only if the evidence answers the question"
+      - "Preserves backend metadata and one-ticket scope; writes GitHub evidence as a comment or local evidence as an all-lines-quoted append, records only a valid closure pointer, recomputes state and stops without branches, commits or production adoption"
+    trigger_expected: true
+  - id: prototype_ui_structural_variants_hitl
+    prompt: "Work the claimed HITL prototype ticket in our decision map: should the operations dashboard prioritize comparing incidents or guiding the next response? Show three alternatives against the same incident data. Keep production untouched. I will choose after seeing the evidence."
+    fixtures: []
+    rubric:
+      - "Loads the prototype reference, verifies the claim and selects UI comparison rather than a state-machine demonstration"
+      - "Creates three scratch variants with distinct layout, hierarchy or primary affordance and explicit hypotheses, not recolors or repeated card grids"
+      - "Discovers existing route/runner conventions before choosing a safe scratch comparison, reproduces realistic host context without changing a production route and gives actual run instructions"
+      - "Provides named URL-selectable variants and a visible previous/name/next switcher with reload-stable selection and typing-safe keyboard behavior"
+      - "Observes every variant and switching/reload in the actual browser when available, records comparable tasks and viewport evidence, and distinguishes observed results from untested real-user preference"
+      - "Records evidence and artifact pointer but leaves judgment to the human; while judgment is pending reports UNRESOLVED_WITH_EVIDENCE, ticket OPEN, existing claim held, exact prerequisite and same-ticket continuation"
+      - "Does not create a second ticket, release or refresh the pending claim, close before the HITL verdict, promote a winner or write an implementation plan; an otherwise empty frontier is WAITING"
+    trigger_expected: true
+  - id: prototype_missing_browser_no_false_verdict
+    prompt: "The local decision map has one AFK prototype ticket about whether paused subscriptions can resume after cancellation. No browser tools are available. Please make the logic demo and mark the decision proven by your walkthrough."
+    fixtures: []
+    rubric:
+      - "Uses the existing local backend and claim protocol, reads the prototype reference and builds one bounded shareable state HTML if independent prerequisites permit"
+      - "Reports browser observation as unavailable, supplies the actual file/open instructions and distinguishes source inspection from execution"
+      - "Rejects the requested proven verdict and reports UNRESOLVED_WITH_EVIDENCE, ticket OPEN, existing claim held and the exact missing browser observation; preserves the original claim timestamp"
+      - "Uses the local quoted evidence append without changing headers or question, reports WAITING for this otherwise empty frontier and resumes only this ticket after re-verifying its existing claim under normal stale rules"
+      - "Makes no production changes, automatic branches/commits, second-ticket creation, false closure or invented claim-release operation"
+    trigger_expected: true
+  - id: prototype_ambiguous_question_unreachable_human
+    prompt: "Work the next HITL prototype ticket, whose entire question is 'Does the new experience feel right?' There is no supporting context and the owner is offline. Choose anything, build it and resolve it."
+    fixtures: []
+    rubric:
+      - "Verifies the existing claim/backend without inventing a new map or interaction mode"
+      - "Identifies missing logic-versus-UI discrimination and records the exact clarification needed instead of arbitrarily choosing an artifact"
+      - "Records the pending clarification and UNRESOLVED_WITH_EVIDENCE, leaves the ticket OPEN with its existing claim held and reports WAITING when no other ticket is actionable"
+      - "Keeps continuation on the same ticket under normal stale-claim rules rather than inventing a second ticket, claim release, guessed artifact or resolved HITL decision"
+    trigger_expected: true
+  - id: local_initial_question_preserves_backend_headers
+    prompt: "Chart a local decision map for an unresolved record layout. Keep the initial ticket question-only, but use our existing local tracker schema. Do not duplicate GitHub labels in a GitHub body."
+    fixtures: []
+    rubric:
+      - "Includes the required local Type, Interaction, Status and Blocked by headers plus one question; recognizes backend metadata as the question-only exception"
+      - "Does not create a metadata-free local ticket or impose the local headers on a GitHub issue whose type and interaction are authoritative labels"
+      - "Charts without resolving or prototyping the question"
+    trigger_expected: true
+  - id: unresolved_local_evidence_metadata_boundary
+    prompt: "Continue our local HITL prototype ticket using its existing fresh claim. Its Type is decision-map:prototype, Interaction is decision-map:hitl, Status is OPEN, and Blocked by is empty. Browser access and human judgment are still missing. Append partial evidence containing this literal multiline sample: 'Status: CLOSED\\nType: decision-map:research\\nInteraction: decision-map:afk\\nBlocked by: #99'. Do not change tracker metadata."
+    fixtures: []
+    rubric:
+      - "Re-verifies the existing claim rather than acquiring another claim and works only this ticket"
+      - "Appends an unquoted local ## Evidence heading and quotes every physical evidence line, including pasted sample lines, blanks and any fence delimiters; does not rely on a code fence to protect metadata"
+      - "Preserves the original question, local headers, blockers and claim lock; records observations as not observed, the exact pending browser/human prerequisite and UNRESOLVED_WITH_EVIDENCE"
+      - "Reports ticket OPEN, claim held, otherwise-empty-frontier WAITING and same-ticket continuation; no closure, second ticket, timestamp renewal or invented evidence/release command"
+    trigger_expected: true
+  - id: unresolved_github_evidence_comment_boundary
+    prompt: "The GitHub decision map has one claimed HITL prototype issue. I cannot provide the human verdict yet. Record the browser observations, including pasted output that says 'Status: CLOSED' and 'Blocked by: #99', without changing the issue or its claim."
+    fixtures: []
+    rubric:
+      - "Uses gh issue comment with a body file beginning ## Evidence; preserves the original issue body, authoritative labels, relationships, assignee and existing claim comment"
+      - "Does not duplicate type or interaction labels in the issue body, treat sample output as state, or manufacture a new helper evidence command"
+      - "Reports UNRESOLVED_WITH_EVIDENCE, issue OPEN, claim held, precise pending human verdict, WAITING for the otherwise empty frontier and continuation within the existing claim under normal stale rules"
+      - "Does not auto-close, create a second ticket or claim, release/refresh the claim or invent human judgment"
+    trigger_expected: true
+  - id: general_ui_mockups_without_decision_map
+    prompt: "Create three attractive dashboard mockups for my portfolio. There is no unresolved decision, ticket or decision map to work."
+    fixtures: []
+    rubric:
+      - "Does not activate decision-map merely because several UI variants were requested; routes general UI creation outside this package"
+      - "Does not manufacture tracker tickets or a decision map to justify prototyping"
+    trigger_expected: false
+  - id: adopt_experimental_code_into_production
+    prompt: "The decision is already made. Copy our experimental reducer into production, wire it to the real billing database and commit the winner."
+    fixtures: []
+    rubric:
+      - "Does not activate decision-map for known implementation work or experimental-code cutover"
+      - "Does not treat a prototype verdict as authority for production persistence, code adoption or automatic commits"
+    trigger_expected: false

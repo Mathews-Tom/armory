@@ -1,0 +1,120 @@
+cases:
+  - id: metadata_missing_recipient
+    prompt: >
+      Prepare a Markdown questionnaire that I can send asynchronously to someone
+      outside this conversation. I need to decide whether to adopt weekly billing
+      and learn which invoice corrections must remain possible. I have not said
+      who the recipient is or what they know. I cannot answer the billing policy
+      questions myself.
+    fixtures: []
+    rubric:
+      - "Selects the missing-metadata branch and asks only for the recipient or role and their expertise/audience context."
+      - "Reuses the two supplied outcomes rather than asking the sender to repeat them or supply the recipient-held billing answers."
+      - "Does not invent a recipient, write a generic questionnaire or require a deadline/effort estimate before continuing."
+      - "Makes clear that the missing recipient/expertise is the prerequisite for drafting; performs no sending, tracker creation or external calls."
+    trigger_expected: true
+
+  - id: metadata_missing_outcomes
+    prompt: >
+      I want an asynchronous discovery questionnaire for Noor, our external
+      accessibility consultant. Noor knows inclusive interaction design and is
+      familiar with our checkout redesign. I haven't told you what decisions or
+      facts I need from Noor yet. Please help prepare it, not a live interview.
+    fixtures: []
+    rubric:
+      - "Selects the missing-metadata branch and asks which decisions or facts the sender needs Noor to help resolve."
+      - "Preserves the already supplied audience and expertise rather than making the sender re-establish them."
+      - "Does not demand accessibility findings from the sender, invent redesign requirements or generate a speculative questionnaire."
+      - "Does not open external services or send anything."
+    trigger_expected: true
+
+  - id: draft_nontechnical_unknown_logistics
+    prompt: >
+      Draft one asynchronous Markdown questionnaire for Morgan, the warehouse
+      operations lead. I'm Kai, the product lead. Morgan knows dispatch operations
+      but is not a software engineer. We're defining a parcel-dispatch tool.
+      I need to choose a same-day dispatch cut-off, identify which packing events
+      must be recorded, and learn the typical daily parcel count. I don't have
+      those answers. Deadline and completion-time estimate are unknown. Please
+      give me the questionnaire file and a sender-only decision coverage matrix.
+    fixtures: []
+    rubric:
+      - "Selects the drafting branch without interviewing Kai for warehouse-held answers or blocking on unknown deadline/effort."
+      - "Reads the local question-design reference and questionnaire template when drafting, not unrelated package or external sources."
+      - "Produces exactly one Morgan-specific Markdown questionnaire file and reports its actual path, or explicitly reports an unavailable filesystem prerequisite without claiming a saved artifact."
+      - "The recipient file has supplied context, purpose, Kai as sender, Morgan as recipient and grounded answer use, plus partial/uncertain-answer permission."
+      - "Orders concrete one-idea questions by importance, uses operational rather than database jargon, and places an empty answer stub immediately under every question including the catch-all."
+      - "The separate sender-facing matrix maps all three input outcomes to actual question IDs; the catch-all is not counted as outcome coverage and the matrix is absent from the recipient file."
+      - "Omits unknown deadline and effort or labels them unknown; invents no domain values, promises, sends, trackers or external calls."
+    trigger_expected: true
+
+  - id: draft_compound_outcomes_expertise_limit
+    prompt: >
+      Write one asynchronous questionnaire for Inez, a vendor security reviewer
+      who knows our authentication and audit controls but does not set pricing.
+      I'm Sam. We are evaluating the vendor for a regulated internal service.
+      I need to decide whether its login controls are acceptable and which audit
+      events we can retain; I also need to know whether usage discounts could
+      change our budget decision. For login, distinguish the normal requirement
+      from emergency-access exceptions. Ask Inez, not me, for this information.
+      Use the supplied deadline of 30 October 2026 and effort estimate of 20 minutes.
+      Give me the sender-only coverage matrix separately from the recipient file.
+    fixtures: []
+    rubric:
+      - "Drafts immediately for the specified recipient instead of asking Sam to answer security or pricing questions."
+      - "Splits the compound login policy/exception request into separate one-idea questions and traces each, the audit-event outcome and the pricing outcome in the matrix."
+      - "Keeps a targeted pricing question that accepts unknown or an appropriate source suggestion, and flags Inez's pricing expertise limit for Sam rather than dropping the outcome or inventing a second questionnaire."
+      - "Keeps the security-blocking questions ahead of the secondary budget question and does not presuppose particular controls, audit events or discounts."
+      - "Includes the supplied deadline and effort unchanged, all required recipient framing, grounded answer use and empty stubs with partial/uncertain-answer permission."
+      - "Produces one questionnaire file with a real path or an explicit filesystem blocker, and gives a complete sender-only matrix outside the file; no sending or integrations occur."
+    trigger_expected: true
+
+  - id: draft_unnamed_sender_role_recipient
+    prompt: >
+      Create one async Markdown questionnaire for the municipal permits officer,
+      an expert in local event permits who has not seen our plans. We are exploring
+      an outdoor community concert. I need to learn which permits apply and which
+      submission dependencies determine when we can apply. I have not provided my
+      name, a deadline or an effort estimate. Keep the outcome coverage for me,
+      not in the document I will forward.
+    fixtures: []
+    rubric:
+      - "Treats a specific role and known expertise as sufficient recipient metadata; does not demand a personal name, sender identity or optional logistics."
+      - "Drafts for the permits officer with enough supplied context for someone new to the plans, using Sender for the unnamed sender rather than inventing a person."
+      - "Asks distinct neutral questions covering applicable permits and submission dependencies without assuming a jurisdiction-specific rule."
+      - "Provides one recipient Markdown file, empty stubs and partial/uncertain-answer permission, plus a sender-only matrix covering both outcomes."
+      - "Keeps deadline/effort unknown or omitted and performs no recipient lookup, sending, tracker creation or external calls."
+    trigger_expected: true
+
+  - id: negative_live_interrogation
+    prompt: >
+      Interview me live, one question at a time, to challenge my product idea.
+      I'm the person with the domain answers. Do not make a document for anyone
+      else to complete later.
+    fixtures: []
+    rubric:
+      - "Does not activate intake for a live interrogation of the current user."
+      - "Does not reframe the user as an external recipient or generate an async questionnaire."
+    trigger_expected: false
+
+  - id: negative_survey_analytics
+    prompt: >
+      Analyze the completed customer survey responses and compare satisfaction
+      by region. I need response rates, charts and confidence intervals, not a
+      new discovery questionnaire for one person.
+    fixtures: []
+    rubric:
+      - "Does not activate intake for survey analytics or claim to analyze responses using the questionnaire workflow."
+      - "Does not manufacture a recipient or create a new questionnaire or response tracker."
+    trigger_expected: false
+
+  - id: negative_repository_onboarding
+    prompt: >
+      Teach me how to use this repository and trace a request through its code.
+      I'm the learner, and I want an onboarding guide and a safe first engineering
+      change. There is no external recipient or async questionnaire to prepare.
+    fixtures: []
+    rubric:
+      - "Does not activate intake for direct repository tutoring/onboarding."
+      - "Does not substitute a questionnaire for the requested teaching journey."
+    trigger_expected: false

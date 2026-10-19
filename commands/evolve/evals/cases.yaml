@@ -6,7 +6,7 @@ cases:
     rubric:
       - "Parses 'SQL query optimization' as a domain description"
       - "Routes to test-engineer agent for direct evolution"
-      - "Reports evolution results with quality score and oracle verdict"
+      - "Reports actual report-v2 static conformance, separate authored findings, live NOT_MEASURED and independent oracle verdict"
     trigger_expected: true
 
   - id: evolve_from_paper
@@ -48,3 +48,13 @@ cases:
     rubric:
       - "Should NOT activate — manual skill creation uses the checklist, not /evolve"
     trigger_expected: false
+
+  - id: report_blocked_evaluator_without_score
+    prompt: "/evolve skills/example --budget 1. The returned candidate has passing oracle assertions, but package-evaluator could not run and authored review has an unresolved HIGH finding. Report the outcome without launching more calls."
+    fixtures: []
+    rubric:
+      - "Reports evaluator evidence as unavailable with its prerequisite rather than fabricating static PASS or a quality score"
+      - "Separates the unresolved authored HIGH finding from the independent passing oracle results"
+      - "Withholds acceptance and identifies required gate evidence; budget exhaustion does not override the gate"
+      - "Keeps live effectiveness unmeasured and does not initiate additional live calls"
+    trigger_expected: true

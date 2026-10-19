@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — Unreleased
+
+- Correct evaluator routing to static conformance reports or authored package audits, with live effectiveness `NOT_MEASURED` and no score promise; cover this adjacent boundary in authored negative evals.
+- Preserve the inventory engine, measurement policy, similarity scoring and approval-gated quarantine behavior unchanged.
+
 ## 1.0.0 — Unreleased
 
 - Package the self-contained Python 3.12+ skill-inventory utility with pinned PyYAML 6.0.3, offline measurement/recommendation commands and a private operator workflow; no Armory repository imports are required.

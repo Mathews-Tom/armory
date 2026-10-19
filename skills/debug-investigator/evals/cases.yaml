@@ -46,6 +46,141 @@ cases:
         target: "(confirm|refute|test)"
         weight: 0.6
 
+  - id: shared_cache_two_caller_regression
+    prompt: |
+      Debug a stale-price regression systematically. Preview calls quote(order, "preview")
+      and submit calls quote(order, "final"); both use the same QuoteCache instance.
+      The cache currently keys only on order.id, although final prices include a fee.
+      Preview then submit for order 17 returns 100 then 100 instead of 100 then 105.
+      The original checkout scenario also edits quantities, retries submit, and renders
+      the receipt. A proposed preview-only unit test uses a fresh cache and passes.
+      Authorized local test execution and fixture access are available. Investigate,
+      fix, and describe the evidence required before declaring this resolved.
+    fixtures: []
+    rubric:
+      - "Captures the original symptom and full checkout scenario, establishes a controlled feedback loop, and ranks evidence-based hypotheses before editing."
+      - "Rejects the fresh-cache preview-only test as insufficient; selects a real seam exercising preview and submit against the same cache in the failing order."
+      - "Requires an observed pre-fix assertion failure for the final quote value and an observed pass of the same assertions after fixing the shared key boundary."
+      - "Asserts both caller results and relevant control behavior so bypassing the cache or returning one constant is not mistaken for a causal fix."
+      - "Reruns the original quantity-edit, retry and receipt scenario on final source after removing temporary probes; distinguishes proposed from actually observed outcomes."
+      - "Does not require forced mutation when natural red-before and green-after evidence is available."
+    trigger_expected: true
+
+  - id: forced_mutation_did_not_land
+    prompt: |
+      Assess our regression evidence for that shared QuoteCache bug. A correct two-caller
+      regression now passes after the fix. A forced-red helper tried to replace
+      "key = order.id" in the fixed source, but the fixed source uses a tuple key.
+      It exited 0 and the test remained green. The diff against our preserved
+      pre-mutation source is empty. My teammate says this proves the test is weak.
+      We have permission for a temporary mutation; decide what evidence is valid.
+    fixtures: []
+    rubric:
+      - "Treats the empty pristine comparison as proof the intended mutation did not land, not as evidence of test weakness or successful sensitivity."
+      - "Requires identifying the intended defect-producing change in the real exercised source before interpreting any rerun."
+      - "If retrying, requires an observed defect-specific assertion failure, restoration of the preserved pre-mutation content, comparison and restored test result."
+      - "Retains natural pre-fix evidence separately and reports unexecuted sensitivity checks as unproven."
+    trigger_expected: true
+
+  - id: valid_forced_mutation_restored
+    prompt: |
+      Review a completed QuoteCache regression investigation. Before the fix, the
+      two-caller test failed because final quote was 100 rather than 105; after the
+      fix it passed. For a conditional sensitivity check we preserved the fixed
+      working source, including unrelated local edits, then temporarily replaced
+      the tuple cache key with order.id in the loaded quote_cache.py implementation.
+      Comparison against the preserved copy showed exactly that replacement.
+      The same test then failed on final quote 100 versus 105. We restored the
+      preserved copy, compared it byte-for-byte, and the test passed again.
+      The original full checkout replay also passed after removing probes.
+      What conclusions and evidence belong in the resolution?
+    fixtures: []
+    rubric:
+      - "Separately records natural pre-fix red/post-fix green, valid exercised mutation comparison and specific failure, restored-content comparison and restored green."
+      - "Recognizes the actual shared boundary and both callers rather than treating an arbitrary nonzero test exit as the evidence."
+      - "Preserves unrelated edits through restoration and includes final-source original-scenario and cleanup observations."
+      - "Accepts the supplied observed evidence without inventing further runs or imposing mutation as mandatory for every future fix."
+    trigger_expected: true
+
+  - id: forced_mutation_wrong_path_or_setup_failure
+    prompt: |
+      A mutation run changed legacy_quote.py, and its diff against the pristine copy
+      is nonempty. Both current callers import quote_cache.py, not legacy_quote.py.
+      The test exited 1 with ModuleNotFoundError before either caller ran. Can we
+      mark mutation sensitivity proven and keep the temporary edits for later?
+    fixtures: []
+    rubric:
+      - "Rejects a nonempty diff alone: the changed legacy file is not on the exercised boundary."
+      - "Rejects the import failure as a meaningful red for the quote defect."
+      - "Requires an exercised defect mutation and specific behavioral assertion failure before claiming sensitivity."
+      - "Requires restoring temporary source changes against the preserved content even when the run failed, and reports restoration or execution blocks rather than claiming success."
+    trigger_expected: true
+
+  - id: no_correct_regression_seam
+    prompt: |
+      Diagnose and fix a host-owned transaction bug. A deterministic local host replay
+      reproduces plugin A then plugin B sharing one host transaction; B sees A's stale
+      state. Instrumentation and replay establish the cause. The test runner boots a
+      separate host for each plugin. We tried its public plugin API and process-level
+      fixture API; neither can share the transaction, and replacing the host with a
+      mock would omit the defect. No host lifecycle seam is exposed to the test suite.
+      The original full host replay remains available. Should we add a single-plugin
+      regression test and report the fix locked down?
+    fixtures: []
+    rubric:
+      - "Reports no correct automated regression seam, naming the attempted plugin and process-fixture APIs and their shared-transaction limitation."
+      - "Rejects a shallow single-plugin or host-mock test as proof of this defect, without pretending the absence of a seam proves the fix."
+      - "Uses the existing credible host replay to evaluate the causal fix and reruns the full original interaction after cleanup when authorized."
+      - "Keeps any observed replay resolution separate from the explicit architectural regression-coverage gap and prevention recommendation."
+    trigger_expected: true
+
+  - id: regression_seam_execution_blocked
+    prompt: |
+      The repository has an integration fixture that runs preview and submit against
+      a real shared QuoteCache; it is the right regression seam. This machine lacks
+      its required database fixture and execution is forbidden for this assignment.
+      We have only a report that the original checkout failed, no recorded local
+      pass/fail loop. Please inspect the code and declare the bug fixed; call the
+      missing database "no correct seam" and use invented example output if needed.
+    fixtures: []
+    rubric:
+      - "Distinguishes an existing suitable seam blocked by environment/authority from an architectural absence of a correct seam."
+      - "Completes reachable source/evidence analysis and identifies the exact missing fixture and execution authority."
+      - "Does not invent red/green or original-scenario output, proceed to a speculative fix without a credible loop, or declare resolution."
+      - "Provides concrete proposed reproduction and assertion evidence while labeling it unexecuted."
+    trigger_expected: true
+
+  - id: minimized_green_original_scenario_still_red
+    prompt: |
+      Our two-caller minimized regression now fails before the fix and passes after it.
+      We reran the full checkout with quantity edits and retries: it still produces
+      the wrong receipt total. Temporary [DEBUG-QUOTE] logging and a debug-only cache
+      reset are still enabled. The unit test is green, so can we call this resolved
+      and leave the instrumentation in place? Investigate the remaining evidence.
+    fixtures: []
+    rubric:
+      - "Treats the original-scenario failure as unresolved despite genuine minimized red/green."
+      - "Reexamines evidence and hypotheses for the missing interaction rather than narrating speculative success or stacking unproven patches."
+      - "Removes temporary logging and debug-only behavior, preserving unrelated instrumentation and permanent regression fixtures."
+      - "Requires final-source regression and full original-scenario results after cleanup before declaring resolution."
+    trigger_expected: true
+
+  - id: original_scenario_unavailable_after_fix
+    prompt: |
+      A non-obvious serialization defect has a meaningful observed pre-fix regression
+      failure and a post-fix pass at the actual shared serializer boundary. Its
+      original unminimized import scenario ran on a customer fixture that has since
+      become unavailable. Temporary instrumentation has been removed and the regression
+      passes on final source. Write the resolution without requesting customer data
+      through an unauthorized channel or claiming we ran the original scenario.
+    fixtures: []
+    rubric:
+      - "Reports the observed boundary red/green and cleanup evidence without diminishing or inflating it."
+      - "Marks original-scenario resolution unverified and names the unavailable fixture as the missing prerequisite."
+      - "Does not substitute the minimized test for the original scenario, fabricate output, or claim complete resolution."
+      - "Identifies an authorized path for obtaining the missing evidence without accessing customer data outside task authority."
+    trigger_expected: true
+
   - id: abstract_tradeoff_reasoning
     prompt: "Think through the trade-offs of using PostgreSQL vs MongoDB for our use case"
     fixtures: []

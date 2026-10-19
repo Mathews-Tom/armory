@@ -9,7 +9,7 @@ description: >-
   "help me pick a skill", "discover packages". Use this command when unsure
   which armory skill, agent, or command to use for a task.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   category: operations
   tags: [discovery, routing, meta, navigation]
   difficulty: beginner
@@ -47,6 +47,8 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Feasibility assessment | `feasibility-assessor` skill | `estimate-calibrator` |
 | Full business validation pipeline | `idea-scout` agent | (orchestrates all four above) |
 | Set up repo-local agent context | `project-context-setup` skill | `adr-writer`, `github` |
+| Draft an async discovery questionnaire for one external recipient | `intake` skill | Clarify missing recipient/outcomes first; live elicitation with the current user stays with the task-specific workflow |
+| Challenge domain terms, cardinalities, or code/model contradictions | `domain-modeling` skill | `project-context-setup` scaffolds context; `adr-writer` records architecture decisions, neither replaces active domain challenge |
 
 ## Plan Phase — "I need to plan the work"
 
@@ -59,6 +61,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Record architecture decisions | `adr-writer` skill | `architecture-reviewer` skill |
 | Plan a full project | `project-planner` agent | `task-decomposer`, `estimate-calibrator` |
 | Turn repo findings into implementation plans | `codebase-advisor` skill | `codebase-auditor` for report-only audit |
+| Resolve an unknown destination or design, optionally using a disposable prototype as evidence | `decision-map` skill | `plan-prompts` once decisions are resolved; a prototype is a decision-map branch, not a duplicate skill |
 
 ## Build Phase — "I need to write code"
 
@@ -75,6 +78,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Build an MCP server or agent skill | `agent-builder` skill | `mcp-to-skill` |
 | Convert MCP tool to skill | `mcp-to-skill` skill | `agent-builder` |
 | Validate environment setup | `env-validator` skill | — |
+| Guide unavoidable human-only consent, credential entry, physical access, or cutover approval | `walkthrough` skill | Agent-doable setup/configuration stays with the agent; repository onboarding uses `repo-tutor` |
 
 ## Verify Phase — "I need to validate quality"
 
@@ -134,6 +138,8 @@ Shipping routes keep the authority the user asked for. `ship-workflow` is the si
 | NotebookLM-style analysis | `notebooklm` skill | — |
 | Web fetch / scrape | `web-fetch` skill | `lightpanda-browser` |
 | Convert academic paper to skill | `paper-to-skill` skill | `skill-distiller` |
+| Maintain or resume a human's cross-session learning mission, lessons, and practice evidence | `learning-workspace` skill | One-off repository explanation → `repo-tutor`; agent conventions/global memory → the agent's memory workflow, not human learning |
+| Explain or onboard to a repository in one learning guide | `repo-tutor` skill | Not `learning-workspace` unless persistent human learning is requested; not `walkthrough` without a human-only operation |
 
 ## Content & Media — "I need to create content"
 
@@ -164,6 +170,15 @@ Shipping routes keep the authority the user asked for. `ship-workflow` is the si
 | Coordinate multi-agent work | `team-lead` agent | (delegates to specialized agents) |
 | Evolve/improve a skill | `test-engineer` agent | `surrogate-verifier`, `skill-distiller` |
 | Full skill evolution pipeline | `/evolve` command | `test-engineer` agent |
+
+### Adjacent boundaries
+
+- Choose `intake` for a questionnaire someone other than the current user will answer asynchronously. A live requirements conversation remains with the relevant planning/domain workflow; do not turn the current user into an external recipient.
+- Choose `learning-workspace` for persistent human learning, including resumed lessons, practice reports, misconception correction and mission revision. One-off repository teaching belongs to `repo-tutor`; teaching the agent or saving global facts belongs to its memory workflow.
+- Choose `domain-modeling` for active challenge of meanings, relationships and implementation contradictions. Generic context scaffolding belongs to `project-context-setup`; writing a decision record belongs to `adr-writer`.
+- Choose `walkthrough` only for operations requiring human-held access, consent or physical action. Available tools and authority keep setup with the agent; risk alone does not make an operation human-only.
+
+These routes and their authored cases describe intended behavior, not live routing proof. Static conformance is PASS/FAIL; live effectiveness remains NOT_MEASURED until separately exercised.
 
 ---
 

@@ -1,0 +1,111 @@
+fixture_kind: synthetic_learning_events
+schema_version: 1
+execution_status: not_exercised
+purpose: >-
+  Data for authoring or disposable local state-transition exercises. This fixture
+  is not a learner workspace and grants no write, network or execution authority.
+workspace:
+  id: csv-reporting
+  root: null
+  root_rule: A real root must be separately supplied and authorized outside the studied repository.
+mission:
+  revision: 1
+  confirmed_text:
+    topic: Trustworthy CSV summaries
+    why: Prepare a weekly customer summary without miscounting repeated rows.
+    success_criteria:
+      SC1: Given a small export, identify duplicate records and explain the key used.
+      SC2: Produce a summary with one contribution per customer and justify its count.
+    constraints:
+      - Offline synthetic data; no subscriptions or production customer data.
+      - Short written exercises; diagrams have text descriptions.
+    out_of_scope:
+      - Database deployment and production data cleanup.
+  confirmation: Synthetic learner explicitly approves this exact mission text in S01.
+sessions:
+  - id: S01
+    date: '2026-10-19'
+    inputs:
+      - kind: learner_report
+        concept_id: aggregation
+        text: I use GROUP BY already, but I am unsure how repeated customer rows affect the weekly count.
+        depth: Claimed practical familiarity; no artifact supplied.
+      - kind: delivered_lesson
+        lesson_id: L-0001
+        concept_id: duplicate-key-selection
+        contract: customer_id identifies a customer; one customer may have several invoice rows.
+        rows:
+          - [A, 10]
+          - [A, 20]
+          - [B, 30]
+        criterion: Two customers; customer_id key; repeated A is the same customer.
+      - kind: inspected_learner_answer
+        text: Three customers; each row is another customer.
+        support: No hints; task and data visible.
+      - kind: teacher_feedback
+        text: There are two distinct customer IDs. Repeated A does not add another customer.
+        learner_retry: null
+    expected_records:
+      - id: LR-0001
+        concept_id: aggregation
+        evidence_kind: self_reported
+        result: not_assessed
+        status: active
+      - id: LR-0002
+        concept_id: duplicate-key-selection
+        evidence_kind: demonstrated
+        result: incorrect
+        status: active
+        misconception_id: MC-01
+        misconception_state: open
+    expected_projection:
+      aggregation: Self-reported only; no grouping work inspected.
+      duplicate-key-selection: Needs practice; explanation covered but MC-01 unresolved.
+      window-functions: Unknown.
+    expected_next_task: Fresh customer-key task before aggregation because MC-01 blocks SC1 and SC2.
+  - id: S02
+    date: '2026-10-22'
+    inputs:
+      - kind: resume
+        mission_change_requested: false
+      - kind: fresh_task
+        concept_id: duplicate-key-selection
+        rows:
+          - [C, 5]
+          - [D, 7]
+          - [C, 11]
+          - [E, 2]
+        criterion: Three customers; customer_id key; both C rows name one customer.
+      - kind: inspected_learner_answer
+        text: Three customers C, D and E. customer_id is the key; both C rows belong to the same customer.
+        support: Task visible; no notes or hints used in the supplied synthetic event.
+    expected_records:
+      - id: LR-0003
+        concept_id: duplicate-key-selection
+        evidence_kind: demonstrated
+        result: correct
+        status: active
+        misconception_id: MC-01
+        misconception_state: corrected
+        supersedes: [LR-0002]
+    expected_prior_record_edits:
+      LR-0002:
+        status: superseded
+        superseded_by: LR-0003
+        preserve: Original incorrect answer, date, feedback and scope.
+      LR-0001:
+        preserve: Active self-report; never upgrade aggregation to demonstrated.
+    expected_projection:
+      aggregation: Still self-reported only; a new lesson would add coverage, not demonstration.
+      duplicate-key-selection: Demonstrated on the supplied examples; MC-01 corrected in scope, not global mastery.
+      window-functions: Still unknown.
+    expected_next_task: >-
+      Diagnose one-per-customer aggregation for SC2, with a supplied contribution
+      rule and a fresh export. Revisit keys within that meaningful summary task.
+    unchanged:
+      - Mission revision remains 1.
+      - No global memory, target-repository files or external resources are written.
+      - No retention gain or durable mastery is inferred from elapsed time.
+counterfactual:
+  replacement_s02_input: I understand now.
+  expected: Self-report only; no LR-0003 correction, no supersession, MC-01 remains unresolved, next task still customer-key practice.

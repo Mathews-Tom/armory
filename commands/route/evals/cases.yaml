@@ -110,3 +110,116 @@ cases:
       - "recommends static-web-artifacts-builder or a web-page oriented package"
       - "does not recommend html-video (no video output requested)"
     trigger_expected: true
+
+  - id: route_async_external_intake
+    prompt: "/route Draft questions for our billing lead to answer asynchronously so we can decide refund policy."
+    fixtures: []
+    rubric:
+      - "recommends intake as primary for one external recipient's questionnaire"
+      - "distinguishes sender context from recipient-held answers and does not conduct the recipient interview with the sender"
+    trigger_expected: true
+
+  - id: route_intake_missing_recipient
+    prompt: "/route I need an async questionnaire, but have not picked who should receive it or which decisions it will inform."
+    fixtures: []
+    rubric:
+      - "recommends intake and identifies its recipient/outcome clarification branch"
+      - "does not recommend drafting a generic form or inventing an audience"
+    trigger_expected: true
+
+  - id: route_live_elicitation_not_intake
+    prompt: "/route Interview me now to work out requirements for my project; nobody else will receive a questionnaire."
+    fixtures: []
+    rubric:
+      - "recommends an appropriate live planning or discovery workflow, such as project-architect"
+      - "does not recommend intake because there is no asynchronous external recipient"
+    trigger_expected: true
+
+  - id: route_persistent_human_learning
+    prompt: "/route I want a human learning workspace with a mission, lessons and practice records that I can resume next month."
+    fixtures: []
+    rubric:
+      - "recommends learning-workspace as primary"
+      - "distinguishes persistent learner-owned evidence from one-off repo-tutor output and agent memory"
+    trigger_expected: true
+
+  - id: route_resume_learning_evidence
+    prompt: "/route Resume my learning mission from recorded lessons, correct a misconception from yesterday's practice, and reconsider the mission."
+    fixtures: []
+    rubric:
+      - "recommends learning-workspace for resume, practice evidence, misconception history and mission revision"
+      - "does not treat an agent memory update or a one-off repository guide as completion"
+    trigger_expected: true
+
+  - id: route_one_off_repo_tutoring
+    prompt: "/route Explain this repository once in an offline HTML guide; I do not want an ongoing learning workspace."
+    fixtures: []
+    rubric:
+      - "recommends repo-tutor rather than learning-workspace"
+      - "does not recommend walkthrough because no human-only operation is requested"
+    trigger_expected: true
+
+  - id: route_agent_memory_not_learning
+    prompt: "/route I want the agent to remember my coding convention globally, not to teach me or track my learning."
+    fixtures: []
+    rubric:
+      - "directs the request to the harness's actual agent-memory workflow, or identifies missing memory support"
+      - "does not recommend learning-workspace or invent a package for global memory"
+    trigger_expected: true
+
+  - id: route_active_domain_challenge
+    prompt: "/route Challenge whether cancellation applies to orders or individual units, confirm cardinalities, and reconcile code that contradicts our domain terms."
+    fixtures: []
+    rubric:
+      - "recommends domain-modeling as primary for active scenario-driven challenge"
+      - "does not substitute project-context-setup scaffolding or adr-writer decision recording"
+    trigger_expected: true
+
+  - id: route_context_scaffold_not_domain
+    prompt: "/route Scaffold repo-local agent context, glossary layout and ADR lookup; our domain definitions are already agreed."
+    fixtures: []
+    rubric:
+      - "recommends project-context-setup"
+      - "does not recommend domain-modeling for unchanged agreed definitions or perform a new domain challenge"
+    trigger_expected: true
+
+  - id: route_adr_not_domain_modeling
+    prompt: "/route Write an ADR documenting our already-made architecture decision and its alternatives."
+    fixtures: []
+    rubric:
+      - "recommends adr-writer as primary"
+      - "does not route ADR writing to domain-modeling or claim a vocabulary entry replaces a decision record"
+    trigger_expected: true
+
+  - id: route_unavoidable_human_operations
+    prompt: "/route I need a repeatable procedure for dashboard consent and hidden credential entry that only I can perform."
+    fixtures: []
+    rubric:
+      - "recommends walkthrough and keeps human-only operations separate from agent-doable preparation"
+      - "does not ask for secrets in chat or treat repository onboarding as the task"
+    trigger_expected: true
+
+  - id: route_human_cutover_approval
+    prompt: "/route A physical operator must approve an irreversible cutover; help deliver a sourced guided procedure."
+    fixtures: []
+    rubric:
+      - "recommends walkthrough for the unavoidable human approval branch"
+      - "does not interpret routing as authority to execute the cutover"
+    trigger_expected: true
+
+  - id: route_agent_doable_setup
+    prompt: "/route Set up this repository using the tools and permissions already available to the agent; no human-only step exists."
+    fixtures: []
+    rubric:
+      - "keeps setup in the ordinary agent workflow, with env-validator only if configuration validation is needed"
+      - "does not recommend walkthrough or manufacture a human ceremony"
+    trigger_expected: true
+
+  - id: route_prototype_decision_evidence
+    prompt: "/route Our design destination is uncertain; use a disposable prototype to gather evidence before resolving the decision."
+    fixtures: []
+    rubric:
+      - "recommends decision-map with its prototype evidence branch"
+      - "does not invent a separate prototype skill or route directly to production implementation"
+      - "keeps implementation planning under plan-prompts only after decisions are resolved"
+    trigger_expected: true

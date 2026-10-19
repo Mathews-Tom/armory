@@ -13,7 +13,7 @@ description:
 
   '
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: meta
   tags: [evolution, skill-generation, co-evolutionary, command]
   difficulty: intermediate
@@ -79,9 +79,10 @@ After the test-engineer completes:
 
 1. Report the results:
    - Package path
-   - Quality score (from package-evaluator)
+   - Actual report-v2 static conformance and evidence, separate authored findings/resolutions, and live effectiveness NOT_MEASURED (package-evaluator 2.0.0 contract)
    - Oracle verdict and number of evolution rounds
    - Key improvements made
+   - Missing evaluator/review prerequisites or unresolved CRITICAL/HIGH findings block acceptance; do not substitute oracle scores or invent evaluator scores
 2. If `--distill` was specified:
    - Invoke the `skill-distiller` skill on the generated package
    - Report the cross-model comparison
@@ -105,7 +106,7 @@ Report any validation failures to the user.
 ## Termination Criteria
 
 The command completes when:
-- The skill passes all validation checks and the oracle accepts it, OR
+- The skill passes all validation checks, has actual report-v2 static PASS AND no unresolved CRITICAL/HIGH authored findings, and the independent oracle accepts it, OR
 - The evolution budget is exhausted (report best-scoring iteration), OR
 - `--dry-run` mode outputs the specification
 

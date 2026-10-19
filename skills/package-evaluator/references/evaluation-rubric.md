@@ -1,305 +1,160 @@
 # Evaluation Rubric
 
-Detailed scoring criteria for each dimension of package quality evaluation.
+Use this reference for authored contract review, type-specific criteria and report/evidence calibration. It is not a scoring model and does not extend the machine report schema.
 
-## Score Scale
+## Evidence Boundaries
 
-General criteria for the 1-5 scale. Dimension-specific tables below refine these.
+| Evidence layer | Establishes | Does not establish |
+| --- | --- | --- |
+| `scripts/evaluate_package.py`, report_version 2 | The implemented static checks returned PASS or FAIL for the evaluated package | Full authoring-policy compliance, resolved references, executable behavior, activation or task effectiveness |
+| Separate frontmatter/reference/eval-schema validators | Their implemented structural requirements for the checked scope | Correct conditional reference loading or successful agent execution |
+| Authored review | Source-backed contract findings and coverage gaps | Observed model behavior or an efficacy estimate |
+| Deterministic helper smoke | The specific exercised input/output or side effect in its recorded environment | Model discovery, all invocation branches or general effectiveness |
+| Separately authorized live cases | Observed invocation/task behavior for the actual case/environment and evidence collected | Unexercised branches or clearance of broader experimental gates |
+| Authored cases or dry-run | Intended coverage or structure-only traversal | Passing behavioral cases; skipped cases remain unmeasured |
 
-| Score | General Criteria                                                                            |
-| ----- | ------------------------------------------------------------------------------------------- |
-| 1     | Absent or fundamentally broken — the dimension is not addressed or fails on load            |
-| 2     | Present but severely lacking — minimal effort, major gaps, does not meet basic expectations |
-| 3     | Functional with notable gaps — covers the basics but misses important aspects               |
-| 4     | Strong with minor improvements possible — well-executed, small refinements remain           |
-| 5     | Comprehensive, no meaningful gaps — exemplary execution of this dimension                   |
+Keep the existing effectiveness roadmap, including M4/M8 experimental gates, binding. No prose review, source shortening, phrase count or character count clears those gates.
 
----
+## Exact Static Interface
 
-## Per-Dimension Scoring Criteria
+The CLI supports `--path <package-directory>` and `--json`. Without `--path` it scans the registered type directories for definitions. It has no type-filter, score or threshold flag. Normalize a supplied definition-file path before passing its parent directory. For multiple/type-filtered audits, select scope separately and invoke supported paths.
 
-### D1: Frontmatter Quality (20%)
+JSON output is a **list** of records. This illustrative record shows the current fields for a hypothetical conformant skill, not an executed result:
 
-| Score | Criteria                                                                                                                |
-| ----- | ----------------------------------------------------------------------------------------------------------------------- |
-| 1     | Missing `name` or `description` field, or YAML frontmatter absent/unparseable                                           |
-| 2     | Both fields present but description is under 100 characters, generic, or contains no trigger phrases                    |
-| 3     | Description is 100-200 characters with 1-2 trigger phrases, or 200+ characters but no trigger phrases                   |
-| 4     | Description is 200-800 characters, contains 3+ trigger phrases, but lacks a "Use this skill when..." clause             |
-| 5     | Description is 200-800 characters, contains 4+ trigger phrases, includes "Use this skill when..." clause, keyword-dense |
-
-### D2: Trigger Coverage (18%)
-
-| Score | Criteria                                                                                                                     |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Zero trigger phrases in description or body; package activates only on exact name match                                      |
-| 2     | 1-2 trigger phrases, all using the same root word (e.g., "review" and "reviewer" but no synonyms)                            |
-| 3     | 3-4 distinct trigger phrases covering 2+ synonym families, but missing implied contexts or interrogative forms               |
-| 4     | 5-7 trigger phrases across 3+ synonym families, includes at least one implied context scenario                               |
-| 5     | 8+ trigger phrases across 4+ synonym families, covers imperative and interrogative forms, includes implied context scenarios |
-
-### D3: Structural Completeness (20%)
-
-| Score | Criteria                                                                                                                                                                         |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | No workflow, no structure beyond a heading and a few sentences or bare commands                                                                                                  |
-| 2     | Has a workflow or step list but missing 3+ of: prerequisites, error handling, output format, limitations, reference table                                                        |
-| 3     | Has a workflow and 2-3 of the structural elements; missing error handling or output format specification                                                                         |
-| 4     | Has workflow, output format, error handling or limitations, and reference table; missing 1 minor element (e.g., calibration rules)                                               |
-| 5     | All structural elements present: workflow/phases, prerequisites (if applicable), error handling, output format, limitations, reference table, calibration rules or quality gates |
-
-### D4: Content Depth (22%)
-
-| Score | Criteria                                                                                                                                           |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Bare commands or single-sentence instructions with no explanatory context, decision guidance, or examples                                          |
-| 2     | Commands with brief explanations but no multi-step workflows, no decision frameworks, no output examples                                           |
-| 3     | Multi-step workflow present but lacks decision frameworks (when X vs Y), error recovery, or verbatim output templates                              |
-| 4     | Multi-step workflow with decision guidance and output templates; missing cross-cutting analysis, severity schemes, or advanced calibration         |
-| 5     | Multi-phase workflow with decision frameworks, severity/scoring systems, verbatim output templates, cross-cutting synthesis, and calibration rules |
-
-### D5: Consistency and Integrity (12%)
-
-| Score | Criteria                                                                                                                                                                               |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Directory name does not match frontmatter `name` field, OR package contains cross-package `../` references that break standalone packaging (CRITICAL findings)                         |
-| 2     | Name matches but 2+ referenced files do not exist on disk, or description promises features the body does not deliver                                                                  |
-| 3     | Name matches, 1 referenced file missing or 1 description-body mismatch, minor terminology inconsistencies                                                                              |
-| 4     | Name matches, all referenced files exist and are self-contained (no `../` paths), description aligns with body, minor terminology variation                                            |
-| 5     | Name matches directory exactly, all referenced files exist within the package directory, description accurately reflects body, consistent terminology throughout, fully self-contained |
-
-### D6: CONTRIBUTING.md Compliance (8%)
-
-| Score | Criteria                                                                                                                        |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Invalid YAML frontmatter that prevents parsing, or name is not kebab-case                                                       |
-| 2     | YAML parses but 2+ violations: name over 64 chars, description over 1024 chars, angle brackets present, pushy language          |
-| 3     | 1 violation present (e.g., description slightly over 1024 chars, or contains one instance of pushy language)                    |
-| 4     | All conventions met with one borderline case (e.g., description at 1010 characters, or a debatable trigger phrase)              |
-| 5     | Full compliance: kebab-case name under 64 chars, description under 1024 chars, no angle brackets, no pushy language, valid YAML |
-
----
-
-## Type-Specific Scoring Criteria
-
-The shared D1-D6 criteria above apply to all package types. The following sections
-document additional scoring adjustments for each non-skill package type. These
-adjustments modify D3 and D4 scores based on type-specific quality signals.
-
-### Agent Scoring Adjustments
-
-**D3 adjustments for AGENT.md:**
-
-| Condition                                 | Impact              |
-| ----------------------------------------- | ------------------- |
-| Missing `model` field (opus/sonnet/haiku) | -0.5 from D3 score  |
-| Missing `color` field                     | -0.25 from D3 score |
-| Missing `metadata.category`               | -0.5 from D3 score  |
-| Missing `metadata.execution_phase`        | -0.5 from D3 score  |
-| Missing `metadata.language_targets`       | -0.25 from D3 score |
-| All agent metadata absent                 | Cap D3 at 3/5       |
-
-**D4 adjustments for AGENT.md:**
-
-| Condition                                             | Impact              |
-| ----------------------------------------------------- | ------------------- |
-| No decision tree or algorithm section                 | Cap D4 at 2/5       |
-| No phase markers (START/END or numbered phases)       | -0.5 from D4 score  |
-| No severity classification (CRITICAL/HIGH/MEDIUM/LOW) | -0.5 from D4 score  |
-| Only generic advice, no language-specific patterns    | -0.5 from D4 score  |
-| No VIOLATION/BLOCK/PASS outcome paths                 | -0.25 from D4 score |
-
-### Hook Scoring Adjustments
-
-**D3 adjustments for HOOK.md:**
-
-| Condition                      | Impact             |
-| ------------------------------ | ------------------ |
-| No `hook.events` list          | Cap D3 at 2/5      |
-| Missing `hook.handler.type`    | -0.5 from D3 score |
-| Missing `hook.handler.command` | -0.5 from D3 score |
-| No handler script in directory | -1.0 from D3 score |
-
-**D4 adjustments for HOOK.md:**
-
-| Condition                                             | Impact              |
-| ----------------------------------------------------- | ------------------- |
-| No handler script exists                              | Cap D4 at 1/5       |
-| Handler is a placeholder/stub                         | Cap D4 at 2/5       |
-| No stdin JSON handling documented                     | -0.5 from D4 score  |
-| No exit code semantics documented                     | -0.5 from D4 score  |
-| No edge case documentation (timeout, malformed input) | -0.25 from D4 score |
-
-### Rule Scoring Adjustments
-
-**D3 adjustments for RULE.md:**
-
-| Condition                                                      | Impact             |
-| -------------------------------------------------------------- | ------------------ |
-| Missing `metadata.scope` (global/project)                      | -0.5 from D3 score |
-| Language-specific rule without `metadata.applies_to.languages` | -0.5 from D3 score |
-
-**D4 adjustments for RULE.md:**
-
-| Condition                                                    | Impact              |
-| ------------------------------------------------------------ | ------------------- |
-| Only vague principles, no concrete requirements              | Cap D4 at 2/5       |
-| No code examples for key rules                               | -0.5 from D4 score  |
-| No anti-patterns shown                                       | -0.25 from D4 score |
-| Thresholds use "reasonable"/"appropriate" instead of numbers | -0.5 from D4 score  |
-
-### Command Scoring Adjustments
-
-**D3 adjustments for COMMAND.md:**
-
-| Condition                 | Impact              |
-| ------------------------- | ------------------- |
-| Missing `command.syntax`  | -0.5 from D3 score  |
-| Missing `command.handler` | -0.5 from D3 score  |
-| No argument documentation | -0.25 from D3 score |
-
-**D4 adjustments for COMMAND.md:**
-
-| Condition                  | Impact              |
-| -------------------------- | ------------------- |
-| No step-by-step workflow   | Cap D4 at 2/5       |
-| No decision points marked  | -0.5 from D4 score  |
-| No output format specified | -0.25 from D4 score |
-| No termination criteria    | -0.25 from D4 score |
-
-### Utility Scoring Adjustments
-
-**D3 adjustments for UTILITY.md:**
-
-| Condition                                            | Impact              |
-| ---------------------------------------------------- | ------------------- |
-| Missing `utility.runtime`                            | -0.5 from D3 score  |
-| Missing `utility.entry_point` or file does not exist | -1.0 from D3 score  |
-| Missing `utility.executable`                         | -0.25 from D3 score |
-
-**D4 adjustments for UTILITY.md:**
-
-| Condition                                         | Impact              |
-| ------------------------------------------------- | ------------------- |
-| No working entry_point script                     | Cap D4 at 1/5       |
-| Entry point lacks argparse or CLI handling        | -0.5 from D4 score  |
-| No error handling in script (bare except or none) | -0.5 from D4 score  |
-| No usage examples in body                         | -0.25 from D4 score |
-| Undocumented external dependencies                | -0.5 from D4 score  |
-
-### Preset Scoring Adjustments
-
-**D3 adjustments for PRESET.md:**
-
-| Condition                                | Impact              |
-| ---------------------------------------- | ------------------- |
-| Missing `preset.packages`                | Cap D3 at 1/5       |
-| No package type sections in preset       | -0.5 from D3 score  |
-| Missing `preset.compatibility.platforms` | -0.25 from D3 score |
-
-**D4 adjustments for PRESET.md:**
-
-| Condition                                          | Impact                         |
-| -------------------------------------------------- | ------------------------------ |
-| References non-existent packages                   | CRITICAL — caps overall at 40% |
-| No explanation of why packages work together       | -0.5 from D4 score             |
-| No target workflow or use case described           | -0.5 from D4 score             |
-| References aspirational (not yet created) packages | -1.0 from D4 score             |
-
----
-
-## Dimension Weights and Justification
-
-| Dimension                     | Weight | Justification                                                                                                                                                          |
-| ----------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D4: Content Depth             | 22%    | Highest weight because shallow packages waste activation — once triggered, the package must deliver substantive guidance or the user loses trust in the package system |
-| D1: Frontmatter Quality       | 20%    | Controls discoverability — Claude Code uses the description to match packages to queries; a poor description means the package is invisible                            |
-| D3: Structural Completeness   | 20%    | Structural gaps cause unpredictable behavior — missing error handling leads to silent failures, missing output format leads to inconsistent results                    |
-| D2: Trigger Coverage          | 18%    | Breadth of activation — even with a good description, narrow trigger vocabulary means the package misses valid queries phrased differently                             |
-| D5: Consistency and Integrity | 12%    | Internal coherence — mismatches between name, description, and content cause confusion but do not prevent function if frontmatter is correct                           |
-| D6: CONTRIBUTING Compliance   | 8%     | Lowest weight because convention violations are easy to fix and rarely affect runtime behavior, but they block PR acceptance                                           |
-
----
-
-## Worked Example: `github` Skill (Deficient)
-
-Evaluating the current `github` skill as a calibration baseline.
-
-| Dimension                     | Score | Rationale                                                                                                                                |
-| ----------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| D1: Frontmatter Quality       | 2/5   | Description exists (134 chars) but contains no trigger phrases, no "Use when" clause, under 200 chars                                    |
-| D2: Trigger Coverage          | 1/5   | Zero trigger synonyms in description or body; activates only on exact command references                                                 |
-| D3: Structural Completeness   | 1/5   | No prerequisites, no error handling, no limitations, no reference table, no workflow phases                                              |
-| D4: Content Depth             | 1/5   | Six bare commands with minimal explanatory context; no decision frameworks, no output examples                                           |
-| D5: Consistency and Integrity | 4/5   | Directory name matches frontmatter `name`; no referenced files to check; description matches body                                        |
-| D6: CONTRIBUTING Compliance   | 4/5   | Kebab-case name, under 64 chars, description under 1024 chars, no angle brackets; minor: description uses quotes instead of block scalar |
-
-**Score Calculation:**
-
-```text
-D1: 2 x 0.20 = 0.400
-D2: 1 x 0.18 = 0.180
-D3: 1 x 0.20 = 0.200
-D4: 1 x 0.22 = 0.220
-D5: 4 x 0.12 = 0.480
-D6: 4 x 0.08 = 0.320
-Sum = 1.800
-Overall = 1.800 / 5 x 100 = 36% — Deficient
+```json
+[
+  {
+    "report_version": 2,
+    "name": "example-package",
+    "type": "skill",
+    "static_conformance": {
+      "status": "PASS",
+      "requirements": [
+        "definition file",
+        "valid YAML frontmatter",
+        "type-required frontmatter",
+        "matching package name",
+        "kebab-case package directory"
+      ],
+      "findings": []
+    },
+    "live_effectiveness": {
+      "status": "NOT_MEASURED",
+      "runner": "scripts/run_evals.py",
+      "dimensions": ["routing", "task outcome"]
+    },
+    "status": "PASS",
+    "findings": []
+  }
+]
 ```
 
-This score reflects a skill that loads correctly but provides minimal guidance and
-activates on almost no natural-language queries.
+Static failures populate `findings` with severity/message entries and set both static and top-level status to FAIL. The current evaluator uses CRITICAL for its static findings. Its checks include version syntax when a version is present; missing version is a separate frontmatter-validator/policy issue, not a reason to invent a static finding. Exit status is 1 for static failure or invalid requested path, otherwise 0. Invalid input can emit an error without a JSON record. A default catalog scan skips directories without the expected definition: reconcile requested inventory separately.
 
----
+Live-effectiveness dimensions vary by type:
 
-## Worked Example: `architecture-reviewer` Skill (Exemplary)
+| Type | Declared dimensions (not measured by this CLI) |
+| --- | --- |
+| Skill / agent | routing; task outcome |
+| Hook | event handling; observable side effect |
+| Rule | routing; constraint adherence |
+| Command / utility | command invocation or utility invocation, respectively; task outcome |
+| Preset | preset loading; configuration effect |
 
-Evaluating the `architecture-reviewer` skill as the upper calibration point.
+Preserve actual output. NOT_RUN may be an execution note in an authored report, but is not a machine status. There are no weighted dimensions, numeric quality grades, score caps, percentage acceptance thresholds or quality scorecards in report-v2. Do not overwrite a static PASS because an authored finding exists, and do not interpret PASS as acceptance of unmeasured behavior.
 
-| Dimension                     | Score | Rationale                                                                                                                                                                 |
-| ----------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1: Frontmatter Quality       | 5/5   | Description is ~680 chars, contains 10+ trigger phrases ("review architecture", "critique design", "audit system", etc.), includes implied activation context             |
-| D2: Trigger Coverage          | 5/5   | Broad synonym coverage across synonym families: review/critique/audit/evaluate/assess/check; imperative and contextual forms; domain terms (SOC2, HIPAA, scalability)     |
-| D3: Structural Completeness   | 5/5   | All sections present: scan script as prerequisites, 4-phase workflow, severity table, output template with compliance checklist, calibration rules, reference file table  |
-| D4: Content Depth             | 5/5   | Multi-phase workflow with decision frameworks (3 modes), severity classification, scored output with arithmetic verification, cross-cutting analysis, 7 calibration rules |
-| D5: Consistency and Integrity | 5/5   | Directory matches name, 10+ reference files referenced and present, description accurately reflects the body content, consistent terminology                              |
-| D6: CONTRIBUTING Compliance   | 4/5   | All conventions met; minor: description block scalar formatting could be slightly more concise                                                                            |
+## Common Authored Criteria
 
-**Score Calculation:**
+Apply all applicable criteria to every in-scope package; record source evidence, a finding or the precise reason a criterion is inapplicable/uninspectable. Do not require ceremonial headings in place of the actual contract.
 
-```text
-D1: 5 x 0.20 = 1.000
-D2: 5 x 0.18 = 0.900
-D3: 5 x 0.20 = 1.000
-D4: 5 x 0.22 = 1.100
-D5: 5 x 0.12 = 0.600
-D6: 4 x 0.08 = 0.320
-Sum = 4.920
-Overall = 4.920 / 5 x 100 = 98.4% — Exemplary
-```
+| Criterion | Observable review evidence | Finding example |
+| --- | --- | --- |
+| Identity and metadata | Definition/type, name/directory agreement, YAML mapping, exact X.Y.Z version, category/tags/difficulty and required type fields | Name mismatch or absent required type data; distinguish the responsible validator from authored policy |
+| Invocation boundary | Description names each distinct supported context and adjacent alternatives; body delivers every promised branch | Export promised for CLI and config integration, but only CLI flow exists |
+| Completion | Every step has a checkable end condition; final criteria account for every applicable input and promised output | “Understand config, then summarize” leaves active files, precedence and unhandled inputs unaccounted for |
+| Common versus branch-only instructions | Shared prerequisites/authority/evidence inline; branch selection precedes conditional material | Config-only review must perform unrelated CLI installation before it can inspect a config |
+| Reference loading | Each pointer supplies a load condition and purpose; selected branch can find required rules without reading all references | A filenames-only list conceals a required error-evidence reference |
+| Environment discovery | Commands, keys and precedence traced to current scripts/config/loader/help or implementation | Unsupported flags copied from an older CLI; hardcoded config path conflicts with the active loader |
+| Integrity and self-containment | Every promised file/helper exists locally; no cross-package filesystem dependency; consistent names/claims | Broken required reference or helper; a full installed copy cannot supply the target |
+| Recovery and authority | Required inputs, authorization, missing-prerequisite/error/cancellation outcomes explicit | Missing binary produces a fabricated success artifact or a dangerous automatic setup |
+| Invocation coverage | Every distinct branch mapped to a positive case and output/evidence; adjacent negatives and relevant adversarial variants | Several “audit/review/evaluate” prompts cover only one branch while catalog/config handling has no case |
+| Claim discipline | Actual static output, authored findings, deterministic results and live evidence separated | Schema validity or dry-run PASS described as effective activation |
 
-This score reflects a skill with comprehensive coverage, deep multi-phase workflows,
-and broad trigger activation. The 1.6% gap comes from a minor formatting preference
-in CONTRIBUTING compliance.
+The current frontmatter validator enforces a 50–1024 character description range; naming policy allows at most 64 characters. Keep required metadata and those limits. Length is a static format constraint, not a routing measure: a conformant short description is not defective because another is longer, and a long description is not effective because it contains more trigger phrases. Prefer distinct contexts and boundaries over synonym quotas. Preserve a description for explicit-only invocation and discover actual target-harness flag/router support; do not transplant another runtime's invocation assumptions.
 
----
+## Conditional Reference and Configuration Examples
 
-## Calibration Rules for Meta-Evaluation
+The following are synthetic review examples, not commands or files supplied by this package. Apply the evidence contract to the real audited package's local targets.
 
-1. If all packages in a Full Audit score above 80%, spot-check the lowest-scoring dimension
-   across all packages — the rubric may be too lenient if no dimension scores below 3/5.
-2. If a package scores below 40%, verify CRITICAL findings are genuine before reporting.
-   Distinguish between truly missing frontmatter and frontmatter that is merely sparse.
-3. When comparing scores across packages, a 10+ percentage point gap should correspond to
-   visible quality differences. If two packages feel similar in quality but score 15 points
-   apart, re-examine the dimension that diverges most.
-4. Self-evaluation must produce the same score regardless of whether the evaluator is
-   aware it is evaluating itself. Run the same rubric, check the same files, apply the
-   same caps.
-5. Do not round dimension scores to avoid half-scores — use 3.5 when the package clearly
-   falls between two levels. Round only the final percentage to one decimal place.
-6. A single CRITICAL finding dominates the overall score by design. This is intentional:
-   a package that cannot activate or cannot load has zero utility regardless of content quality.
-7. Type-specific adjustments are additive to shared criteria. Apply shared scoring first,
-   then adjust for type-specific signals. Never double-penalize: if a shared criterion and
-   a type-specific criterion flag the same gap, apply only the stricter cap.
+| Branch | Pointer/config discovery | Completion artifact/evidence | Adversarial distinction |
+| --- | --- | --- | --- |
+| CLI-backed export | “For CLI export, load `references/cli-export.md` before selecting flags; it defines output and error evidence.” Inspect the installed CLI's help/implementation and the project script selecting it. | Record sourced invocation, output artifact path, actual exit and artifact inspection when authorized; otherwise exact unexecuted prerequisite. | New CLI omits a flag cached in an old example: use current source, report incompatibility if needed, never invent success. |
+| Config-only integration | “For config export, load `references/config-export.md` before choosing keys; it describes loader precedence and output evidence.” Inspect actual config and loader. | Record each active config source/key, precedence and resulting artifact or observed configuration effect; if no loader is available, identify that missing prerequisite. | CLI is absent but config/loader are available: do not require unrelated CLI setup or load its branch reference. |
+| Either branch missing a prerequisite | Apply common authority/blocked handling, then the affected branch's local guidance if available. | Identify missing binary/config/loader/reference, affected outputs and completed independent work. | Absence is not a fallback implementation, completed side effect or measured routing failure. |
+
+Reference integrity and loading behavior are separate: a local file can exist while its pointer gives no way to select it. An authored audit checks both. Auditing the CLI pointer does not establish the config branch is covered. Synonyms such as “export” and “dump” are one branch unless they require genuinely different inputs/actions/outputs.
+
+## Type-Specific Criteria
+
+Consult the section matching the audited definition type. Required machine fields come from the current registry/validators, not from this list of authored behavior questions. Inspect declared optional metadata only when it affects the promised contract; do not turn generic preferences into requirements.
+
+### Skill (`SKILL.md`)
+
+- Map model-discovery and explicit invocation promises to actual target-harness support, without removing required description metadata.
+- Procedural skills need branch-specific actions, outputs and termination conditions. Reference-only skills need an exhaustive, checkable application criterion rather than a fake procedure.
+- Evidence: branch-to-case matrix, local loading pointers and each promised output's evidence requirement.
+
+### Agent (`AGENT.md`)
+
+- Check required `model` and `color` and applicable declared metadata such as execution phase or language targets against current validators/configuration.
+- Inspect decisions, allowed operations, phase transitions and completion/blocked handoff. Language-specific guidance is required only where the agent promises language-specific behavior.
+- Evidence: each decision path terminates in an artifact, finding or explicit blocker; model/tool availability and authority limitations are recorded. Phase markers or a decision-tree heading alone do not demonstrate correct execution.
+
+### Hook (`HOOK.md`)
+
+- Check `hook.events`, handler type/command, local executable target and declared input/output protocol against actual schema/handler code.
+- Inspect malformed input, timeout, cancellation and exit/side-effect semantics for the actual event. Never assume all events use the same nonzero/blocking convention.
+- Evidence: sourced event/handler mapping and an artifact/exit/side-effect requirement per path; actual runtime proof only when safely authorized. A present handler is not proof it works, and an audit is not permission to fire it.
+
+### Rule (`RULE.md`)
+
+- Inspect declared scope/language applicability and concrete obligations. Each relevant rule needs an observable adherence/violation criterion, with examples where ambiguity warrants them.
+- Use justified numeric limits only when the domain requires them; inventing thresholds is not a substitute for a checkable rule.
+- Evidence: representative compliant/violating scenarios tied to actual constraints and applicability boundaries, not broad principles alone.
+
+### Command (`COMMAND.md`)
+
+- Check the `command` mapping and actual invocation/argument handling, supported modes, handler and target-harness configuration.
+- Inspect missing/invalid arguments, decisions, permitted actions and termination conditions.
+- Evidence: distinct argument/mode branches each map to an output/error artifact and case. Documented syntax does not establish that the runtime can invoke it.
+
+### Utility (`UTILITY.md`)
+
+- Check the `utility` mapping/runtime and any declared entry point or executable against actual local files and configuration.
+- Inspect CLI/input protocol, dependencies, errors and output/side-effect contract. A stdlib-only implementation is not universally required; declared dependencies must be discoverable and handled.
+- Evidence: sourced invocation, each output/error path and prerequisite/authority handling; runtime results only for inputs actually exercised.
+
+### Preset (`PRESET.md`)
+
+- Check the `preset` mapping/package entries against current manifest and installer representation; do not assume a top-level `packages` field satisfies the actual schema.
+- Inspect compatibility, included package existence, intended combined workflow and configuration effect. Preset package identifiers are intentional bundle dependencies, not cross-package file-reference violations.
+- Evidence: every declared entry resolved or explicitly missing, supported-target loading/configuration expectations and actual observations when authorized. Manifest membership is not proof that the bundle loaded.
+
+## Severity and Reporting Calibration
+
+1. Tie each finding to a specific source, branch and observable impact. CRITICAL/HIGH/MEDIUM/LOW prioritize authored repairs; they do not alter report-v2 statuses or produce a numeric grade.
+2. Classify a demonstrated missing executable/distribution target or unsafe required action as CRITICAL; a missing promised branch, uncheckable completion, unusable required pointer or invented command/config as HIGH. Use MEDIUM for incomplete adversarial/adjacent coverage or ambiguous recovery, LOW for local clarity without a blocked contract.
+3. Distinguish absent required data from sparse but valid metadata, optional preferences and lack of measured behavior. “Not measured” is an evidence limit, not automatic evidence of failure.
+4. Account for all requested packages and each supported invocation branch. An unreadable target or unavailable reference remains an explicit unresolved entry, not silently dropped coverage.
+5. When comparing packages, prioritize evidenced defects rather than assigning efficacy rankings from static inspection. Apply the same criteria to self-evaluation.
+6. Keep one finding per underlying defect with all affected evidence/branches; do not inflate severity by repeating the same gap across headings.
+7. Report commands/exit/artifact pointers only when observed. A blocked check receives an execution note, never a fabricated JSON report. Keep live_effectiveness NOT_MEASURED in actual evaluator output even when attaching separate valid behavioral evidence.
+
+## Worked Interpretation (Synthetic)
+
+A hypothetical package has valid required frontmatter, matching directory/name and parseable version, but promises both CLI and config exports while only documenting CLI flags.
+
+- An actual report-v2 run could return static PASS and live NOT_MEASURED; no run is asserted here.
+- Authored review records the missing config branch as HIGH with its description/body evidence and required config/loader/output contract.
+- A CLI helper smoke, if separately authorized and observed, demonstrates only that invocation's artifact/result. It does not fill the config gap or demonstrate model routing.
+- Completion requires accounting for both promised branches, sourcing current environment configuration and recording unexercised outcomes. Neither a static pass nor a more verbose description closes the finding.

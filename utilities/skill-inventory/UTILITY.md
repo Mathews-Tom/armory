@@ -1,9 +1,9 @@
 ---
 name: skill-inventory
 type: utility
-description: 'Measures installed skill metadata exposure and observed reads or invocations from local OMP, Claude Code and Codex logs. Use this utility when you ask "audit my skill inventory", "how much do skill descriptions cost?", "find unused managed skills", "which skills were read?", "find duplicate skills", or "restore archived skills". Covers offline measurement, conservative archive/merge proposals and reversible OMP managed-skill quarantine. NOT for general session/context audits (usage-audit), catalog installation (skill-library), or static package quality/effectiveness scoring (package-evaluator).'
+description: 'Measures installed skill metadata exposure and observed reads or invocations from local OMP, Claude Code and Codex logs. Use this utility when you ask "audit my skill inventory", "how much do skill descriptions cost?", "find unused managed skills", "which skills were read?", "find duplicate skills", or "restore archived skills". Covers offline measurement, conservative archive/merge proposals and reversible OMP managed-skill quarantine. NOT for general session/context audits (usage-audit), catalog installation (skill-library), or static conformance reports/authored package audits (package-evaluator; live effectiveness NOT_MEASURED).'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: workflow
   tags: [skills, inventory, exposure, privacy, quarantine]
   difficulty: advanced
@@ -19,7 +19,7 @@ Measure local skill-file metadata and persisted exposure; propose conservative a
 |---|---|
 |Audit installed descriptions, observed reads/invocations or duplicate candidates|General context/token audit: use usage-audit|
 |Review managed-skill keep/archive/merge proposals|Install/search the package catalog: use skill-library|
-|List or restore a previous managed-skill quarantine|Score static package quality: use package-evaluator|
+|List or restore a previous managed-skill quarantine|Static conformance report/authored package audit: use package-evaluator; live effectiveness `NOT_MEASURED`|
 
 Triggers group into inventory/exposure ("audit my skill inventory", "how much do skill descriptions cost?"), usage/similarity ("find unused managed skills", "which skills were read?", "find duplicate skills"), and recovery ("restore archived skills").
 

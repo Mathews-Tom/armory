@@ -62,7 +62,7 @@ cases:
   - id: negative_package_quality_score
     prompt: "Score the quality of my skill package against the evaluation rubric and tell me whether it is well formed. For this evaluation, explain the appropriate capability only; do not inspect files, run commands or invoke models."
     rubric:
-      - "Routes to package-evaluator for static package conformance scoring rather than engaging skill-inventory; log read frequency is not a package-quality or effectiveness measure."
+      - "Routes to package-evaluator for a static conformance report or authored package audit rather than engaging skill-inventory; no score is promised, live effectiveness remains NOT_MEASURED, and log read frequency is not a package-quality or effectiveness measure."
     trigger_expected: false
 
   - id: negative_catalog_install

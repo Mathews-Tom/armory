@@ -1,5 +1,12 @@
 # Changelog — Route
 
+## 1.3.0
+
+- Route asynchronous external-recipient discovery to `intake`, persistent human learning to `learning-workspace`, active domain challenge to `domain-modeling`, and unavoidable human operations to `walkthrough`.
+- Distinguish live elicitation, one-off repo tutoring, agent memory, context scaffolding, ADR writing and agent-doable setup from those routes.
+- Keep disposable prototypes within `decision-map` as decision evidence, without adding a duplicate package.
+- Author positive and adjacent-boundary routing cases; these are not live execution evidence.
+
 ## 1.2.0
 
 - Route explicit full shipping requests to `/ship` or `ship-workflow` with the `clean` default; keep PR publication at `pr` and CI/status requests read-only.

@@ -1,0 +1,203 @@
+cases:
+  - id: partial_cancellation_context_conflict
+    prompt: |
+      Sharpen our Ordering/Billing model for partial cancellations, without changing code.
+      docs/agents/domain.md routes via CONTEXT-MAP.md to src/ordering/CONTEXT.md and
+      src/billing/CONTEXT.md. Ordering defines Cancellation as ending an entire order;
+      Billing defines Cancellation as reversing an invoice. Ordering has the exact human
+      note "Keep warehouse annotations" and the unrelated ambiguity "Guest checkout
+      ownership awaits Priya". Billing has "Finance note: retain historic invoice terms".
+      src/ordering/cancel.ts:10-13 sets the entire order status to cancelled and zeroes
+      every line. src/billing/adjust.ts:20-22 creates a credit note. These are the only
+      implementation excerpts supplied; do not claim execution or unseen caller behavior.
+      Our owner confirms: O has L requesting 3 units and M requesting 1; cancelling 1
+      unit of L leaves L requesting 2 and M unchanged. A Line Cancellation concerns
+      exactly one line, is a positive quantity no greater than its remaining requested
+      quantity, may recur, and retains line identity. The whole-order method is behind
+      this agreed intent. Billing confirms Credit Note reduces invoiced money owed,
+      is not invoice erasure, and is unnecessary before invoicing. Split-invoice mapping
+      and the separate whole-order operation remain unanswered. These answers are
+      approved; narrow context edits are authorized. Show what is captured and what
+      remains unresolved, preserving existing human content and routes.
+    fixtures: []
+    rubric:
+      - "Selects the contradiction/scenario branch and loads local context-format and scenario-review references before choosing context destinations."
+      - "Explicitly challenges the two Cancellation meanings against the supplied partial-unit scenario rather than producing a generic glossary."
+      - "Captures agreed Line Cancellation and Credit Note definitions in their owning contexts inline; distinguishes the unanswered whole-order meaning rather than silently deleting it."
+      - "Accounts for one cancellation to exactly one line, line to zero or more cancellations, quantity bounds, stable identity and unchanged M; does not infer cancellation-to-credit-note cardinality."
+      - "Retains split-invoice and whole-order questions as unresolved, with needed owner evidence."
+      - "Preserves all three exact human notes/ambiguities, map routes and unrelated sections; no duplicate glossary or unnecessary route rewrite."
+      - "Reports the supplied source-level contradiction and stale-method disposition outside canonical vocabulary; no code changes, runtime claim or ADR creation."
+    trigger_expected: true
+
+  - id: lazy_first_agreement
+    prompt: |
+      Help settle the meaning of Booking in this single-context equipment-hire repo.
+      There is no CONTEXT.md, CONTEXT-MAP.md or docs/agents/domain.md and no competing
+      domain route. Existing AGENTS.md contains human rules that must not be edited.
+      The domain owner has explicitly agreed: a Booking is a confirmed reservation of
+      one or more equipment units for one customer during a specified interval; each
+      Booking belongs to exactly one Customer and a Customer may have zero or more
+      Bookings. Provisional holds are not Bookings. Narrow domain documentation writes
+      are authorized. No implementation sources are available in this session. Record
+      the agreement now, with its scenario boundary; do not set up unrelated context.
+    fixtures: []
+    rubric:
+      - "Selects new agreed vocabulary capture and loads the local context-format reference."
+      - "Uses the confirmed-vs-provisional scenario to account for the boundary; captures a one-sentence Booking definition and both relationship cardinalities."
+      - "Lazily creates only the warranted root CONTEXT.md and necessary domain lookup note, not a context map, empty context directories or ADRs."
+      - "Preserves AGENTS.md, identifies unavailable implementation sources and labels code/model consistency unverified while completing vocabulary work."
+    trigger_expected: true
+
+  - id: unanswered_term_no_scaffold
+    prompt: |
+      Model account for our checkout work. In this disposable repo there are no domain
+      files yet. I do not know whether account means a login, a buyer organization,
+      or a billing ledger; no owner has agreed any definition. We only need to resolve
+      which entity owns an order. There is no source access and no write authority.
+      Help me identify the next concrete question without inventing agreement.
+    fixtures: []
+    rubric:
+      - "Bounds the session to order ownership and offers a concrete discriminating scenario such as multiple logins buying for one organization."
+      - "Asks one material business question rather than silently choosing a meaning or treating a proposed term as accepted."
+      - "Returns unresolved alternatives and missing owner/source evidence; creates no CONTEXT.md, map, lookup note, generic headings or ADR."
+    trigger_expected: true
+
+  - id: read_only_existing_model
+    prompt: |
+      Review our domain model in read-only mode. docs/agents/domain.md points to root
+      CONTEXT.md. It says a Member belongs to exactly one Team. The owner now confirms
+      members may belong to zero or many Teams and each Team may have zero or many
+      Members, including a new member before joining and a member shared by two Teams.
+      The file includes the human note "Legal reviewed the consent definition".
+      src/members/schema.sql:8 has a non-null team_id; callers are unavailable. Show
+      exact proposed domain edits and the contradiction disposition, without writing.
+    fixtures: []
+    rubric:
+      - "Loads the context and scenario references, challenges the old cardinality using both supplied scenarios, and respects the declared root route."
+      - "Returns clearly unapplied edits for both relationship directions while preserving the legal note and unrelated definitions."
+      - "Names schema.sql:8 as inspected evidence of the conflicting constraint and marks absent callers/runtime effects unverified."
+      - "Requests or records a domain-owner disposition for whether schema or model is stale, does not assume database truth or perform a migration, and makes no filesystem changes."
+    trigger_expected: true
+
+  - id: conflicting_context_route
+    prompt: |
+      Help refine Customer ownership for the checkout feature. docs/agents/domain.md
+      declares GLOSSARY.md authoritative, while root CONTEXT-MAP.md points Ordering at
+      a missing src/ordering/CONTEXT.md. Root CONTEXT.md also claims Customer ownership
+      with different wording. No migration or destination decision has been agreed.
+      The owner can still discuss whether guest checkout creates a Customer. Preserve
+      all existing human edits and do not invent a parallel model.
+    fixtures: []
+    rubric:
+      - "Identifies the conflicting routes and missing mapped target before selecting a write destination."
+      - "Pauses affected writes and asks for destination authority; does not rename the legacy glossary, create the missing tree or pick a route silently."
+      - "Continues independent concrete guest-checkout reasoning and returns unresolved ownership/destination evidence rather than claiming capture."
+    trigger_expected: true
+
+  - id: adr_gate_all_three
+    prompt: |
+      While resolving our domain model, we agreed that a Line Cancellation is an
+      accepted positive reduction in one line's remaining requested quantity. Document
+      only this business meaning. We also actually chose immutable cancellation events
+      over mutable rows: audit reconstruction outweighed storage/projection complexity.
+      The owner confirms reversal would migrate seven years of retained records and
+      three external consumers. A future maintainer would expect CRUD in this small
+      product and would not know the audit reason. docs/agents/domain.md declares
+      docs/adr/ for global decisions. Domain writes are authorized, ADR writing is not.
+    fixtures: []
+    rubric:
+      - "Loads decision-boundary when the implementation choice arises and keeps the business definition separate from event/storage mechanisms."
+      - "Surfaces a candidate only with explicit evidence for meaningful reversal cost, surprise without context and alternatives actually weighed/chosen for stated trade-offs."
+      - "Provides a concise candidate handoff to authorized adr-writer using the existing lookup route, without creating an ADR, assigning a number or making an ADR directory."
+      - "Completes independently agreed vocabulary capture despite absent ADR-writing authority."
+    trigger_expected: true
+
+  - id: adr_gate_missing_reversal_cost
+    prompt: |
+      We are modeling accepted versus pending Line Cancellations. The owner has resolved
+      those business meanings. In the discussion we chose an unusual blue rather than
+      red cancellation badge after weighing accessibility contrast against the brand
+      palette; future readers would find blue surprising without that context. It is
+      one local setting with no persisted data or external consumers and can be reversed
+      in minutes at negligible cost. Is this an ADR candidate? Keep implementation
+      choices out of the canonical cancellation definitions.
+    fixtures: []
+    rubric:
+      - "Applies the all-three gate and returns no ADR candidate because meaningful reversal cost is missing despite surprise and a real trade-off."
+      - "Keeps badge choices outside canonical business definitions and does not offer a draft ADR anyway."
+    trigger_expected: true
+
+  - id: adr_gate_missing_surprise
+    prompt: |
+      We are clarifying Invoice and Credit Note terminology. The approved definitions
+      are business concepts, not SQL choices. During this work we actually chose our
+      standard relational invoice store over a document store after weighing query
+      consistency against schema flexibility. Reversal would migrate years of invoices.
+      The owner and repository decision guide explicitly confirm that the choice is
+      unsurprising to a future maintainer even without additional context. Should this
+      become an ADR candidate during this domain-modeling session?
+    fixtures: []
+    rubric:
+      - "Returns no ADR candidate: meaningful reversal cost and actual trade-offs do not replace the missing surprise condition."
+      - "Keeps the resolved vocabulary and implementation discussion separate; creates no ADR or placeholder."
+    trigger_expected: true
+
+  - id: adr_gate_missing_real_tradeoff
+    prompt: |
+      While agreeing what Settlement means, the owner confirms we must retain events
+      in the regulator's sole mandated archive. It is hard to reverse because historic
+      records and downstream consumers would need migration, and a future maintainer
+      would be surprised without the regulation's context. No alternatives were available
+      or weighed and no trade-off choice was made. Should domain-modeling surface an
+      ADR candidate? Capture the agreed business term without archival mechanisms.
+    fixtures: []
+    rubric:
+      - "Returns no ADR candidate because no real alternatives were weighed/chosen, even though reversal cost and surprise are present."
+      - "Does not invent rejected alternatives or turn the regulator's mandate into a fictional trade-off."
+      - "Captures only agreed business language and leaves archival implementation rationale outside the glossary."
+    trigger_expected: true
+
+  - id: adr_gate_unknown_evidence
+    prompt: |
+      We are distinguishing Order from Invoice. Someone suggested event sourcing and
+      says it probably deserves an ADR because architecture is important. Nobody has
+      chosen it, assessed reversal costs, explained surprise or weighed alternatives.
+      Keep modeling the two business concepts; do not expand scope to design storage.
+    fixtures: []
+    rubric:
+      - "Treats unknown gate evidence as failure to qualify, not as implied truth, and surfaces no ADR candidate."
+      - "Does not manufacture alternatives, incur architecture design work or write a placeholder; continues scoped domain questions."
+    trigger_expected: true
+
+  - id: negative_read_unchanged_context
+    prompt: "Read our existing CONTEXT.md for the canonical spelling of Customer and use it unchanged in a short feature summary. We are not changing the model."
+    fixtures: []
+    rubric:
+      - "Does not invoke active domain-modeling for passive consumption of an unchanged definition."
+      - "Reads the requested existing vocabulary without starting a domain interview or editing context files."
+    trigger_expected: false
+
+  - id: negative_write_single_adr
+    prompt: "Write the ADR for our already-decided Postgres-over-MongoDB choice; domain terminology is settled."
+    fixtures: []
+    rubric:
+      - "Routes ADR authorship to adr-writer under its own authority, not domain-modeling."
+      - "Does not start a glossary workflow or create an ADR through this skill."
+    trigger_expected: false
+
+  - id: negative_generic_context_scaffold
+    prompt: "Set up the repository's agent issue tracker, triage labels and context lookup structure. There are no domain definitions to resolve yet."
+    fixtures: []
+    rubric:
+      - "Recognizes generic repository-context setup rather than active modeling; leaves it to project-context-setup."
+      - "Does not fabricate domain terms, create an empty glossary or take over issue-tracker configuration."
+    trigger_expected: false
+
+  - id: negative_implement_known_fix
+    prompt: "Our approved model already supports partial line cancellations. Implement the known cancelLine bug fix and regression tests; do not revisit terminology."
+    fixtures: []
+    rubric:
+      - "Treats this as implementation/debugging with an already-settled domain model, not a domain-modeling interview."
+      - "Does not use this skill to grant code-change authority or rewrite agreed domain vocabulary."
+    trigger_expected: false

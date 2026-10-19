@@ -35,4 +35,30 @@ Use a generated task list in the map for children and `Blocked by: #N` body line
 
 ## Local path
 
-Store `.docs/decision-maps/<effort>/map.md`, one numbered child file with `Type:`, `Interaction:`, `Status:`, and `Blocked by:` headers, and a `claims/` directory. Write resolution pointers back to the map. Backend selection is: obey `.docs/agents/issue-tracker.md`; otherwise use local markdown. Use GitHub only when the user explicitly selects it and `gh auth status` succeeds; do not infer that choice from a remote or authentication. Report the choice and suggest `project-context-setup` when it should become repo policy.
+Store `.docs/decision-maps/<effort>/map.md`, one numbered child file with `Type:`, `Interaction:`, `Status:`, and `Blocked by:` headers, and a `claims/` directory. These local metadata headers are required even though the initial decision content is question-only; use the example in `references/ticket-types.md`. Write resolution pointers back to the map only after closure. Backend selection is: obey `.docs/agents/issue-tracker.md`; otherwise use local markdown. Use GitHub only when the user explicitly selects it and `gh auth status` succeeds; do not infer that choice from a remote or authentication. Report the choice and suggest `project-context-setup` when it should become repo policy.
+
+## Recording evidence without changing tracker state
+
+Evidence is a write to the selected ticket, not a new helper operation or a closure:
+
+- **GitHub (native or degraded):** write the evidence record to a temporary body file and post it with `gh issue comment <number> --body-file <evidence-file>`. Start the comment with `## Evidence`, not `decision-map claim`. Preserve the original issue body, labels, assignees, blocker relationships and existing claim comment. The evidence comment does not release, replace or refresh that claim.
+- **Local:** append an unquoted `## Evidence` heading to the existing numbered ticket body, followed by the evidence record. Prefix **every physical evidence line** with `> ` (an empty line becomes `>`), including pasted output, nested headings, code-fence delimiters, and any `Type:`, `Interaction:`, `Status:`, or `Blocked by:` text. A fenced block alone is not safe: the current local scanner reads matching metadata lines anywhere in the file, with the last value winning. Quoting each line keeps evidence out of that metadata namespace. Preserve the original question, headers, their values and the claim lock; later evidence is another quoted append, not a body replacement.
+
+For example, this local append records potentially misleading raw output without changing the ticket's metadata:
+
+```markdown
+## Evidence
+> Outcome: UNRESOLVED_WITH_EVIDENCE
+> Artifact: /tmp/decision-prototype/state.html (temporary; open this file directly)
+> Observation: browser unavailable; scenarios not observed.
+>
+> Captured sample output (not tracker metadata):
+> Status: CLOSED
+> Type: decision-map:research
+> Interaction: decision-map:afk
+> Blocked by: #99
+> Pending prerequisite: human browser observation and verdict.
+> Continuation: same ticket and existing session claim.
+```
+
+Record the question/assumptions, artifact access instructions, observations, inferences, verdict and exact pending prerequisite as applicable. An unanswered result leaves `Status: OPEN` locally or the GitHub issue open, with the existing claim held; it adds no resolution pointer and creates no second ticket. Recompute the frontier/state: an otherwise empty frontier with this claimed open ticket is `WAITING`; other actionable tickets still make the map `ACTIVE`. Resume on this ticket by re-verifying the same claim, under the existing 24-hour default stale-claim rule in `references/claim-protocol.md`.

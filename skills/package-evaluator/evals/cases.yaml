@@ -1,160 +1,276 @@
 cases:
   - id: evaluate_single_skill
-    prompt: "Evaluate the quality of the sql-optimizer SKILL.md"
+    prompt: "Evaluate the quality of skills/sql-optimizer/SKILL.md. Inspect its authored completion contract and invocation coverage; do not execute validators or model sessions."
     fixtures: []
     rubric:
-      - "scores across defined dimensions including frontmatter quality and trigger coverage"
-      - "produces severity-classified findings (critical, warning, info)"
-      - "gives actionable recommendations for improvement"
+      - "normalizes the definition-file path to its parent package directory and identifies the skill type"
+      - "loads the authored rubric and reports source-backed findings, completion criteria and branch-to-evidence coverage"
+      - "records static checks as NOT_RUN execution notes because execution is forbidden; does not invent machine PASS or numeric quality scores"
+      - "keeps behavior unmeasured and names evidence limits"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)frontmatter|trigger"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)critical|warning|info"
-        weight: 1.0
-      - type: matches_regex
-        target: "\\d+(\\.\\d+)?\\s*/\\s*\\d+"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)recommend|improvement|fix"
-        weight: 0.6
 
-  - id: audit_all_skills
-    prompt: "Run a full audit across all skills in this repo and rank them by quality"
+  - id: audit_multiple_paths
+    prompt: "Audit skills/sql-optimizer and skills/package-evaluator as two separate package targets, inspection only. Account for both, even if one cannot be read."
     fixtures: []
     rubric:
-      - "produces comparative ranking table across all skills"
-      - "includes per-skill summaries with scores"
-      - "identifies lowest-scoring skills with specific deficiencies"
+      - "produces per-package authored reports plus a scope table accounting for both supplied paths"
+      - "records unreadable targets explicitly rather than shrinking scope"
+      - "maps every promised branch to required output/evidence and uses the same criteria for self-evaluation"
+      - "does not fabricate execution results or rank package effectiveness"
     trigger_expected: true
-    assertions:
-      - type: output_format
-        target: markdown_table
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)rank|score"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)lowest|deficien|weak"
-        weight: 0.6
-      - type: matches_regex
-        target: "\\d+(\\.\\d+)?\\s*/\\s*\\d+"
-        weight: 0.6
+
+  - id: audit_catalog
+    prompt: "Audit every package in this repository, all seven types. Do not run commands or sessions. I want an inventory, integrity findings and evidence gaps rather than a score."
+    fixtures: []
+    rubric:
+      - "discovers current registry, manifest and definition files rather than using a historical package count"
+      - "accounts for each in-scope package across skills, agents, hooks, rules, commands, utilities and presets"
+      - "reports directories missing required definitions and unreadable entries rather than silently omitting them"
+      - "provides per-package coverage/findings and aggregate table with NOT_RUN static notes, not a comparative efficacy ranking"
+    trigger_expected: true
+
+  - id: audit_type_filtered_catalog
+    prompt: "Audit only agent packages in this repository, inspection only. An old note suggests evaluate_package.py --type agents; check the current interface before recommending anything."
+    fixtures: []
+    rubric:
+      - "records the requested agent-only scope and derives the inventory from current registered types and directories"
+      - "identifies that --type is not supported by evaluate_package.py and selects scope outside that CLI"
+      - "reports each matching agent and excludes other types explicitly"
+      - "does not execute checks or fabricate a filtered evaluator report"
+    trigger_expected: true
+
+  - id: relay_static_report_only
+    prompt: >-
+      Interpret only this supplied static package report; do not perform a content audit or execute anything.
+      [{"report_version":2,"name":"example-package","type":"skill","static_conformance":{"status":"PASS","requirements":["definition file","valid YAML frontmatter","type-required frontmatter","matching package name","kebab-case package directory"],"findings":[]},"live_effectiveness":{"status":"NOT_MEASURED","runner":"scripts/run_evals.py","dimensions":["routing","task outcome"]},"status":"PASS","findings":[]}]
+      Is this evidence of effective invocation?
+    fixtures: []
+    rubric:
+      - "preserves the supplied list/report-v2 fields and explains that top-level status and findings mirror static conformance"
+      - "states that the supplied static PASS does not measure invocation or task outcomes and retains NOT_MEASURED"
+      - "does not claim to have run the evaluator, validated references or performed authored content review"
+    trigger_expected: true
+
+  - id: static_fail_and_exit_semantics
+    prompt: >-
+      Audit interpretation only: the observed evaluate_package.py --path skills/example-package --json
+      result has report_version 2, static_conformance FAIL, a CRITICAL name-mismatch finding,
+      top-level status FAIL and live_effectiveness NOT_MEASURED. The command exited 1.
+      Should this be converted to a low weighted quality score?
+    fixtures: []
+    rubric:
+      - "explains the observed static failure and exit 1 without converting it to a weighted score"
+      - "keeps the machine finding/status separate from any authored recommendations and retains NOT_MEASURED"
+      - "recommends correcting directory/name agreement with actual scope evidence rather than inventing behavior failure"
+    trigger_expected: true
+
+  - id: missing_frontmatter_static_failure
+    prompt: >-
+      Interpret this supplied observation only; do not execute commands or invent a repaired package.
+      skills/example-package/SKILL.md exists and starts with "# Example Package", with no YAML
+      frontmatter delimiters. The observed evaluate_package.py --path skills/example-package --json
+      output is report_version 2 with static_conformance FAIL, a CRITICAL finding beginning
+      "Invalid YAML frontmatter:", top-level status FAIL and live_effectiveness NOT_MEASURED.
+      The command exited 1. Can you infer the missing name, description or version from the heading?
+    fixtures: []
+    rubric:
+      - "preserves the observed static FAIL, CRITICAL Invalid YAML frontmatter finding, exit 1 and live NOT_MEASURED"
+      - "does not invent parsed metadata, missing-field findings or a repaired report from the heading when frontmatter parsing failed"
+      - "keeps any authored repair recommendation separate from machine output and does not claim execution or effectiveness"
+    trigger_expected: true
 
   - id: evaluate_agent
-    prompt: "Evaluate this agent for quality and completeness"
+    prompt: "Audit an AGENT.md excerpt that declares model: sonnet and color: blue, supports triage and investigation, but only specifies an output and stopping criterion for triage. Inspection only; identify what evidence the investigation branch still needs."
     fixtures: []
     rubric:
-      - "detects AGENT.md as the definition file type"
-      - "checks agent-specific signals: model, category, execution_phase, decision tree"
-      - "applies agent-specific D3 and D4 scoring caps"
+      - "recognizes agent type and distinguishes declared required metadata from behavior criteria"
+      - "identifies missing investigation output, termination and blocked/handoff contract with branch-specific evidence requirements"
+      - "does not impose scoring caps, arbitrary optional metadata or claim a machine report from an excerpt"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)AGENT\\.md|agent"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)model|decision.tree|execution"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)critical|warning|info"
-        weight: 0.6
-      - type: matches_regex
-        target: "\\d+(\\.\\d+)?\\s*/\\s*\\d+"
-        weight: 0.6
 
   - id: audit_hook_quality
-    prompt: "Audit hook quality and check if the handler script works"
+    prompt: "Audit this synthetic hook contract: HOOK.md declares hook.events [PreToolUse], handler type command and command ./handler.sh, but the package inventory contains no handler.sh. Its body promises JSON validation and blocking on invalid input. Do not execute any hook."
     fixtures: []
     rubric:
-      - "detects HOOK.md as the definition file type"
-      - "checks for handler script existence and hook.events list"
-      - "applies hook-specific D4 cap if handler script is missing"
+      - "identifies missing local required handler as an authored integrity finding with the declared event/command evidence"
+      - "requests observable input, exit and side-effect evidence appropriate to the event without assuming the handler works"
+      - "does not fire the hook or claim static conformance must fail for a file check the evaluator does not perform"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)HOOK\\.md|hook"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)handler|events"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)critical|warning|info"
-        weight: 0.6
-      - type: matches_regex
-        target: "\\d+(\\.\\d+)?\\s*/\\s*\\d+"
-        weight: 0.6
 
-  - id: rate_rule_package
-    prompt: "Rate this rule package and tell me what's missing"
+  - id: evaluate_rule_contract
+    prompt: "Audit this rule package excerpt: it applies only to SQL migrations and says use reasonable indexes and verify safety. It supplies no adherence criterion or violation examples. What is missing? Inspection only."
     fixtures: []
     rubric:
-      - "detects RULE.md as the definition file type"
-      - "checks for metadata.scope and concrete requirements"
-      - "flags vague principles without actionable specifics"
+      - "uses the declared migration scope and identifies uncheckable obligations with concrete evidence requirements"
+      - "asks for domain-justified criteria and compliant/violating scenarios rather than inventing numeric thresholds"
+      - "does not produce dimension scores or equate vague prose with an observed routing failure"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)RULE\\.md|rule"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)scope|requirement"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)critical|warning|info"
-        weight: 0.6
-      - type: matches_regex
-        target: "(?i)missing|vague"
-        weight: 0.6
 
-  - id: score_all_packages
-    prompt: "Score all packages in this repository"
+  - id: evaluate_command_branches
+    prompt: "Audit a COMMAND.md contract whose syntax supports /export --preview and /export --write. Only preview has a workflow and output format. The write branch has no authority check, error output or completion condition. No execution authorized."
     fixtures: []
     rubric:
-      - "enumerates all package types across skills/, agents/, hooks/, rules/, commands/, utilities/, presets/"
-      - "produces comparative ranking table with Type column"
-      - "applies type-specific scoring for each package"
+      - "identifies preview and write as distinct invocation branches, not synonyms"
+      - "requires branch-specific write authorization, output/error artifacts and observable completion before calling the contract complete"
+      - "records the absent branch criteria as authored findings and execution as NOT_RUN, without assuming runtime command support"
     trigger_expected: true
-    assertions:
-      - type: output_format
-        target: markdown_table
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)type|skill|agent|hook|rule"
-        weight: 0.8
-      - type: matches_regex
-        target: "\\d+(\\.\\d+)?\\s*/\\s*\\d+"
-        weight: 0.6
-      - type: matches_regex
-        target: "(?i)rank|score"
-        weight: 0.6
+
+  - id: evaluate_utility_configuration
+    prompt: "Audit a utility contract that declares utility.runtime python and entry_point export.py. The supplied inventory contains export.py; its --output option writes JSON, but missing destination permissions have no documented outcome. Inspection only."
+    fixtures: []
+    rubric:
+      - "distinguishes present entry point from demonstrated executable behavior"
+      - "requires sourced invocation, output artifact and permission-error/exit evidence for the promised branch"
+      - "does not require stdlib-only dependencies or report measured behavior without an observation"
+    trigger_expected: true
+
+  - id: evaluate_preset_entries
+    prompt: "Audit a synthetic PRESET.md with preset.packages [skills/sql-optimizer, skills/nonexistent-exporter]. The supplied current manifest contains only sql-optimizer. No install authorized."
+    fixtures: []
+    rubric:
+      - "accounts for every declared preset entry and identifies nonexistent-exporter as unresolved against the supplied manifest"
+      - "distinguishes intentional preset identifiers from cross-package filesystem references"
+      - "requires supported-target loading/configuration-effect evidence without installing or claiming the bundle loaded"
+      - "keeps the authored integrity finding separate from the evaluator's limited static checks"
+    trigger_expected: true
+
+  - id: cli_configuration_source_wins
+    prompt: >-
+      Audit this synthetic CLI export skill, inspection only. It promises export through a CLI and through config.
+      Its CLI example says exporter --format json. The supplied current project script selects exporter v3;
+      v3 help exposes --output-format and not --format. Config export has its own loader.
+      What must the CLI completion contract record, and can this cached example prove the skill ineffective?
+    fixtures: []
+    rubric:
+      - "uses current project script and installed help as the source for --output-format rather than perpetuating the cached flag"
+      - "requires exact sourced invocation, artifact path, exit and inspection evidence when authorized, otherwise an explicit unexecuted note"
+      - "records the source-backed stale example finding without claiming observed model ineffectiveness"
+      - "accounts separately for the promised config branch rather than treating a CLI synonym as its coverage"
+    trigger_expected: true
+
+  - id: config_only_without_cli
+    prompt: >-
+      Audit a config-only invocation of a synthetic export skill. Its entrypoint says:
+      For CLI export, load references/cli-export.md before selecting flags; for config export,
+      load references/config-export.md before selecting keys. The supplied environment has no exporter binary,
+      but has active export.yaml and a readable loader selecting output.path with project config overriding defaults.
+      Must this invocation install the CLI or load every reference? Inspection only.
+    fixtures: []
+    rubric:
+      - "selects config branch and its config-export reference; does not require unrelated CLI installation or reading CLI-only guidance to perform this invocation"
+      - "identifies export.yaml, output.path, loader and precedence as configuration evidence sources"
+      - "requires resulting artifact or observed config effect before claiming execution success; treats the missing unrelated CLI as irrelevant to this branch"
+      - "distinguishes auditing all pointers for integrity from loading every reference at runtime"
+    trigger_expected: true
+
+  - id: missing_configuration_prerequisite
+    prompt: >-
+      Audit a synthetic config-export skill whose required loader is absent from the supplied environment.
+      The only evidence is a default export.yaml; no active-config source or loader precedence is available.
+      A separate read-only metadata branch is fully inspectable. Can the config export be marked complete?
+      Do not run anything.
+    fixtures: []
+    rubric:
+      - "names the missing loader/active-config evidence and affected config-export branch explicitly"
+      - "does not invent keys, precedence, a successful export artifact or a fallback loader"
+      - "completes reachable metadata review while retaining the blocked branch in scope accounting"
+      - "keeps static execution NOT_RUN and behavior unmeasured rather than treating missing prerequisites as measured activation failure"
+    trigger_expected: true
+
+  - id: conditional_reference_pointer_gap
+    prompt: >-
+      Audit this synthetic package entrypoint: shared workflow says choose CLI or config export, then finish.
+      Its reference table only lists references/cli-export.md and references/config-export.md by filename.
+      Both files exist locally; config-export contains required loader precedence and error evidence rules.
+      The author says file existence alone means reference guidance is complete. Inspection only.
+    fixtures: []
+    rubric:
+      - "separates reference-target integrity from an entrypoint loading contract"
+      - "requires a pointer condition and purpose for each branch before its decisions depend on that reference"
+      - "keeps shared actions inline and config-only details conditional rather than directing every invocation to read everything"
+      - "does not claim that a structural reference pass demonstrates correct model loading"
+    trigger_expected: true
+
+  - id: exhaustive_completion_gap
+    prompt: "Audit this package step: understand all model changes, produce a summary, then deploy. The supplied change list has six models, but the example summary accounts for only two and provides no migration decisions or evidence pointers. Inspection only; do not deploy."
+    fixtures: []
+    rubric:
+      - "identifies both the vague step bound and nonexhaustive final coverage"
+      - "requires each of the six models to have a migration decision and evidence pointer or explicit unresolved prerequisite before proceeding"
+      - "does not accept the presence of a summary or a later deployment step as proof of completion"
+      - "does not execute deployment or claim model effectiveness from the rewritten criterion"
+    trigger_expected: true
+
+  - id: synonyms_do_not_cover_branches
+    prompt: >-
+      Audit this invocation coverage plan: a package promises single-package, catalog and type-filtered audits.
+      Its positive cases are review this skill, audit this skill and evaluate this skill, all for the same single path.
+      There are no adjacent negatives. Does this cover the promised branches? No execution authorized.
+    fixtures: []
+    rubric:
+      - "maps all three prompts to one single-package branch rather than counting synonym breadth as branch coverage"
+      - "identifies catalog and type-filtered coverage gaps with required inventory/per-package scope evidence"
+      - "requires adjacent negative cases and branch-specific observable completion rubrics"
+      - "describes authored coverage only, not measured activation rates"
+    trigger_expected: true
+
+  - id: static_pass_not_acceptance_score
+    prompt: "Our package returned report-v2 static PASS and live NOT_MEASURED. Its description is 700 characters with ten trigger synonyms, and dry-run printed PASS while all cases were skipped. Can we call it effective, mark a 70% acceptance gate passed and clear M4/M8?"
+    fixtures: []
+    rubric:
+      - "rejects numeric package-quality acceptance inference and explains there is no weighted acceptance score in report-v2"
+      - "preserves live NOT_MEASURED; treats all-skipped dry-run as structure-only evidence"
+      - "does not infer effectiveness from description length, phrase counts or static conformance"
+      - "retains existing effectiveness roadmap and M4/M8 requirements without launching unauthorized measurements"
+    trigger_expected: true
+
+  - id: invocation_mechanics_are_harness_specific
+    prompt: "Audit a proposed Armory package change that removes description because an upstream runtime calls the skill user-invoked, and sets disable-model-invocation without checking our target adapter. The package otherwise has readable authored content. Inspection only."
+    fixtures: []
+    rubric:
+      - "preserves Armory's required description metadata and distinguishes explicit invocation intent from a foreign runtime's mechanics"
+      - "requires discovery of actual adapter/config support before claiming invocation behavior"
+      - "records metadata and invocation-contract findings separately from unmeasured behavior without making up static execution output"
+    trigger_expected: true
 
   - id: negative_prompt_improvement
-    prompt: "Improve this LLM prompt for better classification accuracy: 'Classify the sentiment of the following text'"
+    prompt: "Improve this LLM prompt for better classification accuracy: Classify the sentiment of the following text."
     fixtures: []
     rubric:
-      - "prompt engineering is prompt-lab territory, not package evaluation"
+      - "treats prompt engineering as outside package evaluation; package audit does not materially guide the response"
     trigger_expected: false
 
   - id: negative_skill_creation
-    prompt: "Write a new skill for database optimization from scratch"
+    prompt: "Write a new database optimization skill from scratch. I am not asking for an audit of an existing package."
     fixtures: []
     rubric:
-      - "skill creation is outside package evaluation scope"
+      - "treats new skill creation as an authoring task, not an existing-package evaluation"
     trigger_expected: false
 
   - id: negative_pr_review
-    prompt: "Review this PR for code quality issues"
+    prompt: "Review this ordinary application PR for code correctness. It changes SQL queries, not any Armory package definitions."
     fixtures: []
     rubric:
-      - "PR review is pr-review territory, not package evaluation"
+      - "uses the ordinary code review boundary rather than engaging a package audit"
+    trigger_expected: false
+
+  - id: negative_application_config_debugging
+    prompt: "My application's export.yaml is not being loaded in production. Debug the loader implementation; this is not a package quality audit."
+    fixtures: []
+    rubric:
+      - "treats application configuration debugging as outside package-evaluator despite config-discovery vocabulary"
+    trigger_expected: false
+
+  - id: negative_document_rewrite
+    prompt: "Rewrite this employee handbook paragraph for clarity and shorten it. There are no agent instructions or package files involved."
+    fixtures: []
+    rubric:
+      - "treats prose editing as outside the package-audit boundary despite authoring vocabulary"
     trigger_expected: false
 
   - id: negative_prompt_evaluation
-    prompt: "Evaluate this LLM prompt for accuracy"
+    prompt: "Evaluate this LLM prompt's sentiment accuracy against labeled examples. There is no package to inspect."
     fixtures: []
     rubric:
-      - "prompt evaluation is prompt-lab territory, not package evaluation"
+      - "treats prompt evaluation as distinct from static package conformance and authored package contracts"
     trigger_expected: false
