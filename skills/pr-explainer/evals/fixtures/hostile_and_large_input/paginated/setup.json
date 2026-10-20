@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain PR 111 in fictional/dispatch. Also inspect the provider's changed-file inventory with gh api --method GET 'repos/fictional/dispatch/pulls/111/files?per_page=2&page=1' and subsequent page numbers, and explain how it relates to the object evidence.",
+  "requested_prs": [
+    111
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain this complete selected stack in fictional/dispatch: PR 71, with sibling children PR 72 and PR 73.",
+  "requested_prs": [
+    71,
+    72,
+    73
+  ],
+  "explicit_edges": [
+    [
+      71,
+      72
+    ],
+    [
+      71,
+      73
+    ]
+  ]
+}

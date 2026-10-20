@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain the stack containing PR 91 and PR 92 in fictional/dispatch. PR 92 was based on change-91.",
+  "requested_prs": [
+    91,
+    92
+  ],
+  "explicit_edges": [
+    [
+      91,
+      92
+    ]
+  ]
+}

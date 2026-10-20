@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "request": "Draft the title and body for a pull request that changes parcel charging. I need authoring help, not a briefing of a pushed PR.",
+  "mode": "catalog-routing",
+  "catalog_candidates": [
+    "pr-explainer",
+    "pr-review",
+    "pre-landing-review",
+    "repo-tutor",
+    "stacked-prs",
+    "github"
+  ],
+  "tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "provider_access": false,
+  "receipt": "ARMORY_EVAL_ROUTE: engaged|inactive"
+}

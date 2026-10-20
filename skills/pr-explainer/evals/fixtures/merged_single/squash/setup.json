@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain merged PR 144 in fictional/dispatch.",
+  "requested_prs": [
+    144
+  ],
+  "landing_method": "squash"
+}

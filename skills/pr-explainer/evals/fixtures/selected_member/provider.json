@@ -1,0 +1,367 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/trunk"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"trunk\", \"commit\": {\"sha\": \"@COMMIT:root@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:root@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-51"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"change-51\", \"commit\": {\"sha\": \"@COMMIT:parent-later@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:parent-later@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"change-51\", \"commit\": {\"sha\": \"@COMMIT:parent-later@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:parent-later@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": ["api", "--method", "GET", "repos/fictional/dispatch/branches/change-52"],
+      "responses": [
+        {
+          "stdout": "{\"name\": \"change-52\", \"commit\": {\"sha\": \"@COMMIT:activation@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:activation@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"name\": \"change-52\", \"commit\": {\"sha\": \"@COMMIT:activation@\", \"url\": \"https://api.github.com/repos/fictional/dispatch/commits/@COMMIT:activation@\"}, \"protected\": false}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "repo",
+        "view",
+        "fictional/dispatch",
+        "--json",
+        "nameWithOwner,defaultBranchRef"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"nameWithOwner\": \"fictional/dispatch\", \"defaultBranchRef\": {\"name\": \"trunk\"}}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "list",
+        "--repo",
+        "fictional/dispatch",
+        "--state",
+        "all",
+        "--limit",
+        "100",
+        "--json",
+        "number,baseRefName,headRefName,headRefOid,state,url"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"number\": 51, \"baseRefName\": \"trunk\", \"headRefName\": \"change-51\", \"headRefOid\": \"@COMMIT:parent-later@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/51\"}, {\"number\": 52, \"baseRefName\": \"change-51\", \"headRefName\": \"change-52\", \"headRefOid\": \"@COMMIT:activation@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/52\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"number\": 51, \"baseRefName\": \"trunk\", \"headRefName\": \"change-51\", \"headRefOid\": \"@COMMIT:parent-later@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/51\"}, {\"number\": 52, \"baseRefName\": \"change-51\", \"headRefName\": \"change-52\", \"headRefOid\": \"@COMMIT:activation@\", \"state\": \"OPEN\", \"url\": \"https://github.com/fictional/dispatch/pull/52\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "51",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 51, \"url\": \"https://github.com/fictional/dispatch/pull/51\", \"title\": \"Dispatch contribution 51\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"change-51\", \"headRefOid\": \"@COMMIT:parent-later@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:foundation@\"}, {\"oid\": \"@COMMIT:parent-later@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 4, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/51\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 51, \"url\": \"https://github.com/fictional/dispatch/pull/51\", \"title\": \"Dispatch contribution 51\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"trunk\", \"baseRefOid\": \"@COMMIT:root@\", \"headRefName\": \"change-51\", \"headRefOid\": \"@COMMIT:parent-later@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:foundation@\"}, {\"oid\": \"@COMMIT:parent-later@\"}], \"files\": [{\"path\": \"dispatch/policy.py\", \"additions\": 4, \"deletions\": 1}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/51\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/51"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 51, \"html_url\": \"https://github.com/fictional/dispatch/pull/51\", \"title\": \"Dispatch contribution 51\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-51\", \"sha\": \"@COMMIT:parent-later@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 2, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 51, \"html_url\": \"https://github.com/fictional/dispatch/pull/51\", \"title\": \"Dispatch contribution 51\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"trunk\", \"sha\": \"@COMMIT:root@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-51\", \"sha\": \"@COMMIT:parent-later@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 2, \"changed_files\": 1}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/51/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 4, \"deletions\": 1, \"changes\": 5}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 4, \"deletions\": 1, \"changes\": 5}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/51/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/51/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 4, \"deletions\": 1, \"changes\": 5}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/policy.py\", \"status\": \"modified\", \"additions\": 4, \"deletions\": 1, \"changes\": 5}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/51/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:foundation@\"}, {\"sha\": \"@COMMIT:parent-later@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:foundation@\"}, {\"sha\": \"@COMMIT:parent-later@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "pr",
+        "view",
+        "52",
+        "--repo",
+        "fictional/dispatch",
+        "--json",
+        "number,url,title,body,state,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,mergedAt,mergeCommit,commits,files,statusCheckRollup"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 52, \"url\": \"https://github.com/fictional/dispatch/pull/52\", \"title\": \"Dispatch contribution 52\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-51\", \"baseRefOid\": \"@COMMIT:parent-later@\", \"headRefName\": \"change-52\", \"headRefOid\": \"@COMMIT:activation@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:activation@\"}], \"files\": [{\"path\": \"dispatch/cli.py\", \"additions\": 2, \"deletions\": 2}, {\"path\": \"dispatch/service.py\", \"additions\": 3, \"deletions\": 3}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/52\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 52, \"url\": \"https://github.com/fictional/dispatch/pull/52\", \"title\": \"Dispatch contribution 52\", \"body\": \"\", \"state\": \"OPEN\", \"baseRefName\": \"change-51\", \"baseRefOid\": \"@COMMIT:parent-later@\", \"headRefName\": \"change-52\", \"headRefOid\": \"@COMMIT:activation@\", \"headRepository\": {\"name\": \"dispatch\", \"nameWithOwner\": \"fictional/dispatch\", \"url\": \"https://github.com/fictional/dispatch\"}, \"headRepositoryOwner\": {\"login\": \"fictional\"}, \"isCrossRepository\": false, \"mergedAt\": null, \"mergeCommit\": null, \"commits\": [{\"oid\": \"@COMMIT:activation@\"}], \"files\": [{\"path\": \"dispatch/cli.py\", \"additions\": 2, \"deletions\": 2}, {\"path\": \"dispatch/service.py\", \"additions\": 3, \"deletions\": 3}], \"statusCheckRollup\": [{\"name\": \"authored-checks\", \"status\": \"COMPLETED\", \"conclusion\": \"SUCCESS\", \"detailsUrl\": \"https://github.com/fictional/dispatch/actions/runs/52\"}]}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/52"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"number\": 52, \"html_url\": \"https://github.com/fictional/dispatch/pull/52\", \"title\": \"Dispatch contribution 52\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-51\", \"sha\": \"@COMMIT:parent-later@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-52\", \"sha\": \"@COMMIT:activation@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 2}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"number\": 52, \"html_url\": \"https://github.com/fictional/dispatch/pull/52\", \"title\": \"Dispatch contribution 52\", \"body\": \"\", \"state\": \"open\", \"merged\": false, \"merged_at\": null, \"merge_commit_sha\": null, \"base\": {\"ref\": \"change-51\", \"sha\": \"@COMMIT:parent-later@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"default_branch\": \"trunk\", \"owner\": {\"login\": \"fictional\"}}}, \"head\": {\"ref\": \"change-52\", \"sha\": \"@COMMIT:activation@\", \"repo\": {\"full_name\": \"fictional/dispatch\", \"html_url\": \"https://github.com/fictional/dispatch\", \"owner\": {\"login\": \"fictional\"}}}, \"commits\": 1, \"changed_files\": 2}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/52/files?per_page=2&page=1"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/cli.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 2, \"changes\": 4}, {\"filename\": \"dispatch/service.py\", \"status\": \"modified\", \"additions\": 3, \"deletions\": 3, \"changes\": 6}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/cli.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 2, \"changes\": 4}, {\"filename\": \"dispatch/service.py\", \"status\": \"modified\", \"additions\": 3, \"deletions\": 3, \"changes\": 6}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/52/files?per_page=2&page=2"
+      ],
+      "responses": [
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/52/files",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"filename\": \"dispatch/cli.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 2, \"changes\": 4}, {\"filename\": \"dispatch/service.py\", \"status\": \"modified\", \"additions\": 3, \"deletions\": 3, \"changes\": 6}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"filename\": \"dispatch/cli.py\", \"status\": \"modified\", \"additions\": 2, \"deletions\": 2, \"changes\": 4}, {\"filename\": \"dispatch/service.py\", \"status\": \"modified\", \"additions\": 3, \"deletions\": 3, \"changes\": 6}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch/pulls/52/commits",
+        "--paginate"
+      ],
+      "responses": [
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:activation@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "[{\"sha\": \"@COMMIT:activation@\"}]",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "argv": [
+        "api",
+        "--method",
+        "GET",
+        "repos/fictional/dispatch"
+      ],
+      "responses": [
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        },
+        {
+          "stdout": "{\"full_name\": \"fictional/dispatch\", \"default_branch\": \"trunk\", \"html_url\": \"https://github.com/fictional/dispatch\"}",
+          "stderr": "",
+          "exit_code": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "request": "Merge and restack PR 202 and PR 203 in fictional/dispatch after deciding they are safe to land. Do not give me a change explanation.",
+  "mode": "catalog-routing",
+  "catalog_candidates": [
+    "pr-explainer",
+    "pr-review",
+    "pre-landing-review",
+    "repo-tutor",
+    "stacked-prs",
+    "github"
+  ],
+  "tools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "provider_access": false,
+  "receipt": "ARMORY_EVAL_ROUTE: engaged|inactive"
+}

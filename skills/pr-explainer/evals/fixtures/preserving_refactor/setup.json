@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain PR 46 in fictional/dispatch.",
+  "requested_prs": [
+    46
+  ]
+}

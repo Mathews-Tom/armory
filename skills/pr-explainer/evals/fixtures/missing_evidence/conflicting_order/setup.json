@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "source.json",
+  "provider": "provider.json",
+  "request": "Use pr-explainer to explain the whole stack in fictional/dispatch. My supplied order is PR 52 then PR 51, and I believe PR 51 depends on PR 52.",
+  "requested_prs": [
+    52,
+    51
+  ],
+  "explicit_edges": [
+    [
+      52,
+      51
+    ]
+  ]
+}
