@@ -328,6 +328,21 @@ def run_package_evals(
         print(f"Package not found: {pkg_path}", file=sys.stderr)
         return None
 
+    if not dry_run and any(
+        pkg_type.native
+        and (
+            pkg_dir.is_relative_to(pkg_type.repo_dir)
+            or (pkg_dir / pkg_type.definition_file).is_file()
+        )
+        for pkg_type in TYPES.values()
+    ):
+        print(
+            f"Native package {pkg_path} cannot be evaluated through Claude prompt loading; "
+            "use --dry-run for eval structure and scripts/check_extensions.py for native checks",
+            file=sys.stderr,
+        )
+        return None
+
     cases = load_cases(pkg_dir)
     if cases is None:
         print(f"No evals/cases.yaml found in {pkg_path}", file=sys.stderr)
@@ -366,7 +381,7 @@ def collect_all_packages() -> list[str]:
         if not type_dir.exists():
             continue
         for pkg_dir in sorted(type_dir.iterdir()):
-            if not pkg_dir.is_dir():
+            if not (pkg_dir / pkg_type.definition_file).is_file():
                 continue
             if (pkg_dir / "evals" / "cases.yaml").exists():
                 packages.append(str(pkg_dir.relative_to(_REPO_ROOT)))
@@ -478,6 +493,7 @@ def main() -> int:
 
     packages = collect_all_packages() if args.all else [args.package]
     results: list[PackageResult] = []
+    unavailable = 0
 
     for pkg_path in packages:
         print(f"Running evals for {pkg_path}...")
@@ -488,6 +504,8 @@ def main() -> int:
             print(
                 f"  {status}: {result.passed}/{result.total_cases} passed (score: {result.aggregate_score:.2f})"
             )
+        else:
+            unavailable += 1
 
     output_path = _REPO_ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -501,7 +519,7 @@ def main() -> int:
         print(f"History appended: {total_cases} cases -> {args.history}")
 
     total_failed = sum(r.failed for r in results)
-    return 1 if total_failed > 0 else 0
+    return 1 if unavailable or total_failed > 0 else 0
 
 
 if __name__ == "__main__":

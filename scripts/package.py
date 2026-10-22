@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.build_extensions import BuildError, build_feature, load_metadata
 from scripts.frontmatter import extract_version, parse_frontmatter, validate_version
 from scripts.package_types import (
     TYPES,
@@ -82,8 +84,42 @@ def collect_files(pkg_dir: Path) -> tuple[list[Path], list[Path]]:
     return included, excluded
 
 
+def _write_zip(output_path: Path, entries: list[tuple[str, bytes, bool]]) -> None:
+    """Write (arcname, bytes, executable) entries with fixed timestamps and modes."""
+    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for arcname, data, executable in entries:
+            info = zipfile.ZipInfo(arcname, date_time=ZIP_EPOCH)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (MODE_EXECUTABLE if executable else MODE_REGULAR) << 16
+            zf.writestr(info, data)
+
+
+def package_native(pkg_dir: Path, output_dir: Path, pkg_type: PackageType) -> list[Path]:
+    """Build each declared host artifact and archive it as <name>-<version>-<host><ext>.
+
+    Native extensions ship built artifacts, not their TypeScript source tree.
+    Each archive holds one ``<name>/`` directory ready for that host.
+    """
+    metadata = load_metadata(pkg_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    archives: list[Path] = []
+    with tempfile.TemporaryDirectory(prefix="armory-native-package-") as scratch:
+        for host, artifact in build_feature(pkg_dir, Path(scratch)).items():
+            output_path = output_dir / f"{metadata.name}-{metadata.version}-{host}{pkg_type.archive_ext}"
+            entries = [
+                (f"{metadata.name}/{path.relative_to(artifact).as_posix()}", path.read_bytes(), False)
+                for path in sorted(artifact.rglob("*"))
+                if path.is_file()
+            ]
+            _write_zip(output_path, entries)
+            archives.append(output_path)
+    return archives
+
+
 def package(pkg_dir: Path, output_dir: Path, pkg_type: PackageType) -> Path:
     """Package a directory into a typed archive."""
+    if pkg_type.native:
+        raise ValueError(f"{pkg_type.key} packages ship per-host native archives; use package_native")
     meta = validate_frontmatter(pkg_dir, pkg_type)
     name: str = meta["name"]
     version: str = meta["_resolved_version"]
@@ -159,12 +195,15 @@ def main() -> int:
             return 1
 
     try:
-        output_path = package(pkg_dir, output_dir, pkg_type)
-        print(f"Packaged: {output_path}")
-        return 0
-    except (FileNotFoundError, ValueError) as exc:
+        outputs = package_native(pkg_dir, output_dir, pkg_type) if pkg_type.native else [
+            package(pkg_dir, output_dir, pkg_type)
+        ]
+    except (FileNotFoundError, ValueError, BuildError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    for output_path in outputs:
+        print(f"Packaged: {output_path}")
+    return 0
 
 
 if __name__ == "__main__":

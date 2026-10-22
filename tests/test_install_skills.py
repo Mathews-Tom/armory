@@ -1,15 +1,19 @@
 """Tests for scripts/install.py (package installer)."""
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
 import pytest
 import yaml
+from rich.prompt import Prompt
 
 from scripts.install import (
     BODY_ONLY_TYPES,
     InstallAction,
+    InstallInputError,
     InstallPlan,
     PackageInfo,
     build_install_plans,
@@ -22,9 +26,15 @@ from scripts.install import (
     is_newer,
     parse_selection,
     parse_version,
+    resolve_preset_packages,
     resolve_profile_packages,
 )
-from scripts.package_types import TYPES, PackageType, should_exclude
+from scripts.package_types import (
+    TYPES,
+    PackageType,
+    UnsupportedInstallError,
+    should_exclude,
+)
 
 
 def _skill_type() -> PackageType:
@@ -880,3 +890,163 @@ class TestMainValidation:
         assert code == 0
         assert (claude_dir / "skills" / "s1" / "SKILL.md").read_text() == skill_content
         assert not (claude_dir / "agents").exists()
+
+
+class TestNativeExtensionsStayExplicit:
+    """Native extensions never ride along with interactive, profile, preset or all installs."""
+
+    def _native_package(self, root: Path) -> PackageInfo:
+        source = root / "extensions" / "native-demo"
+        source.mkdir(parents=True)
+        (source / "EXTENSION.md").write_text("---\nname: native-demo\n---\n")
+        return PackageInfo("native-demo", "1.0.0", "", source, TYPES["extension"])
+
+    def test_all_selection_installs_legacy_packages_but_not_native_extensions(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        repo = tmp_path / "repo"
+        skill = repo / "skills" / "demo-skill"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: demo-skill\nmetadata:\n  version: 1.0.0\n---\nBody\n")
+        self._native_package(repo)
+        _point_at_repo(mod, monkeypatch, repo, {
+            "packages": {
+                "skills": [{"name": "demo-skill", "version": "1.0.0", "path": "skills/demo-skill"}],
+                "extensions": [{"name": "native-demo", "version": "1.0.0", "path": "extensions/native-demo"}],
+            },
+        })
+        answers = iter(["all", "y"])
+        monkeypatch.setattr(Prompt, "ask", lambda *_args, **_kwargs: next(answers))
+        claude_dir = tmp_path / "claude-home"
+        monkeypatch.setattr(mod, "DEFAULT_CLAUDE_DIR", claude_dir)
+        monkeypatch.setattr("sys.argv", ["install.py"])
+
+        assert mod.main() == 0
+        assert (claude_dir / "skills" / "demo-skill" / "SKILL.md").is_file()
+        assert sorted(entry.name for entry in claude_dir.iterdir()) == ["skills"]
+
+    def test_profile_with_native_section_is_rejected(self) -> None:
+        profiles = {"p": {"packages": {"extensions": ["native-demo"]}}}
+        with pytest.raises(InstallInputError, match="profiles cannot include native extensions"):
+            resolve_profile_packages("p", profiles)
+
+    def test_preset_bundling_native_extension_is_rejected(self, tmp_path: Path) -> None:
+        preset = tmp_path / "bundle"
+        preset.mkdir()
+        (preset / "PRESET.md").write_text(
+            "---\nname: bundle\npreset:\n  packages:\n    extensions:\n      - name: native-demo\n---\n"
+        )
+        with pytest.raises(InstallInputError, match="presets cannot bundle native extensions"):
+            resolve_preset_packages(preset, TYPES["preset"])
+
+    def test_copy_install_plan_refuses_native_package(self, tmp_path: Path) -> None:
+        native = self._native_package(tmp_path / "repo")
+        claude_dir = tmp_path / "claude-home"
+        with pytest.raises(UnsupportedInstallError):
+            build_install_plans([native], claude_dir)
+        assert not claude_dir.exists()
+
+    @pytest.mark.parametrize(
+        ("argv", "message"),
+        [
+            (["--type", "extension", "--platform", "omp", "--name", "x", "--action", "install",
+              "--target-root", "ROOT"], "requires --yes"),
+            (["--type", "extension", "--yes"], "requires --platform, --name, --action, --target-root"),
+            (["--platform", "omp"], "--platform apply only to --type extension"),
+            (["--type", "skill", "--action", "remove", "--yes"], "--action, --yes apply only to --type extension"),
+            (["--type", "extension", "--platform", "claude", "--name", "x", "--action", "remove",
+              "--target-root", "ROOT", "--yes", "--profile", "core"], "--profile cannot be combined"),
+            (["--type", "extension", "--platform", "claude", "--name", "x", "--action", "remove",
+              "--target-root", "ROOT", "--yes", "--target", "cursor"], "--target cannot be combined"),
+            (["--type", "extension", "--platform", "cursor"], "invalid choice: 'cursor'"),
+            (["--type", "extension", "--action", "enable"], "invalid choice: 'enable'"),
+        ],
+    )
+    def test_extension_cli_requires_explicit_complete_flags(
+        self, argv: list[str], message: str, tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        import scripts.install as mod
+
+        monkeypatch.setattr("sys.argv", ["install.py", *[str(tmp_path) if a == "ROOT" else a for a in argv]])
+        with pytest.raises(SystemExit) as exc:
+            mod.main()
+        assert exc.value.code == 2
+        assert message in capsys.readouterr().err
+        assert list(tmp_path.iterdir()) == []
+
+    def test_extension_cli_does_not_install_unregistered_fixture(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import scripts.install as mod
+
+        monkeypatch.setattr("sys.argv", [
+            "install.py", "--type", "extension", "--platform", "omp", "--name", "fixture-wordcount",
+            "--action", "install", "--target-root", str(tmp_path), "--yes",
+        ])
+        assert mod.main() == 1
+        assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("mode", ["legacy", "native-unsupported"])
+def test_native_platform_dependency_is_isolated_from_legacy_installation(
+    mode: str, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    definition = b"---\nname: fictional-legacy\nmetadata:\n  version: 1.0.0\n---\nLegacy body.\n"
+    (source / "SKILL.md").write_bytes(definition)
+    (source / "references").mkdir()
+    reference = b"SYNTHETIC_REFERENCE\n"
+    (source / "references" / "context.md").write_bytes(reference)
+    target = tmp_path / "target"
+    target.mkdir()
+    foreign = b'{"foreign":"keep exact bytes"}\n'
+    (target / "settings.json").write_bytes(foreign)
+    child = """
+import argparse
+import builtins
+import os
+from pathlib import Path
+import sys
+
+original_import = builtins.__import__
+def without_native_locking(name, *args, **kwargs):
+    if name == "fcntl":
+        raise ModuleNotFoundError("synthetic unavailable POSIX locking", name="fcntl")
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = without_native_locking
+sys.path.insert(0, sys.argv[1])
+from scripts.install import PackageInfo, build_install_plans, execute_plans, run_extension_action
+from scripts.package_types import TYPES
+source, target = Path(sys.argv[2]), Path(sys.argv[3])
+if sys.argv[4] == "legacy":
+    package = PackageInfo("fictional-legacy", "1.0.0", "Synthetic package", source, TYPES["skill"])
+    execute_plans(build_install_plans([package], target), [0], target)
+else:
+    original_name = os.name
+    os.name = "unsupported-platform"
+    try:
+        result = run_extension_action(argparse.Namespace(
+            action="install", platform="omp", name="fictional-native", target_root=target
+        ))
+    finally:
+        os.name = original_name
+    if result != 1:
+        raise AssertionError("unsupported native installation did not fail")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", child, str(Path(__file__).resolve().parents[1]),
+         str(source), str(target), mode],
+        text=True, capture_output=True, check=False, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (target / "settings.json").read_bytes() == foreign
+    if mode == "legacy":
+        installed = target / "skills" / "fictional-legacy"
+        assert (installed / "SKILL.md").read_bytes() == definition
+        assert (installed / "references" / "context.md").read_bytes() == reference
+    else:
+        assert sorted(path.name for path in target.iterdir()) == ["settings.json"]

@@ -31,6 +31,14 @@ validate:
 sync-templates:
     uv run scripts/sync_templates.py
 
+# Native extension workspace gates plus every gate the committed files select
+check-extensions:
+    bun install --cwd extensions --frozen-lockfile
+    bun run --cwd extensions typecheck
+    bun run --cwd extensions lint
+    bun run --cwd extensions test
+    uv run python scripts/check_extensions.py --ci
+
 # Run repo-level tests
 test-repo:
     # `python -m pytest`, not the `pytest` console script, so the project
@@ -69,3 +77,4 @@ check:
     just sync-templates
     just validate
     just test
+    just check-extensions

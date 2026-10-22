@@ -1,8 +1,8 @@
 ---
 name: skill-library
-description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update, and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory search", "/library list", "package catalog".'
+description: 'Agent-native armory catalog for eight package types and installer for seven legacy types. Native extensions require the explicit per-host lifecycle CLI. Triggers on: "list available packages", "install skill", "armory install", "armory search", "/library list", "package catalog".'
 metadata:
-  version: 2.0.2
+  version: 2.0.3
   category: operations
   tags: [armory, catalog, install, package-management, discovery]
   difficulty: beginner
@@ -10,7 +10,7 @@ metadata:
 
 # Package Library
 
-Agent-native catalog and installer for all armory package types. Provides browsing, searching, installing, updating, syncing, and removing packages directly within an agent session.
+Browse and search all armory package types within an agent session. Install, update, sync and remove the seven legacy package types through their existing procedures; native extensions use the separate explicit per-host lifecycle.
 
 ## Variables
 
@@ -32,6 +32,7 @@ Agent-native catalog and installer for all armory package types. Provides browsi
 | command | `~/.claude/commands/`  | Body-only file  |
 | utility | `~/.claude/utilities/` | Copy + chmod +x |
 | preset  | `~/.claude/presets/`   | Copy directory  |
+| extension | Explicit per-host root | Native lifecycle CLI only |
 
 ## Command Reference
 
@@ -55,6 +56,16 @@ User commands are routed to the corresponding cookbook file based on the subcomm
 For example, `/library use commit-standards` dispatches to `cookbook/use.md` with `commit-standards` as the package name argument. `/library list --type agent` dispatches to `cookbook/list.md` with `--type agent` as the filter.
 
 If the subcommand does not match any known cookbook, report the error and list the valid subcommands from the table above.
+
+## Native Extension Boundary
+
+This boundary takes precedence over the legacy cookbook procedures.
+
+- Identify the type from the matching manifest section before inspecting an installed path or fetching package files. Catalog inspection may fetch the manifest; it must not fetch or copy a native extension payload.
+- For native catalog queries, read `packages.extensions` and show catalog metadata. Do not derive native installed status from `~/.claude/skills/`, the legacy plugin inventory or any other prompt-package directory; report that native installation status was not inspected.
+- Refuse `/library use`, sync, update or remove filesystem operations on an `extension`. Never copy native artifacts into skills, agents or other legacy directories, never enable one implicitly, and never treat a profile or preset as native-install authority.
+- After the user explicitly confirms the native host, lifecycle action and target root, hand off to `uv run python scripts/install.py` in an existing Armory checkout with every native flag explicit: `--type extension --platform <omp|claude> --name <name> --action <install|update|disable|remove> --target-root <explicit-root> --yes`. Never supply `--yes` before that confirmation. Do not select a host or persistent root on the user's behalf, or execute the handoff as part of a legacy library operation.
+- Native entries remain discoverable in the catalog but never contribute to legacy profile membership or package counts. For bulk legacy operations, exclude `packages.extensions` before expanding the selection.
 
 ## Type Detection
 

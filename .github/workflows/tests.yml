@@ -38,6 +38,25 @@ jobs:
       - name: Install project environment
         run: uv sync --locked
 
+      # The Bun version comes from the packageManager field of
+      # extensions/package.json, the workspace's single pin; bun.lock pins every
+      # TypeScript dependency, including the OMP SDK the adapters type-check
+      # against.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: extensions/package.json
+
+      - name: Install extension workspace
+        run: bun install --cwd extensions --frozen-lockfile
+
+      # Version and per-platform SHA-256 live only in extensions/native-hosts.json;
+      # the binary serves `claude plugin validate/test`, never a signed-in session.
+      - name: Provision pinned Claude Code for static mod validation
+        run: |
+          uv run python scripts/acquire_claude.py --dest "${RUNNER_TEMP}/claude-code"
+          echo "${RUNNER_TEMP}/claude-code" >> "${GITHUB_PATH}"
+
       - name: Verify shared template synchronization
         run: uv run python scripts/sync_templates.py
 
@@ -59,6 +78,28 @@ jobs:
           uv run ruff format --check utilities/skill-inventory/scripts utilities/skill-inventory/tests
           uv run mypy --strict utilities/skill-inventory/scripts
 
+      # follow-imports=silent scopes strict typing to the extension tooling
+      # itself; the legacy validators it reuses predate strict typing.
+      - name: Extension tooling lint and strict types
+        run: |
+          uv run ruff check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py
+          uv run ruff format --check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py
+          uv run mypy --strict --follow-imports=silent scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py
+
+      - name: Extension workspace typecheck, lint, tests and build
+        run: |
+          bun run --cwd extensions typecheck
+          bun run --cwd extensions lint
+          bun run --cwd extensions test
+          bun run --cwd extensions build
+
+      # Selects each feature's gate from its committed files: registered
+      # features run the full gate plus native smoke, unregistered prefixes run
+      # their implemented stage, and the catalog check always runs. There is no
+      # caller-controlled skip.
+      - name: Native extension gates selected by committed files
+        run: uv run python scripts/check_extensions.py --ci
+
       - name: Repo-level tests
         run: uv run python -m pytest tests/ -q
 
@@ -66,7 +107,8 @@ jobs:
       # is installed. One pytest process per package, because each package's
       # tests/conftest.py prepends its own scripts/ dir to sys.path and a
       # shared process would resolve a same-named module to whichever package
-      # loaded first.
+      # loaded first. Native extensions carry Bun tests, run by the extension
+      # workspace step above.
       - name: Package test suites
         shell: bash
         run: |

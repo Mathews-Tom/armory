@@ -31,6 +31,12 @@ import yaml
 
 _this_dir = Path(__file__).resolve().parent
 _repo_root = _this_dir.parent
+# Appended, not prepended: the repository's own mcp/ package must not shadow
+# the installed SDK any further than the loader below already handles.
+if str(_repo_root) not in sys.path:
+    sys.path.append(str(_repo_root))
+
+from scripts.package_types import TYPES
 
 
 def _import_fastmcp() -> type:
@@ -78,15 +84,7 @@ FastMCP = _import_fastmcp()
 
 MANIFEST_PATH = _repo_root / "manifest.yaml"
 
-PACKAGE_SECTIONS: tuple[str, ...] = (
-    "skills",
-    "agents",
-    "hooks",
-    "rules",
-    "commands",
-    "utilities",
-    "presets",
-)
+SECTION_TYPES: dict[str, str] = {t.manifest_section: t.key for t in TYPES.values()}
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -103,8 +101,7 @@ def _load_packages() -> list[dict[str, str | list[str]]]:
     packages_section: dict[str, list[dict[str, str | list[str]]]] = data.get("packages", {})
     results: list[dict[str, str | list[str]]] = []
 
-    for section in PACKAGE_SECTIONS:
-        pkg_type = section.rstrip("s")  # skills -> skill, agents -> agent
+    for section, pkg_type in SECTION_TYPES.items():
         for entry in packages_section.get(section, []) or []:
             entry["type"] = pkg_type
             results.append(entry)
@@ -206,7 +203,8 @@ mcp_server = FastMCP(
     "armory",
     instructions=(
         "Armory package discovery server. Search, browse, and get recommendations "
-        "for Claude Code skills, agents, hooks, rules, commands, utilities, and presets."
+        "for Claude Code skills, agents, hooks, rules, commands, utilities, and presets, "
+        "plus optional native OMP/Claude Code extensions (installed only explicitly)."
     ),
 )
 

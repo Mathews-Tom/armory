@@ -84,9 +84,12 @@ intended deliverable is an artifact use artifact-aware validation rather than
 final-answer prose checks.
 
 `package_strata.yaml` records one active, high-risk-relevant sample for each
-of the seven package types and an explicit rationale for every other package's
-exclusion. `uv run python scripts/validate_skillsbench.py` rejects duplicate,
-missing, undeclared, deprecated-included, and incomplete-type classifications.
+of the seven historically eligible package types and an explicit rationale for
+every other package's exclusion. Types added to the catalog later, such as
+native extensions, are never eligible: their packages must be excluded.
+`uv run python scripts/validate_skillsbench.py` rejects duplicate, missing,
+undeclared, deprecated-included, ineligible-type and incomplete-type
+classifications.
 
 ## What This Does Not Measure
 

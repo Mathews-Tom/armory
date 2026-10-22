@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import cast
+
 import pytest
 
 from scripts.evaluate_package import evaluate_package
@@ -122,3 +126,59 @@ def test_negative_case_without_route_marker_fails_loudly(
 
     assert result.oracle_verdict == "fail"
     assert result.error == "missing or ambiguous routing declaration"
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_native_eval_never_launches_prompt_loader(
+    tmp_path: Path, dry_run: bool
+) -> None:
+    root = Path(__file__).resolve().parent.parent
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    sentinel = tmp_path / "prompt-loader-started"
+    fake_claude = bin_dir / "claude"
+    fake_claude.write_text(
+        '#!/bin/sh\nprintf invoked > "$ARMORY_NATIVE_EVAL_SENTINEL"\nexit 97\n',
+        encoding="utf-8",
+    )
+    fake_claude.chmod(0o755)
+    output = tmp_path / "results.json"
+    command = [
+        sys.executable,
+        str(root / "scripts" / "run_evals.py"),
+        "--package",
+        "extensions/_fixtures/fixture-wordcount",
+        "--output",
+        str(output),
+        "--no-history",
+    ]
+    if dry_run:
+        command.append("--dry-run")
+
+    result = subprocess.run(
+        command,
+        cwd=tmp_path,
+        env=os.environ
+        | {
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+            "ARMORY_NATIVE_EVAL_SENTINEL": str(sentinel),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == (0 if dry_run else 1)
+    assert not sentinel.exists()
+    packages = json.loads(output.read_text(encoding="utf-8"))["packages"]
+    if dry_run:
+        assert {
+            case["case_id"]: case["oracle_verdict"]
+            for case in packages[0]["case_results"]
+        } == {
+            "counts-words": "skipped",
+            "unrelated-request": "skipped",
+            "character-count-request": "skipped",
+        }
+    else:
+        assert packages == []

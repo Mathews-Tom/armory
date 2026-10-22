@@ -9,9 +9,11 @@ from scripts.package_types import (
     EXCLUDE_NAMES,
     EXCLUDE_SUFFIXES,
     MANIFEST_PATH,
+    NATIVE_HOSTS,
     REPO_ROOT,
     TYPES,
     PackageType,
+    UnsupportedInstallError,
     detect_type_from_path,
     should_exclude,
 )
@@ -20,9 +22,8 @@ from scripts.package_types import (
 class TestPackageTypeRegistry:
     """Tests for TYPES registry completeness and correctness."""
 
-    def test_all_seven_types_registered(self) -> None:
-        assert len(TYPES) == 7
-        expected = {"skill", "agent", "hook", "rule", "command", "utility", "preset"}
+    def test_registered_types(self) -> None:
+        expected = {"skill", "agent", "hook", "rule", "command", "utility", "preset", "extension"}
         assert set(TYPES.keys()) == expected
 
     def test_keys_match_dict_keys(self) -> None:
@@ -45,8 +46,8 @@ class TestPackageTypeRegistry:
         sections = [t.manifest_section for t in TYPES.values()]
         assert len(sections) == len(set(sections))
 
-    def test_unique_install_subdirs(self) -> None:
-        subdirs = [t.install_subdir for t in TYPES.values()]
+    def test_unique_claude_copy_subdirs(self) -> None:
+        subdirs = [t.claude_subdir for t in TYPES.values() if t.claude_subdir is not None]
         assert len(subdirs) == len(set(subdirs))
 
     def test_archive_ext_starts_with_dot(self) -> None:
@@ -61,6 +62,24 @@ class TestPackageTypeRegistry:
         for pkg_type in TYPES.values():
             assert "name" in pkg_type.required_frontmatter
             assert "description" in pkg_type.required_frontmatter
+
+
+class TestHostInstallSemantics:
+    """Copy-install and native-host semantics are distinct registry facts."""
+
+    def test_legacy_types_install_by_copy_into_claude_only(self, tmp_path: Path) -> None:
+        for key in ("skill", "agent", "hook", "rule", "command", "utility", "preset"):
+            pkg_type = TYPES[key]
+            assert not pkg_type.native
+            assert pkg_type.claude_install_dir(tmp_path) == tmp_path / pkg_type.dir_name
+
+    def test_extension_is_native_for_both_hosts_without_copy_install(self, tmp_path: Path) -> None:
+        extension = TYPES["extension"]
+        assert extension.native
+        assert extension.native_hosts == NATIVE_HOSTS == ("omp", "claude")
+        with pytest.raises(UnsupportedInstallError, match="--platform <omp\\|claude>"):
+            extension.claude_install_dir(tmp_path)
+        assert not (tmp_path / "extensions").exists()
 
 
 class TestPackageTypeDataclass:

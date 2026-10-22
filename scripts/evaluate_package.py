@@ -14,6 +14,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
+from scripts.extension_metadata import ExtensionMetadataError, parse_extension_metadata
 from scripts.frontmatter import extract_version, parse_frontmatter, validate_version  # noqa: E402
 from scripts.package_types import REPO_ROOT, TYPES, PackageType, detect_type_from_path  # noqa: E402
 
@@ -26,6 +27,7 @@ EFFECTIVENESS_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "command": ("command invocation", "task outcome"),
     "utility": ("utility invocation", "task outcome"),
     "preset": ("preset loading", "configuration effect"),
+    "extension": ("native command invocation", "observable host effect"),
 }
 
 
@@ -91,6 +93,15 @@ def evaluate_package(pkg_dir: Path, pkg_type: PackageType) -> dict[str, object]:
         if version and not validate_version(version):
             findings.append(_finding("CRITICAL", f"Invalid package version: {version}"))
 
+        if pkg_type.native:
+            requirements.append("native extension metadata")
+            try:
+                parse_extension_metadata(meta)
+            except ExtensionMetadataError as exc:
+                findings.append(
+                    _finding("CRITICAL", f"Invalid extension metadata: {exc}")
+                )
+
     if not _is_kebab_case(name):
         findings.append(
             _finding("CRITICAL", f"Package directory '{name}' is not kebab-case")
@@ -108,7 +119,11 @@ def evaluate_package(pkg_dir: Path, pkg_type: PackageType) -> dict[str, object]:
         },
         "live_effectiveness": {
             "status": "NOT_MEASURED",
-            "runner": "scripts/run_evals.py",
+            "runner": (
+                "scripts/check_extensions.py"
+                if pkg_type.native
+                else "scripts/run_evals.py"
+            ),
             "dimensions": list(EFFECTIVENESS_DIMENSIONS[pkg_type.key]),
         },
         "status": status,

@@ -17,7 +17,7 @@ from scripts.package_types import TYPES, PackageType
 _REF_PATTERN = re.compile(r"(?:references|assets)/[a-zA-Z0-9_.-]+")
 # Matches ../ followed by a known package directory pattern (actual cross-package refs)
 _CROSS_PKG_PATTERN = re.compile(
-    r"\.\./(?:skills|agents|hooks|rules|commands|utilities|presets)/"
+    r"\.\./(?:" + "|".join(re.escape(t.dir_name) for t in TYPES.values()) + r")/"
 )
 
 

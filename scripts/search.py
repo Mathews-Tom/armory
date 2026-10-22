@@ -18,7 +18,7 @@ from rich.table import Table
 
 from scripts.package_types import MANIFEST_PATH, TYPES
 
-PACKAGE_SECTIONS: tuple[str, ...] = tuple(t.manifest_section for t in TYPES.values())
+SECTION_TYPES: dict[str, str] = {t.manifest_section: t.key for t in TYPES.values()}
 DEFAULT_LIMIT = 20
 
 console = Console()
@@ -32,8 +32,7 @@ def load_packages() -> list[dict[str, str | list[str]]]:
     packages_section = data.get("packages", {})
     results: list[dict[str, str | list[str]]] = []
 
-    for section in PACKAGE_SECTIONS:
-        pkg_type = section.rstrip("s")  # skills -> skill, agents -> agent, etc.
+    for section, pkg_type in SECTION_TYPES.items():
         for entry in packages_section.get(section, []) or []:
             entry["type"] = pkg_type
             results.append(entry)

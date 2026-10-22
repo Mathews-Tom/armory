@@ -28,3 +28,12 @@ def test_agents_listed() -> None:
 def test_commands_listed() -> None:
     commands = {name: entry["source"] for name, entry in PLUGIN["commands"].items()}
     assert commands == _definitions("command")
+
+
+def test_legacy_plugin_never_enables_native_extensions() -> None:
+    """The all-in-one plugin loads from the repository root; a root hooks/hooks.json
+    would turn it into a mod, and any extensions/ reference would load native
+    modules without an explicit per-host lifecycle action."""
+    extension_dir = f"{TYPES['extension'].dir_name}/"
+    assert extension_dir not in json.dumps(PLUGIN)
+    assert not (REPO_ROOT / "hooks" / "hooks.json").exists()

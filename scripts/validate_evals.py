@@ -181,7 +181,9 @@ def main() -> int:
 
         validated = 0
         for pkg_dir in sorted(type_dir.iterdir()):
-            if not pkg_dir.is_dir():
+            # Only registered packages: extensions/ also holds the Bun
+            # workspace, test fixtures and unregistered prefix-stage sources.
+            if not (pkg_dir / pkg_type.definition_file).is_file():
                 continue
             if is_deprecated(pkg_dir, pkg_type):
                 continue
