@@ -13,6 +13,9 @@ Authoring guidance is adapted from Matt Pocock's [writing-for-agents](https://gi
 | Hook | `hooks/` | `HOOK.md` |
 | Utility | `utilities/` | `UTILITY.md` |
 | Preset | `presets/` | `PRESET.md` |
+| Extension | `extensions/` | `EXTENSION.md` |
+
+Native extensions follow every phase plus the extension-specific items in Phase 6 and Phase 7; their source layout and `extension` metadata block are defined in `CONTRIBUTING.md`.
 
 ## Phase 1: Scope and Invocation
 
@@ -81,6 +84,8 @@ Run checks only within the assignment's authority. Record actual commands, outco
 - [ ] **Run static package conformance**: `uv run python scripts/evaluate_package.py --path <package-directory> --json`. Expect a JSON list of report-v2 records with `static_conformance.status: PASS|FAIL` and `live_effectiveness.status: NOT_MEASURED`. Top-level `status`/`findings` mirror static conformance. Exit 1 means static failure or invalid requested path; a valid passing report exits 0.
 - [ ] **Perform authored review** with package-evaluator: inspect every invocation branch, completion criterion, pointer/config source and type-specific requirement. Keep authored findings separate from machine report fields; repair applicable blocking findings.
 - [ ] **Exercise authorized behavior**: capture invocation/case identity, environment, observed output/artifact and result for every exercised branch; label all unexercised branches. Normal `scripts/run_evals.py` launches live model sessions and needs authorization. Its dry-run skips execution and is structure-only evidence, even if its summary prints PASS.
+- [ ] **Extensions only — run native gates**: `bun install --cwd extensions --frozen-lockfile`, then `bun run --cwd extensions typecheck`, `lint` and `test`, `uv run python scripts/build_extensions.py --feature <name> --output-dir <dist-root>` and `uv run python scripts/check_extensions.py --feature <name>`. Record the JSON report; static, test-kit and lifecycle passes are not native compatibility. Record `--native-smoke` results separately and keep `extension.tested` limited to host versions and surfaces actually exercised.
+- [ ] **Extensions only — land complete**: an implementation prefix without `EXTENSION.md` reports its stage with `--stage core|omp` and `feature_complete=false`. Add `EXTENSION.md`, both host adapters, `CHANGELOG.md`, evals, the manifest entry and the excluded classification in `evals/skillsbench/package_strata.yaml` together in the final package-bearing PR.
 - [ ] **Preserve evidence limits**: the static evaluator does not inspect references, execute helpers or measure activation/task outcomes. There is no weighted score or percentage acceptance gate; do not relabel static PASS as measured effectiveness or treat this checklist as clearing the effectiveness roadmap.
 
 ## Phase 7: Integration
@@ -88,6 +93,7 @@ Run checks only within the assignment's authority. Record actual commands, outco
 - [ ] **Update README catalog and derived counts** according to current repository conventions.
 - [ ] **Keep the package standalone**: local reference/helper paths resolve inside its directory; use registered template synchronization for shared content rather than cross-package filesystem paths.
 - [ ] **Exclude secrets and private/internal URLs** from distributable content.
+- [ ] **Extensions only — keep installation explicit**: never add an extension to `profiles.yaml`, a preset, `.claude-plugin/plugin.json` or default install paths; document the per-host `--type extension` lifecycle and session-local `--plugin-dir` trial in the package body.
 - [ ] **Complete applicable version/changelog, license and provenance integration** under repository conventions.
 
 ## Phase 8: PR Submission (Only When Authorized)

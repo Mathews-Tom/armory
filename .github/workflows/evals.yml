@@ -10,6 +10,7 @@ on:
       - 'commands/**'
       - 'utilities/**'
       - 'presets/**'
+      - 'extensions/**'
       - 'scripts/validate_evals.py'
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - 'commands/**'
       - 'utilities/**'
       - 'presets/**'
+      - 'extensions/**'
   schedule:
     - cron: '0 0 * * 1'  # Weekly Monday — catches model drift
 
@@ -66,16 +68,14 @@ jobs:
       - name: Evaluate package quality
         if: github.event_name == 'pull_request'
         run: |
-          TYPE_DIRS="skills agents hooks rules commands utilities presets"
-          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md"
+          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md extensions:EXTENSION.md"
 
           changed_packages=""
           for mapping in $DEFINITION_MAP; do
             type_dir="${mapping%%:*}"
             def_file="${mapping#*:}"
             matches=$(git diff --diff-filter=ACMR --name-only origin/${{ github.base_ref }}...HEAD -- "${type_dir}/" \
-              | grep "${def_file}" \
-              | sed "s|${type_dir}/\([^/]*\)/.*|\1|" \
+              | sed -n "s|^${type_dir}/\([^/][^/]*\)/${def_file%.md}\.md$|\1|p" \
               | sort -u)
             for pkg in $matches; do
               changed_packages="${changed_packages} ${type_dir}/${pkg}"
@@ -104,16 +104,14 @@ jobs:
       - name: Check eval coverage for changed packages
         if: github.event_name == 'pull_request'
         run: |
-          TYPE_DIRS="skills agents hooks rules commands utilities presets"
-          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md"
+          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md extensions:EXTENSION.md"
 
           changed_packages=""
           for mapping in $DEFINITION_MAP; do
             type_dir="${mapping%%:*}"
             def_file="${mapping#*:}"
             matches=$(git diff --diff-filter=ACMR --name-only origin/${{ github.base_ref }}...HEAD -- "${type_dir}/" \
-              | grep "${def_file}" \
-              | sed "s|${type_dir}/\([^/]*\)/.*|\1|" \
+              | sed -n "s|^${type_dir}/\([^/][^/]*\)/${def_file%.md}\.md$|\1|p" \
               | sort -u)
             for pkg in $matches; do
               changed_packages="${changed_packages} ${type_dir}/${pkg}"

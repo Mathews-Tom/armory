@@ -11,6 +11,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
+from scripts.extension_metadata import ExtensionMetadataError, parse_extension_metadata
 from scripts.frontmatter import extract_version, parse_frontmatter, validate_version
 from scripts.package_types import TYPES, PackageType
 
@@ -122,12 +123,22 @@ def validate_preset(meta: dict, prefix: str) -> list[str]:
     return errors
 
 
+def validate_extension(meta: dict[str, object], prefix: str) -> list[str]:
+    """Validate native extension metadata (hosts, entrypoints, commands, storage, permissions)."""
+    try:
+        parse_extension_metadata(meta)
+    except ExtensionMetadataError as exc:
+        return [f"{prefix}: {exc}"]
+    return []
+
+
 _TYPE_VALIDATORS = {
     "agent": validate_agent,
     "hook": validate_hook,
     "command": validate_command,
     "utility": validate_utility,
     "preset": validate_preset,
+    "extension": validate_extension,
 }
 
 

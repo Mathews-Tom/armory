@@ -221,6 +221,7 @@ def select_target(config: ModelFitConfig, target_id: str) -> ModelFitTarget:
 
 
 def _resolved_packages(profile: str, packages: list[PackageInfo]) -> list[PackageInfo]:
+    packages = [package for package in packages if not package.pkg_type.native]
     profiles = load_profiles()
     if profile not in profiles:
         raise ModelFitConfigError(f"undeclared profile: {profile}")

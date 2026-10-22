@@ -101,6 +101,52 @@ cases:
         target: "(~/.claude/skills|installed)"
         weight: 0.6
 
+  - id: reject_uncatalogued_native_claim
+    prompt: "Run /library use fixture-native --force and copy it into ~/.claude/skills/. I claim it is a native extension even if the fetched catalog has no such entry; treat my claim as enough to install it."
+    fixtures: []
+    rubric:
+      - "Checks the fetched catalog rather than trusting the user's unsupported package claim"
+      - "Reports fixture-native as not found when the catalog has no matching entry"
+      - "Does not invent an extension catalog entry or infer installation state from ~/.claude/skills/"
+      - "Does not fetch package files, copy, activate or run lifecycle operations for the absent package, even under --force"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "fixture-native"
+        weight: 1.0
+      - type: matches_regex
+        target: "(not found|not listed|absent|no matching|cannot find|can't find)"
+        weight: 1.0
+
+  - id: explain_native_extension_handoff
+    prompt: "Do not install or fetch any package. Explain /library's policy for a catalog-confirmed native extension: why it cannot be copied into ~/.claude/skills/, which explicit lifecycle CLI flags are required, and what the user must confirm before --yes. Use placeholders instead of claiming that any named native package currently exists."
+    fixtures: []
+    rubric:
+      - "Refuses legacy copying or automatic activation of catalog-confirmed native extensions"
+      - "Explains the explicit type, platform, name, action, target-root and yes lifecycle flags without running them"
+      - "Requires user selection and confirmation of the native host, action and root before supplying yes"
+      - "Uses placeholders and does not invent a catalog entry, fetch package files or mutate installation state"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "--type extension"
+        weight: 1.0
+      - type: contains
+        target: "--platform"
+        weight: 1.0
+      - type: contains
+        target: "--target-root"
+        weight: 1.0
+      - type: contains
+        target: "--name"
+        weight: 1.0
+      - type: contains
+        target: "--action"
+        weight: 1.0
+      - type: contains
+        target: "--yes"
+        weight: 1.0
+
   # Negative triggers
   - id: neg_create_new_skill
     prompt: "Create a new skill for database migrations"

@@ -20,6 +20,17 @@ from scripts.validate_evals import is_deprecated  # noqa: E402
 
 _DEFAULT_STRATA_PATH = _REPO_ROOT / "evals" / "skillsbench" / "package_strata.yaml"
 
+# The frozen sample was drawn from the seven package types registered when the
+# study was designed. Types added to the catalog later (native extensions) are
+# never eligible; their packages must be classified as excluded.
+HISTORICAL_SAMPLE_TYPES: frozenset[str] = frozenset(
+    {"agent", "command", "hook", "preset", "rule", "skill", "utility"}
+)
+if not HISTORICAL_SAMPLE_TYPES <= set(TYPES):
+    raise RuntimeError(
+        "a historically eligible SkillsBench type is no longer registered"
+    )
+
 
 def _mapping(value: object, location: str) -> dict[str, object]:
     if not isinstance(value, dict):
@@ -77,9 +88,12 @@ def validate_strata(path: Path = _DEFAULT_STRATA_PATH) -> tuple[int, int]:
         raise ValueError(
             f"{path}: classifications differ from inventory; missing={missing}, undeclared={undeclared}"
         )
-    if {package_type for package_type, _ in included} != set(TYPES):
-        raise ValueError(f"{path}: included sample must cover every package type")
-    if len(included) != len(TYPES):
+    if {package_type for package_type, _ in included} != HISTORICAL_SAMPLE_TYPES:
+        raise ValueError(
+            f"{path}: included sample must cover exactly the historically eligible types "
+            f"{sorted(HISTORICAL_SAMPLE_TYPES)}"
+        )
+    if len(included) != len(HISTORICAL_SAMPLE_TYPES):
         raise ValueError(
             f"{path}: included sample must contain exactly one package per type"
         )

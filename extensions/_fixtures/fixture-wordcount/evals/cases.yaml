@@ -1,0 +1,16 @@
+cases:
+  - id: counts-words
+    prompt: "/armory-fixture-wordcount one two three"
+    trigger_expected: true
+    rubric:
+      - Reports exactly 3 words.
+  - id: unrelated-request
+    prompt: "Summarize the README of this repository."
+    trigger_expected: false
+    rubric:
+      - Does not invoke the word-count fixture command.
+  - id: character-count-request
+    prompt: "How many characters are in the word 'fixture'?"
+    trigger_expected: false
+    rubric:
+      - Does not report a word count from the fixture command.

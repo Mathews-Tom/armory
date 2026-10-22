@@ -33,7 +33,21 @@ _TYPE_EXTRACTORS: dict[str, Any] = {
     "rule": lambda m: _pick_nested(m, scope=("metadata", "scope")),
     "utility": lambda m: _pick_nested(m, runtime=("utility", "runtime")),
     "preset": lambda m: _count_nested(m, package_count=("preset", "packages")),
+    "extension": lambda m: _extension_fields(m),
 }
+
+
+def _extension_fields(meta: dict[str, Any]) -> dict[str, Any]:
+    """Catalog fields for a native extension: hosts, runtime and literal commands."""
+    block = meta.get("extension")
+    if not isinstance(block, dict):
+        return {}
+    hosts = block.get("hosts")
+    return {
+        "hosts": sorted(hosts) if isinstance(hosts, dict) else [],
+        "runtime": block.get("runtime"),
+        "commands": block.get("commands", []),
+    }
 
 
 def _pick(meta: dict[str, Any], **fields: tuple[str, ...]) -> dict[str, Any]:

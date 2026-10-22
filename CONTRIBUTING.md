@@ -4,7 +4,7 @@ Authoring guidance on context pointers, invocation branches, completion criteria
 
 ## Package Types
 
-Armory supports seven package types. Each lives in its own top-level directory with a definition file:
+Armory supports eight package types. Each lives in its own top-level directory with a definition file:
 
 | Type    | Directory    | Definition File | Description                                |
 | ------- | ------------ | --------------- | ------------------------------------------ |
@@ -15,6 +15,7 @@ Armory supports seven package types. Each lives in its own top-level directory w
 | Hook    | `hooks/`     | `HOOK.md`       | Event-driven automation (pre/post actions) |
 | Utility | `utilities/` | `UTILITY.md`    | Standalone tool or report generator        |
 | Preset  | `presets/`   | `PRESET.md`     | Curated bundle of packages across types    |
+| Extension | `extensions/` | `EXTENSION.md` | Optional native OMP / Claude Code runtime module, installed only explicitly per host |
 
 ## Package Structure
 
@@ -143,7 +144,71 @@ metadata:
 ---
 ```
 
-Optional subdirectories (for any package type):
+### Extension (`EXTENSION.md`)
+
+Native extensions are executable host modules, not prompt files. Each feature owns one directory under the Bun workspace in `extensions/` (Python stays on uv):
+
+```text
+extensions/<feature>/
+  EXTENSION.md        # definition; its presence registers the feature
+  CHANGELOG.md
+  core/               # pure TypeScript rules: no Bun/Node/host imports, timers, fs, network or clock
+  omp/                # OMP adapter; factory entry declared under hosts.omp
+  claude-code/        # Claude Code mod; register(on, options) entry declared under hosts.claude
+  claude-code/mod-checks/*.test.ts   # `claude plugin test` cases (claude-code/testing)
+  helpers/*.ts        # optional CLI helpers, bundled to helpers/<name>.js with Bun
+  runner/*.ts         # optional real-process helper entries; also bundled to helpers/<name>.js
+  tests/*.test.ts     # bun test cases
+  evals/cases.yaml
+```
+
+```yaml
+---
+name: my-extension
+description: Use when ... (what the native commands do, on which hosts).
+metadata:
+  version: 1.0.0
+  category: workflow
+  tags: [native, extension, workflow]
+  difficulty: intermediate
+extension:
+  schema_version: 1
+  runtime: bun
+  core:
+    version: 1.0.0
+  hosts:
+    omp:
+      entry: omp/index.ts
+    claude:
+      entry: claude-code/register.ts
+  commands: [armory-my-command]       # literal names, armory- prefix, no shadowing
+  helpers: [helpers/my-helper.ts]     # optional
+  storage: none                       # none | user-private (needs fs.write)
+  permissions: [process.spawn]        # fs.read | fs.write | process.spawn | network
+  tested:                             # optional: only versions/surfaces actually exercised
+    omp:
+      - version: "<exact observed version>"
+        surfaces: [terminal-interactive]
+---
+```
+
+Unknown keys are refused, including any minimum-host-version claim; `tested` records exact exercised versions and surfaces, never a compatibility floor.
+
+Helper entrypoints must be `.ts` files directly under `helpers/` or `runner/`, with unique filename stems. Their static dependency graph may use `core/`, `helpers/` and `runner/` only; every included file is checked before Bun receives immutable snapshots. Claude modules may statically import only `hooks/` modules and the pure `core/`; executable helpers must run through explicit host process effects. Import syntax is parsed with the pinned TypeScript compiler rather than matched with line-oriented regular expressions. Generated-output ancestors must remain real directories, and a rebuild refuses modified or foreign artifact files rather than deleting them. Publishing both host artifacts retains the previous pair for rollback; this is not a crash-atomic multi-directory filesystem transaction. A failed restoration preserves its recovery trees and reports their location; an unexpected occupied destination, including an empty directory, is retained rather than overwritten during rollback.
+
+Claude permission checks follow the registered hook callback's API binding rather than its spelling. Local aliases, object destructuring and static dot/optional access are resolved with lexical shadowing. Computed API access, API escapes into other functions or nested closures, unresolved callback registration and mutation of tracked API/callback bindings are refused. Keep callback references local and statically resolvable. This is bounded static auditing of trusted code, not a sandbox or native-host compatibility proof.
+
+
+- **Build:** `uv run python scripts/build_extensions.py --feature <name> --output-dir <path>` writes `<path>/extensions/<name>/omp/` (`package.json` with `omp.extensions`) and `<path>/extensions/<name>/claude/` (`.claude-plugin/plugin.json`, `hooks/hooks.json`, static relative modules). Each artifact carries its adapter, the exact core, bundled helpers, `LICENSE` and an `armory-extension.json` content manifest with feature/core/schema identity, entrypoints, commands, storage, permissions and file digests. Symlinks, special files, hidden files, secret/data-shaped files, test-only files, bare imports outside host type packages, dynamic imports and Claude `$` effects without a declared permission fail the build. Identical sources build to identical bytes in any output root; output inside canonical source is refused.
+- **Check:** `uv run python scripts/check_extensions.py --feature <name>` runs definition, toolchain, typecheck, lint, unit tests, reproducible builds, the OMP factory probe, `claude plugin validate --strict --json`, `claude plugin test` and a disposable-root lifecycle round trip. Absent tools or zero executed cases fail. `--native-smoke` adds real-host proof and stays incomplete (exit 3) until a real-host driver exercises the feature. `--all --catalog` checks every registered extension plus manifest, evaluator and explicit-install consumers; `--ci` runs exactly the gates the committed files select.
+- **Prefix stages:** a feature without `EXTENSION.md` is an unregistered implementation prefix. `--stage core` (core sources, typecheck, lint, unit tests) and `--stage omp` (plus the OMP adapter probe and OMP native smoke) certify only that stage and always report `feature_complete=false`; the full gate stays incomplete. A `claude-code/` directory without `EXTENSION.md` is refused: the complete package, definition, catalog entry and CHANGELOG land together in one PR.
+- **Install:** never through profiles, presets, interactive selection or "all". Use `uv run python scripts/install.py --type extension --platform <omp|claude> --name <feature> --action <install|update|disable|remove> --target-root <host root> --yes`. For OMP the root is the agent directory (`~/.omp/agent`, or `PI_CODING_AGENT_DIR`): the payload goes to `<root>/extensions/<feature>/` and disable adds `extension-module:<feature>` to `disabledExtensions` in `<root>/config.yml`. For Claude Code the root is the configuration directory (`~/.claude`, or `CLAUDE_CONFIG_DIR`): the payload goes to `<root>/.armory-native/claude-plugins/<feature>/` and is registered in `env.CLAUDE_CODE_PLUGIN_DIRS` of `<root>/settings.json`; disable removes exactly that entry. To try an artifact for one session without installing, use `omp --plugin-dir <artifact>` or `claude --plugin-dir <artifact>`.
+- **Lifecycle safety:** a private ownership record under `<root>/.armory-native/ownership/` binds feature, host, version, root, owned file digests and exact configuration/ownership preimages. Every action holds an advisory host-root lock and writes a durable journal before activation. Recovery rolls back an interrupted pre-commit action; after a durable commit it finishes cleanup instead of restoring retired files. Foreign or locally modified files, special files, symlinked paths, name collisions and malformed journals are refused. Ambiguous recovery preserves the journal and payload trees rather than guessing which data to delete. Targeted configuration edits preserve comments, formatting and foreign path segments; removal deletes only unchanged owned files and the exact registration Armory added. Extension data, other features and foreign configuration survive.
+- **Platforms:** native lifecycle operations require POSIX host-root locking. Other platforms fail before changing native files or configuration; legacy copy and adapter routes do not import the native-only locking dependency.
+- **Fixtures:** packaging tests use fictional complete packages under `extensions/_fixtures/`, outside registered discovery. They are never cataloged or released; lifecycle tests install them only under disposable test roots.
+- **Eval boundary:** `scripts/run_evals.py --package extensions/<name> --dry-run` validates eval structure only. Live prompt loading cannot load native commands and is refused with a nonzero exit; use the explicit native check/smoke driver for host execution. Legacy model-fit manifests and website profile membership/counts exclude native extensions even when the profile selects `all`.
+
+Optional subdirectories (for any package type except extensions, whose layout is fixed above):
 
 - `references/` — documents or context files the package uses
 - `scripts/` — helper scripts invoked by the package
@@ -199,6 +264,8 @@ Packages must be standalone. Every file a package references must live within it
 - `../other-package/references/file.md` — cross-package path references
 - Absolute paths to files outside the package directory
 - References to files that only exist in other packages
+
+Native extensions extend this to runtime code: each built host artifact contains every module it loads, and an installed copy never imports the repository, a sibling package or anything from npm.
 
 **Why:** Packages are distributed individually via `npx skills add` and archive files. Cross-package file references break when a package is installed without its dependency. Check this with `scripts/validate_references.py` and package-content review; the report-v2 static evaluator does not inspect reference targets.
 

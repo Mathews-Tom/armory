@@ -34,6 +34,8 @@ Parse `/tmp/armory-manifest.yaml` and search for the `<name>` argument:
 2. **Fuzzy fallback**: if no exact match, search description keywords for `<name>`.
 3. If multiple fuzzy matches, list them and ask the user to pick one.
 
+Before checking an installed path or fetching package files, identify the manifest section of the selected entry. If it is `packages.extensions`, stop this legacy procedure: refuse copying or automatic activation, explain that native extensions require an explicit host and lifecycle root, and report the complete CLI flag contract in SKILL.md's Native Extension Boundary. Do not inspect `~/.claude/skills/<name>/` to infer native installation state, even with `--force`.
+
 ### Step 3: No match
 
 If no match found, report: "Skill `<name>` not found in catalog. Use `/library search <keyword>` to browse available skills."

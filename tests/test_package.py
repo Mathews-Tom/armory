@@ -40,6 +40,8 @@ def _write_definition(
         fields += "utility: formatter\n"
     if "preset" in pkg_type.required_frontmatter:
         fields += "preset: default\n"
+    if "extension" in pkg_type.required_frontmatter:
+        fields += "extension: {schema_version: 1}\n"
     fields += extras
     content = f"---\n{fields}---\n# Content\n"
     (pkg_dir / pkg_type.definition_file).write_text(content)

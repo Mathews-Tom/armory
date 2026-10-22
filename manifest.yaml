@@ -1319,10 +1319,10 @@ packages:
     category: operations
     difficulty: beginner
   - name: skill-library
-    version: 2.0.2
-    description: 'Agent-native catalog and installer for armory packages across all 7 types. Browse, search, install, update,
-      and remove without leaving session. Triggers on: "list available packages", "install skill", "armory install", "armory
-      search", "/library list", "package catalog".'
+    version: 2.0.3
+    description: 'Agent-native armory catalog for eight package types and installer for seven legacy types. Native extensions
+      require the explicit per-host lifecycle CLI. Triggers on: "list available packages", "install skill", "armory install",
+      "armory search", "/library list", "package catalog".'
     path: skills/skill-library
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/skill-library/SKILL.md
     tags:

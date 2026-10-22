@@ -113,6 +113,35 @@ def test_profile_manifest_rejects_missing_definition(
         model_fit.resolve_profile_manifest("core")
 
 
+def test_full_profile_never_includes_native_extensions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    packages = [
+        PackageInfo(
+            name="shared-name",
+            version="1.0.0",
+            description="Synthetic profile boundary fixture.",
+            source_path=tmp_path / package_type.manifest_section / "shared-name",
+            pkg_type=package_type,
+        )
+        for package_type in (TYPES["skill"], TYPES["extension"])
+    ]
+    monkeypatch.setattr(model_fit, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(model_fit, "load_profiles", lambda: {"full": {"all": True}})
+    monkeypatch.setattr(model_fit, "discover_packages", lambda: packages)
+
+    manifest = model_fit.resolve_profile_manifest("full")
+
+    assert manifest.packages == (
+        model_fit.PackageReference(
+            name="shared-name",
+            package_type="skill",
+            version="1.0.0",
+            source_path="skills/shared-name",
+        ),
+    )
+
+
 def test_dry_run_keeps_discovery_separate_from_loaded_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

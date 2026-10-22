@@ -194,3 +194,40 @@ class TestGeminiAdapter:
         assert sorted(p.name for p in (skills / "shared" / "scripts").iterdir()) == [
             "run.py"
         ]
+
+
+def test_prompt_adapters_skip_native_extensions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Executable native modules are never rewritten into prompt artifacts."""
+    repo = tmp_path / "repo"
+    _write_skill(repo / "skills", "plain")
+    native = repo / "extensions" / "native-demo"
+    (native / "omp").mkdir(parents=True)
+    (native / "EXTENSION.md").write_text(
+        "---\nname: native-demo\ndescription: Native demo extension.\n"
+        "extension: {schema_version: 1}\n---\n\n# Native demo body\n",
+        encoding="utf-8",
+    )
+    (native / "omp" / "index.ts").write_text(
+        'export default function (pi) { pi.registerCommand("armory-native-demo", {}); }\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(package_types, "REPO_ROOT", repo)
+    monkeypatch.setattr(generate_adapters, "REPO_ROOT", repo)
+    packages = load_packages()
+    assert [pkg.name for pkg in packages["extension"]] == ["native-demo"]
+
+    for name, adapter_cls in generate_adapters._ADAPTERS.items():
+        output_dir = tmp_path / name
+        adapter_cls(output_dir).generate(packages)
+        generated = [path for path in output_dir.rglob("*") if path.is_file()]
+        assert generated, name
+        for path in generated:
+            assert "native-demo" not in path.as_posix()
+            text = path.read_text(encoding="utf-8")
+            assert "Native demo body" not in text
+            assert "registerCommand" not in text
+        assert f"{name}: skipped 1" in capsys.readouterr().err

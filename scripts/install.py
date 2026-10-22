@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""TUI installer for armory — copies packages to ~/.claude/{type}/."""
+"""TUI installer for armory.
+
+Copy-installable types go to ~/.claude/{type}/. Native extensions are never
+part of interactive, profile, preset or "all" installs; they use an explicit
+host lifecycle: --type extension --platform <omp|claude> --name <feature>
+--action <install|update|disable|remove> --target-root <host root> --yes.
+"""
 from __future__ import annotations
 
+import argparse
+import os
 import shutil
 import stat
 import sys
@@ -23,6 +31,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
+from scripts.build_extensions import BuildError
 from scripts.frontmatter import (
     FrontmatterError,
     extract_body,
@@ -33,6 +42,8 @@ from scripts.frontmatter import (
 from scripts.hooks_installer import install_hook as _install_hook_to_settings
 from scripts.package_types import (
     MANIFEST_PATH,
+    NATIVE_ACTIONS,
+    NATIVE_HOSTS,
     REPO_ROOT,
     TYPES,
     PackageType,
@@ -54,6 +65,7 @@ TYPE_COLORS: dict[str, str] = {
     "command": "blue",
     "utility": "red",
     "preset": "bright_black",
+    "extension": "bright_cyan",
 }
 
 console = Console()
@@ -260,7 +272,7 @@ def build_install_plans(
     plans: list[InstallPlan] = []
 
     for pkg in packages:
-        install_dir = claude_dir / pkg.pkg_type.install_subdir
+        install_dir = pkg.pkg_type.claude_install_dir(claude_dir)
         if pkg.pkg_type.key in BODY_ONLY_TYPES:
             target = install_dir / f"{pkg.name}.md"
         else:
@@ -459,6 +471,11 @@ def resolve_preset_packages(
     for section, entries in packages_meta.items():
         # section is e.g. "skills", "hooks" — map to type key
         type_key = _section_to_type_key(section)
+        if type_key is not None and TYPES[type_key].native:
+            raise InstallInputError(
+                f"{def_file}: presets cannot bundle native {section}; install them explicitly "
+                "with --type extension --platform <host> --action install"
+            )
         if type_key and isinstance(entries, list):
             names = [e["name"] for e in entries if isinstance(e, dict) and "name" in e]
             if names:
@@ -497,7 +514,7 @@ def install_preset(
                 )
                 continue
 
-            install_dir = claude_dir / sub_pkg.pkg_type.install_subdir
+            install_dir = sub_pkg.pkg_type.claude_install_dir(claude_dir)
             if sub_pkg.pkg_type.key in BODY_ONLY_TYPES:
                 target = install_dir / f"{name}.md"
             else:
@@ -694,6 +711,11 @@ def resolve_profile_packages(
         pkg_type_key = _section_to_type_key(type_key)
         if pkg_type_key is None:
             raise InstallInputError(f"Profile '{profile_name}': unknown package type section '{type_key}'")
+        if TYPES[pkg_type_key].native:
+            raise InstallInputError(
+                f"Profile '{profile_name}': profiles cannot include native {type_key}; install them "
+                "explicitly with --type extension --platform <host> --action install"
+            )
         if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
             raise InstallInputError(
                 f"Profile '{profile_name}': packages.{type_key} must be a list of names"
@@ -807,10 +829,62 @@ def install_to_platform(target: str, project_dir: Path) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _validate_extension_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Require the complete explicit lifecycle flag set for native extensions only."""
+    lifecycle = {
+        "--platform": args.platform,
+        "--name": args.name,
+        "--action": args.action,
+        "--target-root": args.target_root,
+        "--yes": args.yes,
+    }
+    if args.pkg_type != "extension":
+        given = [flag for flag, value in lifecycle.items() if value]
+        if given:
+            parser.error(f"{', '.join(given)} apply only to --type extension")
+        return
+    missing = [flag for flag, value in lifecycle.items() if not value]
+    if missing:
+        parser.error(
+            f"--type extension requires {', '.join(missing)}; native extensions are never "
+            "installed interactively, by profile or as part of 'all'"
+        )
+    legacy = {
+        "--profile": args.profile,
+        "--reinstall": args.reinstall,
+        "--list-profiles": args.list_profiles,
+        "--target": args.target,
+        "--project-dir": args.project_dir,
+    }
+    conflicting = [flag for flag, value in legacy.items() if value]
+    if conflicting:
+        parser.error(f"{', '.join(conflicting)} cannot be combined with --type extension")
+
+
+def run_extension_action(args: argparse.Namespace) -> int:
+    """Run one explicit native extension lifecycle action."""
+    if os.name != "posix":
+        console.print(
+            Text(
+                "Native extension lifecycle requires a POSIX host; "
+                "legacy installation remains available.",
+                style="red",
+            )
+        )
+        return 1
+    from scripts.extension_lifecycle import LifecycleError, run_action
+
+    try:
+        message = run_action(args.action, args.platform, args.name, args.target_root, TYPES["extension"].repo_dir)
+    except (BuildError, LifecycleError) as exc:
+        console.print(Text(f"Error: {exc}", style="red"))
+        return 1
+    console.print(Text(message))
+    return 0
+
+
 def main() -> int:
     """Main entry point for the TUI installer."""
-    import argparse
-
     parser = argparse.ArgumentParser(description="Install armory packages to ~/.claude/")
     parser.add_argument(
         "--reinstall",
@@ -835,16 +909,41 @@ def main() -> int:
     parser.add_argument(
         "--target",
         choices=["claude", "cursor", "codex", "gemini"],
-        default="claude",
-        help="Target platform (default: claude)",
+        help="Target platform for copy/adapter installs (default: claude)",
     )
     parser.add_argument(
         "--project-dir",
         type=Path,
-        default=Path.cwd(),
         help="Project directory for non-Claude targets (default: current directory)",
     )
+    parser.add_argument(
+        "--platform",
+        choices=list(NATIVE_HOSTS),
+        help="Native host for an --type extension lifecycle action",
+    )
+    parser.add_argument("--name", help="Registered extension feature name (with --type extension)")
+    parser.add_argument(
+        "--action",
+        choices=list(NATIVE_ACTIONS),
+        help="Extension lifecycle action (with --type extension)",
+    )
+    parser.add_argument(
+        "--target-root",
+        type=Path,
+        help=(
+            "Host configuration root to install into: the OMP agent directory or the Claude Code "
+            "configuration directory (with --type extension)"
+        ),
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm a noninteractive extension lifecycle mutation",
+    )
     args = parser.parse_args()
+    _validate_extension_args(parser, args)
+    if args.pkg_type == "extension":
+        return run_extension_action(args)
 
     if args.list_profiles:
         try:
@@ -868,9 +967,10 @@ def main() -> int:
         console.print(table)
         return 0
 
-    if args.target != "claude":
+    target = args.target or "claude"
+    if target != "claude":
         try:
-            return install_to_platform(args.target, args.project_dir)
+            return install_to_platform(target, args.project_dir or Path.cwd())
         except InstallInputError as exc:
             console.print(Text(f"Error: {exc}", style="red"))
             return 1
@@ -884,6 +984,8 @@ def main() -> int:
         packages = discover_packages(
             None if args.profile or args.pkg_type == "preset" else type_filter
         )
+        # Native extensions only ever install through the explicit lifecycle above.
+        packages = [p for p in packages if not p.pkg_type.native]
         if args.profile:
             packages = filter_by_profile(packages, args.profile)
         if type_filter:

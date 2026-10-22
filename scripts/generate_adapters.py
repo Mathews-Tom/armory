@@ -311,8 +311,9 @@ class CursorAdapter(AdapterGenerator):
         for pkg in packages.get("command", []):
             self._write(commands_dir / f"{pkg.name}.md", pkg.body)
 
-        # Hooks, utilities, presets → skipped (no Cursor equivalent)
-        for skipped_type in ("hook", "utility", "preset"):
+        # Hooks, utilities, presets → skipped (no Cursor equivalent);
+        # native extensions are executable OMP/Claude modules with no Cursor form.
+        for skipped_type in ("hook", "utility", "preset", "extension"):
             count = len(packages.get(skipped_type, []))
             if count:
                 print(
@@ -473,8 +474,8 @@ class CodexAdapter(AdapterGenerator):
                 self.output_dir / "skills" / "AGENTS.md", "\n".join(skill_parts)
             )
 
-        # Hooks, utilities, presets → skipped
-        for skipped_type in ("hook", "utility", "preset"):
+        # Hooks, utilities, presets, native extensions → skipped
+        for skipped_type in ("hook", "utility", "preset", "extension"):
             count = len(packages.get(skipped_type, []))
             if count:
                 print(
@@ -588,6 +589,15 @@ class GeminiAdapter(AdapterGenerator):
         if presets:
             print(
                 f"  gemini: skipped {len(presets)} preset(s) (no equivalent)",
+                file=sys.stderr,
+            )
+
+        # Native extensions → skipped. Unlike utilities they are executable
+        # host modules, so they are never rewritten into skill Markdown.
+        extensions = packages.get("extension", [])
+        if extensions:
+            print(
+                f"  gemini: skipped {len(extensions)} native extension(s) (OMP/Claude Code modules only)",
                 file=sys.stderr,
             )
 

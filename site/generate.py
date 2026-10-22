@@ -8,11 +8,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.package_types import TYPES
+
+SECTION_TYPES: dict[str, str] = {t.manifest_section: t.key for t in TYPES.values()}
 _DEFAULT_OUTPUT = _REPO_ROOT / "site" / "dist" / "index.html"
 
 
@@ -23,11 +30,13 @@ def load_manifest() -> list[dict]:
         data = yaml.safe_load(f)
 
     packages: list[dict] = []
-    for pkg_type, items in data.get("packages", {}).items():
+    for section, items in data.get("packages", {}).items():
         if not isinstance(items, list):
             continue
+        if section not in SECTION_TYPES:
+            raise ValueError(f"{manifest_path}: unknown package section '{section}'")
         for item in items:
-            item["type"] = pkg_type.rstrip("s")  # skills -> skill, agents -> agent
+            item["type"] = SECTION_TYPES[section]
             packages.append(item)
     return packages
 
@@ -45,6 +54,11 @@ def build_html(packages: list[dict], profiles: dict) -> str:
     packages_json = json.dumps(packages, ensure_ascii=False)
     profiles_json = json.dumps(profiles, ensure_ascii=False)
     pkg_count = len(packages)
+    type_options = "\n        ".join(
+        f'<option value="{key}">{key.capitalize()}</option>' for key in TYPES
+    )
+    type_colors_json = json.dumps({key: f"type-{key}" for key in TYPES})
+    native_types_json = json.dumps([key for key, value in TYPES.items() if value.native])
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -152,6 +166,7 @@ select:focus{{border-color:var(--accent)}}
 .type-command{{background:rgba(88,166,255,0.15);color:var(--blue)}}
 .type-utility{{background:rgba(248,81,73,0.15);color:var(--red)}}
 .type-preset{{background:rgba(139,148,158,0.15);color:var(--gray)}}
+.type-extension{{background:rgba(121,192,255,0.08);color:var(--cyan);border:1px dashed rgba(121,192,255,0.4)}}
 .cat-badge{{background:rgba(88,166,255,0.1);color:var(--accent);border:1px solid rgba(88,166,255,0.2)}}
 .diff-beginner{{background:rgba(86,211,100,0.12);color:var(--green)}}
 .diff-intermediate{{background:rgba(210,153,34,0.12);color:var(--amber)}}
@@ -248,13 +263,7 @@ select:focus{{border-color:var(--accent)}}
       <input type="text" class="search-box" id="search" placeholder="Search packages by name, description, or tags..." autocomplete="off">
       <select id="type-filter">
         <option value="all">All types</option>
-        <option value="skill">Skill</option>
-        <option value="agent">Agent</option>
-        <option value="hook">Hook</option>
-        <option value="rule">Rule</option>
-        <option value="command">Command</option>
-        <option value="utility">Utility</option>
-        <option value="preset">Preset</option>
+        {type_options}
       </select>
       <select id="diff-filter">
         <option value="all">All levels</option>
@@ -315,9 +324,11 @@ select:focus{{border-color:var(--accent)}}
 <script>
 const PACKAGES = {packages_json};
 const PROFILES = {profiles_json};
+const SECTION_TYPES = {json.dumps(SECTION_TYPES)};
+const NATIVE_TYPES = new Set({native_types_json});
 
 const CATEGORIES = ["all","development","review","security","research","content","business","visualization","operations","data"];
-const TYPE_COLORS = {{"skill":"type-skill","agent":"type-agent","hook":"type-hook","rule":"type-rule","command":"type-command","utility":"type-utility","preset":"type-preset"}};
+const TYPE_COLORS = {type_colors_json};
 
 let activeCategory = "all";
 let activeProfile = null;
@@ -349,25 +360,29 @@ function setCategory(cat) {{
 function getProfilePackages(name) {{
   const p = PROFILES[name];
   if (!p) return [];
-  let names = [];
-  if (p.all) return PACKAGES.map(pkg => pkg.name);
+  let identities = [];
+  if (p.all) return PACKAGES
+    .filter(pkg => !NATIVE_TYPES.has(pkg.type))
+    .map(pkg => `${{pkg.type}}/${{pkg.name}}`);
   if (p.includes) {{
     for (const inc of p.includes) {{
-      names = names.concat(getProfilePackages(inc));
+      identities = identities.concat(getProfilePackages(inc));
     }}
   }}
   if (p.packages) {{
-    for (const typeKey of Object.keys(p.packages)) {{
-      names = names.concat(p.packages[typeKey]);
+    for (const [section, names] of Object.entries(p.packages)) {{
+      const type = SECTION_TYPES[section];
+      if (!type || NATIVE_TYPES.has(type)) continue;
+      identities = identities.concat(names.map(name => `${{type}}/${{name}}`));
     }}
   }}
-  return [...new Set(names)];
+  return [...new Set(identities)];
 }}
 
 function renderProfiles() {{
   const container = document.getElementById("profiles");
   container.innerHTML = Object.entries(PROFILES).map(([name, p]) => {{
-    const count = p.all ? PACKAGES.length : getProfilePackages(name).length;
+    const count = getProfilePackages(name).length;
     return `<div class="profile-card ${{activeProfile === name ? "active" : ""}}" onclick="setProfile('${{name}}')">
       <div class="profile-name">${{name.replace(/-/g, " ")}}</div>
       <div class="profile-desc">${{p.description || ""}}</div>
@@ -403,7 +418,7 @@ function renderGrid() {{
     if (activeCategory !== "all" && pkg.category !== activeCategory) return false;
     if (typeFilter !== "all" && pkg.type !== typeFilter) return false;
     if (diffFilter !== "all" && pkg.difficulty !== diffFilter) return false;
-    if (profilePkgs && !profilePkgs.includes(pkg.name)) return false;
+    if (profilePkgs && !profilePkgs.includes(`${{pkg.type}}/${{pkg.name}}`)) return false;
     if (query) {{
       const haystack = [pkg.name, pkg.description || "", ...(pkg.tags || [])].join(" ").toLowerCase();
       return haystack.includes(query);

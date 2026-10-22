@@ -12,7 +12,7 @@ Curated, production-grade skills, agents, hooks, rules, commands, utilities, and
 
 ## Overview
 
-`armory` is a collection of packages for [Claude Code](https://claude.ai/code) and Claude.ai. Each package is a self-contained prompt or automation unit that extends Claude with a repeatable, opinionated workflow for a specific task domain. Packages span seven types: skills, agents, hooks, rules, commands, utilities, and presets.
+`armory` is a collection of packages for [Claude Code](https://claude.ai/code) and Claude.ai. Each package is a self-contained prompt or automation unit that extends Claude with a repeatable, opinionated workflow for a specific task domain. Packages span seven types: skills, agents, hooks, rules, commands, utilities, and presets. An optional eighth type, native extensions, packages executable OMP and Claude Code modules that install only through an explicit per-host lifecycle.
 
 **Philosophy:** Packages in this collection are practical and context-free. They define the _how_, not just the _what_ — covering inputs, outputs, edge cases, and failure modes. They are tested in real workloads, not constructed as examples.
 
@@ -317,6 +317,21 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 | [research](presets/research/)             | `research-analyst` agent                        |
 | [eng-ops](presets/eng-ops/)               | `ship-workflow` skill + `release-captain` + `full-stack-builder` agents |
 
+## Native Extensions
+
+Native extensions (`extensions/<feature>/EXTENSION.md`) are optional executable modules for OMP and Claude Code. Each feature keeps deterministic rules in a pure shared core and ships one self-contained artifact per host: an OMP package (`package.json` with `omp.extensions`) and a Claude Code mod (`.claude-plugin/plugin.json` plus `hooks/hooks.json`). No extension is registered in the catalog yet; the type, build, check and lifecycle tooling exist so features can land complete.
+
+Extensions are never installed by profiles, presets, the interactive installer, "all" or the all-in-one Claude plugin. Install, update, disable or remove one explicitly per host:
+
+```bash
+uv run python scripts/install.py --type extension --platform omp \
+  --name <feature> --action install --target-root ~/.omp/agent --yes
+uv run python scripts/install.py --type extension --platform claude \
+  --name <feature> --action install --target-root ~/.claude --yes
+```
+
+For OMP the payload goes to the documented discovery directory `<root>/extensions/<feature>/`, and `--action disable` adds `extension-module:<feature>` to `disabledExtensions` in `<root>/config.yml`. For Claude Code the payload goes to `<root>/.armory-native/claude-plugins/<feature>/` and is registered in `env.CLAUDE_CODE_PLUGIN_DIRS` in `<root>/settings.json`; disable removes exactly that entry. Removal deletes only unchanged files Armory installed and the exact registration it added; extension data and foreign configuration stay. To try a built artifact for one session instead, run `omp --plugin-dir <artifact>` or `claude --plugin-dir <artifact>`. Extensions require [Bun](https://bun.sh) for bundled helpers. Compatibility is claimed only for host versions and surfaces a feature records as actually exercised. See [CONTRIBUTING.md](CONTRIBUTING.md#extension-extensionmd) for the package contract.
+
 ---
 
 ## Installation
@@ -379,8 +394,9 @@ This uses Claude Code's native plugin system and loads a subset of armory's cata
 | rules        | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | utilities    | ❌ no — armory-specific type, not a Claude Code plugin concept |
 | presets      | ❌ no — use `just install-profile` instead |
+| extensions   | ❌ no — native modules; never enabled by the all-in-one plugin (see [Native Extensions](#native-extensions)) |
 
-The Skills CLI (Option 1) installs only `SKILL.md` packages, so it skips agents, hooks, rules, commands, utilities and presets; the `skill-inventory` skill can install the same-name utility from the rolling release. For the full catalog across all seven package types, use Option 2 (profile installer).
+The Skills CLI (Option 1) installs only `SKILL.md` packages, so it skips agents, hooks, rules, commands, utilities and presets; the `skill-inventory` skill can install the same-name utility from the rolling release. For the full catalog across the seven copy-installed package types, use Option 2 (profile installer); native extensions install only through the explicit extension lifecycle.
 
 **Option 4 — Manual**
 
