@@ -762,6 +762,7 @@ def code_identity() -> str:
         "state_store.py",
         "graph.py",
         "native_stack.py",
+        "source_renewal.py",
     ):
         digest.update(name.encode("ascii"))
         digest.update((Path(__file__).resolve().parent / name).read_bytes())

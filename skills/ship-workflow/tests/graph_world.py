@@ -958,7 +958,7 @@ class GraphWorld:
     def run(
         self,
         plan: StackPlan,
-        endpoint: Endpoint,
+        endpoint: Endpoint | Literal["renewed"],
         *,
         wait: float = 120.0,
         gates: GatePolicy | None = None,
@@ -971,7 +971,7 @@ class GraphWorld:
     def resume(
         self,
         run_id: str,
-        endpoint: Endpoint,
+        endpoint: Endpoint | Literal["renewed"],
         *,
         wait: float = 120.0,
         gates: GatePolicy | None = None,

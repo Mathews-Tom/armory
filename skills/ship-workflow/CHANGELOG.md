@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Graph-only `--until renewed` source renewal for existing manual PRs: parent-first open-parent replay, exact expected-old pushes and confirmed retargets without merge, post-merge acceptance or branch deletion.
+- Explicit exact-input reviewed conflict trees, preserving every original slice commit and author/message/encoding/trailer bytes; absent, stale or extraneous approvals stop before publication.
+- Independently proved adoption of externally completed ancestor landings with their historical provider bases, separate source completion evidence and immutable, reverified resume authority. Existing `pr`, `merged`, `clean` and native landing semantics remain unchanged.
+
 ### Changed
 
 - Routine shipping uses current GitHub checks, required reviews, branch protections and merge policy; checkout-log attestation and immutable action pins are explicit `assurance: "high"` policy instead of default repository prerequisites.
@@ -13,6 +19,7 @@
 
 ### Fixed
 
+- Distinguish unselected, externally merged native ancestors from native source renewal; retain exact landing/trunk proofs while continuing to refuse native selected or unlanded source.
 - Freeze and reuse exact verified replay commit objects after definite push refusal with unchanged inputs; no caller-seeded committer date or temporary pre-push validation protocol.
 - Renew local gates and the outgoing secret scan after a refused or reconciled not-applied ordinary publication; validation cache hits cannot skip a requested retry check. Push diagnostics describe observed publication failure without misattributing local hooks or transport errors to the remote.
 - Recheck trunk/member inputs after local validation before dispatching a stack push or native request, and validate refreshed native heads rather than old journal members.

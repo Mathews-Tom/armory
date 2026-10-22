@@ -46,6 +46,7 @@ from changeset import (
 from git_ops import GitError, GitRepository, parse_remote_identity
 from github_ops import GitHub, ProviderError
 from graph import (
+    GraphEndpoint,
     StackPlan,
     execute_graph,
     inspect_graph,
@@ -202,11 +203,11 @@ def stack_graph(
         host, repo = repository_selector(args.repo)
         if (host, repo.lower()) != (plan.host, plan.repo.lower()):
             raise ReceiptInputError("--repo does not match the stack plan repository")
-    endpoint: Endpoint
+    endpoint: GraphEndpoint
     if args.until is not None:
         endpoint = args.until
     elif journal is not None:
-        endpoint = cast(Endpoint, journal.endpoint)
+        endpoint = cast(GraphEndpoint, journal.endpoint)
     else:
         endpoint = "clean"
     deadline = time.monotonic() + args.wait_timeout
@@ -295,7 +296,7 @@ def main() -> int:
     parser.add_argument(
         "--repo", help="actual PR base repository, optionally prefixed by host"
     )
-    parser.add_argument("--until", choices=("pr", "merged", "clean"))
+    parser.add_argument("--until", choices=("pr", "renewed", "merged", "clean"))
     parser.add_argument(
         "--policy", type=Path, help="explicit source-backed decision packet"
     )
@@ -447,6 +448,10 @@ def main() -> int:
             result, code = stack_graph(git, store, args, None, graph_run, gates)
             print(json.dumps(result, ensure_ascii=True, sort_keys=True))
             return code
+        if args.until == "renewed":
+            raise ReceiptInputError(
+                "--until renewed requires --stack-plan or a source-renewal graph run"
+            )
         if selected is None:
             selected = infer_repository(git)
         endpoint: Endpoint

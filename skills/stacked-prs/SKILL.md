@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization and optional GitHub-native stack support, or when an existing stack needs its topology, provenance and native membership resolved before its landing and cleanup are delegated to the ship-workflow lifecycle.'
 metadata:
-  version: 0.5.0
+  version: 0.6.0
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
@@ -15,7 +15,7 @@ Build, publish, synchronize and validate stacked pull requests without corruptin
 
 The package identity is provider-neutral. Git is the source of truth for branch ancestry; provider PR metadata is the source of truth for review bases. GitHub through `gh` is the first documented provider adapter.
 
-Landing, post-landing promotion and retargeting, and cleanup of an existing manual or GitHub-native stack have one executable owner: the `ship-workflow` skill's stack graph run. This skill authors its explicit stack decision packet and delegates to it once (§5); it has no hand-run landing or cleanup procedure of its own.
+Landing, post-landing source renewal, promotion and retargeting, and cleanup of an existing stack have one executable owner: the `ship-workflow` skill's stack graph run. This skill authors its explicit decision packet and delegates to it once (§5); source-only renewal uses its manual-graph `renewed` endpoint, not a hand-run fallback or implicit landing.
 
 ## Reference Files
 
@@ -156,7 +156,7 @@ git merge-tree --write-tree --merge-base=<F> <L> <C>
 git push --force-with-lease=refs/heads/<branch>:<C> origin <N>:refs/heads/<branch>
 ```
 
-Start at the first branch above the base and continue toward the leaf. Stop on conflicts, remote lease failures, or a parent PR that closed without merge. Promoting and retargeting children after their parent landed is part of the delegated lifecycle (§5), not this step.
+Start at the first branch above the base and continue toward the leaf. Stop on conflicts, remote lease failures, or a parent PR that closed without merge. After any parent landed, both source-only renewal and promotion for landing belong to the delegated controller (§5), not this standalone procedure.
 
 ### 4. Validate
 
@@ -187,12 +187,15 @@ Landing, post-landing promotion and retargeting, post-merge acceptance and clean
    ```
 
    "Merge the stack" is `--until merged`; "merge and clean up" is the default `clean`. "Clean up" alone selects only nodes the provider already reports merged, so the run verifies and cleans them without landing anything new.
-5. Resume with `--resume RUN_ID` only when the controller returned a saved run; add a refreshed packet of the same topology only for a resolved decision. A pre-journal admission or inspection stop can have `run_id: null` or no id: resolve its bounded input and repeat the original explicitly scoped invocation, never invent an id or select an unrelated run with bare `--resume`.
+5. Resume with `--resume RUN_ID` only when the controller returned a saved run. Landing runs can admit a reviewed same-topology refresh for a resolved decision; source-only `renewed` packets remain immutable. For changed source conflict evidence, reconcile the old run's pending mutations, preserve its journal and start a new exact-live run using the registered lifecycle reference's staged continuation. A receipt-free stop requires correcting its bounded input and repeating the original scoped invocation, never inventing an id or selecting an unrelated run.
 6. Relay the run's status, confirmed merges, retained dependents, cleanup dispositions and next action. `NEEDS_JUDGMENT` names a topology, provenance, scope or gate decision that belongs back here; `BLOCKED` names a missing prerequisite.
 
 The run enforces parent-first order, slice-preserving promotion, expected-old leases, fresh gates per node, open-base retention and landing proofs (`references/merge-discipline.md`), and lands a native selection with one guarded request (`references/github-native.md` § Landing policy).
 
 Routine delegated shipping uses the repository's current provider checks, reviews, protections and merge policy. A selected node can request `assurance: "high"` explicitly; routine nodes do not need pinned checkout logs or renamed CI jobs. Supply `--gates` when local validation is requested; use `per_commit: true` for every replayed commit and each gate's own timeout. Validation precedes push and preserves existing hooks. Definite refusals with unchanged inputs reuse the exact verified replay objects; uncertain mutations reconcile before retry. Saved assurance and validation survive resume; incompatible legacy authority stops for an explicit decision.
+
+For explicitly authorized source-only renewal, inspect and execute the manual graph with `--until renewed` and the requested `--gates`, never `merged` or `clean`. Read the registered `ship-workflow` lifecycle reference's **Source-only renewal** contract before authoring reviewed conflict evidence. Capture old child slices before rewriting an open selected parent; keep its child based on the confirmed renewed parent branch. Historical UI-landed ancestors retain their observed bases and need independently proved trunk-reachable landings. Selection preserves the existing PRs and author/message/trailer bytes, and authorizes no merge, deletion or actual/human acceptance claim. A native graph refuses this endpoint; keep its supported native workflow unchanged.
+
 
 ## Splitting One Branch Into A Stack
 

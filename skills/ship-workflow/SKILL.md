@@ -2,7 +2,7 @@
 name: ship-workflow
 description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the supported path and cleans up only proven-stale branches and worktrees. Stops at the requested endpoint and never bumps versions, edits changelogs, tags or publishes. Triggers on: "ship it", "ship this", "open a PR", "push and PR", "land this PR", "merge PR and clean up", "check CI on my PR", "resume the ship run", "/ship-workflow".'
 metadata:
-  version: 2.1.0
+  version: 2.2.1
   category: review
   tags: [shipping, pull-request, ci-cd, merge, cleanup]
   difficulty: intermediate
@@ -18,7 +18,7 @@ Ship through the authorized endpoint using the repository's current checks, requ
 | File | Contents | Load When |
 |---|---|---|
 | `references/commit-planning.md` | Inventory, logical commit plans and local gate packets | Creating commits or requesting local/per-commit validation |
-| `references/lifecycle-contract.md` | Explicit policy, assurance, publication, stack packets, journals and recovery | Supplying `--policy` or `--stack-plan`, resuming, or interpreting a blocker |
+| `references/lifecycle-contract.md` | Explicit policy, assurance, publication, source-only renewal, stack packets, journals and recovery | Supplying `--policy` or `--stack-plan`, renewing without landing, resuming, or interpreting a blocker |
 | `references/project-detection.md` | Repository gate-source detection | Locating local test commands; version/changelog tables do not authorize release work |
 
 ## Workflow
@@ -33,9 +33,10 @@ Choose exactly one target: `--pr N`, `--branch NAME`, an explicit stack, a saved
 | "Merge it", "land PR 12 but keep the branch" | `--until merged` |
 | "Open a PR", "push and PR" | `--until pr` |
 | "Check CI", "what blocks PR 12" | `--until pr --dry-run` (inspection only) |
+| "Renew these existing stack PRs without merging" | `--stack-plan PATH --until renewed` (manual graphs only) |
 | Version, changelog, tag, release, package publication or deployment | Separate release authority, not this skill |
 
-State the target, endpoint and cleanup scope before mutation. A resume preserves the saved authority. `pr` confirms publication only; `merged` adds confirmed landing and applicable post-merge acceptance; `clean` adds proof-based cleanup. Keep active, dirty, protected/default/release, unmerged, open-PR-dependent and unknown work. Never widen a stack selection or resume endpoint implicitly.
+State the target, endpoint and cleanup scope before mutation. A resume preserves the saved authority. `pr` confirms publication only; graph-only `renewed` updates existing source heads and bases without landing; `merged` adds confirmed landing and applicable post-merge acceptance; `clean` adds proof-based cleanup. Keep active, dirty, protected/default/release, unmerged, open-PR-dependent and unknown work. Never widen a stack selection or resume endpoint implicitly.
 
 ### 2. Inspect through the executable
 
@@ -74,16 +75,26 @@ The controller freezes and verifies replay proposals before publication. After a
 
 ### 5. Ship existing stacks parent-first
 
-Load the registered `stacked-prs` companion and inspect topology, slice boundaries, provenance and native membership. Missing companion skills are `BLOCKED`. Author one explicit `--stack-plan` packet: select exactly the authorized PRs; include every ancestor and relevant dependent as context; cite unchanged provenance and each selected node's merge policy. Use routine node assurance unless high assurance was requested.
+Load the registered `stacked-prs` companion and inspect topology, slice boundaries, provenance and native membership. Missing companion skills are `BLOCKED`. Author one explicit `--stack-plan` packet: select exactly the authorized PRs; include every ancestor and relevant dependent as context; cite unchanged provenance and each selected node's policy. Selection authorizes only the requested endpoint, not implicit landing. Use routine node assurance unless high assurance was requested.
 
 ```bash
 uv run --no-project --python 3.12 python "<skill-dir>/scripts/ship.py" --stack-plan /tmp/ship.X/stack.json --dry-run
 uv run --no-project --python 3.12 python "<skill-dir>/scripts/ship.py" --stack-plan /tmp/ship.X/stack.json --gates /tmp/ship.X/gates.json --until merged
 ```
 
-The controller proves each own slice, preserves author/message/trailer bytes, publishes restacks with an exact expected-old force-with-lease, retargets only after confirmed parent landing and requires renewed checks for the new context. An open unselected ancestor stops for a scope decision. Cleanup follows confirmed landing, never a submitted merge request.
+For landing endpoints, the controller proves each own slice, preserves author/message/trailer bytes, publishes restacks with an exact expected-old force-with-lease, retargets only after confirmed parent landing and requires renewed checks for the new context. An open unselected ancestor stops for a scope decision. Cleanup follows confirmed landing, never a submitted merge request.
 
 GitHub-native selections use one guarded asynchronous request on the highest selected member, never manual merges or fallback promotion. The provider can rebase retained upper members; disclose that effect and require the controller's tree/slice proofs. Queue enrollment is not landing; the request guards only the highest selected head, not every lower member atomically.
+
+### 6. Renew source without landing
+
+Use `--stack-plan PATH --until renewed` only for explicitly authorized source-only renewal of existing manual PRs. Inspect with the same endpoint and `--dry-run`, then execute with the requested `--gates`. This endpoint replays, pushes and retargets; it never merges, deletes branches, runs post-merge acceptance or claims current CI/review acceptance.
+
+Renew selected parents before their children, capturing each child's old slice before rewriting its parent. An open renewed parent stays open and its child stays based on that parent's branch. A child of an already-landed parent targets the current trunk. Historical provider base names on merged ancestors remain unchanged; adoption requires their exact observed identities and a landing proved reachable from the trunk.
+
+Conflicts require independently reviewed, exact-input `resolution` evidence in the explicit packet; read the lifecycle reference's source-only renewal contract. Preserve both sides' intended content, author/message/trailer bytes and every original slice commit. Missing or stale resolution evidence stops before push. The endpoint refuses native stacks and ordinary single-PR invocation; keep their existing supported paths.
+
+Report source renewal separately from merge readiness. Resume only the returned source-renewal run with its frozen endpoint, decisions, resolution identities and gates; reconcile uncertain pushes/retargets before proceeding.
 
 ## Error Handling And Recovery
 

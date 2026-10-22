@@ -85,6 +85,7 @@ from state_store import (
 )
 
 STACK_PLAN_SCHEMA_VERSION = 1
+GraphEndpoint = Endpoint | Literal["renewed"]
 MAX_STACK_PLAN_BYTES = 256 * 1024
 MAX_STACK_NODES = 64
 MAX_PR_NUMBER = 2**31 - 1
@@ -93,7 +94,7 @@ MAX_SOURCE_CHARS = 1024
 PROVENANCE_DISPOSITIONS = ("preserve",)
 _PLAN_KEYS = frozenset({"schema_version", "repository", "trunk", "nodes"})
 _NODE_KEYS = frozenset({"pr", "parent", "select", "head", "base"})
-_OPTIONAL_NODE_KEYS = frozenset({"fork"})
+_OPTIONAL_NODE_KEYS = frozenset({"fork", "resolution"})
 _SELECTED_KEYS = frozenset({"decision", "provenance"})
 _HEAD_KEYS = frozenset({"repo", "ref", "sha"})
 _PROVENANCE_KEYS = frozenset({"disposition", "sources"})
@@ -119,6 +120,26 @@ class Provenance:
 
 
 @dataclass(frozen=True)
+class Resolution:
+    """Reviewed conflicting replay steps bound to one exact source and destination."""
+
+    fork: str
+    old_head: str
+    onto: str
+    commits: tuple[tuple[str, str], ...]
+    sources: tuple[str, ...]
+
+    def canonical(self) -> dict[str, object]:
+        return {
+            "fork": self.fork,
+            "old_head": self.old_head,
+            "onto": self.onto,
+            "commits": [{"old": old, "tree": tree} for old, tree in self.commits],
+            "sources": list(self.sources),
+        }
+
+
+@dataclass(frozen=True)
 class PlanNode:
     """One PR of the graph as the packet binds it.
 
@@ -139,6 +160,7 @@ class PlanNode:
     fork: str | None
     decision: Decision | None
     provenance: Provenance | None
+    resolution: Resolution | None = None
 
 
 @dataclass(frozen=True)
@@ -483,6 +505,35 @@ def _provenance(value: object, label: str) -> Provenance:
     return Provenance("preserve", names)
 
 
+def _resolution(value: object, label: str) -> Resolution:
+    raw = _object(value, label)
+    _keys(
+        raw, frozenset({"fork", "old_head", "onto", "commits", "sources"}), _NONE, label
+    )
+    sources = _provenance(
+        {"disposition": "preserve", "sources": raw["sources"]}, label
+    ).sources
+    entries = raw["commits"]
+    if not isinstance(entries, list) or not 0 < len(entries) <= 256:
+        raise StackPlanError(f"{label}.commits must be a bounded nonempty list")
+    commits: list[tuple[str, str]] = []
+    for entry in entries:
+        item = _object(entry, f"{label}.commits entry")
+        _keys(item, frozenset({"old", "tree"}), _NONE, label)
+        commits.append(
+            (_oid(item["old"], f"{label}.old"), _oid(item["tree"], f"{label}.tree"))
+        )
+    if len({old for old, _ in commits}) != len(commits):
+        raise StackPlanError(f"{label}.commits repeats an original commit")
+    return Resolution(
+        _oid(raw["fork"], f"{label}.fork"),
+        _oid(raw["old_head"], f"{label}.old_head"),
+        _oid(raw["onto"], f"{label}.onto"),
+        tuple(commits),
+        sources,
+    )
+
+
 def _node(value: object, index: int) -> PlanNode:
     raw = _object(value, f"nodes[{index}]")
     if "pr" not in raw:
@@ -501,16 +552,14 @@ def _node(value: object, index: int) -> PlanNode:
         raise StackPlanError(
             f"unselected {label} must not carry decision or provenance"
         )
+    if not selected and "resolution" in raw:
+        raise StackPlanError(f"unselected {label} must not carry resolution")
     _keys(raw, _NODE_KEYS | present, _OPTIONAL_NODE_KEYS, label)
     parent = None if raw["parent"] is None else _pr(raw["parent"], f"{label}.parent")
     head = _object(raw["head"], f"{label}.head")
     _keys(head, _HEAD_KEYS, _NONE, f"{label}.head")
     fork: str | None = None
     if "fork" in raw:
-        if parent is None:
-            raise StackPlanError(
-                f"{label}.fork needs a parent; a trunk-based node has no fork boundary"
-            )
         fork = _oid(raw["fork"], f"{label}.fork")
     node = PlanNode(
         pr=pr,
@@ -525,7 +574,15 @@ def _node(value: object, index: int) -> PlanNode:
         provenance=(
             _provenance(raw["provenance"], f"{label}.provenance") if selected else None
         ),
+        resolution=_resolution(raw["resolution"], f"{label}.resolution")
+        if "resolution" in raw
+        else None,
     )
+    if node.resolution is not None and (
+        node.resolution.old_head != node.head_sha
+        or (node.fork is not None and node.resolution.fork != node.fork)
+    ):
+        raise StackPlanError(f"{label}.resolution contradicts its source fork/head")
     if node.fork == node.head_sha:
         raise StackPlanError(
             f"{label}.fork is its own head; a fork boundary must be an older commit"
@@ -599,6 +656,8 @@ def _node_json(node: PlanNode) -> dict[str, object]:
     }
     if node.fork is not None:
         row["fork"] = node.fork
+    if node.resolution is not None:
+        row["resolution"] = node.resolution.canonical()
     if node.decision is not None:
         row["decision"] = _decision_json(node.decision)
     if node.provenance is not None:
@@ -725,6 +784,26 @@ def journal_plan(journal: GraphJournal) -> StackPlan:
             raise ReceiptInputError(
                 f"graph journal node #{row.pr} fork contradicts the plan"
             )
+        if node.resolution is not None:
+            if journal.endpoint != "renewed":
+                raise ReceiptInputError(
+                    "reviewed resolution belongs only to source renewal"
+                )
+            if row.fork is not None and (row.fork, row.old_head) != (
+                node.resolution.fork,
+                node.resolution.old_head,
+            ):
+                raise ReceiptInputError(
+                    "reviewed resolution contradicts the captured source"
+                )
+            if row.promotion is not None and (
+                row.promotion.fork,
+                row.promotion.old_head,
+                row.promotion.landing,
+            ) != (node.resolution.fork, node.resolution.old_head, node.resolution.onto):
+                raise ReceiptInputError(
+                    "reviewed resolution contradicts the frozen replay"
+                )
     return plan
 
 
@@ -744,6 +823,8 @@ def resumed_plan(journal: GraphJournal, refreshed: StackPlan | None) -> StackPla
             "the stack plan contradicts the resumed graph run: "
             + "; ".join(differences)
         )
+    if journal.endpoint == "renewed" and frozen.identity != refreshed.identity:
+        raise StackPlanError("source renewal resume authority is immutable")
     return refreshed
 
 
@@ -1145,7 +1226,7 @@ def execute_graph(
     git: GitRepository,
     provider: GitHub,
     plan: StackPlan,
-    endpoint: Endpoint,
+    endpoint: GraphEndpoint,
     wait_timeout: float,
     store: Store,
     journal: GraphJournal | None = None,
@@ -1168,6 +1249,13 @@ def execute_graph(
         raise ValueError("the provider is not bound to the stack plan repository")
     if journal is not None:
         resumed_plan(journal, plan)
+    _require_graph_endpoint(plan, endpoint)
+    if endpoint == "renewed":
+        from source_renewal import RenewalRun
+
+        return RenewalRun(
+            git, provider, plan, endpoint, wait_timeout, store, journal, gates
+        ).run()
     return _GraphRun(
         git, provider, plan, endpoint, wait_timeout, store, journal, gates
     ).run()
@@ -1194,7 +1282,7 @@ class _GraphRun:
         git: GitRepository,
         provider: GitHub,
         plan: StackPlan,
-        endpoint: Endpoint,
+        endpoint: GraphEndpoint,
         wait_timeout: float,
         store: Store,
         journal: GraphJournal | None,
@@ -1203,9 +1291,9 @@ class _GraphRun:
         self.git = git
         self.provider = provider
         self.plan = plan
-        self.endpoint: Endpoint = endpoint
         self.store = store
         self.journal = journal
+        self.endpoint: GraphEndpoint = endpoint
         self.code = lifecycle.code_identity()
         self.deadline = time.monotonic() + wait_timeout
         self.prs: dict[int, PullRequest] = {}
@@ -1237,6 +1325,12 @@ class _GraphRun:
 
     def run(self) -> tuple[dict[str, object], int]:
         try:
+            if self.endpoint == "renewed" and self.native_owner:
+                raise _Stop(
+                    "BLOCKED",
+                    "native source renewal is unsupported",
+                    "retain the native stack unchanged",
+                )
             prs = self._observe()
             self._remote(self.plan.repo)
             owner = self._owner(prs)
@@ -1317,13 +1411,16 @@ class _GraphRun:
                 "the selection stopped being native while it was observed",
                 "resume this graph run to re-evaluate the current facts",
             )
+        endpoint = self.endpoint
+        if endpoint == "renewed":
+            raise StateError("source renewal cannot dispatch to the native owner")
         import native_stack
 
         owner = native_stack.NativeRun(
             self.git,
             self.provider,
             self.plan,
-            self.endpoint,
+            endpoint,
             0.0,
             self.store,
             self.journal,
@@ -1914,7 +2011,11 @@ class _GraphRun:
             slice_identity=saved.slice_identity,
         )
         try:
-            self.git.verify_promotion(proof)
+            reviewed = self._reviewed(self.plan.node(row.pr), fork, head, tip)
+            if reviewed:
+                self.git.verify_promotion(proof, reviewed=reviewed)
+            else:
+                self.git.verify_promotion(proof)
         except GitRefused:
             return None
         return proof
@@ -1937,19 +2038,42 @@ class _GraphRun:
             self.deadline += time.monotonic() - started
             self.provider.deadline = self.deadline
 
+    def _reviewed(
+        self, node: PlanNode, fork: str, head: str, tip: str
+    ) -> tuple[tuple[str, str], ...]:
+        resolution = node.resolution
+        if resolution is None:
+            return ()
+        if self.endpoint != "renewed" or (
+            resolution.fork,
+            resolution.old_head,
+            resolution.onto,
+        ) != (fork, head, tip):
+            raise _Stop(
+                "NEEDS_JUDGMENT",
+                f"#{node.pr} has stale reviewed resolution bindings",
+                "start a new run with the exact source slice and destination",
+            )
+        return resolution.commits
+
     def _prove(self, node: PlanNode, fork: str, head: str, tip: str) -> SliceProof:
-        """Replay and re-verify the slice ``fork..head`` onto ``tip``; never resolve."""
+        """Replay the exact source slice, admitting only explicitly bound conflict trees."""
         try:
-            proof = self.git.promote_slice(fork, head, tip)
-            self.git.verify_promotion(proof)
+            reviewed = self._reviewed(node, fork, head, tip)
+            if reviewed:
+                proof = self.git.promote_slice(fork, head, tip, reviewed=reviewed)
+                self.git.verify_promotion(proof, reviewed=reviewed)
+            else:
+                proof = self.git.promote_slice(fork, head, tip)
+                self.git.verify_promotion(proof)
         except GitRefused as error:
             # Also a configured or present commit signature: a plumbing replay
             # cannot sign, and the caller's signing is never disabled.
             raise _Stop(
                 "NEEDS_JUDGMENT",
                 f"#{node.pr} cannot be promoted onto {tip}: {_detail(error)}",
-                "resolve the child slice by hand (sync, split, sign or give its "
-                "explicit fork); nothing was rewritten",
+                "review the exact source slice, signing requirements and any "
+                "source-only conflict-tree evidence; nothing was pushed",
             ) from error
         return proof
 
@@ -2063,6 +2187,7 @@ class _GraphRun:
         with self.store.mutation_lock():
             self._require_clean(node.pr, "retargeted")
             self._unchanged(pr)
+            self._retarget_guard(node, pr)
             self._require_room(1)
             intent = self._intent(
                 "retarget", node.pr, f"pull/{node.pr}", (pr.base_ref, self.plan.trunk)
@@ -2085,6 +2210,9 @@ class _GraphRun:
             row.base_ref = self.plan.trunk
             self._resolve(intent, "CONFIRMED", self.plan.trunk)
             self.mutation_confirmed = True
+
+    def _retarget_guard(self, node: PlanNode, pr: PullRequest) -> None:
+        """Endpoint-specific destination guard, under the mutation lock."""
 
     # -- landing through the lifecycle owner -----------------------------------------
 
@@ -2126,6 +2254,9 @@ class _GraphRun:
         self, node: PlanNode, pr: PullRequest, receipt: Receipt | None, run_id: str
     ) -> str:
         """``COMPLETE``, or ``DEFERRED`` when only open dependents block cleanup."""
+        endpoint = self.endpoint
+        if endpoint == "renewed":
+            raise StateError("source renewal never dispatches the landing lifecycle")
         decision = node.decision
         if decision is None:
             raise StateError(f"selected #{node.pr} has no decision")
@@ -2142,7 +2273,7 @@ class _GraphRun:
             self.git,
             self.provider,
             node.pr,
-            self.endpoint,
+            endpoint,
             _bind(decision, pr, receipt),
             remaining,
             self.store,
@@ -2527,7 +2658,7 @@ def inspect_graph(
     git: GitRepository,
     provider: GitHub,
     plan: StackPlan,
-    endpoint: Endpoint,
+    endpoint: GraphEndpoint,
     *,
     journal: GraphJournal | None = None,
 ) -> dict[str, object]:
@@ -2546,7 +2677,12 @@ def inspect_graph(
     listed and the status stays ``PLANNED``. A native selection is previewed by
     the native stack owner (``native_stack.inspect_native``), equally write-free.
     """
+    _require_graph_endpoint(plan, endpoint)
     prs = {node.pr: provider.read_pr(node.pr) for node in plan.nodes}
+    if endpoint == "renewed":
+        from source_renewal import inspect_renewal
+
+        return inspect_renewal(git, provider, plan, journal, prs)
     if selection(plan, prs) == "native":
         import native_stack
 
@@ -2912,4 +3048,16 @@ class _Preview:
         observed = self.provider.observe(node.pr, assurance=decision.assurance)
         return asdict(
             lifecycle.evaluate(observed, decision.bound(pr.head_sha, pr.base_sha))
+        )
+
+
+def _require_graph_endpoint(plan: StackPlan, endpoint: GraphEndpoint) -> None:
+    if endpoint not in ("pr", "merged", "clean", "renewed"):
+        raise StackPlanError("unsupported graph endpoint")
+    if endpoint != "renewed" and any(
+        node.resolution is not None or (node.parent is None and node.fork is not None)
+        for node in plan.nodes
+    ):
+        raise StackPlanError(
+            "reviewed resolution and root fork are source-renewal-only inputs"
         )

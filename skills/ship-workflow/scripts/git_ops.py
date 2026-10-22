@@ -2230,16 +2230,24 @@ class GitRepository:
             parent = oid
         return tuple(commits)
 
-    def promote_slice(self, fork: str, head: str, landing: str) -> Promotion:
+    def promote_slice(
+        self,
+        fork: str,
+        head: str,
+        landing: str,
+        *,
+        reviewed: tuple[tuple[str, str], ...] = (),
+    ) -> Promotion:
         """Replay the child's own slice ``fork..head`` onto ``landing``.
 
         Execution only: it writes objects (merged trees and the replayed commits)
         into this repository; no ref, index, worktree or checkout changes and no
-        hook runs. The expected result is the clean three-way merge
-        ``base=fork, ours=landing, theirs=head``; a conflict refuses and is never
-        resolved. Each slice commit, oldest first, is replayed with plumbing
-        only: its tree is the clean three-way merge of the commit over its own
-        parent onto the replayed tip, and its new commit object is composed from
+        hook runs. Without ``reviewed`` the expected result is the clean aggregate
+        three-way tree ``base=fork, ours=landing, theirs=head``. ``reviewed``
+        contains ordered (original commit, approved tree) pairs only for actual
+        conflicting per-commit steps. Clean steps always retain their mechanically
+        proved trees; missing, extraneous or reordered approvals refuse the replay.
+        Each commit, oldest first, is replayed with plumbing. Its object preserves
         the original author, ``encoding`` header and message bytes (trailers and
         a missing trailing newline included) and written with ``git hash-object
         -t commit -w``, then read back and compared byte-for-byte. The committer
@@ -2278,33 +2286,45 @@ class GitRepository:
         if identity is None:
             raise GitRefused(f"the slice {start}..{old} has no net change")
         committer = self._committer_ident()
+        approvals = self._reviewed_trees(commits, reviewed)
         expected = self.three_way_tree(start, target, old)
-        if expected is None:
+        if expected is None and not approvals:
             raise GitRefused(
                 f"replaying {start}..{old} onto {target} is a conflict; "
                 "it is never resolved automatically"
             )
         tip = target
         tip_tree = self._tree_of(target)
+        used: list[str] = []
         for commit in commits:
             tree = self.three_way_tree(commit.parent, tip, commit.oid)
             if tree is None:
+                if commit.oid not in approvals:
+                    raise GitRefused(
+                        f"replaying {commit.oid} requires an explicitly reviewed tree"
+                    )
+                tree = approvals[commit.oid]
+                used.append(commit.oid)
+            elif commit.oid in approvals:
                 raise GitRefused(
-                    f"replaying {commit.oid} onto {tip} is a conflict; "
-                    "it is never resolved automatically"
+                    f"{commit.oid} has extraneous approval for a nonconflicting replay"
                 )
             if tree == tip_tree:
                 raise GitRefused(
-                    f"{commit.oid} would become empty on {target}; "
-                    "it is never dropped silently"
+                    f"{commit.oid} would become empty on {target}; it is never dropped silently"
                 )
             tip = self._replay(commit, tree, tip, committer)
             tip_tree = tree
         final_tree = self._tree_of(tip)
+        if used != list(approvals):
+            raise GitRefused(
+                "reviewed conflict trees are absent, extraneous or out of replay order"
+            )
+        if approvals:
+            expected = final_tree
         if final_tree != expected:
             raise GitRefused(
-                f"the replayed slice has the tree {final_tree}, not the clean "
-                f"three-way tree {expected}"
+                f"the replayed slice has tree {final_tree}, not the clean three-way tree {expected}"
             )
         if len(self._linear_chain(target, tip)) != len(commits):
             raise GitRefused(f"{target}..{tip} does not hold exactly the slice")
@@ -2318,7 +2338,12 @@ class GitRepository:
             slice_identity=identity,
         )
 
-    def verify_promotion(self, promotion: Promotion) -> None:
+    def verify_promotion(
+        self,
+        promotion: Promotion,
+        *,
+        reviewed: tuple[tuple[str, str], ...] = (),
+    ) -> None:
         """Re-prove a recorded promotion from its identities; refuse any mismatch.
 
         Read-only: nothing in this repository is written (the three-way tree is
@@ -2330,10 +2355,11 @@ class GitRepository:
         ``commits`` non-merge commits carrying, in order, exactly the author,
         ``encoding`` and message of the commits of ``fork..old_head`` (a usable
         slice, see :meth:`slice_commits`) and no signature or other header;
-        ``slice_identity`` is the net delta identity of ``fork..old_head``; and
-        the clean three-way merge of the recorded ``fork``/``landing``/
-        ``old_head`` is still ``expected_tree``. The recorded ``expected_tree``
-        and ``new_head`` are never trusted on their own.
+        ``slice_identity`` is the net delta identity of ``fork..old_head``.
+        Every per-commit tree is re-proved read-only; only actual conflicts may use
+        the supplied ordered ``reviewed`` trees. Without approvals, the clean
+        aggregate three-way tree must also equal ``expected_tree``. Recorded
+        output trees and heads alone are never authority for a replay.
         """
         if not isinstance(promotion, Promotion):
             raise GitRefused("a recorded promotion is required")
@@ -2369,6 +2395,9 @@ class GitRepository:
                 f"{landing}..{new} holds {len(replayed)} commit(s) and "
                 f"{fork}..{old} {len(originals)}, not the recorded {count}"
             )
+        approvals = self._reviewed_trees(originals, reviewed)
+        used: list[str] = []
+        replay_parent = landing
         for original, oid in zip(originals, replayed, strict=True):
             record = self._commit_record(oid)
             if record.signatures or record.unsupported:
@@ -2384,17 +2413,60 @@ class GitRepository:
                     f"{oid} does not carry the exact author and message of "
                     f"{original.oid}"
                 )
+            step_tree = self.preview_three_way(
+                original.parent, replay_parent, original.oid
+            )
+            if step_tree is None:
+                if original.oid not in approvals:
+                    raise GitRefused(f"{original.oid} has no reviewed conflict tree")
+                step_tree = approvals[original.oid]
+                used.append(original.oid)
+            elif original.oid in approvals:
+                raise GitRefused(
+                    f"{original.oid} has approval for a nonconflicting step"
+                )
+            if record.tree != step_tree or record.tree == self._tree_of(replay_parent):
+                raise GitRefused(
+                    f"{oid} does not preserve the proved nonempty replay step"
+                )
+            replay_parent = oid
+        if used != list(approvals):
+            raise GitRefused("reviewed conflict trees do not match replay order")
         identity = self._net_change_identity(fork, old)
         if identity != promotion.slice_identity:
             raise GitRefused(
                 f"the recorded slice identity does not match {fork}..{old}"
             )
-        recomputed = self.preview_three_way(fork, landing, old)
+        recomputed = (
+            expected if approvals else self.preview_three_way(fork, landing, old)
+        )
         if recomputed != expected:
             raise GitRefused(
                 f"the clean three-way tree of the recorded fork, landing and old "
                 f"head is {recomputed}, not the recorded {expected}"
             )
+
+    def _reviewed_trees(
+        self,
+        commits: tuple[SliceCommit, ...],
+        reviewed: tuple[tuple[str, str], ...],
+    ) -> dict[str, str]:
+        approvals: dict[str, str] = {}
+        originals = {commit.oid for commit in commits}
+        for old, tree in reviewed:
+            _require_oid(old, "reviewed original")
+            _require_oid(tree, "reviewed tree")
+            if old in approvals or old not in originals:
+                raise GitRefused(
+                    "reviewed originals must be unique members of the source slice"
+                )
+            kind = self.run("cat-file", "-t", tree, check=False)
+            if kind.returncode != 0 or kind.stdout.strip() != b"tree":
+                raise GitRefused(
+                    f"reviewed tree {tree} is not an available tree object"
+                )
+            approvals[old] = tree
+        return approvals
 
     def _linear_chain(self, start: str, tip: str) -> tuple[str, ...]:
         """Commits ``start..tip`` oldest first; refused unless one linear chain.

@@ -289,6 +289,40 @@ cases:
         target: "(migration|policy|NEEDS_JUDGMENT|pending|reconcil)"
         weight: 0.9
 
+  - id: source_only_renewal_after_external_ui_landings
+    prompt: "I merged the ancestor PRs in the UI; they still carry historical native-stack metadata. Renew existing manual PRs 88 and 89 onto main without merging or deleting anything. The root has reviewed EOF-addition conflicts; the child must stay on its open renewed parent. Preserve the old producer evidence and all human acceptance gates."
+    fixtures: []
+    rubric:
+      - "selects graph-only renewed authority rather than the observation-only pr endpoint or a merge-capable endpoint"
+      - "uses the registered controller, requested local gates and exact expected-old leases instead of hand-run rebases or lifecycle fallbacks"
+      - "requires exact-input reviewed resolution trees and proves historical ancestor landing reachability without rewriting provider metadata"
+      - "distinguishes already-merged unselected native ancestors as external landing evidence from unsupported native selected or unlanded source"
+      - "renews the parent first and preserves child-only commits, author/message/trailer bytes and existing PR identities"
+      - "reports source completion separately from current CI/review, actual evidence, human acceptance and landing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "--stack-plan[^\\n]*--until renewed|--until renewed[^\\n]*--stack-plan"
+        weight: 1.0
+      - type: matches_regex
+        target: "(resolution|reviewed).*(tree|fork|head|onto)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(reachable|reachability|ancestor|external)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?s)(adopt|evidence).{0,180}native|native.{0,180}(adopt|evidence)"
+        weight: 1.0
+      - type: not_contains
+        target: "--until merged"
+        weight: 1.0
+      - type: not_contains
+        target: "--until clean"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
   - id: deploy_to_prod
     prompt: "Deploy this to production"
     fixtures: []

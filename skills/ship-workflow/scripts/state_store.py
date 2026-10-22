@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, TypedDict, cast
 
 from github_ops import (
     ASSURANCES,
@@ -1063,6 +1063,30 @@ class NativeRecord:
         raise StateError(f"PR #{pr} is not a recorded native stack member")
 
 
+class RenewalCompletion(TypedDict):
+    """Confirmed source identity and destination of one renewed selected PR."""
+
+    pr: int
+    head: str
+    base: str
+    onto: str
+
+
+class RenewalAncestor(TypedDict):
+    """Exact external landing observed and proved reachable from trunk."""
+
+    pr: int
+    head: str
+    base: str
+    merge: str
+    trunk: str
+
+
+class RenewalEvidence(TypedDict):
+    completed: list[RenewalCompletion]
+    ancestors: list[RenewalAncestor]
+
+
 @dataclass
 class GraphJournal:
     """The master journal of one stack-graph run; per-node receipts stay separate.
@@ -1092,6 +1116,7 @@ class GraphJournal:
     native: NativeRecord | None = None
     assurance: str | None = "routine"
     gates: dict[str, object] | None = None
+    renewal: RenewalEvidence | None = None
     kind: Literal["stack-graph"] = "stack-graph"
 
     def node(self, pr: int) -> GraphNode:
@@ -1104,6 +1129,8 @@ class GraphJournal:
         payload = asdict(self)
         if self.native is None:
             del payload["native"]
+        if self.renewal is None:
+            del payload["renewal"]
         return {"schema_version": GRAPH_SCHEMA_VERSION, **payload}
 
     @classmethod
@@ -1128,8 +1155,10 @@ class GraphJournal:
                 "assurance": None,
                 "gates": None,
             }
-        manual = set(cls.__dataclass_fields__) - {"native"} | {"schema_version"}
-        if set(raw) - {"native"} != manual:
+        manual = set(cls.__dataclass_fields__) - {"native", "renewal"} | {
+            "schema_version"
+        }
+        if set(raw) - {"native", "renewal"} != manual:
             raise ReceiptInputError("graph journal fields are missing or unsupported")
         assurance = raw["assurance"]
         if assurance is not None and assurance not in ASSURANCES:
@@ -1145,7 +1174,7 @@ class GraphJournal:
             raise ReceiptInputError("invalid graph provider namespace")
         endpoint = _text(raw["endpoint"], "graph endpoint")
         status = _text(raw["status"], "graph status")
-        if endpoint not in _ENDPOINTS or status not in _STATUSES:
+        if endpoint not in (_ENDPOINTS | {"renewed"}) or status not in _STATUSES:
             raise ReceiptInputError("unsupported graph endpoint or status")
         plan = _object(raw["plan"], "graph plan")
         _json_value(plan)
@@ -1178,11 +1207,13 @@ class GraphJournal:
             native=_native_record(raw["native"]) if "native" in raw else None,
             assurance=assurance,
             gates=gates,
+            renewal=_renewal(raw["renewal"]) if "renewal" in raw else None,
         )
         _check_graph_nodes(journal)
         _check_graph_intents(journal)
         _check_graph_completion(journal)
         _check_graph_native(journal)
+        _check_graph_renewal(journal)
         return journal
 
 
@@ -1260,8 +1291,8 @@ def _graph_node(value: object) -> GraphNode:
         raise ReceiptInputError(f"{label} records fork, old head and time together")
     fork = _optional_oid(raw["fork"], f"{label} fork")
     old_head = _optional_oid(raw["old_head"], f"{label} old head")
-    if fork is not None and (parent is None or fork == old_head):
-        raise ReceiptInputError(f"{label} fork needs a parent and a nonempty slice")
+    if fork is not None and fork == old_head:
+        raise ReceiptInputError(f"{label} fork needs a nonempty slice")
     decision = _optional_digest(raw["decision_identity"], f"{label} decision")
     run_id = (
         None
@@ -1418,7 +1449,7 @@ def _check_graph_intents(journal: GraphJournal) -> None:
                 raise ReceiptInputError(f"{label}: a node has one confirmed capture")
             captured.add(intent.pr)
         parent = None if node.parent is None else nodes[node.parent]
-        _check_intent_node(journal.trunk, node, parent, intent, label)
+        _check_intent_node(journal.trunk, node, parent, intent, label, journal.endpoint)
     for node in journal.nodes:
         if node.fork is not None and node.pr not in captured:
             raise ReceiptInputError(
@@ -1432,7 +1463,7 @@ def _check_graph_intents(journal: GraphJournal) -> None:
 
 def _check_graph_completion(journal: GraphJournal) -> None:
     """A landing endpoint completes only once every selected node has landed."""
-    if journal.status != "COMPLETE" or journal.endpoint == "pr":
+    if journal.status != "COMPLETE" or journal.endpoint in ("pr", "renewed"):
         return
     for node in journal.nodes:
         if node.selected and node.state != "LANDED":
@@ -1448,9 +1479,10 @@ def _check_intent_node(
     parent: GraphNode | None,
     intent: GraphIntent,
     label: str,
+    endpoint: str,
 ) -> None:
     if intent.kind == "capture":
-        if parent is None:
+        if parent is None and endpoint != "renewed":
             raise ReceiptInputError(f"{label} captures a fork of a trunk-based node")
         # A capture records observed facts before the parent changes; it is never
         # dispatched, so it has no unknown or refused outcome.
@@ -1459,9 +1491,11 @@ def _check_intent_node(
         if (intent.expected_old, intent.new) != (node.old_head, node.fork):
             raise ReceiptInputError(f"{label} is not the node's recorded capture")
         return
-    if not node.selected or parent is None:
-        raise ReceiptInputError(f"{label} mutates only a selected child node")
+    if not node.selected or (parent is None and endpoint != "renewed"):
+        raise ReceiptInputError(f"{label} mutates only an authorized selected source")
     if intent.kind == "retarget":
+        if parent is None:
+            raise ReceiptInputError(f"{label} cannot retarget a trunk-based source")
         if intent.new != trunk:
             raise ReceiptInputError(f"{label} must retarget onto the trunk")
         if intent.expected_old != parent.head_ref:
@@ -1980,3 +2014,162 @@ class Store:
                 fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)
+
+
+def _renewal_rows(
+    value: object, fields: set[str]
+) -> Iterator[tuple[int, dict[str, object]]]:
+    if not isinstance(value, list) or len(value) > _GRAPH_MAX_NODES:
+        raise ReceiptInputError("source renewal evidence must be a bounded list")
+    seen: set[int] = set()
+    for entry in value:
+        row = _object(entry, "source renewal evidence")
+        if set(row) != fields:
+            raise ReceiptInputError(
+                "source renewal evidence fields are missing or unsupported"
+            )
+        pr = _pr_number(row["pr"], "source renewal PR")
+        if pr in seen:
+            raise ReceiptInputError("source renewal evidence repeats a PR")
+        seen.add(pr)
+        yield pr, row
+
+
+def _renewal(value: object) -> RenewalEvidence:
+    raw = _object(value, "source renewal")
+    if set(raw) != {"completed", "ancestors"}:
+        raise ReceiptInputError("source renewal fields are missing or unsupported")
+    completed: list[RenewalCompletion] = [
+        {
+            "pr": pr,
+            "base": validate_branch(row["base"], "source renewal base"),
+            "head": _oid(row["head"], "source renewal head"),
+            "onto": _oid(row["onto"], "source renewal onto"),
+        }
+        for pr, row in _renewal_rows(raw["completed"], {"pr", "head", "base", "onto"})
+    ]
+    ancestors: list[RenewalAncestor] = [
+        {
+            "pr": pr,
+            "base": validate_branch(row["base"], "source renewal base"),
+            "head": _oid(row["head"], "source renewal head"),
+            "merge": _oid(row["merge"], "source renewal merge"),
+            "trunk": _oid(row["trunk"], "source renewal trunk"),
+        }
+        for pr, row in _renewal_rows(
+            raw["ancestors"], {"pr", "head", "base", "merge", "trunk"}
+        )
+    ]
+    return {"completed": completed, "ancestors": ancestors}
+
+
+def _check_graph_renewal(journal: GraphJournal) -> None:
+    if journal.endpoint != "renewed":
+        if journal.renewal is not None:
+            raise ReceiptInputError("only source renewal owns renewal evidence")
+        if any(node.parent is None and node.fork is not None for node in journal.nodes):
+            raise ReceiptInputError("only source renewal captures a root slice")
+        return
+    if journal.native is not None or any(
+        node.run_id is not None or node.state == "LANDED" for node in journal.nodes
+    ):
+        raise ReceiptInputError(
+            "source renewal never owns native or lifecycle landing state"
+        )
+    from graph import journal_plan
+
+    plan = journal_plan(journal)
+    for node in journal.nodes:
+        original = plan.node(node.pr)
+        confirmed = [
+            intent
+            for intent in journal.intents
+            if intent.pr == node.pr and intent.outcome == "CONFIRMED"
+        ]
+        if node.old_head is not None and node.old_head != original.head_sha:
+            raise ReceiptInputError(
+                "source capture must preserve the original packet head"
+            )
+        if node.head_sha != original.head_sha and not any(
+            intent.kind == "rewrite-push" and intent.new == node.head_sha
+            for intent in confirmed
+        ):
+            raise ReceiptInputError(
+                "changed source head requires its confirmed guarded push"
+            )
+        if node.base_ref != original.base_ref and not any(
+            intent.kind == "retarget" and intent.new == node.base_ref
+            for intent in confirmed
+        ):
+            raise ReceiptInputError(
+                "changed source base requires its confirmed retarget"
+            )
+        if not node.selected and (
+            node.fork is not None
+            or any(intent.pr == node.pr for intent in journal.intents)
+        ):
+            raise ReceiptInputError(
+                "external ancestors are observations, never this run's mutations"
+            )
+    evidence = journal.renewal
+    if evidence is None:
+        if journal.status == "COMPLETE":
+            raise ReceiptInputError("complete source renewal requires source evidence")
+        return
+    selected = {node.pr for node in plan.selected_nodes()}
+    ancestors = {
+        ancestor
+        for node in plan.selected_nodes()
+        for ancestor in plan.unselected_ancestors(node.pr)
+    }
+    adopted = {row["pr"] for row in evidence["ancestors"]}
+    for observed in evidence["ancestors"]:
+        number = observed["pr"]
+        if number not in ancestors:
+            raise ReceiptInputError(
+                "external adoption must name an unselected ancestor"
+            )
+        original = plan.node(number)
+        if (observed["head"], observed["base"]) != (
+            original.head_sha,
+            original.base_ref,
+        ):
+            raise ReceiptInputError(
+                "external adoption contradicts original source identity"
+            )
+    completed: set[int] = set()
+    for completion in evidence["completed"]:
+        number = completion["pr"]
+        if number not in selected:
+            raise ReceiptInputError("source completion must name a selected node")
+        node = journal.node(number)
+        if (completion["head"], completion["base"]) != (node.head_sha, node.base_ref):
+            raise ReceiptInputError(
+                "source completion contradicts confirmed node identity"
+            )
+        if node.parent is not None and node.parent in selected:
+            parent = journal.node(node.parent)
+            if node.parent not in completed or (
+                completion["onto"],
+                completion["base"],
+            ) != (
+                parent.head_sha,
+                parent.head_ref,
+            ):
+                raise ReceiptInputError(
+                    "source completion must follow its renewed open parent"
+                )
+        elif completion["base"] != journal.trunk:
+            raise ReceiptInputError(
+                "source completion after an external landing must target trunk"
+            )
+        if node.promotion is not None and (
+            node.promotion.landing,
+            node.promotion.new_head,
+        ) != (completion["onto"], completion["head"]):
+            raise ReceiptInputError("source completion contradicts frozen replay proof")
+        completed.add(number)
+    if journal.status == "COMPLETE" and (completed != selected or adopted != ancestors):
+        raise ReceiptInputError(
+            "complete source renewal requires every selected source and external ancestor"
+        )
