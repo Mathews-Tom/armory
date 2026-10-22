@@ -34,6 +34,216 @@ def _tree(root: Path) -> dict[str, bytes]:
     }
 
 
+@pytest.mark.parametrize(
+    ("parameter", "body", "permission"),
+    [
+        pytest.param("api", 'await api.fs.read("file");', "fs.read", id="renamed-api"),
+        pytest.param(
+            "api",
+            'const root = api; await root.fs.list(".");',
+            "fs.read",
+            id="root-alias",
+        ),
+        pytest.param(
+            "api",
+            'const fs = api.fs; await fs.exists("file");',
+            "fs.read",
+            id="namespace-alias",
+        ),
+        pytest.param(
+            "api",
+            'const run = api.process.run; await run("tool");',
+            "process.spawn",
+            id="method-alias",
+        ),
+        pytest.param(
+            "api",
+            'const { fs } = api; await fs.stat("file");',
+            "fs.read",
+            id="root-destructure",
+        ),
+        pytest.param(
+            "api",
+            'const { read: load } = api.fs; await load("file");',
+            "fs.read",
+            id="method-destructure",
+        ),
+        pytest.param(
+            "api",
+            'const { process: { spawn: launch } } = api; await launch("tool");',
+            "process.spawn",
+            id="nested-destructure",
+        ),
+        pytest.param(
+            "{ http: { fetch: request } }",
+            'await request("https://example.invalid");',
+            "network",
+            id="parameter-destructure",
+        ),
+        pytest.param(
+            "api",
+            'await api?.fs?.ancestors?.("file");',
+            "fs.read",
+            id="optional-static-read",
+        ),
+        pytest.param(
+            "api",
+            'await api.fs?.write?.("file", "value");',
+            "fs.write",
+            id="optional-static-write",
+        ),
+        pytest.param(
+            "api",
+            'await api.http.fetch("https://example.invalid");',
+            "network",
+            id="renamed-network",
+        ),
+        pytest.param(
+            "$", 'await $.process.run("tool");', "process.spawn", id="literal-control"
+        ),
+    ],
+)
+def test_claude_bound_effects_require_and_accept_declared_permissions(
+    parameter: str, body: str, permission: str, feature: Path, tmp_path: Path
+) -> None:
+    source = (
+        "export function register(onHook) {\n"
+        f'  onHook("session.start", async ({parameter}, event, next) => {{\n'
+        f"    {body}\n"
+        "    return next(event);\n"
+        "  });\n"
+        "}\n"
+    )
+    (feature / "claude-code/register.ts").write_text(source)
+    output = tmp_path / "output"
+    with pytest.raises(builder.BuildError, match=rf"does not declare '{permission}'"):
+        builder.build_feature(feature, output)
+    assert not (output / "extensions" / NAME / "claude").exists()
+    assert not (output / "extensions" / NAME / "omp").exists()
+
+    metadata = feature / "EXTENSION.md"
+    metadata.write_text(
+        metadata.read_text().replace("permissions: []", f"permissions: [{permission}]")
+    )
+    artifacts = builder.build_feature(feature, output)
+    manifest = builder.verify_artifact_dir(artifacts["claude"])
+    assert manifest["permissions"] == [permission]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            'const note = "$.process.run() $.fs.write() $.http.fetch()"; // $.fs.read()\nvoid note;',
+            id="inert-text",
+        ),
+        pytest.param(
+            "const other = { process: { run() { return 7; } } }; other.process.run();",
+            id="unrelated-object",
+        ),
+        pytest.param(
+            "{ const api = { fs: { read() { return 7; } } }; api.fs.read(); }",
+            id="shadowed-root",
+        ),
+        pytest.param(
+            "function local($) { $.process.run(); } local({ process: { run() { return 7; } } });",
+            id="shadowed-dollar-parameter",
+        ),
+        pytest.param(
+            "const fs = api.fs; { const fs = { write() { return 7; } }; fs.write(); }",
+            id="shadowed-namespace",
+        ),
+        pytest.param(
+            "function identity() { return arguments[0]; } identity(7);",
+            id="nested-own-arguments",
+        ),
+        pytest.param(
+            "function identity() { const read = () => arguments[0]; return read(); } identity(7);",
+            id="nested-arrow-own-arguments",
+        ),
+    ],
+)
+def test_claude_non_effects_build_without_permissions(
+    body: str, feature: Path, tmp_path: Path
+) -> None:
+    source = (
+        "export function register(on) {\n"
+        f'  on("session.start", async (api, event, next) => {{ {body}\n'
+        "    return next(event);\n"
+        "  });\n"
+        "}\n"
+    )
+    (feature / "claude-code/register.ts").write_text(source)
+    artifacts = builder.build_feature(feature, tmp_path / "output")
+    manifest = builder.verify_artifact_dir(artifacts["claude"])
+    assert manifest["permissions"] == []
+
+
+@pytest.mark.parametrize(
+    ("preamble", "body"),
+    [
+        pytest.param("", 'await api["process"].run("tool");', id="computed-namespace"),
+        pytest.param("", 'await api.process["run"]("tool");', id="computed-method"),
+        pytest.param(
+            "", 'const key = "fs"; await api[key].read("file");', id="dynamic-namespace"
+        ),
+        pytest.param(
+            "function consume(value) { return value; }\n",
+            "consume(api);",
+            id="local-api-transfer",
+        ),
+        pytest.param(
+            'import { countWords } from "../core/index.ts";\n',
+            "countWords(api);",
+            id="pure-import-api-transfer",
+        ),
+        pytest.param(
+            "function consume(value) { return value; }\n",
+            "consume(api.fs);",
+            id="namespace-transfer",
+        ),
+        pytest.param(
+            "function consume(value) { return value; }\n",
+            "consume(api.process.run);",
+            id="method-transfer",
+        ),
+        pytest.param("", "return api;", id="returned-api"),
+        pytest.param("", "const holder = { api }; void holder;", id="stored-api"),
+        pytest.param(
+            "",
+            "let alias; alias = api; await alias.process.run('tool');",
+            id="dynamic-alias-transfer",
+        ),
+        pytest.param(
+            "",
+            "const read = () => arguments[0]; read();",
+            id="arrow-inherited-injected-arguments",
+        ),
+    ],
+)
+def test_claude_unresolved_api_access_is_rejected_even_with_all_permissions(
+    preamble: str, body: str, feature: Path, tmp_path: Path
+) -> None:
+    (feature / "claude-code/register.ts").write_text(
+        preamble
+        + "export function register(on) {\n"
+        + f'  on("session.start", async (api) => {{ {body} }});\n'
+        + "}\n"
+    )
+    metadata = feature / "EXTENSION.md"
+    metadata.write_text(
+        metadata.read_text().replace(
+            "permissions: []",
+            "permissions: [fs.read, fs.write, process.spawn, network]",
+        )
+    )
+    output = tmp_path / "output"
+    with pytest.raises(builder.BuildError, match="claude artifact"):
+        builder.build_feature(feature, output)
+    assert not (output / "extensions" / NAME / "claude").exists()
+    assert not (output / "extensions" / NAME / "omp").exists()
+
+
 @pytest.mark.parametrize("transitive", [False, True])
 def test_outside_json_never_enters_helper_bundle(
     transitive: bool, feature: Path, tmp_path: Path

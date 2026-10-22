@@ -280,13 +280,6 @@ def _write(path: Path, text: str) -> None:
             id="dynamic-import",
         ),
         pytest.param(
-            lambda f: _write(
-                f / "claude-code" / "run.ts",
-                "export const go = async ($) => $.process.run({});\n",
-            ),
-            id="undeclared-process-effect",
-        ),
-        pytest.param(
             lambda f: _write(f / "claude-code" / "hooks.json", "{}\n"),
             id="generated-file-collision",
         ),

@@ -63,19 +63,6 @@ _FORBIDDEN_FILE = re.compile(
 _OS_NOISE = frozenset({".DS_Store"})
 
 
-# Effects a Claude mod reaches through `$`, mapped to the permission each needs.
-_CLAUDE_EFFECTS: tuple[tuple[re.Pattern[str], str, str], ...] = (
-    (re.compile(r"\$\.fs\.write\b"), "fs.write", "$.fs.write"),
-    (
-        re.compile(r"\$\.fs\.(?:read|list|exists|stat|ancestors)\b"),
-        "fs.read",
-        "$.fs reads",
-    ),
-    (re.compile(r"\$\.process\.(?:run|spawn)\b"), "process.spawn", "$.process"),
-    (re.compile(r"\$\.http\.fetch\b"), "network", "$.http.fetch"),
-)
-
-
 class BuildError(RuntimeError):
     """A native extension artifact cannot be built from its declared inputs."""
 
@@ -389,17 +376,24 @@ def check_artifact_imports(files: dict[str, bytes], host: str) -> None:
 def check_claude_permissions(
     files: dict[str, bytes], permissions: tuple[str, ...]
 ) -> None:
-    """Refuse a Claude mod whose explicit `$` effects exceed declared permissions."""
-    for path in sorted(files):
-        if not path.startswith(f"{CLAUDE_HOOKS_DIR}/") or not path.endswith(
-            _SCRIPT_SUFFIXES
-        ):
-            continue
-        text = files[path].decode("utf-8")
-        for pattern, permission, label in _CLAUDE_EFFECTS:
-            if permission not in permissions and pattern.search(text):
+    """Refuse undeclared bound API effects and unresolved capability transfers."""
+    hooks = {
+        path: data
+        for path, data in files.items()
+        if path.startswith(f"{CLAUDE_HOOKS_DIR}/") and path.endswith(_SCRIPT_SUFFIXES)
+    }
+    for path, analysis in sorted(_analyze_sources(hooks).items()):
+        claude = analysis["claude"]
+        if claude["forbidden"]:
+            raise BuildError(
+                f"claude artifact: {path} uses unsupported Claude API bindings: "
+                f"{'; '.join(claude['forbidden'])}"
+            )
+        for effect in claude["effects"]:
+            permission = effect["permission"]
+            if permission not in permissions:
                 raise BuildError(
-                    f"claude artifact: {path} uses {label} but extension.permissions "
+                    f"claude artifact: {path} uses {effect['label']} but extension.permissions "
                     f"does not declare '{permission}'"
                 )
 
