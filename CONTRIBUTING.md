@@ -168,6 +168,9 @@ name: my-extension
 description: Use when ... (what the native commands do, on which hosts).
 metadata:
   version: 1.0.0
+  category: workflow
+  tags: [native, extension, workflow]
+  difficulty: intermediate
 extension:
   schema_version: 1
   runtime: bun
@@ -192,6 +195,8 @@ extension:
 Unknown keys are refused, including any minimum-host-version claim; `tested` records exact exercised versions and surfaces, never a compatibility floor.
 
 Helper entrypoints must be `.ts` files directly under `helpers/` or `runner/`, with unique filename stems. Their static dependency graph may use `core/`, `helpers/` and `runner/` only; every included file is checked before Bun receives immutable snapshots. Claude modules may statically import only `hooks/` modules and the pure `core/`; executable helpers must run through explicit host process effects. Import syntax is parsed with the pinned TypeScript compiler rather than matched with line-oriented regular expressions. Generated-output ancestors must remain real directories, and a rebuild refuses modified or foreign artifact files rather than deleting them. Publishing both host artifacts retains the previous pair for rollback; this is not a crash-atomic multi-directory filesystem transaction. A failed restoration preserves its recovery trees and reports their location; an unexpected occupied destination, including an empty directory, is retained rather than overwritten during rollback.
+
+Claude permission checks follow the registered hook callback's API binding rather than its spelling. Local aliases, object destructuring and static dot/optional access are resolved with lexical shadowing. Computed API access, API escapes into other functions or nested closures, unresolved callback registration and mutation of tracked API/callback bindings are refused. Keep callback references local and statically resolvable. This is bounded static auditing of trusted code, not a sandbox or native-host compatibility proof.
 
 
 - **Build:** `uv run python scripts/build_extensions.py --feature <name> --output-dir <path>` writes `<path>/extensions/<name>/omp/` (`package.json` with `omp.extensions`) and `<path>/extensions/<name>/claude/` (`.claude-plugin/plugin.json`, `hooks/hooks.json`, static relative modules). Each artifact carries its adapter, the exact core, bundled helpers, `LICENSE` and an `armory-extension.json` content manifest with feature/core/schema identity, entrypoints, commands, storage, permissions and file digests. Symlinks, special files, hidden files, secret/data-shaped files, test-only files, bare imports outside host type packages, dynamic imports and Claude `$` effects without a declared permission fail the build. Identical sources build to identical bytes in any output root; output inside canonical source is refused.
