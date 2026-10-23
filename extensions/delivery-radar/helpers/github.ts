@@ -40,6 +40,12 @@ function url(value: unknown): string | null {
   const result = text(value);
   try { const parsed = new URL(result); return parsed.protocol === "https:" && !parsed.username && !parsed.password ? result : malformed(); } catch { return malformed(); }
 }
+function displayUrl(value: unknown): string | null {
+  try { return url(value); } catch (error) {
+    if (error instanceof ReadFailure && error.status === "malformed") return null;
+    throw error;
+  }
+}
 function member<T extends string>(value: unknown, values: readonly T[]): T { return typeof value === "string" && values.includes(value as T) ? value as T : malformed(); }
 function source<T>(reference: string, binding: Binding | null, status: SourceStatus, value: T | null, diagnostic: string | null = null): Source<T> {
   return { reference, binding, status, value, diagnostic, observedAt: Date.now() };
@@ -221,7 +227,7 @@ async function checks(reader: Reader, repository: string, headOid: string): Prom
     // A check-suite's PR base association is mutable; it is not an attestation
     // that this run actually tested that base. Never promote it to testedBaseOid.
     if (oid(value.head_sha) !== headOid) return malformed();
-    return { id: `check:${integer(value.id)}`, context: text(value.name), publisherId: integer(object(value.app).id), state: checkState(value.status, value.conclusion), headOid, testedBaseOid: null, url: url(value.html_url), completedAt: timestamp(value.completed_at) };
+    return { id: `check:${integer(value.id)}`, context: text(value.name), publisherId: integer(object(value.app).id), state: checkState(value.status, value.conclusion), headOid, testedBaseOid: null, url: displayUrl(value.html_url), completedAt: timestamp(value.completed_at) };
   });
   // The REST status list is newest-first. Keep the current value of each legacy
   // context; a status creator's user id is NOT a GitHub App publisher id.
@@ -232,7 +238,7 @@ async function checks(reader: Reader, repository: string, headOid: string): Prom
     const state = member(value.state, ["error", "failure", "pending", "success"]);
     const id = integer(value.id);
     const completedAt = timestamp(value.updated_at);
-    const target = url(value.target_url);
+    const target = displayUrl(value.target_url);
     if (!contexts.has(context)) {
       contexts.add(context);
       results.push({ id: `status:${id}`, context, publisherId: null, state: state === "success" ? "passed" : state === "pending" ? "pending" : "failed", headOid, testedBaseOid: null, url: target, completedAt });

@@ -18,6 +18,8 @@ interface Scenario {
   drift?: "head" | "base" | "viewer";
   policy?: "missing" | "none" | "unsupported" | "rules-unavailable" | "malformed" | "paginated" | "requirements" | "signatures";
   checks?: "pending" | "rate-limited" | "unavailable" | "malformed" | "paginated";
+  checkUrl?: string;
+  statusUrl?: string;
   pagination?: "reviews" | "threads" | "statuses" | "budget" | "broken";
   graphql?: "rate-limited" | "permission" | "malformed-review";
   cancel?: boolean;
@@ -142,14 +144,14 @@ async function scenario(config: Scenario = {}) {
         const second = path.searchParams.get("page") === "2";
         return { body: { total_count: 101, check_runs: second ? [check(101)] : Array.from({ length: 100 }, (_, index) => check(index + 1)) } };
       }
-      return { body: { total_count: 1, check_runs: [check(1, config.checks === "pending")] } };
+      return { body: { total_count: 1, check_runs: [{ ...check(1, config.checks === "pending"), html_url: config.checkUrl ?? check(1).html_url }] } };
     }
     if (path.pathname.endsWith("/statuses")) {
       if (config.pagination === "statuses") {
         const first = path.searchParams.get("page") === "1";
         return { body: first ? Array.from({ length: 100 }, (_, index) => ({ id: 900 + index, context: `legacy-${index}`, state: "success", updated_at: API_DATE, target_url: null })) : [{ id: 1001, context: "last-status", state: "pending", updated_at: API_DATE, target_url: null }] };
       }
-      return { body: [{ id: 900, context: "legacy", state: "success", updated_at: API_DATE, target_url: null, creator: { id: 15368 } }] };
+      return { body: [{ id: 900, context: "legacy", state: "success", updated_at: API_DATE, target_url: config.statusUrl ?? null, creator: { id: 15368 } }] };
     }
     if (path.pathname === "/repos/acme/widget/branches/main") return { body: { protected: config.policy !== "none" } };
     if (path.pathname.endsWith("/protection")) {
@@ -309,6 +311,19 @@ test("fully paginates legacy statuses and preserves a final pending context", as
   expect(checks.value?.at(-1)?.context).toBe("last-status");
   expect(checks.value?.at(-1)?.state).toBe("pending");
 });
+for (const unsafe of ["not a URL", "http://ci.example/run/7", "https://user:private@ci.example/run/7"]) {
+  test(`display-only URLs do not discard independent check evidence: ${unsafe.split(":")[0]}`, async () => {
+    const { observation } = await scenario({ checkUrl: unsafe, statusUrl: unsafe });
+    const checks = firstPull(observation).checks;
+    expect(checks.status).toBe("available");
+    expect(checks.value?.map(({ id, state, url }) => ({ id, state, url }))).toEqual([
+      { id: "check:1", state: "passed", url: null },
+      { id: "status:900", state: "passed", url: null },
+    ]);
+    expect(checks.value?.[0]?.publisherId).toBe(15368);
+    expect(checks.value?.[1]?.publisherId).toBeNull();
+  });
+}
 for (const checks of ["pending", "rate-limited", "unavailable", "malformed"] as const) {
   test(`retains ${checks} check evidence without fabricated success`, async () => {
     const { observation } = await scenario({ checks }); const value = firstPull(observation).checks;
