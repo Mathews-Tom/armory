@@ -2683,6 +2683,18 @@ packages:
     category: operations
     difficulty: beginner
   extensions:
+  - name: resume-brief
+    version: 1.0.0
+    description: Record and reopen a freshness-checked resume card for an explicitly selected project in OMP and Claude Code,
+      reporting source-linked branch, plan, blocker, session and approval discrepancies without executing or authorizing anything.
+    path: extensions/resume-brief
+    source: https://github.com/Mathews-Tom/armory/blob/main/extensions/resume-brief/EXTENSION.md
+    hosts:
+    - claude
+    - omp
+    runtime: bun
+    commands:
+    - armory-brief
   - name: verification-receipts
     version: 1.0.0
     description: Execute explicitly configured local verification gates and reopen private, scoped evidence with current input

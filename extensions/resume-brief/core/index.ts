@@ -6,7 +6,7 @@ export const FEATURE_VERSION = "1.0.0" as const;
 export const CORE_VERSION = "1.0.0" as const;
 export const CONTEXT_SCHEMA = "armory.resume-brief.context/v1" as const;
 export const BLOCKERS_SCHEMA = "armory.resume-brief.blockers/v1" as const;
-export const SNAPSHOT_SCHEMA = "armory.resume-brief.snapshot/v1" as const;
+export const SNAPSHOT_SCHEMA = "armory.resume-brief.snapshot/v2" as const;
 export const OMP_SESSION_VERSION = 3 as const;
 
 export const LIMITS = {
@@ -29,7 +29,10 @@ export interface Context {
   sessionId: string;
 }
 
-export type SourceRole = "context" | "plan" | "blockers" | "receipt" | "omp-session" | "omp-handoff";
+export type SourceRole = "context" | "plan" | "blockers" | "receipt" | "omp-session" | "omp-handoff" | "claude-session";
+
+/** `$.session.messages()` returns at most this many newest rows, never a complete total. */
+export const CLAUDE_MESSAGE_WINDOW = 4096 as const;
 
 /** Why a source fact is not known. A source is never silently treated as current. */
 export type SourceStatus =
@@ -139,6 +142,35 @@ export interface OmpHandoffObservation {
   generatedAt: string | null;
 }
 
+/**
+ * Feature-owned projection of the current Claude Code session, derived from
+ * the host API at invocation time. It is not a native file format: only
+ * identity, locations and bounded counts are kept, never message text, tool
+ * input or tool results.
+ */
+export interface ClaudeSessionProjection {
+  sessionId: string;
+  cwd: string;
+  root: string;
+  /** `$.session.usage().startedAt`; null when the host did not answer. */
+  startedAtMs: number | null;
+  /** `$.session.turns()`; null when the host did not answer. */
+  turns: number | null;
+  /** Rows returned by `$.session.messages()`, at most CLAUDE_MESSAGE_WINDOW. */
+  observedMessages: number;
+  /** False when the window was full, so earlier rows were not observed. */
+  messagesComplete: boolean;
+  lastRole: "user" | "assistant" | null;
+  /** Tool uses among the observed rows only. */
+  toolUses: number;
+}
+
+export interface ClaudeSessionObservation extends ClaudeSessionProjection {
+  /** Canonical forms supplied by the helper when they resolve; null otherwise. */
+  cwdResolved: string | null;
+  rootResolved: string | null;
+}
+
 /** Everything a helper observed at one moment. Unknown facts are null plus a source status. */
 export interface Observations {
   observedAtMs: number;
@@ -150,6 +182,7 @@ export interface Observations {
   receipt: ReceiptReference | null;
   ompSession: OmpSessionObservation | null;
   ompHandoff: OmpHandoffObservation | null;
+  claudeSession: ClaudeSessionObservation | null;
 }
 
 export type HoldStatus = "expired" | "unexpired-hold" | "no-expiry-hold" | "not-yet-valid";
@@ -210,6 +243,18 @@ export interface Card {
     entryCount: number | null;
     lastEntryAt: string | null;
     handoffGeneratedAt: string | null;
+  };
+  claudeSession: {
+    kind: "claude-session" | null;
+    id: string | null;
+    cwdMatchesWorktree: boolean | null;
+    rootMatchesWorktree: boolean | null;
+    startedAtMs: number | null;
+    turns: number | null;
+    observedMessages: number | null;
+    messagesComplete: boolean | null;
+    lastRole: ClaudeSessionProjection["lastRole"];
+    toolUses: number | null;
   };
   approvals: ApprovalHold[];
   sources: SourceIdentity[];

@@ -1,10 +1,10 @@
-# Resume Brief (development prefix)
+# Resume Brief 1.0.0
 
-A standalone CLI that records a freshness-checked brief for one explicitly selected Git worktree and, when reopened, reports exactly which branch, plan, blocker, verification, session and approval facts changed since recording, each linked to the source it came from. This prefix contains the pure shared core and the bounded helper CLI only. It has no OMP or Claude Code command, no `EXTENSION.md`, no catalog, install or release entry, and is not a cross-host extension yet; `/armory-brief` and native renderers are planned for the package-bearing delivery.
+A standalone, cross-host native package that records a freshness-checked brief for one explicitly selected Git worktree and reports source-linked differences when reopened. Package and shared core versions are 1.0.0. It executes no recorded action, resumes no task and grants no authority. The compatibility section identifies exercised native surfaces; implementation and qualification do not assert merge or publication.
 
 ## Requirements
 
-Git, the locked Bun 1.3.14 toolchain and macOS or glibc Linux. Repository-source containment uses the operating system's `openat` through Bun FFI, pinning every directory and refusing symbolic links during the actual open rather than relying on preflight checks. From an Armory checkout run `bun install --cwd extensions --frozen-lockfile`. The CLI runs from the checkout; no distributed artifact exists for this prefix.
+Git, the locked Bun 1.3.14 toolchain and macOS or glibc Linux. Repository-source containment uses the operating system's `openat` through Bun FFI, pinning every directory and refusing symbolic links during the actual open rather than relying on preflight checks. From an Armory checkout run `bun install --cwd extensions --frozen-lockfile`. Both native artifacts bundle their helpers and do not import another feature or require an Armory checkout at runtime. Native compatibility is limited to the exact versions and surfaces declared below; Linux support in deterministic filesystem checks is not native Linux qualification.
 
 ## Select project sources
 
@@ -85,20 +85,133 @@ State creation, enumeration, reads and publication use descriptor-pinned, no-fol
 
 A snapshot is a derived cache: it holds the selection, source hashes and the bounded allowlisted facts needed for comparison (objective, blocker ids/summaries/status, next action, declared pull request, approvals, receipt reference fields and session header facts). It holds no plan text, handoff text, receipt body or transcript content, and it is not an authoritative plan, memory or receipt store. Deleting the data root removes only briefs; it never touches project files, handoffs or receipts.
 
-## Limits of this prefix
+**Standalone-prefix cache format:** the complete native package writes `armory.resume-brief.snapshot/v2` and refuses the earlier PR1 prefix's `snapshot/v1` files rather than guessing missing native-session fields. `show`, `reopen` and `list` can therefore reject an old cache. Keep the old root and files unchanged. Select a new external private data root with `--data-root` (standalone), `--armory-brief-data-root` (OMP) or `ARMORY_BRIEF_DATA_ROOT` (Claude), then explicitly `record` a new brief from the original selected sources. Do not edit schema identifiers, mix old snapshots into the new root or treat the new record as a renewal of any approval.
 
-- Standalone host only; OMP and Claude Code commands, renderers and native qualification are not implemented.
-- Claude Code sessions have no supported on-disk export here. Native observation will come through the host API in the adapter delivery; Claude transcripts are refused as unsupported.
-- Receipt freshness is not recomputed; only the receipt reference is checked.
-- Snapshot pruning is not provided.
+## Build and owned lifecycle
 
-## Checks
+Run from the Armory checkout:
 
 ```bash
-bun run --cwd extensions typecheck
-bun run --cwd extensions eslint --max-warnings=0 resume-brief
-bun test extensions/resume-brief/tests/
-uv run --python 3.12 python scripts/check_extensions.py --feature resume-brief --stage core
+uv sync --locked
+uv run python scripts/build_extensions.py --feature resume-brief \
+  --output-dir /tmp/armory-brief-build
 ```
 
-The core stage reports `feature_complete=false`; it certifies only this standalone prefix.
+The host artifacts are `/tmp/armory-brief-build/extensions/resume-brief/omp` and `/tmp/armory-brief-build/extensions/resume-brief/claude`. OMP loads the package-root `index.ts`; Claude uses `.claude-plugin/plugin.json`, `hooks/hooks.json` and `hooks/register.ts`. Bundled helpers live under `helpers/`.
+
+Select the extension and host explicitly. Use separate disposable configuration roots for lifecycle exercises:
+
+```bash
+uv run python scripts/install.py --type extension --platform omp \
+  --name resume-brief --action install --target-root /tmp/armory-brief-omp-profile --yes
+uv run python scripts/install.py --type extension --platform omp \
+  --name resume-brief --action update --target-root /tmp/armory-brief-omp-profile --yes
+uv run python scripts/install.py --type extension --platform omp \
+  --name resume-brief --action disable --target-root /tmp/armory-brief-omp-profile --yes
+uv run python scripts/install.py --type extension --platform omp \
+  --name resume-brief --action install --target-root /tmp/armory-brief-omp-profile --yes
+uv run python scripts/install.py --type extension --platform omp \
+  --name resume-brief --action remove --target-root /tmp/armory-brief-omp-profile --yes
+
+uv run python scripts/install.py --type extension --platform claude \
+  --name resume-brief --action install --target-root /tmp/armory-brief-claude-profile --yes
+uv run python scripts/install.py --type extension --platform claude \
+  --name resume-brief --action update --target-root /tmp/armory-brief-claude-profile --yes
+uv run python scripts/install.py --type extension --platform claude \
+  --name resume-brief --action disable --target-root /tmp/armory-brief-claude-profile --yes
+uv run python scripts/install.py --type extension --platform claude \
+  --name resume-brief --action install --target-root /tmp/armory-brief-claude-profile --yes
+uv run python scripts/install.py --type extension --platform claude \
+  --name resume-brief --action remove --target-root /tmp/armory-brief-claude-profile --yes
+```
+
+`install` re-enables an owned disabled package. There is no rollback action: deliberately select a reviewed older compatible checkout and run `update` against the same host/root. Modified or foreign payloads are refused, not overwritten; do not delete unknown files to bypass ownership checks. Lifecycle preserves private snapshots, selected sources and foreign host state. Configuration roots do not automatically select a running host. Profiles, presets, `all` selection and the all-in-one plugin do not enable extensions.
+
+## Deliberate native invocation
+
+Keep normal HOME, default authentication, trust, permissions and enforcement. Do not automate login/trust prompts or substitute an isolated HOME to make a host start. Use an explicitly selected disposable synthetic project and sources, and an external private data root (0700). Account labels are references, not credentials or authenticated identity attestations.
+
+### OMP
+
+```bash
+omp --mode rpc \
+  --extension /tmp/armory-brief-build/extensions/resume-brief/omp/index.ts \
+  --armory-brief-repo /absolute/path/to/project \
+  --armory-brief-data-root /tmp/armory-brief-state \
+  --armory-brief-account local-account \
+  --armory-brief-context brief.json
+```
+
+Optional string flags are `--armory-brief-omp-session /absolute/session.jsonl`, `--armory-brief-omp-handoff /absolute/handoff-<timestamp>.md` and `--armory-brief-receipt /absolute/receipt.json`. No session is discovered automatically; the current invocation session identity comes from the host. Wait for RPC readiness, query `get_available_commands` and verify `armory-brief` has extension provenance before sending any literal command. Do not submit an absent slash command as a model prompt.
+
+### Claude Code
+
+```bash
+export ARMORY_BRIEF_REPO=/absolute/path/to/project
+export ARMORY_BRIEF_DATA_ROOT=/tmp/armory-brief-state
+export ARMORY_BRIEF_ACCOUNT=local-account
+export ARMORY_BRIEF_CONTEXT=brief.json
+claude --settings "$ARMORY_CLAUDE_NATIVE_SETTINGS" \
+  --plugin-dir /path/to/disposable-claude-runtime-copy
+```
+
+Copy the built Claude artifact into a separately owned disposable runtime directory first: the development loader may generate SDK types and configuration there. Do not load a lifecycle-owned payload with this development loader or remove generated files to evade ownership checks. `ARMORY_CLAUDE_NATIVE_SETTINGS` must name an explicitly reviewed private 0600 additive settings file; no permission bypass or fabricated safe default is supplied. Start in an already trusted, reviewed cwd with optional writers, plugins, hooks and MCP inventory inspected. These instructions do not establish normal installed-loader compatibility.
+
+Optional environment values are `ARMORY_BRIEF_OMP_SESSION`, `ARMORY_BRIEF_OMP_HANDOFF` and `ARMORY_BRIEF_RECEIPT`, each an explicit absolute source path. The current Claude session comes from `$.session`, not an environment label or invented on-disk export. Only identity, locations, start time, turn count and counts over the newest 4096 rows are projected. A full window is incomplete; denied/malformed host answers remain unknown. No message text, tool input or tool results enter the projection.
+
+For an already discovered native command, the same reviewed context supports a whole-command headless invocation with no widget or person:
+
+```bash
+claude --settings "$ARMORY_CLAUDE_NATIVE_SETTINGS" \
+  --plugin-dir /path/to/disposable-claude-runtime-copy \
+  --output-format text -p "/armory-brief reopen --json"
+```
+
+Claude 2.1.309 emits `resume-brief: ` followed by the command's JSON payload. Strip exactly that host-owned prefix before decoding JSON; a refusal contains `error`, not a successful brief. Do not treat process exit 0 alone as a successful observation. This exercises the native command path, not a model prompt or the Agent SDK.
+
+### Commands
+
+Discover `/armory-brief` in the real native command surface before invoking it. Both adapters use:
+
+```text
+/armory-brief record
+/armory-brief reopen
+/armory-brief reopen <snapshot-id>
+/armory-brief show <snapshot-id>
+/armory-brief list
+/armory-brief help
+/armory-brief reopen --json
+```
+
+`reopen` and `show` default to the latest snapshot. `record` and `reopen` require the context selection; `show` and `list` do not re-read selected sources. Reopen refuses a configured selection different from the recorded selection before reading sources; record a new brief instead of widening the old selection. JSON is ASCII-escaped and native text renders untrusted values as escaped literals. Commands are local observations without a model turn, verification run, automatic resumption or executable approval.
+
+Once command arguments are valid, `--json` also returns refusals as `{"error": "<code>", "detail": null | "<safe diagnostic>"}`. This includes missing configuration, changed invocation scope and rejected or truncated helper answers. Invalid command syntax is reported as usage text because no command was accepted. Private helper stderr and foreign exception text are never included.
+
+Session transitions revoke publication into a replacement context. A bounded helper already running may finish its read; cancellation or interruption is not a successful record/reopen or a general process-tree cleanup guarantee. Inspect the actual command result and durable snapshot state rather than inferring completion from a closed UI or stream.
+
+## Offline checks and manual native qualification
+
+```bash
+uv run python scripts/check_extensions.py --ci
+uv run python scripts/check_extensions.py --feature resume-brief
+```
+
+These request credential-free deterministic/integration checks, pinned SDK/adapter contracts, offline Claude validation/test kits, reproducible contained builds, package/catalog and owned lifecycle checks. They are not authenticated host startups or native compatibility evidence. Actual detached-artifact qualification exercised OMP 18.12.6 RPC and Claude Code 2.1.309 interactive and whole-command headless text on macOS arm64; the metadata names only those versions/surfaces.
+
+Explicit local/manual qualification uses real hosts with normal authentication and enforcement:
+
+```bash
+export ARMORY_CLAUDE_NATIVE_CWD=/path/to/already-trusted-reviewed-directory
+export ARMORY_CLAUDE_NATIVE_SETTINGS=/path/to/reviewed-private-settings.json
+uv run python scripts/check_extensions.py --feature resume-brief --native-smoke
+```
+
+Feature-owned `tests/omp-smoke.py` and `tests/claude-smoke.py` cover success, failure, reopen, freshness, changed-during-run, cancellation, private-output and native-text categories with host/version/mode and the current artifact manifest. Missing prerequisites are unavailable/nonzero; runtime failures cannot count as success. Separate actual headless Claude qualification exercised `record`, changed-source `reopen`, durable `show`/`list` and JSON refusal with the invocation above. The generic cancellation category proves completed-command/session disposal, not injected in-flight cancellation. Normal installed Claude loading, SDK and OMP TUI/ACP are not certified. Offline results, historical replay and a standalone CLI are not native substitutes.
+
+## Limits
+
+- Live pull request state is unknown; only declared references are shown.
+- Receipt freshness is not recomputed; only the existing receipt reference is checked.
+- Claude on-disk session exports are unsupported, not inferred from another format.
+- Snapshot pruning is not provided.
+- No Windows or unexercised native surface/version compatibility is claimed.

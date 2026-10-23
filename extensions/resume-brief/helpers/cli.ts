@@ -1,16 +1,13 @@
 import { userInfo } from "node:os";
 import { join } from "node:path";
-import { buildCard, discrepancies } from "../core/card.ts";
-import { FEATURE_VERSION, inert, LIMITS } from "../core/index.ts";
-import type { Card, Context, Discrepancy } from "../core/index.ts";
-import { renderCard, renderDiscrepancies } from "../core/render.ts";
+import { FEATURE_VERSION, LIMITS } from "../core/index.ts";
+import type { Context } from "../core/index.ts";
+import { renderResult } from "../core/render.ts";
 import { assertSnapshotId } from "../core/snapshot.ts";
-import type { Snapshot } from "../core/snapshot.ts";
-import { canonicalSelection, observe, resolveRepository } from "./sources.ts";
-import type { Selection } from "./sources.ts";
-import { openStore, StateError } from "./state.ts";
+import { InputError, listBriefs, recordBrief, reopenBrief, resolveSelection, showBrief } from "./brief.ts";
+import { StateError } from "./state.ts";
 
-const HELP = `Resume Brief ${FEATURE_VERSION} standalone CLI (development prefix; no OMP/Claude commands yet).
+const HELP = `Resume Brief ${FEATURE_VERSION} standalone CLI (OMP and Claude Code use /armory-brief instead).
 Usage: bun extensions/resume-brief/helpers/cli.ts <record|reopen|show|list> [options]
   --repo <worktree-root>     Required. Absolute path of exactly one Git worktree root.
   --data-root <dir>          Private derived-state root outside the repository and package;
@@ -103,36 +100,8 @@ function parseArguments(args: string[]): Arguments {
   };
 }
 
-async function selected(path: string | null, extension: string): Promise<string | null> {
-  if (path === null) return null;
-  try { return await canonicalSelection(path, extension); } catch (error) {
-    throw new UsageError(error instanceof Error ? error.message : "invalid selected source");
-  }
-}
-
-async function selection(options: Arguments): Promise<Selection> {
-  if (options.contextPath === null) throw new UsageError("missing --context");
-  return {
-    contextPath: options.contextPath,
-    ompSessionPath: await selected(options.ompSessionPath, ".jsonl"),
-    ompHandoffPath: await selected(options.ompHandoffPath, ".md"),
-    receiptPath: await selected(options.receiptPath, ".json"),
-  };
-}
-
 function write(options: Arguments, json: unknown, text: string): void {
   process.stdout.write(options.format === "json" ? `${JSON.stringify(json)}\n` : text);
-}
-
-interface Reopened {
-  snapshotId: string;
-  recordedAtMs: number;
-  recordedBy: Context;
-  recorded: Card;
-  current: Card;
-  discrepancies: Discrepancy[];
-  resumed: false;
-  authority: "none";
 }
 
 export async function main(args: string[]): Promise<number> {
@@ -143,54 +112,36 @@ export async function main(args: string[]): Promise<number> {
     return 2;
   }
   try {
-    const repository = await resolveRepository(options.repositoryRoot).catch((error: unknown) => {
-      const detail = error instanceof Error && error.message.startsWith("repository must") ? error.message : "--repo is not an accessible Git worktree";
-      throw new UsageError(detail);
-    });
-    const store = await openStore(options.dataRoot, repository);
+    const location = { repositoryRoot: options.repositoryRoot, dataRoot: options.dataRoot };
     if (options.command === "list") {
-      const items: { snapshotId: string; recordedAtMs: number; branch: string | null; contextPath: string }[] = [];
-      for (const id of await store.list()) {
-        const snapshot = await store.read(id);
-        items.push({ snapshotId: id, recordedAtMs: snapshot.recordedAtMs, branch: snapshot.observations.git.branch, contextPath: snapshot.selection.contextPath });
-      }
-      write(options, items, items.map((item) => `${item.snapshotId} branch=${item.branch === null ? "unknown" : inert(item.branch)}\n`).join("") || "No snapshots recorded.\n");
+      const result = await listBriefs(location);
+      write(options, result.snapshots, renderResult(result));
       return 0;
     }
     const context = options.context;
     if (context === null) throw new UsageError("missing --account/--session");
+    const scope = { ...location, context };
     if (options.command === "record") {
-      const selected = await selection(options);
-      const observations = await observe(repository, selected, Date.now);
-      const snapshot = await store.record(context, selected, observations, Date.now());
-      const card = buildCard(snapshot.observations, context, snapshot.recordedAtMs);
-      write(options, { snapshotId: snapshot.snapshotId, card }, `Recorded snapshot ${snapshot.snapshotId}\n${renderCard(card)}`);
+      if (options.contextPath === null) throw new UsageError("missing --context");
+      const selection = await resolveSelection({
+        contextPath: options.contextPath, ompSessionPath: options.ompSessionPath, ompHandoffPath: options.ompHandoffPath, receiptPath: options.receiptPath,
+      });
+      const result = await recordBrief(scope, selection);
+      write(options, result, renderResult(result));
       return 0;
     }
-    let snapshot: Snapshot;
-    if (options.snapshotId === "latest") {
-      const ids = await store.list();
-      const last = ids[ids.length - 1];
-      if (last === undefined) throw new StateError("no snapshot recorded for this repository");
-      snapshot = await store.read(last);
-    } else snapshot = await store.read(options.snapshotId ?? "");
+    const snapshot = options.snapshotId ?? "latest";
     if (options.command === "show") {
-      const card = buildCard(snapshot.observations, context, Date.now());
-      write(options, { snapshotId: snapshot.snapshotId, observations: "recorded", card }, `Recorded snapshot ${snapshot.snapshotId} (recorded observations; no sources read)\n${renderCard(card)}`);
+      const result = await showBrief(scope, snapshot);
+      write(options, result, renderResult(result));
       return 0;
     }
-    const current = await observe(repository, snapshot.selection, Date.now);
-    const recordedCard = buildCard(snapshot.observations, context, snapshot.recordedAtMs);
-    const currentCard = buildCard(current, context, current.observedAtMs);
-    const result: Reopened = {
-      snapshotId: snapshot.snapshotId, recordedAtMs: snapshot.recordedAtMs, recordedBy: snapshot.recordedBy,
-      recorded: recordedCard, current: currentCard, discrepancies: discrepancies(recordedCard, currentCard), resumed: false, authority: "none",
-    };
-    write(options, result, `Reopened snapshot ${snapshot.snapshotId}; nothing was resumed or executed.\n${renderDiscrepancies(result.discrepancies)}Current card:\n${renderCard(currentCard)}`);
+    const result = await reopenBrief(scope, snapshot);
+    write(options, result, renderResult(result));
     return result.discrepancies.length === 0 ? 0 : 1;
   } catch (error) {
     // Only this feature's own messages are echoed; foreign exception text is not.
-    const known = error instanceof UsageError || error instanceof StateError;
+    const known = error instanceof UsageError || error instanceof StateError || error instanceof InputError;
     process.stderr.write(`${JSON.stringify(known ? { error: "rejected", detail: error.message } : { error: "operation-failed" })}\n`);
     return 2;
   }

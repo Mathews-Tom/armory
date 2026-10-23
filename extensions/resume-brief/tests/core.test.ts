@@ -31,6 +31,7 @@ function observations(overrides: Partial<Observations> = {}): Observations {
     receipt: null,
     ompSession: null,
     ompHandoff: null,
+    claudeSession: null,
     ...overrides,
   };
 }
@@ -188,6 +189,7 @@ describe("cards and discrepancies", () => {
 describe("snapshot state validation", () => {
   test("unsupported schema and unexpected fields are refused", () => {
     expect(() => parseSnapshot({ schema: "armory.resume-brief.snapshot/v0" })).toThrow("unsupported snapshot schema");
-    expect(() => parseSnapshot({ schema: "armory.resume-brief.snapshot/v1", extra: true })).toThrow("malformed snapshot");
+    expect(() => parseSnapshot({ schema: "armory.resume-brief.snapshot/v1" })).toThrow("unsupported snapshot schema");
+    expect(() => parseSnapshot({ schema: "armory.resume-brief.snapshot/v2", extra: true })).toThrow("malformed snapshot");
   });
 });

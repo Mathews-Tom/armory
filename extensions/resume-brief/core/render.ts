@@ -1,5 +1,6 @@
-import { canonicalJson, formatTimestamp, inert } from "./index.ts";
+import { canonicalJson, CLAUDE_MESSAGE_WINDOW, formatTimestamp, inert } from "./index.ts";
 import type { Card, Discrepancy } from "./index.ts";
+import type { BriefError, BriefResult } from "./protocol.ts";
 
 // Plain-text projection. Every value that came from a repository, a source file
 // or a native session is passed through `inert`, so it is shown, never obeyed.
@@ -15,7 +16,7 @@ function time(ms: number | null): string {
 
 export function renderCard(card: Card): string {
   const lines = [
-    `Resume Brief ${card.featureVersion} — observed ${time(card.observedAtMs)}, evaluated ${time(card.evaluatedAtMs)} for ${card.evaluatedFor.host}`,
+    `Resume Brief ${card.featureVersion} — observed ${time(card.observedAtMs)}, evaluated ${time(card.evaluatedAtMs)} for ${card.evaluatedFor.host} session ${inert(card.evaluatedFor.sessionId)}`,
     "Authority: none. This card executes nothing and grants no approval.",
     `Objective: ${value(card.objective)}`,
     `Plan: ${value(card.plan.ref)} sha256=${value(card.plan.sha256)} lastCommit=${value(card.plan.lastCommit)} modifiedInWorktree=${value(card.plan.modifiedInWorktree)}`,
@@ -28,6 +29,11 @@ export function renderCard(card: Card): string {
   else for (const blocker of card.blockers) lines.push(`Blocker ${value(blocker.id)} [${blocker.status}]: ${value(blocker.summary)}`);
   lines.push(`Next action (not executed): ${value(card.nextAction.text)}`);
   lines.push(`Session: ${card.session.kind ?? "none"} id=${value(card.session.id)} cwdMatchesWorktree=${value(card.session.cwdMatchesWorktree)} entries=${value(card.session.entryCount)} lastEntryAt=${value(card.session.lastEntryAt)} handoff=${value(card.session.handoffGeneratedAt)}`);
+  const claude = card.claudeSession;
+  if (claude.kind !== null) {
+    const window = claude.messagesComplete === false ? ` (newest ${CLAUDE_MESSAGE_WINDOW} rows only; earlier rows unobserved)` : "";
+    lines.push(`Claude session (host API): id=${value(claude.id)} cwdMatchesWorktree=${value(claude.cwdMatchesWorktree)} rootMatchesWorktree=${value(claude.rootMatchesWorktree)} started=${time(claude.startedAtMs)} turns=${value(claude.turns)} messages=${value(claude.observedMessages)}${window} lastRole=${value(claude.lastRole)} toolUses=${value(claude.toolUses)}`);
+  }
   if (card.approvals.length === 0) lines.push("Approvals: none recorded");
   for (const hold of card.approvals) {
     lines.push(`Approval hold ${value(hold.id)} (${hold.source}) ${hold.status}${hold.foreignOrigin ? " foreign-origin" : ""} executable=false scope=${value(hold.scope)} origin=${value(`${hold.origin.host}/${hold.origin.accountId ?? "unknown"}/${hold.origin.sessionId ?? "unknown"}`)} granted=${time(hold.grantedAtMs)} expires=${hold.expiresAtMs === null ? "none" : time(hold.expiresAtMs)}`);
@@ -46,4 +52,47 @@ export function renderDiscrepancies(items: readonly Discrepancy[]): string {
     lines.push(`- ${inert(item.field)} ${item.kind}: recorded=${inert(canonicalJson(item.recorded))} current=${inert(canonicalJson(item.current))} source=${item.source.role} ${value(item.source.ref)} recordedSha256=${value(item.source.recordedSha256)} currentSha256=${value(item.source.currentSha256)}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/** One literal text answer for any validated result. */
+export function renderResult(result: BriefResult): string {
+  switch (result.action) {
+    case "record":
+      return `Recorded snapshot ${result.snapshotId} (private derived cache; nothing was executed)\n${renderCard(result.card)}`;
+    case "show":
+      return `Recorded snapshot ${result.snapshotId} (recorded observations; no sources read)\n${renderCard(result.card)}`;
+    case "reopen":
+      return `Reopened snapshot ${result.snapshotId} recorded ${time(result.recordedAtMs)} by ${result.recordedBy.host}; nothing was resumed or executed.\n${renderDiscrepancies(result.discrepancies)}Current card:\n${renderCard(result.current)}`;
+    case "list":
+      if (result.snapshots.length === 0) return "No snapshots recorded.\n";
+      return result.snapshots.map((item) => `${item.snapshotId} recorded=${time(item.recordedAtMs)} by=${item.recordedBy.host} branch=${value(item.branch)} context=${value(item.contextPath)}\n`).join("");
+  }
+}
+
+export function renderError(error: BriefError): string {
+  return `Resume Brief ${error.error}${error.detail === null ? "" : `: ${inert(error.detail)}`}\n`;
+}
+
+/** JSON with every non-ASCII code unit escaped (surrogates individually), so it is valid and inert. */
+export function asciiJson(value: unknown): string {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+}
+
+/** Compact lines for an interactive widget; the full answer is the message text. */
+export function summarize(answer: BriefResult | BriefError): string[] {
+  if ("error" in answer) return [`Resume Brief: ${answer.error}`];
+  switch (answer.action) {
+    case "record":
+    case "show": {
+      const open = answer.card.blockers?.filter((item) => item.status === "open").length;
+      return [`Brief ${answer.snapshotId} (${answer.action}): branch=${value(answer.card.repository.branch)} openBlockers=${value(open ?? null)} holds=${answer.card.approvals.length} unknowns=${answer.card.unknowns.length} authority=none`];
+    }
+    case "reopen": {
+      const fields = answer.discrepancies.slice(0, 3).map((item) => `${inert(item.field)} ${item.kind}`);
+      const more = answer.discrepancies.length > 3 ? ` +${answer.discrepancies.length - 3} more` : "";
+      return [`Brief ${answer.snapshotId} reopened: ${answer.discrepancies.length} discrepancies${fields.length === 0 ? "" : `: ${fields.join(", ")}${more}`}; nothing resumed`];
+    }
+    case "list":
+      return [`Resume Brief: ${answer.snapshots.length} snapshot(s) recorded`];
+  }
 }

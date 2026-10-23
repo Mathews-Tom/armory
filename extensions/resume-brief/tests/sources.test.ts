@@ -39,7 +39,7 @@ test("observes git, plan, blockers, native session, handoff and receipt with has
   const observed = await observe(repository, { contextPath: "brief.json", ompSessionPath: sessionPath, ompHandoffPath: handoffPath, receiptPath }, () => 42);
   expect(observed.git).toMatchObject({ status: "ok", branch: "main", detached: false, worktreeRoot: item.root });
   expect(observed.sources.map((source) => [source.role, source.status])).toEqual([
-    ["context", "ok"], ["plan", "ok"], ["blockers", "ok"], ["receipt", "ok"], ["omp-session", "ok"], ["omp-handoff", "ok"],
+    ["context", "ok"], ["plan", "ok"], ["blockers", "ok"], ["receipt", "ok"], ["omp-session", "ok"], ["omp-handoff", "ok"], ["claude-session", "not-selected"],
   ]);
   expect(observed.plan?.lastCommit).toBe(await item.git("rev-parse", "HEAD"));
   expect(observed.ompSession?.cwdResolved).toBe(item.root);

@@ -1,4 +1,4 @@
-import { canonicalJson, FEATURE, FEATURE_VERSION, formatTimestamp } from "./index.ts";
+import { canonicalJson, CLAUDE_MESSAGE_WINDOW, FEATURE, FEATURE_VERSION, formatTimestamp } from "./index.ts";
 import type {
   Approval,
   ApprovalHold,
@@ -68,13 +68,20 @@ function unknowns(observations: Observations): Unknown[] {
   if (context?.status === "ok" && observations.context?.blockersPath === null) result.push({ field: "blockers", reason: "context selects no blockers source" });
   if (source(observations, "receipt")?.status === "not-selected") result.push({ field: "lastVerification", reason: "no receipt selected" });
   if (source(observations, "omp-session")?.status === "not-selected") result.push({ field: "session", reason: "no native session selected" });
+  if (observations.claudeSession?.messagesComplete === false) {
+    result.push({ field: "claudeSession.observedMessages", reason: `the host returns only the newest ${CLAUDE_MESSAGE_WINDOW} transcript rows; earlier rows were not observed` });
+  }
   result.push({ field: "repository.pullRequest.observed", reason: "pull request state is not observed: no network or GitHub calls" });
   return result;
 }
 
+function matches(resolved: string | null, worktreeRoot: string | null): boolean | null {
+  return resolved === null || worktreeRoot === null ? null : resolved === worktreeRoot;
+}
+
 /** Build the card for one set of observations, evaluating approvals for `context` at `nowMs`. */
 export function buildCard(observations: Observations, context: Context, nowMs: number): Card {
-  const { git, plan, blockers, receipt, ompSession } = observations;
+  const { git, plan, blockers, receipt, ompSession, claudeSession } = observations;
   const ctx = observations.context;
   const approvals = [...(ctx?.approvals ?? []), ...(ompSession?.approvals ?? [])].map((item) => evaluateApproval(item, context, nowMs));
   return {
@@ -119,6 +126,18 @@ export function buildCard(observations: Observations, context: Context, nowMs: n
       entryCount: ompSession?.entryCount ?? null,
       lastEntryAt: ompSession?.lastEntryAt ?? null,
       handoffGeneratedAt: observations.ompHandoff?.generatedAt ?? null,
+    },
+    claudeSession: {
+      kind: claudeSession === null ? null : "claude-session",
+      id: claudeSession?.sessionId ?? null,
+      cwdMatchesWorktree: matches(claudeSession?.cwdResolved ?? null, git.worktreeRoot),
+      rootMatchesWorktree: matches(claudeSession?.rootResolved ?? null, git.worktreeRoot),
+      startedAtMs: claudeSession?.startedAtMs ?? null,
+      turns: claudeSession?.turns ?? null,
+      observedMessages: claudeSession?.observedMessages ?? null,
+      messagesComplete: claudeSession?.messagesComplete ?? null,
+      lastRole: claudeSession?.lastRole ?? null,
+      toolUses: claudeSession?.toolUses ?? null,
     },
     approvals,
     sources: observations.sources,
@@ -237,6 +256,11 @@ export function discrepancies(recorded: Card, current: Card): Discrepancy[] {
     }
   }
   if (both("omp-handoff")) out.value("session.handoffGeneratedAt", "omp-handoff", recorded.session.handoffGeneratedAt, current.session.handoffGeneratedAt);
+  if (both("claude-session")) {
+    for (const key of ["id", "cwdMatchesWorktree", "rootMatchesWorktree", "startedAtMs", "turns", "observedMessages", "messagesComplete", "lastRole", "toolUses"] as const) {
+      out.value(`claudeSession.${key}`, "claude-session", recorded.claudeSession[key], current.claudeSession[key]);
+    }
+  }
   for (const origin of ["context", "omp-session"] as const) {
     const holds = (card: Card): Map<string, Json> => new Map(card.approvals.filter((item) => item.source === origin).map((item) => [item.id, approvalJson(item)]));
     out.keyed(`approvals.${origin}`, origin, holds(recorded), holds(current));

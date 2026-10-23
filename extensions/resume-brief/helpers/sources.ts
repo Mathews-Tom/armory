@@ -6,8 +6,10 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { openRepositoryFile } from "./contained-open.ts";
+import { canonicalJson } from "../core/index.ts";
 import type {
   BlockersDocument,
+  ClaudeSessionObservation,
   ContextDocument,
   GitObservation,
   Observations,
@@ -15,9 +17,11 @@ import type {
   OmpSessionObservation,
   PlanObservation,
   ReceiptReference,
+  Json,
   SourceIdentity,
   SourceRole,
 } from "../core/index.ts";
+import type { ClaudeHostPayload } from "../core/claude-session.ts";
 import {
   parseBlockers,
   parseContext,
@@ -40,6 +44,7 @@ export const MAX_BYTES: Record<SourceRole, number> = {
   receipt: 1024 * 1024,
   "omp-session": 16 * 1024 * 1024,
   "omp-handoff": 1024 * 1024,
+  "claude-session": 64 * 1024,
 };
 const MAX_SESSION_LINES = 200_000;
 
@@ -290,10 +295,51 @@ export function stableGit(before: GitObservation, after: GitObservation): GitObs
   };
 }
 
+export interface ObserveOptions {
+  /** The current Claude host session, supplied only by the Claude adapter. */
+  claudeHost?: ClaudeHostPayload;
+  /** Session the invocation is evaluated for; a host projection for another session is refused. */
+  sessionId?: string;
+  /** Cooperative cancellation between bounded reads; an aborted observation publishes nothing. */
+  signal?: AbortSignal;
+}
+
+const CLAUDE_REF = "claude-host-api:current-session";
+
+async function resolvedOrNull(path: string): Promise<string | null> {
+  try { return await realpath(path); } catch { return null; }
+}
+
+/** Identity of the host-API projection: canonical bytes, never a transcript file. */
+async function claudeSource(options: ObserveOptions): Promise<{ identity: SourceIdentity; value: ClaudeSessionObservation | null }> {
+  const payload = options.claudeHost;
+  if (payload === undefined) return { identity: notSelected("claude-session"), value: null };
+  const unavailable = (status: SourceIdentity["status"], diagnostic: string): { identity: SourceIdentity; value: null } => ({
+    identity: { role: "claude-session", ref: CLAUDE_REF, status, sha256: null, bytes: null, mtimeMs: null, diagnostic }, value: null,
+  });
+  if ("claudeSessionUnavailable" in payload) {
+    return payload.claudeSessionUnavailable === "host-api-unavailable"
+      ? unavailable("unreadable", "the host did not answer a required Claude session query")
+      : unavailable("malformed", "the host's Claude session answer was outside the supported shape");
+  }
+  const projection = payload.claudeSession;
+  if (options.sessionId !== undefined && projection.sessionId !== options.sessionId) {
+    return unavailable("malformed", "the Claude session observation does not belong to the invoking session");
+  }
+  const bytes = Buffer.from(canonicalJson(projection as unknown as Json), "utf8");
+  return {
+    identity: { role: "claude-session", ref: `claude-host-api:session/${projection.sessionId}`, status: "ok", sha256: sha256(bytes), bytes: bytes.length, mtimeMs: null, diagnostic: null },
+    value: { ...projection, cwdResolved: await resolvedOrNull(projection.cwd), rootResolved: await resolvedOrNull(projection.root) },
+  };
+}
+
 /** Observe the selected repository and sources once, with bounded reads only. */
-export async function observe(repository: Repository, selection: Selection, now: () => number): Promise<Observations> {
+export async function observe(repository: Repository, selection: Selection, now: () => number, options: ObserveOptions = {}): Promise<Observations> {
   const root = repository.worktreeRoot;
+  const step = (): void => options.signal?.throwIfAborted();
+  step();
   const gitBefore = await gitFacts(repository);
+  step();
   const sources: SourceIdentity[] = [];
 
   const contextRead = interpret(await readInRepository("context", root, selection.contextPath), (bytes): ContextDocument => parseContext(json(bytes)));
@@ -301,6 +347,7 @@ export async function observe(repository: Repository, selection: Selection, now:
   const context = contextRead.value;
 
   const contextUnknown = context === null ? "context artifact unavailable, so its selection is unknown" : null;
+  step();
   let plan: PlanObservation | null = null;
   if (context?.planPath) {
     const read = await readInRepository("plan", root, context.planPath);
@@ -311,6 +358,7 @@ export async function observe(repository: Repository, selection: Selection, now:
     } else sources.push(read.identity);
   } else sources.push(notSelected("plan", contextUnknown));
 
+  step();
   let blockers: BlockersDocument | null = null;
   if (context?.blockersPath) {
     const read = interpret(await readInRepository("blockers", root, context.blockersPath), (bytes) => parseBlockers(json(bytes)));
@@ -318,6 +366,7 @@ export async function observe(repository: Repository, selection: Selection, now:
     blockers = read.value;
   } else sources.push(notSelected("blockers", contextUnknown));
 
+  step();
   let receipt: ReceiptReference | null = null;
   if (selection.receiptPath !== null) {
     const read = interpret(await boundedRead("receipt", selection.receiptPath, selection.receiptPath), (bytes) => parseReceiptReference(json(bytes)));
@@ -325,6 +374,7 @@ export async function observe(repository: Repository, selection: Selection, now:
     receipt = read.value;
   } else sources.push(notSelected("receipt"));
 
+  step();
   let ompSession: OmpSessionObservation | null = null;
   if (selection.ompSessionPath !== null) {
     const read = interpret(await boundedRead("omp-session", selection.ompSessionPath, selection.ompSessionPath), (bytes) => parseOmpSession(sessionLines(bytes)));
@@ -332,6 +382,7 @@ export async function observe(repository: Repository, selection: Selection, now:
     ompSession = read.value === null ? null : await resolvedCwd(read.value);
   } else sources.push(notSelected("omp-session"));
 
+  step();
   let ompHandoff: OmpHandoffObservation | null = null;
   if (selection.ompHandoffPath !== null) {
     const path = selection.ompHandoffPath;
@@ -340,6 +391,10 @@ export async function observe(repository: Repository, selection: Selection, now:
     ompHandoff = read.value;
   } else sources.push(notSelected("omp-handoff"));
 
+  const claude = await claudeSource(options);
+  sources.push(claude.identity);
+  step();
   const gitAfter = await gitFacts(repository);
-  return { observedAtMs: now(), git: stableGit(gitBefore, gitAfter), sources, context, plan, blockers, receipt, ompSession, ompHandoff };
+  step();
+  return { observedAtMs: now(), git: stableGit(gitBefore, gitAfter), sources, context, plan, blockers, receipt, ompSession, ompHandoff, claudeSession: claude.value };
 }
