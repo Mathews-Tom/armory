@@ -81,7 +81,7 @@ export default function resumeBrief(pi: ExtensionAPI): void {
 
   async function run(command: Exclude<BriefCommand, { action: "help" }>, config: Configured, sessionId: string, signal: AbortSignal): Promise<BriefResult> {
     const scope: Scope = { repositoryRoot: config.repositoryRoot, dataRoot: config.dataRoot, context: { host: "omp", accountId: config.accountId, sessionId } };
-    if (command.action === "list") return listBriefs(scope);
+    if (command.action === "list") return listBriefs(scope, { signal });
     if (command.action === "show") return showBrief(scope, command.snapshot);
     if (config.selection === null) throw new InputError("no context artifact is configured; set --armory-brief-context");
     const selection = await resolveSelection(config.selection);

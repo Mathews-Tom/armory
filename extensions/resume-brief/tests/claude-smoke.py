@@ -140,6 +140,12 @@ class NativeTTY:
             if len(self.raw) > start and predicate(value):
                 return value
             if self.process is None or self.process.poll() is not None:
+                if self.process is not None:
+                    before = len(self.raw)
+                    self.drain()
+                    if len(self.raw) > before:
+                        # Recheck trust and capture limits before accepting output.
+                        continue
                 raise Unavailable("native-process-exited-before-response")
             if select.select(
                 [self.master], [], [], min(0.2, deadline - time.monotonic())
@@ -443,12 +449,14 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
     claude, bun, git = (shutil.which(name) for name in ("claude", "bun", "git"))
     if claude is None or bun is None or git is None:
         raise Unavailable("installed-claude-bun-git-required")
-    version = (
+    words = (
         shared.finite([claude, "--version"], root, "native-version-unavailable")
         .decode()
-        .strip()
-        .split()[0]
+        .split()
     )
+    if not words:
+        raise Unavailable("native-version-unavailable")
+    version = words[0]
     report["version"] = version
     if version != "2.1.309":
         raise Unavailable("installed-version-needs-native-interface-review")
@@ -821,7 +829,7 @@ def main() -> int:
             "native-artifact-validation-or-build-failed",
             1,
         )
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except (OSError, ValueError, LookupError, TypeError, subprocess.SubprocessError):
         report["reasonCode"] = "native-prerequisite-or-protocol-unavailable"
     finally:
         signal.alarm(0)

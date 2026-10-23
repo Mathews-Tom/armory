@@ -103,11 +103,16 @@ export async function showBrief(scope: Scope, snapshot: string): Promise<ShowRes
   return { action: "show", snapshotId: recorded.snapshotId, observations: "recorded", card: buildCard(recorded.observations, scope.context, Date.now()) };
 }
 
-export async function listBriefs(scope: Omit<Scope, "context">): Promise<ListResult> {
+export async function listBriefs(scope: Omit<Scope, "context">, options: { signal?: AbortSignal } = {}): Promise<ListResult> {
+  options.signal?.throwIfAborted();
   const { store } = await open(scope);
+  options.signal?.throwIfAborted();
+  const ids = await store.list();
+  options.signal?.throwIfAborted();
   const snapshots: ListEntry[] = [];
-  for (const id of await store.list()) {
+  for (const id of ids) {
     const snapshot = await store.read(id);
+    options.signal?.throwIfAborted();
     snapshots.push({ snapshotId: id, recordedAtMs: snapshot.recordedAtMs, recordedBy: snapshot.recordedBy, branch: snapshot.observations.git.branch, contextPath: snapshot.selection.contextPath });
   }
   return { action: "list", snapshots };

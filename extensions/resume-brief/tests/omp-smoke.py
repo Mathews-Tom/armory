@@ -1530,7 +1530,7 @@ def main() -> int:
         report["status"] = "failed"
         report["reasonCode"] = str(error)
         code = 1
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except (OSError, ValueError, LookupError, TypeError, subprocess.SubprocessError):
         report["reasonCode"] = "native-prerequisite-or-protocol-unavailable"
     finally:
         signal.alarm(0)
