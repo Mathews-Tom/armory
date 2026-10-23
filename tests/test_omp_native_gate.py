@@ -175,3 +175,82 @@ def test_actual_claude_driver_without_reviewed_context_is_unavailable(
     assert evidence["reasonCode"] == "reviewed-native-settings-and-trusted-cwd-required"
     assert evidence["version"] is None
     assert not any(case["status"] == "passed" for case in evidence["scenarios"])
+
+
+@pytest.mark.parametrize(("version", "exit_code"), [("", 0), ("2.1.309", 2)])
+def test_unusable_claude_version_is_unavailable_before_driver_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str, exit_code: int
+) -> None:
+    binary = tmp_path / "claude"
+    binary.write_text(f"#!/bin/sh\nprintf '%s\\n' '{version}'\nexit {exit_code}\n")
+    binary.chmod(0o700)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    sentinel = tmp_path / "native-started"
+    (tests / "claude-smoke.py").write_text(
+        f"from pathlib import Path\nPath({str(sentinel)!r}).write_text('started')\n"
+        "raise SystemExit(1)\n"
+    )
+    report = check_extensions.Report(scope="fixture", stage="full")
+    report.run(
+        "claude-native-smoke",
+        lambda: check_extensions.claude_native_gate(tmp_path),
+    )
+    assert report.exit_code == check_extensions.EXIT_INCOMPLETE
+    assert report.surfaces[0].status == "unavailable"
+    assert report.feature_complete is False
+    assert not sentinel.exists()
+
+
+def test_actual_claude_driver_wrong_bun_is_unavailable_before_host_start(
+    tmp_path: Path,
+) -> None:
+    tmp_path.chmod(0o700)
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    for name, version in (("claude", "2.1.309"), ("bun", "0.0.0")):
+        binary = binaries / name
+        binary.write_text(
+            "#!/bin/sh\n"
+            f"if [ \"$1\" = '--version' ]; then printf '%s\\n' '{version}'; exit 0; fi\n"
+            'printf started > "$ARMORY_TEST_NATIVE_STARTED"\nexit 97\n'
+        )
+        binary.chmod(0o700)
+    settings = tmp_path / "settings.json"
+    settings.write_text("{}\n")
+    settings.chmod(0o600)
+    sentinel = tmp_path / "native-started"
+    environment = {
+        **os.environ,
+        "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
+        "ARMORY_TEST_NATIVE_STARTED": str(sentinel),
+    }
+    feature = TYPES["extension"].repo_dir / "verification-receipts"
+    report_path = tmp_path / "report.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(feature / "tests" / "claude-smoke.py"),
+            "--feature-dir",
+            str(feature),
+            "--report",
+            str(report_path),
+            "--trusted-cwd",
+            str(tmp_path),
+            "--settings",
+            str(settings),
+        ],
+        check=False,
+        cwd=feature,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    evidence = json.loads(report_path.read_text())
+    assert result.returncode == check_extensions.EXIT_INCOMPLETE
+    assert evidence["status"] == "unavailable"
+    assert evidence["reasonCode"] == "production-artifact-build-tool-unavailable"
+    assert not any(case["status"] == "passed" for case in evidence["scenarios"])
+    assert not sentinel.exists()

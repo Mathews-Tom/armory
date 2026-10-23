@@ -43,6 +43,7 @@ if str(REPO) not in sys.path:
 from scripts.build_extensions import (
     CONTENT_MANIFEST,
     BuildError,
+    ToolUnavailableError,
     build_feature,
     check_artifact_imports,
     load_metadata,
@@ -754,6 +755,8 @@ def main() -> int:
         report["reasonCode"] = str(error)
     except Failure as error:
         report["status"], report["reasonCode"], code = "failed", str(error), 1
+    except ToolUnavailableError:
+        report["reasonCode"] = "production-artifact-build-tool-unavailable"
     except BuildError:
         report["status"], report["reasonCode"], code = (
             "failed",

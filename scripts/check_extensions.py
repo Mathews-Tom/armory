@@ -377,7 +377,12 @@ def _claude() -> tuple[str, str]:
         raise GateUnavailable(
             "claude is not on PATH; provision the pinned binary from extensions/native-hosts.json"
         )
-    version = _run([claude, "--version"], REPO_ROOT, _CLAUDE_ENV).stdout.strip()
+    result = _run([claude, "--version"], REPO_ROOT, _CLAUDE_ENV)
+    if result.returncode != 0:
+        raise GateUnavailable(f"claude --version failed with exit {result.returncode}")
+    version = result.stdout.strip()
+    if not version:
+        raise GateUnavailable("installed claude reported no version")
     return claude, version
 
 
