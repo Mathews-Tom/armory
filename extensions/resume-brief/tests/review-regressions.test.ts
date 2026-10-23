@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { buildCard, discrepancies } from "../core/card.ts";
 import { inert } from "../core/index.ts";
+import type { Observations } from "../core/index.ts";
 import { renderDiscrepancies } from "../core/render.ts";
 import { parseOmpSession, parseReceiptReference } from "../core/validation.ts";
 import { observe, resolveRepository } from "../helpers/sources.ts";
@@ -158,3 +159,25 @@ test("inherited Git locations cannot redirect selected repository observations",
     expect(actual.observations.plan).toEqual(expected.plan);
   }
 });
+
+for (const variable of ["GIT_GRAFT_FILE", "GIT_SHALLOW_FILE"]) {
+  test(`${variable} cannot rewrite the selected plan's last-changing commit`, async () => {
+    const item = await setup();
+    const planCommit = await item.git("rev-parse", "HEAD");
+    await item.write("unrelated.txt", "later work\n");
+    await item.git("add", "unrelated.txt");
+    await item.git("commit", "--quiet", "-m", "unrelated work");
+    const head = await item.git("rev-parse", "HEAD");
+    const historyFile = join(item.external, "foreign-history");
+    await writeFile(historyFile, `${head}\n`);
+    const module = join(import.meta.dir, "../helpers/sources.ts");
+    const script = `const {resolveRepository,observe}=await import(${JSON.stringify(module)}); const r=await resolveRepository(process.argv[1]); console.log(JSON.stringify(await observe(r,${JSON.stringify(SELECTION)},Date.now)));`;
+    const child = await exec(process.execPath, ["-e", script, item.root], {
+      env: { ...process.env, [variable]: historyFile }, timeout: 20_000,
+    });
+    const actual = JSON.parse(child.stdout) as Observations;
+    expect(actual.git.head).toBe(head);
+    expect(actual.plan?.lastCommit).toBe(planCommit);
+    expect(actual.plan?.modifiedInWorktree).toBe(false);
+  });
+}

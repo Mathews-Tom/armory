@@ -153,7 +153,7 @@ export async function openStore(dataRoot: string, repository: Repository): Promi
       if (entry.name.startsWith(".pending-")) continue;
       if (!entry.isFile() || !entry.name.endsWith(".json")) throw new StateError("unexpected entry in snapshot directory");
       const id = entry.name.slice(0, -".json".length);
-      assertSnapshotId(id);
+      try { assertSnapshotId(id); } catch { throw new StateError("unexpected entry in snapshot directory"); }
       if (++count > MAX_SNAPSHOTS) throw new StateError("snapshot limit exceeded");
       yield id;
     }

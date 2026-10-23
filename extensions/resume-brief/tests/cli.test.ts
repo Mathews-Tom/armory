@@ -1,8 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveRepository } from "../helpers/sources.ts";
+import { openStore } from "../helpers/state.ts";
 import { BLOCKERS, CONTEXT, ompSession, project } from "./fixture.ts";
 import type { Project } from "./fixture.ts";
 
@@ -106,4 +108,23 @@ test("invalid arguments, foreign hosts and unsafe data roots are refused", async
   const subdir = await run(["record", ...common.map((value) => (value === item.root ? join(item.root, "docs") : value)), "--context", "brief.json"]);
   expect(JSON.parse(subdir.stderr)).toEqual({ error: "rejected", detail: "repository must be the worktree root itself" });
   expect((await run(["reopen", ...common, "--latest"])).code).toBe(2);
+});
+
+test("malformed snapshot names are rejected without publishing or replacing existing state", async () => {
+  const { item, common } = await setup();
+  const first = await run(["record", ...common, "--context", "brief.json"]);
+  expect(first.code).toBe(0);
+  const { snapshotId } = JSON.parse(first.stdout) as { snapshotId: string };
+  const store = await openStore(item.dataRoot, await resolveRepository(item.root));
+  const snapshotPath = join(store.root, `${snapshotId}.json`);
+  const original = await readFile(snapshotPath);
+  await writeFile(join(store.root, "notes.json"), "{}\n");
+  const names = (await readdir(store.root)).sort();
+  for (const args of [["record", ...common, "--context", "brief.json"], ["list", ...common]]) {
+    const result = await run(args);
+    expect(result.code).toBe(2);
+    expect(JSON.parse(result.stderr)).toMatchObject({ error: "rejected" });
+    expect((await readdir(store.root)).sort()).toEqual(names);
+    expect(await readFile(snapshotPath)).toEqual(original);
+  }
 });
