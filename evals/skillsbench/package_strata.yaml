@@ -103,6 +103,9 @@ excluded:
   - package_type: command
     name: tdd
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
+  - package_type: extension
+    name: verification-receipts
+    rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
   - package_type: hook
     name: anatomy-index
     rationale: Excluded from the fixed one-package hook stratum; its type is represented by the registered sample.

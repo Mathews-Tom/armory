@@ -45,6 +45,15 @@ describe("receipt truth", () => {
     expect(isSuccessfulProof(success, null)).toBe(false);
   });
 
+  test("historical versions remain readable without becoming current proof", () => {
+    for (const key of ["featureVersion", "coreVersion"] as const) {
+      const value = receipt();
+      value.plan[key] = "0.0.0-historical";
+      expect(parseReceipt(value)).toEqual(value);
+      expect(isSuccessfulProof(value, value.plan.before)).toBe(false);
+    }
+  });
+
   test("non-success, unknown applicability and truncated required output never prove success", () => {
     for (const status of ["failed", "cancelled", "incomplete"] as const) {
       const value = receipt();

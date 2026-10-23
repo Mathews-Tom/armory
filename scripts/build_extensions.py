@@ -403,31 +403,57 @@ def check_claude_permissions(
 # ---------------------------------------------------------------------------
 
 
-def bundle_helper(feature_dir: Path, helper: str, bun: str) -> bytes:
+def _bundle_feature_sources(
+    feature_dir: Path, entry: str, bun: str, *, omp_adapter: bool
+) -> bytes:
     """Bundle only a validated immutable snapshot of feature-owned inputs."""
     sources: dict[str, Path] = {}
-    for root in (CORE_DIR, *HELPER_SOURCE_DIRS):
+    roots: tuple[str, ...] = (CORE_DIR, *HELPER_SOURCE_DIRS)
+    if omp_adapter:
+        roots = (*roots, ADAPTER_DIRS["omp"])
+    for root in roots:
         top = feature_dir / root
         if root == CORE_DIR or top.exists() or top.is_symlink():
             sources.update(collect_source_tree(feature_dir, root))
-    if helper not in sources:
-        raise BuildError(f"{feature_dir.name}: declared helper {helper} is missing")
+    if entry not in sources:
+        raise BuildError(f"{feature_dir.name}: bundle entry {entry} is missing")
     # Bun never receives the feature path. Its resolver can only serve these
     # approved bytes, so neither a transitive import nor a concurrent source
     # edit can make it read an unapproved filesystem input.
+    snapshot = {path: _read_source_bytes(feature_dir, path) for path in sources}
+    if omp_adapter:
+        check_artifact_imports(snapshot, "omp")
     try:
         files = {
-            path: _read_source_bytes(feature_dir, path).decode("utf-8")
-            for path in sources
+            path: data.decode("utf-8")
+            for path, data in snapshot.items()
             if path.endswith((*_SCRIPT_SUFFIXES, ".json"))
         }
     except UnicodeError as exc:
         raise BuildError(
-            f"{feature_dir.name}: helper inputs must be UTF-8: {exc}"
+            f"{feature_dir.name}: bundle inputs must be UTF-8: {exc}"
         ) from exc
     return _run_source_tool(
-        {"action": "bundle", "entry": helper, "files": files}, bun
+        {
+            "action": "bundle",
+            "entry": entry,
+            "files": files,
+            "ompAdapter": omp_adapter,
+        },
+        bun,
     ).encode("utf-8")
+
+
+def bundle_helper(feature_dir: Path, helper: str, bun: str) -> bytes:
+    """Bundle an executable helper from its contained core/helper closure."""
+    return _bundle_feature_sources(feature_dir, helper, bun, omp_adapter=False)
+
+
+def bundle_omp_adapter(feature_dir: Path, entry: str, bun: str) -> bytes:
+    """Contain the adapter's runtime helpers without resolving host SDK types."""
+    bundle = _bundle_feature_sources(feature_dir, entry, bun, omp_adapter=True)
+    check_artifact_imports({"omp/index.js": bundle}, "omp")
+    return bundle
 
 
 def core_digest(core_files: dict[str, bytes]) -> str:
@@ -483,8 +509,7 @@ def assemble_artifact(
     files: dict[str, bytes] = dict(core)
     entrypoints: dict[str, Any]
     if host == "omp":
-        for path in adapter:
-            files[path] = _read_source_bytes(feature_dir, path)
+        files[entry] = bundle_omp_adapter(feature_dir, entry, require_bun())
         _add_generated(
             files, OMP_ROOT_ENTRY, f'export {{ default }} from "./{entry}";\n'.encode()
         )

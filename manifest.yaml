@@ -2682,3 +2682,17 @@ packages:
     - verbosity
     category: operations
     difficulty: beginner
+  extensions:
+  - name: verification-receipts
+    version: 1.0.0
+    description: Execute explicitly configured local verification gates and reopen private, scoped evidence with current input
+      freshness in OMP and Claude Code.
+    path: extensions/verification-receipts
+    source: https://github.com/Mathews-Tom/armory/blob/main/extensions/verification-receipts/EXTENSION.md
+    hosts:
+    - claude
+    - omp
+    runtime: bun
+    commands:
+    - armory-verify
+    - armory-evidence

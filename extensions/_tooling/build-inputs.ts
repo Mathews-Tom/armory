@@ -180,6 +180,10 @@ function analyzeClaudePermissions(source: ts.SourceFile): ClaudeAnalysis {
     }
     if (ts.isPropertyAccessExpression(node)) {
       const base = capability(node.expression);
+      // The installed API declares plugin.root as an inert readonly path,
+      // not a transferable API capability or an effect method.
+      if (base?.kind === "api" && base.path.length === 1 &&
+          base.path[0] === "plugin" && node.name.text === "root") return undefined;
       if (base) return { ...base, path: [...base.path, node.name.text] };
     }
     return undefined;
@@ -433,7 +437,7 @@ if (request.action === "analyze") {
         throw new Error(`${path}: core may not import runtime builtins`);
       }
       // OMP SDK declarations are erased, not inputs to the runtime closure.
-      // Keep this exception confined to adapter-prefix builds and adapter files.
+      // Keep this exception confined to adapter builds and adapter files.
       if (
         request.ompAdapter === true && ref.typeOnly && path.startsWith("omp/") &&
         (ref.specifier === "@oh-my-pi/pi-coding-agent" ||

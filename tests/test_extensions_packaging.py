@@ -8,6 +8,7 @@ real feature with a real host session.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -30,6 +31,7 @@ from scripts.build_extensions import (
     build_feature,
     read_content_manifest,
     registered_features,
+    require_bun,
     verify_artifact_dir,
 )
 from scripts.build_extensions import main as build_main
@@ -184,22 +186,13 @@ def test_build_is_byte_identical_across_output_and_source_roots(
 def test_build_produces_host_native_self_contained_artifacts(tmp_path: Path) -> None:
     built = build_feature(FIXTURE, tmp_path / "dist")
     omp, claude = _tree(built["omp"]), _tree(built["claude"])
-    core_source = (FIXTURE / "core" / "index.ts").read_bytes()
 
     assert json.loads(omp["package.json"])["omp"] == {"extensions": ["./index.ts"]}
-    assert omp["index.ts"] == b'export { default } from "./omp/index.ts";\n'
-    assert omp["omp/index.ts"] == (FIXTURE / "omp" / "index.ts").read_bytes()
     plugin = json.loads(claude[".claude-plugin/plugin.json"])
     assert (plugin["name"], plugin["version"]) == (NAME, "1.0.0")
     assert json.loads(claude["hooks/hooks.json"])["modules"] == ["./register.ts"]
-    assert (
-        claude["hooks/register.ts"]
-        == (FIXTURE / "claude-code" / "register.ts").read_bytes()
-    )
 
     for host, files in (("omp", omp), ("claude", claude)):
-        assert files["core/index.ts"] == core_source
-        assert b"countWords" in files["helpers/wordcount.js"]
         assert "LICENSE" in files
         assert not [
             path
@@ -231,6 +224,162 @@ def test_build_produces_host_native_self_contained_artifacts(tmp_path: Path) -> 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def test_detached_omp_command_executes_its_contained_runtime_helper(
+    source_root: Path, tmp_path: Path
+) -> None:
+    """The installed command must work after its source checkout moves away."""
+    feature = source_root / NAME
+    _write(
+        feature / "helpers" / "runtime.ts",
+        'import { readFileSync } from "node:fs";\n'
+        'import { countWords } from "../core/index.ts";\n'
+        "export function countFileWords(path: string): number {\n"
+        '  return countWords(readFileSync(path, "utf8"));\n'
+        "}\n",
+    )
+    _write(
+        feature / "omp" / "index.ts",
+        'import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";\n'
+        'import { formatCount } from "../core/index.ts";\n'
+        'import { countFileWords } from "../helpers/runtime.ts";\n'
+        "export default function register(pi: ExtensionAPI): void {\n"
+        f'  pi.registerCommand("{COMMAND}", {{\n'
+        '    description: "Count words from a local file",\n'
+        "    handler: async (args, ctx) => {\n"
+        '      ctx.ui.notify(formatCount(countFileWords(args)), "info");\n'
+        "    },\n"
+        "  });\n"
+        "}\n",
+    )
+    built = build_feature(feature, tmp_path / "dist")
+    feature.rename(tmp_path / "moved-source")
+    words = tmp_path / "words.txt"
+    words.write_text("one two\nthree\n", encoding="utf-8")
+    script = (
+        f"import register from {json.dumps((built['omp'] / 'index.ts').as_uri())};\n"
+        "const commands = new Map();\n"
+        "const notifications = [];\n"
+        "register({ registerCommand(name, command) { commands.set(name, command); } });\n"
+        f"await commands.get({json.dumps(COMMAND)}).handler({json.dumps(str(words))}, {{\n"
+        "  ui: { notify(message, level) { notifications.push({ message, level }); } },\n"
+        "});\n"
+        "console.log(JSON.stringify(notifications));\n"
+    )
+    result = subprocess.run(
+        [require_bun(), "-e", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    assert json.loads(result.stdout) == [{"message": "3 words", "level": "info"}]
+
+
+def test_production_claude_helper_bundle_executes_and_emits_real_evidence(
+    tmp_path: Path,
+) -> None:
+    """A successful process exit without a receipt is not a usable native helper."""
+    feature = tmp_path / "sources" / "verification-receipts"
+    shutil.copytree(EXTENSION.repo_dir / feature.name, feature)
+    metadata = _fixture_meta()
+    metadata["name"] = feature.name
+    metadata["extension"].update(
+        commands=["armory-verify", "armory-evidence"],
+        helpers=["helpers/claude-cli.ts"],
+        storage="user-private",
+        permissions=["fs.read", "fs.write", "process.spawn"],
+    )
+    (feature / "EXTENSION.md").write_text(
+        f"---\n{yaml.safe_dump(metadata, sort_keys=False)}---\n# Synthetic package\n",
+        encoding="utf-8",
+    )
+    built = build_feature(feature, tmp_path / "dist")
+    repo = tmp_path / "repository"
+    repo.mkdir()
+    (repo / "input.txt").write_text("covered input\n", encoding="utf-8")
+    output = "SYNTHETIC PRIVATE OUTPUT"
+    config = {
+        "schemaVersion": 1,
+        "configId": "detached-helper",
+        "gates": {
+            "check": {
+                "criterionId": "configured-check",
+                "kind": "integration",
+                "executable": require_bun(),
+                "args": ["-e", f"process.stdout.write({json.dumps(output)})"],
+                "cwd": ".",
+                "timeoutMs": 5000,
+                "maxOutputBytes": 4096,
+                "requiresCompleteOutput": True,
+                "scope": {
+                    "paths": ["input.txt"],
+                    "configPaths": ["receipts.json"],
+                    "environmentNames": [],
+                    "datasetIdentity": None,
+                },
+            }
+        },
+    }
+    (repo / "receipts.json").write_text(json.dumps(config), encoding="utf-8")
+    for arguments in (
+        ["init", "--quiet"],
+        ["add", "."],
+        [
+            "-c",
+            "user.name=Armory Fixture",
+            "-c",
+            "user.email=armory-fixture@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "synthetic receipt inputs",
+        ],
+    ):
+        subprocess.run(
+            ["git", *arguments], cwd=repo, check=True, capture_output=True, timeout=30
+        )
+    result = subprocess.run(
+        [
+            require_bun(),
+            str(built["claude"] / "helpers/claude-cli.js"),
+            "run",
+            "--repo",
+            str(repo),
+            "--config",
+            "receipts.json",
+            "--data-root",
+            str(tmp_path / "private-state"),
+            "--session",
+            "synthetic-native-session",
+            "--account",
+            "synthetic-native-account",
+            "--work-context",
+            "synthetic-work",
+            "--gate",
+            "check",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    evidence = json.loads(result.stdout)
+    assert (evidence["status"], evidence["applicability"], evidence["proof"]) == (
+        "passed",
+        "current",
+        True,
+    )
+    assert evidence["output"] == {
+        "sha256": hashlib.sha256(output.encode()).hexdigest(),
+        "capturedBytes": len(output),
+        "totalBytes": len(output),
+        "truncated": False,
+    }
+    assert output not in result.stdout
 
 
 @pytest.mark.parametrize(

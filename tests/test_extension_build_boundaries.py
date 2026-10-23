@@ -99,6 +99,13 @@ def _tree(root: Path) -> dict[str, bytes]:
             id="renamed-network",
         ),
         pytest.param(
+            "api",
+            'const path = api.plugin.root + "/helpers/task.js"; '
+            'await api.process.run(["bun", path]);',
+            "process.spawn",
+            id="readonly-plugin-path-does-not-hide-process-effect",
+        ),
+        pytest.param(
             "$", 'await $.process.run("tool");', "process.spawn", id="literal-control"
         ),
     ],
@@ -357,23 +364,6 @@ def test_dynamic_or_macro_loads_are_refused(source: str) -> None:
         builder.check_artifact_imports({"omp/entry.ts": source.encode()}, "omp")
 
 
-def test_parser_preserves_valid_compact_modules_and_ignores_comment_text(
-    feature: Path, tmp_path: Path
-) -> None:
-    source = (
-        b'const text="require( and import( are documentation";\n'
-        b'// import{x}from"../../outside.ts";\n'
-        b'import{countWords}from"../core/index.ts";'
-        b'export{countWords}from"../core/index.ts";'
-        b"export const value=countWords(text);\n"
-    )
-    (feature / "omp/compact.ts").write_bytes(source)
-    artifacts = builder.build_feature(feature, tmp_path / "output")
-    assert (artifacts["omp"] / "omp/compact.ts").read_bytes() == source
-    manifest = builder.verify_artifact_dir(artifacts["omp"])
-    assert "omp/compact.ts" in {entry["path"] for entry in manifest["files"]}
-
-
 def test_runner_entry_and_transitive_helper_graph_are_detached_and_reproducible(
     feature: Path, tmp_path: Path
 ) -> None:
@@ -516,9 +506,8 @@ def test_host_swap_failure_restores_every_previous_artifact(
             host: output / "extensions" / NAME / host for host in ("omp", "claude")
         }
         before = {}
-    (feature / "core/index.ts").write_text(
-        "export const countWords = (text: string): number => text.trim() ? 99 : 0;\n"
-    )
+    core = feature / "core/index.ts"
+    core.write_text(core.read_text().replace("trimmed.split(/\\s+/u).length", "99"))
     rename = os.rename
     injected = False
 
@@ -664,9 +653,8 @@ def test_rollback_preserves_concurrent_empty_destination_and_retired_artifacts(
     output = tmp_path / "output"
     artifacts = builder.build_feature(feature, output)
     original = {host: _tree(path) for host, path in artifacts.items()}
-    (feature / "core/index.ts").write_text(
-        "export const countWords = (text: string): number => text.trim() ? 99 : 0;\n"
-    )
+    core = feature / "core/index.ts"
+    core.write_text(core.read_text().replace("trimmed.split(/\\s+/u).length", "99"))
     rename = os.rename
     foreign_inode: int | None = None
 

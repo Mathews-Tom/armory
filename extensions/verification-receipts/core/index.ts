@@ -1,6 +1,6 @@
 export const SCHEMA_VERSION = 1 as const;
 export const CORE_VERSION = "1.0.0" as const;
-export const FEATURE_VERSION = "0.0.0-development" as const;
+export const FEATURE_VERSION = "1.0.0" as const;
 export const FEATURE = "verification-receipts" as const;
 export const FINGERPRINT_ALGORITHM = "armory-scope-v1" as const;
 
@@ -146,7 +146,9 @@ export function executionApplicability(before: Snapshot, after: Snapshot | null)
 }
 
 export function isSuccessfulProof(receipt: Receipt, current: Snapshot | null): boolean {
-  return receipt.result.status === "passed"
+  return receipt.plan.featureVersion === FEATURE_VERSION
+    && receipt.plan.coreVersion === CORE_VERSION
+    && receipt.result.status === "passed"
     && receipt.result.descendantsStopped
     && receipt.applicability === "current"
     && compareSnapshots(receipt.plan.before, current) === "current"

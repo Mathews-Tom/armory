@@ -3,7 +3,10 @@
 
 Exit 0: all native scenarios passed; 1: demonstrated regression; 2: arguments;
 3: unavailable prerequisite. Only fixed, advertised local commands are submitted.
-The driver owns its detached bundle, synthetic repository, gates and host group.
+The driver owns scratch builds, synthetic repositories, gates and host groups.
+--artifact loads a verified production OMP artifact unchanged. Otherwise a
+registered definition uses the production build; an unregistered prefix uses
+only a contained source bundle and is reported as such, not as a full artifact.
 """
 
 from __future__ import annotations
@@ -756,12 +759,123 @@ def receipt_for(receipts: list[JsonObject], identity: str) -> JsonObject:
     return matches[0]
 
 
+def prepare_artifact(args: argparse.Namespace, report: JsonObject, root: Path) -> Path:
+    """Select a verified production entry, or explicitly build an unregistered prefix."""
+    checkout = Path(__file__).resolve().parents[3]
+    sys.path.insert(0, str(checkout))
+    from scripts import build_extensions as production
+
+    feature = Path(args.feature_dir).resolve(strict=True)
+    definition = feature / production.EXTENSION_TYPE.definition_file
+    try:
+        if args.artifact or definition.exists() or definition.is_symlink():
+            metadata = production.load_metadata(feature)
+            require(
+                metadata.name == "verification-receipts"
+                and "omp" in metadata.host_entries,
+                "production-source-feature-or-host-mismatch",
+            )
+            artifact = (
+                Path(args.artifact)
+                if args.artifact
+                else production.build_feature(feature, root / "production")["omp"]
+            )
+            manifest = production.verify_artifact_dir(artifact)
+            expected_entries = {
+                "package_manifest": "package.json",
+                "extensions": [production.OMP_ROOT_ENTRY],
+                "adapter": metadata.host_entries["omp"],
+            }
+            require(
+                manifest.get("feature") == metadata.name
+                and manifest.get("host") == "omp"
+                and manifest.get("version") == metadata.version
+                and manifest.get("extension_schema_version") == metadata.schema_version
+                and manifest.get("runtime") == metadata.runtime
+                and manifest.get("entrypoints") == expected_entries,
+                "production-artifact-feature-host-entry-mismatch",
+            )
+            files = {
+                record["path"]: (artifact / record["path"]).read_bytes()
+                for record in manifest["files"]
+            }
+            require(
+                files.get(production.OMP_ROOT_ENTRY)
+                == f'export {{ default }} from "./{metadata.host_entries["omp"]}";\n'.encode(),
+                "production-artifact-root-entry-mismatch",
+            )
+            package_manifest = json.loads(files["package.json"])
+            require(
+                isinstance(package_manifest, dict)
+                and package_manifest.get("name") == metadata.name
+                and package_manifest.get("version") == metadata.version
+                and package_manifest.get("type") == "module"
+                and package_manifest.get("omp")
+                == {"extensions": [f"./{production.OMP_ROOT_ENTRY}"]},
+                "production-artifact-package-entry-mismatch",
+            )
+            production.check_artifact_imports(files, "omp")
+            report["artifact"] = {
+                "mode": "supplied-production" if args.artifact else "built-production",
+                "contentManifestSha256": hashlib.sha256(
+                    (artifact / production.CONTENT_MANIFEST).read_bytes()
+                ).hexdigest(),
+                "sourceDefinitionSha256": hashlib.sha256(
+                    definition.read_bytes()
+                ).hexdigest(),
+                "entry": production.OMP_ROOT_ENTRY,
+                "feature": metadata.name,
+                "host": "omp",
+            }
+            return artifact / production.OMP_ROOT_ENTRY
+
+        # A prefix has no registered definition or production content manifest.
+        # Use the production contained source bundler without inventing either.
+        require(feature.name == "verification-receipts", "prefix-feature-mismatch")
+        artifact = root / "artifact"
+        (artifact / "omp").mkdir(mode=0o700, parents=True)
+        built = artifact / "omp/index.js"
+        bundle = production.bundle_omp_adapter(
+            feature, "omp/index.ts", production.require_bun()
+        )
+        private_write(built, bundle)
+        private_write(
+            artifact / "package.json",
+            json.dumps(
+                {
+                    "name": "armory-verification-receipts-native-smoke",
+                    "private": True,
+                    "type": "module",
+                    "omp": {"extensions": ["./omp/index.js"]},
+                }
+            ),
+        )
+        report["artifact"] = {
+            "mode": "source-built-unregistered-prefix",
+            "bundleSha256": hashlib.sha256(bundle).hexdigest(),
+            "contentManifestSha256": None,
+            "sourceDefinitionSha256": None,
+            "entry": "omp/index.js",
+            "feature": "verification-receipts",
+            "host": "omp",
+        }
+        return built
+    except production.ToolUnavailableError as error:
+        raise Unavailable("production-artifact-build-tool-unavailable") from error
+    except production.BuildError as error:
+        raise Failure("production-artifact-validation-or-build-failed") from error
+    except (KeyError, TypeError, ValueError) as error:
+        raise Failure("production-artifact-binding-invalid") from error
+
+
 def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
     if sys.version_info < (3, 12) or os.name != "posix":
         raise Unavailable("python312-posix-required")
     omp, bun, git = (shutil.which(name) for name in ("omp", "bun", "git"))
     if omp is None or bun is None or git is None:
         raise Unavailable("installed-omp-bun-git-required")
+    # Artifact rejection precedes even the installed host's --version invocation.
+    built = prepare_artifact(args, report, root)
     package, metadata = package_for(omp)
     report["version"] = metadata.get("version")
     if report["version"] != "18.12.6":
@@ -796,18 +910,14 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
     ).decode("utf-8")
     if not re.search(r"\b18\.12\.6\b", version_output):
         raise Unavailable("installed-omp-binary-version-mismatch")
-    feature = Path(args.feature_dir).resolve(strict=True)
-    entry = feature / "omp/index.ts"
-    if not entry.is_file():
-        raise Unavailable("feature-omp-entry-unavailable")
-    artifact, repo, data, sessions = (
-        root / name for name in ("artifact", "repository", "data", "sessions")
-    )
-    for directory in (artifact, repo, data, sessions):
+    repo, data, sessions = (root / name for name in ("repository", "data", "sessions"))
+    for directory in (repo, data, sessions):
         directory.mkdir(mode=0o700)
     finite([git, "init", "--quiet", str(repo)], root, "synthetic-git-init-blocked")
     private_write(repo / "input.txt", "original covered input\n")
     private_write(repo / "unrelated.txt", "original unrelated input\n")
+    (repo / "covered").mkdir(mode=0o700)
+    private_write(repo / "covered" / "baseline.txt", "covered directory baseline\n")
     private_write(repo / "gate.py", GATE)
     token = uuid.uuid4().hex
     secret = "SYNTHETIC_PRIVATE_OUTPUT_" + uuid.uuid4().hex
@@ -833,7 +943,7 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
             "maxOutputBytes": 4096,
             "requiresCompleteOutput": True,
             "scope": {
-                "paths": ["input.txt"],
+                "paths": ["input.txt", "covered"],
                 "configPaths": ["gate.py"],
                 "environmentNames": [],
                 "datasetIdentity": None,
@@ -856,6 +966,7 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
             "unrelated.txt",
             "gate.py",
             "receipts.json",
+            "covered",
         ],
         root,
         "synthetic-git-add-blocked",
@@ -918,51 +1029,6 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
         "ordinaryNativePresenceBookkeepingPossible": True,
         "catalogMetadataTrafficPossible": True,
     }
-    # One standalone ESM bundle, no workspace link or developer import at runtime.
-    (artifact / "omp").mkdir(mode=0o700)
-    built = artifact / "omp" / "index.js"
-    finite(
-        [
-            bun,
-            "build",
-            str(entry),
-            "--target=bun",
-            "--format=esm",
-            "--outfile",
-            str(built),
-        ],
-        root,
-        "detached-adapter-bundle-unavailable",
-    )
-    source = built.read_text()
-    imports = re.findall(
-        r"""(?m)^\s*import\s+(?:[^;\n]*?\s+from\s+)?["']([^"']+)["']""", source
-    )
-    imports += re.findall(
-        r"""(?:import|require)\s*\(\s*["']([^"']+)["']\s*\)""", source
-    )
-    builtin_check = (
-        "import { isBuiltin } from 'node:module';"
-        f"const imports = {json.dumps(imports)};"
-        "console.log(imports.every(s => isBuiltin(s) || s === 'bun' || s.startsWith('bun:')));"
-    )
-    builtins_only = finite(
-        [bun, "-e", builtin_check], root, "detached-bundle-builtin-check-unavailable"
-    )
-    if json.loads(builtins_only) is not True:
-        raise Unavailable("detached-bundle-runtime-import-not-contained")
-    private_write(
-        artifact / "package.json",
-        json.dumps(
-            {
-                "name": "armory-verification-receipts-native-smoke",
-                "private": True,
-                "type": "module",
-                "omp": {"extensions": ["./omp/index.js"]},
-            }
-        ),
-    )
-    os.chmod(built, 0o600)
     argv = [
         omp,
         "--mode",
@@ -1015,13 +1081,34 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
         report["scenarios"][SCENARIOS.index("reopen")]["status"] = "passed"
         (repo / "unrelated.txt").write_text("unrelated edit\n")
         require(host.evidence(repo) == baseline, "unrelated-edit-invalidated-receipt")
-        (repo / "input.txt").write_text("covered edit\n")
-        stale = host.evidence(repo)
-        require(
-            {v["executionId"] for v in stale} == set(results)
-            and all(v["applicability"] == "stale" and not v["proof"] for v in stale),
-            "covered-edit-did-not-stale",
-        )
+        mutations = [
+            (repo / "input.txt", b"covered edit\n"),
+            (repo / "covered" / "new-untracked.txt", b"new covered file\n"),
+            (repo / "covered" / "baseline.txt", None),
+            (
+                repo / "gate.py",
+                (repo / "gate.py").read_bytes() + b"\n# config mutation\n",
+            ),
+        ]
+        for path, replacement in mutations:
+            original = path.read_bytes() if path.exists() else None
+            if replacement is None:
+                path.unlink()
+            else:
+                path.write_bytes(replacement)
+            stale = host.evidence(repo)
+            require(
+                {v["executionId"] for v in stale} == set(results)
+                and all(
+                    v["applicability"] == "stale" and not v["proof"] for v in stale
+                ),
+                "covered-edit-did-not-stale",
+            )
+            if original is None:
+                path.unlink()
+            else:
+                path.write_bytes(original)
+            require(host.evidence(repo) == baseline, "restored-inputs-not-current")
         report["scenarios"][SCENARIOS.index("freshness")]["status"] = "passed"
         barrier = Barrier(root, token)
         barriers.append(barrier)
@@ -1191,9 +1278,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--feature-dir", required=True)
     parser.add_argument("--report", required=True)
+    parser.add_argument(
+        "--artifact",
+        help="Absolute production OMP artifact directory; verified and loaded without rebuilding",
+    )
     args = parser.parse_args()
-    if not Path(args.feature_dir).is_absolute() or not Path(args.report).is_absolute():
-        parser.error("--feature-dir and --report must be absolute")
+    if (
+        not Path(args.feature_dir).is_absolute()
+        or not Path(args.report).is_absolute()
+        or (args.artifact is not None and not Path(args.artifact).is_absolute())
+    ):
+        parser.error("--feature-dir, --report and --artifact must be absolute")
     report_path = Path(args.report)
     if (
         not report_path.parent.is_dir()
