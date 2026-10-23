@@ -834,7 +834,7 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
             {"schemaVersion": 1, "configId": "native-omp-smoke", "gates": gates}
         ),
     )
-    # Do not disable hooks, signing, templates, includes or other Git enforcement.
+    # Synthetic commit metadata only; inherit hooks, signing, credentials and includes.
     finite(
         [
             git,
@@ -854,6 +854,10 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
             git,
             "-C",
             str(repo),
+            "-c",
+            "user.name=Receipt Test",
+            "-c",
+            "user.email=receipt@example.invalid",
             "commit",
             "--quiet",
             "-m",
