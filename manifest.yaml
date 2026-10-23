@@ -2683,6 +2683,19 @@ packages:
     category: operations
     difficulty: beginner
   extensions:
+  - name: delivery-radar
+    version: 1.0.0
+    description: Observe an explicitly selected GitHub pull-request graph in OMP and Claude Code, separating implementation,
+      verification, review, merge and publication with head/base/viewer/time provenance and honest unknowns, without remote
+      actions.
+    path: extensions/delivery-radar
+    source: https://github.com/Mathews-Tom/armory/blob/main/extensions/delivery-radar/EXTENSION.md
+    hosts:
+    - claude
+    - omp
+    runtime: bun
+    commands:
+    - armory-delivery
   - name: resume-brief
     version: 1.0.0
     description: Record and reopen a freshness-checked resume card for an explicitly selected project in OMP and Claude Code,

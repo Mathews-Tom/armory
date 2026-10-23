@@ -2,7 +2,7 @@ import { deriveRadar, renderRadar, validateSelection } from "../core/index.ts";
 import type { Selection } from "../core/types.ts";
 import { observe } from "./github.ts";
 
-const HELP = `Delivery Radar standalone CLI (unregistered core delivery).
+const HELP = `Delivery Radar standalone CLI.
 Usage: bun extensions/delivery-radar/helpers/cli.ts refresh --repo <owner/name> --prs <n,n,...> [--format json|text]
   refresh              Explicit bounded read of only the selected repository and PRs.
   --repo owner/name    Required GitHub repository; uses existing gh read authentication.
@@ -78,4 +78,4 @@ export async function main(args: readonly string[]): Promise<number> {
   }
 }
 
-if (import.meta.main) process.exitCode = await main(process.argv.slice(2));
+process.exitCode = await main(process.argv.slice(2));

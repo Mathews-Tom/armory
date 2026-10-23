@@ -104,6 +104,9 @@ excluded:
     name: tdd
     rationale: Excluded from the fixed one-package command stratum; its type is represented by the registered sample.
   - package_type: extension
+    name: delivery-radar
+    rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
+  - package_type: extension
     name: resume-brief
     rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
   - package_type: extension

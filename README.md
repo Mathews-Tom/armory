@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 153](https://img.shields.io/badge/packages-153-informational)](manifest.yaml)
+[![packages: 155](https://img.shields.io/badge/packages-155-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -44,7 +44,7 @@ Disposable prototypes are evidence within `decision-map`, not a separate package
 
 ## Package Catalog
 
-152 package definitions across seven types. This is an unversioned rolling catalog; individual packages carry their own versions.
+155 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -324,6 +324,8 @@ Native extensions (`extensions/<feature>/EXTENSION.md`) are optional executable 
 | Extension | Capability | Exercised native surface |
 | --- | --- | --- |
 | [verification-receipts](extensions/verification-receipts/) | Run explicitly configured local checks; retain private exact results/output and recompute scoped freshness | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive, macOS arm64 |
+| [resume-brief](extensions/resume-brief/) | Record/reopen source-linked project cards; expose changed facts and non-executable approval holds | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive/headless, macOS arm64 |
+| [delivery-radar](extensions/delivery-radar/) | Read an explicit PR selection; separate implementation, verification, review, merge and publication without remote actions | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive/headless, macOS arm64 |
 
 Extensions are never installed by profiles, presets, the interactive installer, "all" or the all-in-one Claude plugin. Install, update, disable or remove one explicitly per host:
 

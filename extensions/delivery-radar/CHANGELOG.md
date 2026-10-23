@@ -1,0 +1,13 @@
+# Changelog
+
+## 1.0.0
+
+Package and shared core versions are 1.0.0. Native qualification is limited to the exact tested host versions and surfaces below; it does not imply general platform certification.
+
+- Add explicitly selected, bounded read-only GitHub.com observations and a pure Delivery Radar core separating implementation, verification, review, merge and publication. Bind observations to repository, selected PRs, viewer, head, base and sample time; preserve unknown, partial, stale and unavailable evidence.
+- Preserve exact check publishers and complete pagination, distinguish dismissed reviews and unresolved threads, and refuse to infer a tested base from head-only CI or publication from a merged PR. Omit malformed, plain-HTTP, credential-bearing and normalized-schema-incompatible optional display links without discarding independent check outcomes or publisher evidence; keep PR identity validation strict.
+- Add explicit `/armory-delivery` OMP and Claude Code commands with inert text and guarded JSON, session-local semantic transition deduplication, bounded owned refresh and stale-publication suppression. A new Claude refresh awaits all older owned invocations and refuses admission when any cleanup fails, including overlapping chains of three or more requests. No feature data store, daemon, background refresh, model request or remote mutation is introduced.
+- Render complete Claude terminal answers in a command-owned native frame, preserve exact JSON string whitespace across terminal wrapping, and isolate ambient host notices. Execute the production-bundled CLI entry point rather than silently exiting without an observation.
+- Add self-contained host artifacts, package metadata and static eval cases, historical-study EXCLUDED classification, and owned installation/update/disable/removal using disposable roots while preserving foreign files.
+- Keep signed-in local native qualification separate from credential-free CI. Manual drivers bind detached artifacts to canonical source and require actual selected public-PR observations and owned in-flight work cancellation; unexecuted scenarios remain not-run and missing prerequisites remain unavailable. Compatibility is not certified by offline checks.
+- Qualify actual detached native behavior on macOS arm64: OMP 18.12.6 RPC and Claude Code 2.1.309 terminal interactive, plus four whole-native-command Claude headless cases. Observe exact public-PR identities, unknown policy/publication, semantic refresh deduplication, reopening, owned in-flight process termination and stale-publication suppression. Preserve private captures and unchanged canonical/production artifacts; accept only the Claude loader's generated SDK/support configuration in its disposable copy.
