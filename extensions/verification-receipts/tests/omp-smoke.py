@@ -307,6 +307,7 @@ class RPC:
         self.selector = selectors.DefaultSelector()
         self.buffer = b""
         self.stderr_bytes = 0
+        self.default_model_unavailable = False
         self.number = 0
         self.responses: dict[str, JsonObject] = {}
         self.prompt_results: dict[str, JsonObject] = {}
@@ -376,18 +377,22 @@ class RPC:
         events = self.selector.select(remaining)
         if not events:
             raise Unavailable("native-rpc-deadline")
+        disconnected = False
         for key, _ in events:
             chunk = os.read(key.fd, 65536)
             if not chunk:
                 self.selector.unregister(key.fileobj)
                 if key.data == "out":
-                    raise Unavailable(
-                        "native-rpc-disconnected-auth-trust-or-policy-may-block"
-                    )
+                    disconnected = True
                 continue
             if key.data == "err":
                 # Never retain potentially credential-bearing host diagnostics.
                 self.stderr_bytes += len(chunk)
+                if self.ready is None and (
+                    b"No models available." in chunk
+                    or b"Set an API key environment variable:" in chunk
+                ):
+                    self.default_model_unavailable = True
                 if self.stderr_bytes > 4 * MAX_FRAME:
                     raise Unavailable("native-stderr-limit")
                 continue
@@ -398,6 +403,12 @@ class RPC:
                 if line.strip():
                     self.receive(json.loads(line))
             require(len(self.buffer) < MAX_FRAME, "native-frame-limit")
+        if disconnected:
+            raise Unavailable(
+                "native-rpc-no-available-default-model"
+                if self.default_model_unavailable
+                else "native-rpc-disconnected-auth-trust-or-policy-may-block"
+            )
 
     def receive(self, value: JsonObject) -> None:
         require(
