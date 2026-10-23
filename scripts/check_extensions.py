@@ -540,11 +540,15 @@ def _native_gate(
         expected_digest = hashlib.sha256(
             (artifact / CONTENT_MANIFEST).read_bytes()
         ).hexdigest()
-        binding = (
-            evidence.get("artifact", {}).get("contentManifestSha256")
-            if host == "omp" and isinstance(evidence.get("artifact"), dict)
-            else evidence.get("artifactManifestSha256")
-        )
+        if host == "omp":
+            artifact_evidence = evidence.get("artifact")
+            binding = (
+                artifact_evidence.get("contentManifestSha256")
+                if isinstance(artifact_evidence, dict)
+                else None
+            )
+        else:
+            binding = evidence.get("artifactManifestSha256")
         if binding != expected_digest:
             raise GateFailure(
                 f"{host} native evidence does not bind the selected artifact"

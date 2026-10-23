@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -141,6 +142,23 @@ def test_native_evidence_for_another_artifact_cannot_certify_this_build(
     )
     with pytest.raises(check_extensions.GateFailure, match="does not bind"):
         gate(tmp_path, artifact)
+
+
+@pytest.mark.parametrize("artifact_field", [None, "wrong-shape"])
+def test_omp_report_cannot_use_claude_artifact_binding(
+    tmp_path: Path, artifact_field: str | None
+) -> None:
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    manifest = artifact / "armory-extension.json"
+    manifest.write_text('{"selected":"artifact"}\n')
+    report = _report()
+    if artifact_field is not None:
+        report["artifact"] = artifact_field
+    report["artifactManifestSha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    _negative_driver(tmp_path, report, 0)
+    with pytest.raises(check_extensions.GateFailure):
+        check_extensions.omp_native_gate(tmp_path, artifact)
 
 
 def test_actual_claude_driver_without_reviewed_context_is_unavailable(
