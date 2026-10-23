@@ -121,3 +121,40 @@ test("discrepancy fields cannot inject terminal controls or a forged line", () =
   expect(rendered.split("\n")).toHaveLength(3);
   expect(rendered).not.toContain("\nAuthority: forged");
 });
+
+for (const key of ["constructor", "__proto__"]) {
+  test(`persisted snapshots reject unexpected own ${key} fields`, async () => {
+    const item = await setup();
+    const repository = await resolveRepository(item.root);
+    const store = await openStore(item.dataRoot, repository);
+    const snapshot = await store.record(CONTEXT_REF, SELECTION, await observe(repository, SELECTION, Date.now), Date.now());
+    const path = join(store.root, `${snapshot.snapshotId}.json`);
+    const value = JSON.parse(await readFile(path, "utf8")) as { recordedBy: Record<string, unknown> };
+    Object.defineProperty(value.recordedBy, key, { value: "unexpected private content", enumerable: true });
+    await writeFile(path, JSON.stringify(value));
+    await expect(store.read(snapshot.snapshotId)).rejects.toThrow("no such field");
+  });
+}
+
+test("inherited Git locations cannot redirect selected repository observations", async () => {
+  const selected = await setup();
+  const foreign = await setup();
+  await foreign.git("checkout", "--quiet", "-b", "foreign-branch");
+  await foreign.write("docs/PLAN.md", "FOREIGN PLAN\n");
+  await foreign.git("add", ".");
+  await foreign.git("commit", "--quiet", "-m", "foreign plan");
+  const repository = await resolveRepository(selected.root);
+  const expected = await observe(repository, SELECTION, Date.now);
+  const module = join(import.meta.dir, "../helpers/sources.ts");
+  const script = `const {resolveRepository,observe}=await import(${JSON.stringify(module)}); const r=await resolveRepository(process.argv[1]); console.log(JSON.stringify({repository:r,observations:await observe(r,${JSON.stringify(SELECTION)},Date.now)}));`;
+  for (const locations of [
+    { GIT_COMMON_DIR: join(foreign.root, ".git") },
+    { GIT_DIR: join(foreign.root, ".git"), GIT_WORK_TREE: selected.root, GIT_COMMON_DIR: join(foreign.root, ".git"), GIT_INDEX_FILE: join(foreign.root, ".git/index"), GIT_OBJECT_DIRECTORY: join(foreign.root, ".git/objects"), GIT_ALTERNATE_OBJECT_DIRECTORIES: join(foreign.root, ".git/objects"), GIT_NAMESPACE: "foreign", GIT_CEILING_DIRECTORIES: selected.root, GIT_DISCOVERY_ACROSS_FILESYSTEM: "0" },
+  ]) {
+    const child = await exec(process.execPath, ["-e", script, selected.root], { env: { ...process.env, ...locations }, timeout: 20_000 });
+    const actual = JSON.parse(child.stdout) as { repository: typeof repository; observations: typeof expected };
+    expect(actual.repository).toEqual(repository);
+    expect(actual.observations.git).toEqual(expected.git);
+    expect(actual.observations.plan).toEqual(expected.plan);
+  }
+});

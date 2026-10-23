@@ -65,10 +65,19 @@ function code(error: unknown): string | undefined {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined;
 }
 
+const GIT_LOCATION_ENV = new Set([
+  "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+]);
+
 async function gitOutput(root: string, args: string[]): Promise<Buffer> {
+  const env: NodeJS.ProcessEnv = { GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", LC_ALL: "C" };
+  for (const name of Object.keys(process.env)) {
+    if (!GIT_LOCATION_ENV.has(name) && !Object.hasOwn(env, name)) env[name] = process.env[name];
+  }
   const result = await exec("git", ["--literal-pathspecs", "-c", "core.fsmonitor=false", "-C", root, ...args], {
     encoding: "buffer", timeout: 5000, maxBuffer: MAX_BYTES.plan + 1,
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", LC_ALL: "C" },
+    env,
   });
   return result.stdout;
 }

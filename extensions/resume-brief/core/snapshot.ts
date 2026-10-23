@@ -46,9 +46,9 @@ const list = (check: Check, maximum: number): Check => (value, path) => {
 const shape = (fields: Record<string, Check>): Check => (value, path) => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail(path, "object");
   const record = value as Record<string, unknown>;
-  for (const key of Object.keys(record)) if (!(key in fields)) fail(`${path}.${key}`, "no such field");
+  for (const key of Object.keys(record)) if (!Object.hasOwn(fields, key)) fail(`${path}.${key}`, "no such field");
   for (const [key, check] of Object.entries(fields)) {
-    if (!(key in record)) fail(`${path}.${key}`, "present field");
+    if (!Object.hasOwn(record, key)) fail(`${path}.${key}`, "present field");
     check(record[key], `${path}.${key}`);
   }
 };

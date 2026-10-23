@@ -85,3 +85,24 @@ test("a non-private existing data root is refused rather than loosened", async (
   await chmod(item.external, 0o755);
   await expect(openStore(item.external, repository)).rejects.toThrow("0700");
 });
+
+test("the last permitted snapshot stays listable and further records refuse before publication", async () => {
+  const { item, selection } = await recorded();
+  const repository = await resolveRepository(item.root);
+  const store = await openStore(item.dataRoot, repository);
+  for (let start = 0; start < 9999; start += 100) {
+    await Promise.all(Array.from({ length: Math.min(100, 9999 - start) }, async (_, offset) => {
+      const id = `20260101T000000000Z-${(start + offset).toString(16).padStart(8, "0")}`;
+      await writeFile(join(store.root, `${id}.json`), "{}", { mode: 0o600 });
+    }));
+  }
+  const observations = await observe(repository, selection, Date.now);
+  const last = await store.record(WHO, selection, observations, Date.now());
+  const full = await store.list();
+  expect(full).toContain(last.snapshotId);
+  await expect(store.record(WHO, selection, observations, Date.now())).rejects.toThrow("snapshot limit");
+  expect(await store.list()).toEqual(full);
+  const excess = join(store.root, "20260101T000000000Z-ffffffff.json");
+  await writeFile(excess, "{}", { mode: 0o600 });
+  await expect(store.list()).rejects.toThrow("snapshot limit");
+});

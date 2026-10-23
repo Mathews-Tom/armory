@@ -147,19 +147,29 @@ export async function openStore(dataRoot: string, repository: Repository): Promi
     return snapshot;
   }
 
-  async function list(): Promise<string[]> {
-    const names: string[] = [];
+  async function* snapshotIds(): AsyncGenerator<string> {
+    let count = 0;
     for await (const entry of await opendir(directory)) {
       if (entry.name.startsWith(".pending-")) continue;
-      if (names.length >= MAX_SNAPSHOTS || !entry.isFile() || !entry.name.endsWith(".json")) throw new StateError("unexpected entry in snapshot directory");
+      if (!entry.isFile() || !entry.name.endsWith(".json")) throw new StateError("unexpected entry in snapshot directory");
       const id = entry.name.slice(0, -".json".length);
       assertSnapshotId(id);
-      names.push(id);
+      if (++count > MAX_SNAPSHOTS) throw new StateError("snapshot limit exceeded");
+      yield id;
     }
+  }
+
+  async function list(): Promise<string[]> {
+    const names: string[] = [];
+    for await (const id of snapshotIds()) names.push(id);
     return names.sort();
   }
 
   async function record(recordedBy: Context, selection: Selection, observations: Observations, recordedAtMs: number): Promise<Snapshot> {
+    let count = 0;
+    for await (const id of snapshotIds()) {
+      if (++count >= MAX_SNAPSHOTS) throw new StateError(`snapshot limit reached at ${id}; no snapshot was published`);
+    }
     const snapshot: Snapshot = {
       schema: SNAPSHOT_SCHEMA, featureVersion: FEATURE_VERSION, coreVersion: CORE_VERSION,
       snapshotId: newSnapshotId(recordedAtMs), recordedAtMs, recordedBy, repositoryId: repository.repositoryId, selection, observations,
