@@ -107,12 +107,17 @@ Fingerprints prove observations of declared inputs, not complete dependency cove
 ## Exercised verification
 
 ```bash
+uv run python scripts/check_extensions.py --ci
 uv run python scripts/check_extensions.py --feature verification-receipts --stage core
 uv run python scripts/check_extensions.py --feature verification-receipts --stage omp
 ```
+
+`--ci` selects the implemented core and OMP components without starting an authenticated host session. It retains adapter behavior tests, pinned-SDK typechecking, detached reproducible bundle/import-containment checks and catalog validation; registered packages additionally retain offline native validators/test kits, complete builds and owned lifecycle checks. Missing required offline tools or failed checks remain nonzero. Live-host smoke is reported as not requested, never passed.
+
+The explicit `--stage omp` command remains local/manual qualification and fails closed when the real host or its prerequisites are unavailable. CI success is not native compatibility evidence. Reuse unchanged local qualification only while adapter/helper/artifact inputs, host version and advertised surfaces remain applicable.
 
 The prior standalone prefix was exercised with strict TypeScript, ESLint and 28 behavior tests using actual temporary Git repositories, files and processes. Cases included real success/nonzero/missing launch, private output and inert metacharacters, bounded flooding, timeout, IPC-synchronized root/descendant cancellation and CLI SIGINT/SIGTERM, changed-during-run inputs, scoped freshness, publication boundaries, foreign-state preservation and dead-owner reconciliation. An additional actual standalone CLI journey exercised configured exits 0/7, reopened private receipts, unrelated-edit preservation and covered-edit staleness.
 
 Strict TypeScript, ESLint and all 40 feature behavior tests passed for this slice. `tests/omp.test.ts` covers the real runner/store/snapshot through a recording native-API harness: asynchronous safe output, overlap, explicit cancel, lifecycle cancellation, independent factory ownership, reopened scoped freshness, unknown applicability, partition isolation, private-state rejection and publication failure. These tests are separate from actual-host evidence. The OMP prefix acceptance command also passed its actual detached OMP 18.12.6 RPC journey on macOS arm64 with Bun 1.3.14. Python report-boundary tests passed under Python 3.12; Ruff/format and strict driver typing passed. The broader strict Python invocation still reports existing errors in imported `validate_frontmatter.py` and `validate_evals.py`; it is not a repository-wide green claim.
 
-The default full/native gate intentionally remains incomplete/nonzero. Only the OMP RPC prefix is proven; no TUI rendering or native CI provisioning claim is made by the local run. Claude integration and registered native packaging/activation remain undelivered. Optional scheduling, tracing/sandboxing, generic recovery frameworks and extra measurements remain deferred.
+The default full/native gate intentionally remains incomplete/nonzero. Only the OMP RPC prefix is proven; no TUI rendering claim is made by the local run. Claude integration and registered native packaging/activation remain undelivered. Optional scheduling, tracing/sandboxing, generic recovery frameworks and extra measurements remain deferred.

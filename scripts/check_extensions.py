@@ -6,8 +6,9 @@ Exit status: 0 when every executed surface passed, 1 when any surface failed,
 requested gate is not yet implemented (incomplete). A JSON report on stdout
 names the selected stage, ``feature_complete`` and every exercised or
 unavailable surface. Static, test-kit and lifecycle passes never certify
-real-host compatibility. The OMP prefix additionally runs its feature-owned
-actual-host driver; full compatibility still requires both native adapters.
+real-host compatibility. CI runs credential-free offline gates and reports
+native smoke as not requested. The explicit OMP prefix additionally runs its
+feature-owned actual-host driver; full compatibility requires both adapters.
 """
 
 from __future__ import annotations
@@ -35,7 +36,10 @@ import yaml
 from scripts.build_extensions import (
     BuildError,
     ToolUnavailableError,
+    _read_source_bytes,
+    _run_source_tool,
     build_feature,
+    check_artifact_imports,
     collect_source_tree,
     load_metadata,
     registered_features,
@@ -45,7 +49,12 @@ from scripts.build_extensions import (
 )
 from scripts.evaluate_package import evaluate_package
 from scripts.extension_lifecycle import LifecycleError, run_action
-from scripts.extension_metadata import ADAPTER_DIRS, CORE_DIR, is_feature_name
+from scripts.extension_metadata import (
+    ADAPTER_DIRS,
+    CORE_DIR,
+    HELPER_SOURCE_DIRS,
+    is_feature_name,
+)
 from scripts.frontmatter import parse_frontmatter
 from scripts.package_types import MANIFEST_PATH, NATIVE_HOSTS, REPO_ROOT, TYPES
 from scripts.validate_evals import validate_pkg_evals
@@ -285,6 +294,61 @@ def omp_source_gate(bun: str, feature_dir: Path) -> str:
         raise GateFailure(f"{feature_dir.name}: OMP factory registered no commands")
     return (
         f"OMP factory registered {', '.join(commands)} (test-kit probe, not host proof)"
+    )
+
+
+def omp_prefix_build_gate(bun: str, feature_dir: Path) -> str:
+    """Reproduce and probe a detached OMP bundle without registering a package."""
+    sources: dict[str, Path] = {}
+    for root in (CORE_DIR, ADAPTER_DIRS["omp"], *HELPER_SOURCE_DIRS):
+        top = feature_dir / root
+        if root in (CORE_DIR, ADAPTER_DIRS["omp"]) or top.exists() or top.is_symlink():
+            sources.update(collect_source_tree(feature_dir, root))
+    files = {path: _read_source_bytes(feature_dir, path) for path in sources}
+    check_artifact_imports(files, "omp")
+    entry = f"{ADAPTER_DIRS['omp']}/index.ts"
+    if entry not in files:
+        raise GateFailure(f"{feature_dir.name}: OMP adapter entry {entry} is missing")
+    try:
+        inputs = {
+            path: data.decode("utf-8")
+            for path, data in files.items()
+            if path.endswith((".ts", ".js", ".mjs", ".json"))
+        }
+    except UnicodeError as exc:
+        raise BuildError(
+            f"{feature_dir.name}: OMP inputs must be UTF-8: {exc}"
+        ) from exc
+    with tempfile.TemporaryDirectory(prefix="armory-omp-prefix-") as tmp:
+        bundles: list[bytes] = []
+        entries: list[Path] = []
+        for name in ("build-a", "build-b"):
+            artifact = Path(tmp) / name
+            artifact.mkdir()
+            bundle = _run_source_tool(
+                {
+                    "action": "bundle",
+                    "entry": entry,
+                    "files": inputs,
+                    "ompAdapter": True,
+                },
+                bun,
+            ).encode("utf-8")
+            check_artifact_imports({"omp/index.js": bundle}, "omp")
+            detached_entry = artifact / "index.js"
+            detached_entry.write_bytes(bundle)
+            bundles.append(bundle)
+            entries.append(detached_entry)
+        if bundles[0] != bundles[1]:
+            raise GateFailure("OMP prefix bundle bytes differ between build roots")
+        commands = omp_probe(bun, entries[0])
+        if not commands or sorted(commands) != sorted(
+            omp_probe(bun, feature_dir / entry)
+        ):
+            raise GateFailure("detached OMP prefix factory commands differ from source")
+    return (
+        "identical detached OMP bundle bytes across two build roots; source and "
+        "bundle imports confined; factory commands match (offline test-kit, not host proof)"
     )
 
 
@@ -541,15 +605,23 @@ def _native_smoke_gates(
             )
 
 
-def check_stage(feature_dir: Path, stage: str) -> Report:
-    """Run a development-prefix gate for an unregistered feature."""
+def check_stage(feature_dir: Path, stage: str, *, native_smoke: bool = True) -> Report:
+    """Run a prefix gate, with real-host OMP qualification only when requested."""
     report = Report(scope=feature_dir.name, stage=stage)
+    if not native_smoke:
+        report.note("native-smoke", "not-run", "live-host validation not requested")
     bun = _core_gates(report, feature_dir)
     if stage == "omp":
         if bun is not None and report.exit_code == EXIT_OK:
-            if report.run("omp-adapter", lambda: omp_source_gate(bun, feature_dir)):
+            build_ok = report.run(
+                "omp-prefix-build", lambda: omp_prefix_build_gate(bun, feature_dir)
+            )
+            adapter_ok = build_ok and report.run(
+                "omp-adapter", lambda: omp_source_gate(bun, feature_dir)
+            )
+            if native_smoke and adapter_ok:
                 _native_smoke_gates(report, feature_dir, ("omp",))
-        else:
+        elif native_smoke:
             report.note(
                 "omp-native-smoke",
                 "unavailable",
@@ -561,6 +633,8 @@ def check_stage(feature_dir: Path, stage: str) -> Report:
 def check_registered(feature_dir: Path, *, native_smoke: bool) -> Report:
     """Run every static, test-kit, build and lifecycle gate for a registered feature."""
     report = Report(scope=feature_dir.name, stage="full")
+    if not native_smoke:
+        report.note("native-smoke", "not-run", "live-host validation not requested")
     if not report.run("definition", lambda: definition_gate(feature_dir)):
         return report
     metadata = load_metadata(feature_dir)
@@ -612,10 +686,6 @@ def check_registered(feature_dir: Path, *, native_smoke: bool) -> Report:
                 "unavailable",
                 "native launch requires passed static, build and lifecycle prerequisites",
             )
-    else:
-        report.note(
-            "native-smoke", "not-run", "real-host proof requires --native-smoke"
-        )
     report.feature_complete = (
         native_smoke and report.exit_code == EXIT_OK and not missing_hosts
     )
@@ -732,7 +802,7 @@ def check_catalog() -> Report:
 
 
 def check_ci() -> Report:
-    """Run every gate the committed tree selects: prefix stages, full gates and the catalog."""
+    """Run committed offline gates without requesting authenticated native smoke."""
     report = Report(scope="ci", stage="committed")
     for feature_dir in feature_directories(EXTENSION_TYPE.repo_dir):
         try:
@@ -741,9 +811,9 @@ def check_ci() -> Report:
             report.note(f"{feature_dir.name}:stage", "failed", str(exc))
             continue
         sub = (
-            check_registered(feature_dir, native_smoke=True)
+            check_registered(feature_dir, native_smoke=False)
             if stage == "full"
-            else check_stage(feature_dir, stage)
+            else check_stage(feature_dir, stage, native_smoke=False)
         )
         for surface in sub.surfaces:
             report.note(
@@ -763,8 +833,10 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         description=(
             "Run native extension gates. --feature runs the full static/type/package/unit/integration "
             "gate of a registered feature; --stage runs the development-prefix gate of an unregistered "
-            "feature; --native-smoke adds real-host proof; --all --catalog verifies every registered "
-            "extension and its catalog consumers; --ci runs exactly the gates the committed files select."
+            "feature (OMP includes local/manual real-host proof); --native-smoke adds real-host "
+            "proof to a full feature; --all --catalog verifies every registered extension and "
+            "its catalog consumers; --ci runs committed credential-free offline gates only, "
+            "with live-host validation reported as not requested."
         ),
         epilog="Exit status: 0 passed, 1 failed, 2 invalid arguments, 3 incomplete or unavailable.",
     )
@@ -780,7 +852,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     selection.add_argument(
         "--ci",
         action="store_true",
-        help="gates selected by the committed implementation",
+        help="committed credential-free offline gates; no live native smoke",
     )
     parser.add_argument(
         "--catalog",

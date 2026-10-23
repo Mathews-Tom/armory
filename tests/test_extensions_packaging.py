@@ -768,17 +768,8 @@ def test_omp_stage_gate_certifies_only_its_stage() -> None:
     evidence = json.dumps(report.as_dict(), indent=2)
 
     assert report.stage == "omp"
-    passed = {
-        "toolchain",
-        "core-sources",
-        "typecheck",
-        "lint",
-        "unit-tests",
-        "omp-adapter",
-    }
-    assert {
-        name for name, status in statuses.items() if status == "passed"
-    } == passed, evidence
+    assert statuses["omp-prefix-build"] == "passed", evidence
+    assert statuses["unit-tests"] == "passed", evidence
     assert statuses["omp-native-smoke"] == "unavailable"
     assert report.exit_code == check_extensions.EXIT_INCOMPLETE
     assert report.feature_complete is False

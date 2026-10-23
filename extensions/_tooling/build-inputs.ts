@@ -16,6 +16,7 @@ type Request = {
   action: "analyze" | "bundle";
   files: Record<string, string>;
   entry?: string;
+  ompAdapter?: boolean;
 };
 
 const UNSUPPORTED_LOADERS: Readonly<Record<string, true>> = {
@@ -431,6 +432,13 @@ if (request.action === "analyze") {
       if (path.startsWith("core/") && ref.runtimeBuiltin) {
         throw new Error(`${path}: core may not import runtime builtins`);
       }
+      // OMP SDK declarations are erased, not inputs to the runtime closure.
+      // Keep this exception confined to adapter-prefix builds and adapter files.
+      if (
+        request.ompAdapter === true && ref.typeOnly && path.startsWith("omp/") &&
+        (ref.specifier === "@oh-my-pi/pi-coding-agent" ||
+          ref.specifier.startsWith("@oh-my-pi/pi-coding-agent/"))
+      ) continue;
       if (!ref.runtimeBuiltin) {
         const target = resolve(request.files, path, ref.specifier);
         if (path.startsWith("core/") && !target.startsWith("core/")) {
