@@ -1,4 +1,4 @@
-import { CORE_VERSION, FEATURE, FEATURE_VERSION, FINGERPRINT_ALGORITHM, SCHEMA_VERSION } from "./index.ts";
+import { FEATURE, FINGERPRINT_ALGORITHM, SCHEMA_VERSION } from "./index.ts";
 import type { Configuration, Context, Gate, PendingRun, Receipt, RunPlan, Scope, Snapshot } from "./index.ts";
 
 const MAX_OUTPUT = 16 * 1024 * 1024;
@@ -140,7 +140,10 @@ function snapshot(value: unknown): Snapshot {
 
 function plan(value: unknown): RunPlan {
   const item = object(value, ["schemaVersion", "feature", "featureVersion", "coreVersion", "executionId", "repository", "context", "gateId", "gate", "configId", "configPath", "configDigest", "before", "startedAtMs"]);
-  if (item.schemaVersion !== SCHEMA_VERSION || item.feature !== FEATURE || item.featureVersion !== FEATURE_VERSION || item.coreVersion !== CORE_VERSION) reject();
+  if (item.schemaVersion !== SCHEMA_VERSION || item.feature !== FEATURE) reject();
+  // Schema compatibility governs historical reads; version identity governs proof.
+  reference(item.featureVersion);
+  reference(item.coreVersion);
   if (typeof item.executionId !== "string") reject();
   assertExecutionId(item.executionId);
   const repository = object(item.repository, ["repositoryId", "repositoryRoot", "worktreeId", "worktreeRoot", "revision", "dirty"]);

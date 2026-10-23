@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 152](https://img.shields.io/badge/packages-152-informational)](manifest.yaml)
+[![packages: 153](https://img.shields.io/badge/packages-153-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -319,7 +319,11 @@ Superseded by orchestrator agents that provide autonomous workflow orchestration
 
 ## Native Extensions
 
-Native extensions (`extensions/<feature>/EXTENSION.md`) are optional executable modules for OMP and Claude Code. Each feature keeps deterministic rules in a pure shared core and ships one self-contained artifact per host: an OMP package (`package.json` with `omp.extensions`) and a Claude Code mod (`.claude-plugin/plugin.json` plus `hooks/hooks.json`). No extension is registered in the catalog yet; the type, build, check and lifecycle tooling exist so features can land complete.
+Native extensions (`extensions/<feature>/EXTENSION.md`) are optional executable modules for OMP and Claude Code. Each feature keeps deterministic rules in a pure shared core and ships one self-contained artifact per host: an OMP package (`package.json` with `omp.extensions`) and a Claude Code mod (`.claude-plugin/plugin.json` plus `hooks/hooks.json`).
+
+| Extension | Capability | Exercised native surface |
+| --- | --- | --- |
+| [verification-receipts](extensions/verification-receipts/) | Run explicitly configured local checks; retain private exact results/output and recompute scoped freshness | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive, macOS arm64 |
 
 Extensions are never installed by profiles, presets, the interactive installer, "all" or the all-in-one Claude plugin. Install, update, disable or remove one explicitly per host:
 
@@ -331,6 +335,8 @@ uv run python scripts/install.py --type extension --platform claude \
 ```
 
 For OMP the payload goes to the documented discovery directory `<root>/extensions/<feature>/`, and `--action disable` adds `extension-module:<feature>` to `disabledExtensions` in `<root>/config.yml`. For Claude Code the payload goes to `<root>/.armory-native/claude-plugins/<feature>/` and is registered in `env.CLAUDE_CODE_PLUGIN_DIRS` in `<root>/settings.json`; disable removes exactly that entry. Removal deletes only unchanged files Armory installed and the exact registration it added; extension data and foreign configuration stay. To try a built artifact for one session instead, run `omp --extension <artifact>/index.ts` or `claude --plugin-dir <artifact>`. Extensions require [Bun](https://bun.sh) for bundled helpers. Compatibility is claimed only for host versions and surfaces a feature records as actually exercised. See [CONTRIBUTING.md](CONTRIBUTING.md#extension-extensionmd) for the package contract.
+
+Claude's development `--plugin-dir` loader generates SDK files in the supplied directory. Use a disposable artifact copy for that workflow, separate from the managed installation payload; unknown generated files must not be deleted or accepted as Armory-owned to force an update/removal. See the feature's operator guide for explicit configuration, conservative cancellation semantics and fail-closed local/manual qualification. Credential-free CI validates deterministic behavior and distribution, not authenticated native compatibility.
 
 ---
 
@@ -471,7 +477,7 @@ uv run scripts/generate_manifest.py # Regenerate manifest.yaml
 
 **CI pipeline** (`.github/workflows/evals.yml`):
 
-- **PR gate**: validates manifest sync + eval schema on every pull request across all 7 type directories
+- **PR gate**: validates manifest synchronization and eval schemas across all registered package types
 - **Weekly cron**: Monday runs for model drift detection
 
 **Pre-commit hook**: auto-regenerates `manifest.yaml` when any package definition file changes.

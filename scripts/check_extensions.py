@@ -14,6 +14,7 @@ feature-owned actual-host driver; full compatibility requires both adapters.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -34,12 +35,11 @@ if str(_REPO_ROOT) not in sys.path:
 import yaml
 
 from scripts.build_extensions import (
+    CONTENT_MANIFEST,
     BuildError,
     ToolUnavailableError,
-    _read_source_bytes,
-    _run_source_tool,
     build_feature,
-    check_artifact_imports,
+    bundle_omp_adapter,
     collect_source_tree,
     load_metadata,
     registered_features,
@@ -52,7 +52,6 @@ from scripts.extension_lifecycle import LifecycleError, run_action
 from scripts.extension_metadata import (
     ADAPTER_DIRS,
     CORE_DIR,
-    HELPER_SOURCE_DIRS,
     is_feature_name,
 )
 from scripts.frontmatter import parse_frontmatter
@@ -299,42 +298,14 @@ def omp_source_gate(bun: str, feature_dir: Path) -> str:
 
 def omp_prefix_build_gate(bun: str, feature_dir: Path) -> str:
     """Reproduce and probe a detached OMP bundle without registering a package."""
-    sources: dict[str, Path] = {}
-    for root in (CORE_DIR, ADAPTER_DIRS["omp"], *HELPER_SOURCE_DIRS):
-        top = feature_dir / root
-        if root in (CORE_DIR, ADAPTER_DIRS["omp"]) or top.exists() or top.is_symlink():
-            sources.update(collect_source_tree(feature_dir, root))
-    files = {path: _read_source_bytes(feature_dir, path) for path in sources}
-    check_artifact_imports(files, "omp")
     entry = f"{ADAPTER_DIRS['omp']}/index.ts"
-    if entry not in files:
-        raise GateFailure(f"{feature_dir.name}: OMP adapter entry {entry} is missing")
-    try:
-        inputs = {
-            path: data.decode("utf-8")
-            for path, data in files.items()
-            if path.endswith((".ts", ".js", ".mjs", ".json"))
-        }
-    except UnicodeError as exc:
-        raise BuildError(
-            f"{feature_dir.name}: OMP inputs must be UTF-8: {exc}"
-        ) from exc
     with tempfile.TemporaryDirectory(prefix="armory-omp-prefix-") as tmp:
         bundles: list[bytes] = []
         entries: list[Path] = []
         for name in ("build-a", "build-b"):
             artifact = Path(tmp) / name
             artifact.mkdir()
-            bundle = _run_source_tool(
-                {
-                    "action": "bundle",
-                    "entry": entry,
-                    "files": inputs,
-                    "ompAdapter": True,
-                },
-                bun,
-            ).encode("utf-8")
-            check_artifact_imports({"omp/index.js": bundle}, "omp")
+            bundle = bundle_omp_adapter(feature_dir, entry, bun)
             detached_entry = artifact / "index.js"
             detached_entry.write_bytes(bundle)
             bundles.append(bundle)
@@ -525,38 +496,54 @@ def _core_gates(report: Report, feature_dir: Path) -> str | None:
     return bun
 
 
-def omp_native_gate(feature_dir: Path) -> str:
-    """Require the feature's actual RPC journey, not a successful probe exit."""
-    driver = feature_dir / "tests" / "omp-smoke.py"
+def _native_gate(
+    feature_dir: Path,
+    host: str,
+    mode: str,
+    expected_version: str,
+    artifact: Path | None,
+) -> str:
+    """Require real scenario evidence, bound to the selected production artifact."""
+    driver = feature_dir / "tests" / f"{host}-smoke.py"
     if driver.is_symlink() or not driver.is_file():
-        raise GateUnavailable("no feature-owned actual OMP smoke driver")
-    with tempfile.TemporaryDirectory(prefix="armory-omp-native-report-") as scratch:
+        raise GateUnavailable(f"no feature-owned actual {host} smoke driver")
+    with tempfile.TemporaryDirectory(prefix=f"armory-{host}-native-report-") as scratch:
         report_path = Path(scratch) / "report.json"
-        result = _run(
-            [
-                sys.executable,
-                str(driver),
-                "--feature-dir",
-                str(feature_dir),
-                "--report",
-                str(report_path),
-            ],
-            feature_dir,
-        )
+        argv = [
+            sys.executable,
+            str(driver),
+            "--feature-dir",
+            str(feature_dir),
+            "--report",
+            str(report_path),
+        ]
+        if artifact is not None:
+            argv.extend(["--artifact", str(artifact)])
+        result = _run(argv, feature_dir)
         try:
             evidence = json.loads(report_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise GateFailure("OMP native driver produced no valid report") from exc
+            raise GateFailure(f"{host} native driver produced no valid report") from exc
     if not isinstance(evidence, dict):
-        raise GateFailure("OMP native report must be an object")
+        raise GateFailure(f"{host} native report must be an object")
     reason = evidence.get("reasonCode")
     if not isinstance(reason, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", reason):
         reason = "native-prerequisite-unavailable"
     if result.returncode == EXIT_INCOMPLETE and evidence.get("status") == "unavailable":
-        raise GateUnavailable(f"OMP RPC smoke unavailable: {reason}")
-    expected_version = json.loads(
-        (EXTENSION_TYPE.repo_dir / "package.json").read_text(encoding="utf-8")
-    )["devDependencies"]["@oh-my-pi/pi-coding-agent"]
+        raise GateUnavailable(f"{host} {mode} smoke unavailable: {reason}")
+    if artifact is not None:
+        expected_digest = hashlib.sha256(
+            (artifact / CONTENT_MANIFEST).read_bytes()
+        ).hexdigest()
+        binding = (
+            evidence.get("artifact", {}).get("contentManifestSha256")
+            if host == "omp" and isinstance(evidence.get("artifact"), dict)
+            else evidence.get("artifactManifestSha256")
+        )
+        if binding != expected_digest:
+            raise GateFailure(
+                f"{host} native evidence does not bind the selected artifact"
+            )
     scenarios = evidence.get("scenarios")
     required = {
         "success",
@@ -572,8 +559,8 @@ def omp_native_gate(feature_dir: Path) -> str:
         result.returncode != 0
         or type(evidence.get("schemaVersion")) is not int
         or evidence["schemaVersion"] != 1
-        or evidence.get("host") != "omp"
-        or evidence.get("mode") != "rpc"
+        or evidence.get("host") != host
+        or evidence.get("mode") != mode
         or evidence.get("version") != expected_version
         or evidence.get("status") != "passed"
         or not isinstance(scenarios, list)
@@ -586,23 +573,36 @@ def omp_native_gate(feature_dir: Path) -> str:
         )
         or {case["name"] for case in scenarios} != required
     ):
-        raise GateFailure("OMP actual-host scenario evidence is failed or incomplete")
-    return f"OMP {expected_version} RPC: actual configured execution, persistence, scoped freshness and cancellation"
+        raise GateFailure(
+            f"{host} actual-host scenario evidence is failed or incomplete: {reason}"
+        )
+    return f"{host} {expected_version} {mode}: actual execution, persistence, scoped freshness and cancellation"
+
+
+def omp_native_gate(feature_dir: Path, artifact: Path | None = None) -> str:
+    expected_version = json.loads(
+        (EXTENSION_TYPE.repo_dir / "package.json").read_text(encoding="utf-8")
+    )["devDependencies"]["@oh-my-pi/pi-coding-agent"]
+    return _native_gate(feature_dir, "omp", "rpc", expected_version, artifact)
+
+
+def claude_native_gate(feature_dir: Path, artifact: Path | None = None) -> str:
+    _, version = _claude()
+    return _native_gate(
+        feature_dir, "claude", "interactive", version.split()[0], artifact
+    )
 
 
 def _native_smoke_gates(
-    report: Report, feature_dir: Path, hosts: tuple[str, ...]
+    report: Report,
+    feature_dir: Path,
+    hosts: tuple[str, ...],
+    artifacts: dict[str, Path] | None = None,
 ) -> None:
     for host in hosts:
-        if host == "omp":
-            report.run("omp-native-smoke", lambda: omp_native_gate(feature_dir))
-        else:
-            report.note(
-                f"{host}-native-smoke",
-                "unavailable",
-                "no real-host smoke driver is implemented for this host; static, test-kit and "
-                "lifecycle passes do not establish native compatibility",
-            )
+        artifact = artifacts.get(host) if artifacts is not None else None
+        gate = omp_native_gate if host == "omp" else claude_native_gate
+        report.run(f"{host}-native-smoke", partial(gate, feature_dir, artifact))
 
 
 def check_stage(feature_dir: Path, stage: str, *, native_smoke: bool = True) -> Report:
@@ -639,6 +639,13 @@ def check_registered(feature_dir: Path, *, native_smoke: bool) -> Report:
         return report
     metadata = load_metadata(feature_dir)
     bun = _core_gates(report, feature_dir)
+    missing_hosts = [host for host in NATIVE_HOSTS if host not in metadata.hosts]
+    if missing_hosts:
+        report.note(
+            "host-coverage",
+            "incomplete",
+            f"no native adapter declared for {', '.join(missing_hosts)}",
+        )
     with tempfile.TemporaryDirectory(prefix="armory-check-") as tmp:
         scratch = Path(tmp)
         built: dict[str, Path] = {}
@@ -670,22 +677,15 @@ def check_registered(feature_dir: Path, *, native_smoke: bool) -> Report:
                 )
         for host in metadata.hosts:
             report.run(f"{host}-lifecycle", partial(lifecycle_gate, feature_dir, host))
-    missing_hosts = [host for host in NATIVE_HOSTS if host not in metadata.hosts]
-    if missing_hosts:
-        report.note(
-            "host-coverage",
-            "incomplete",
-            f"no native adapter declared for {', '.join(missing_hosts)}",
-        )
-    if native_smoke:
-        if report.exit_code == EXIT_OK:
-            _native_smoke_gates(report, feature_dir, metadata.hosts)
-        else:
-            report.note(
-                "native-smoke",
-                "unavailable",
-                "native launch requires passed static, build and lifecycle prerequisites",
-            )
+        if native_smoke:
+            if report.exit_code == EXIT_OK:
+                _native_smoke_gates(report, feature_dir, metadata.hosts, built)
+            else:
+                report.note(
+                    "native-smoke",
+                    "unavailable",
+                    "native launch requires passed static, build and lifecycle prerequisites",
+                )
     report.feature_complete = (
         native_smoke and report.exit_code == EXIT_OK and not missing_hosts
     )
