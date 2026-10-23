@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { SCHEMA } from "../core/types.ts";
 import type { Binding, Check, Observation, Publication, PullIdentity, PullObservation, RequiredPolicy, Review, ReviewThread, Selection, Source, SourceStatus } from "../core/types.ts";
-import { validateSelection } from "../core/validation.ts";
+import { validUrl, validateSelection } from "../core/validation.ts";
 
 // No implicit polling or retries: each refresh has one finite observation budget.
 const MAX_REQUESTS = 320;
@@ -41,7 +41,10 @@ function url(value: unknown): string | null {
   try { const parsed = new URL(result); return parsed.protocol === "https:" && !parsed.username && !parsed.password ? result : malformed(); } catch { return malformed(); }
 }
 function displayUrl(value: unknown): string | null {
-  try { return url(value); } catch (error) {
+  try {
+    const result = url(value);
+    return result !== null && validUrl(result) ? result : null;
+  } catch (error) {
     if (error instanceof ReadFailure && error.status === "malformed") return null;
     throw error;
   }

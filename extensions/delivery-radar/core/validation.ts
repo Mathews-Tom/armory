@@ -40,10 +40,10 @@ function nullableText(value: unknown): boolean { return value === null || text(v
 function nullableOid(value: unknown): boolean { return value === null || oid(value); }
 function dateOrNull(value: unknown): boolean { return value === null || timestamp(value) !== null; }
 function publisher(value: unknown): boolean { return value === null || (Number.isSafeInteger(value) && (value as number) > 0); }
-function url(value: unknown): boolean { return typeof value === "string" && /^https:\/\/[^\s/?#]+(?:\/[^\s]*)?$/.test(value) && provenance(value); }
+export function validUrl(value: unknown): boolean { return typeof value === "string" && /^https:\/\/[^\s/?#]+(?:\/[^\s]*)?$/.test(value) && provenance(value); }
 
 export function identity(value: unknown): value is PullIdentity {
-  return record(value) && Number.isSafeInteger(value.number) && (value.number as number) > 0 && url(value.url) && typeof value.title === "string" && value.title.length <= 4096 &&
+  return record(value) && Number.isSafeInteger(value.number) && (value.number as number) > 0 && validUrl(value.url) && typeof value.title === "string" && value.title.length <= 4096 &&
     ["OPEN", "CLOSED", "MERGED"].includes(value.state as string) && oid(value.headOid) && oid(value.baseOid) && text(value.headRef) && text(value.baseRef) &&
     (value.headRepository === null || repository(value.headRepository)) && typeof value.draft === "boolean" && ["MERGEABLE", "CONFLICTING", "UNKNOWN"].includes(value.mergeable as string) && nullableOid(value.mergeCommitOid);
 }
@@ -65,7 +65,7 @@ export function threads(value: unknown): value is readonly ReviewThread[] {
 export function checks(value: unknown): value is readonly Check[] {
   return list(value, (item): item is Check => record(item) && text(item.id) && text(item.context) && publisher(item.publisherId) &&
     ["pending", "passed", "failed", "cancelled", "unknown"].includes(item.state as string) && oid(item.headOid) && nullableOid(item.testedBaseOid) &&
-    (item.url === null || url(item.url)) && dateOrNull(item.completedAt) && (item.state !== "passed" || item.completedAt !== null));
+    (item.url === null || validUrl(item.url)) && dateOrNull(item.completedAt) && (item.state !== "passed" || item.completedAt !== null));
 }
 
 export function policy(value: unknown): value is RequiredPolicy {
@@ -79,7 +79,7 @@ export function policy(value: unknown): value is RequiredPolicy {
 export function publication(value: unknown): value is Publication {
   return record(value) && ["published", "pending", "failed", "unknown"].includes(value.state as string) && nullableOid(value.commitOid) &&
     Array.isArray(value.artifactIds) && value.artifactIds.length <= 1000 && value.artifactIds.every(text) && new Set(value.artifactIds).size === value.artifactIds.length &&
-    (value.url === null || url(value.url));
+    (value.url === null || validUrl(value.url));
 }
 
 export function provenance(value: unknown): boolean {

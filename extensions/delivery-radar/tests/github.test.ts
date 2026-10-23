@@ -4,6 +4,7 @@ import type { ChildProcess } from "node:child_process";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { deriveRadar } from "../core/index.ts";
 import type { Observation, PullObservation, Selection } from "../core/types.ts";
 import { observe } from "../helpers/github.ts";
 
@@ -322,6 +323,23 @@ for (const unsafe of ["not a URL", "http://ci.example/run/7", "https://user:priv
     ]);
     expect(checks.value?.[0]?.publisherId).toBe(15368);
     expect(checks.value?.[1]?.publisherId).toBeNull();
+  });
+}
+
+for (const [name, unsafe] of [
+  ["path whitespace", "https://ci.example/build results/7"],
+  ["leading whitespace", " https://ci.example/run/7"],
+  ["trailing whitespace", "https://ci.example/run/7 "],
+  ["authority query", "https://ci.example?run=7"],
+  ["authority fragment", "https://ci.example#run"],
+  ["overlong display URL", `https://ci.example/${"x".repeat(4096)}`],
+] as const) {
+  test(`display URL schema mismatch cannot hide pending verification: ${name}`, async () => {
+    const { observation } = await scenario({ checks: "pending", checkUrl: unsafe, statusUrl: unsafe });
+    const checks = firstPull(observation).checks;
+    expect(checks.value?.map((check) => check.url)).toEqual([null, null]);
+    expect(checks.value?.[0]?.publisherId).toBe(15368);
+    expect(deriveRadar(observation, observation.finishedAt).pulls[0]?.verification.state).toBe("pending");
   });
 }
 for (const checks of ["pending", "rate-limited", "unavailable", "malformed"] as const) {
