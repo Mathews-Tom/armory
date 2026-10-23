@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
+import { closeSync, constants, fstatSync, fsyncSync, readSync, writeSync } from "node:fs";
 import type { Stats } from "node:fs";
-import { link, lstat, mkdir, open, opendir, realpath, unlink } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalJson, CORE_VERSION, FEATURE, FEATURE_VERSION, formatTimestamp, SNAPSHOT_SCHEMA } from "../core/index.ts";
@@ -9,6 +9,7 @@ import type { Context, Json, Observations } from "../core/index.ts";
 import { assertSnapshotId, parseSnapshot } from "../core/snapshot.ts";
 import type { Snapshot } from "../core/snapshot.ts";
 import type { Repository, Selection } from "./sources.ts";
+import { createTemporary, directoryNames, linkAt, openAt, openDirectory, unlinkAt } from "./contained-open.ts";
 
 const MAX_SNAPSHOT_BYTES = 1024 * 1024;
 const MAX_SNAPSHOTS = 10_000;
@@ -35,19 +36,17 @@ function owned(stat: Stats): boolean {
   return process.getuid === undefined || stat.uid === process.getuid();
 }
 
-async function privateDirectory(path: string, create: boolean): Promise<void> {
-  if (create) {
-    try { await mkdir(path, { mode: 0o700 }); } catch (error) { if (code(error) !== "EEXIST") throw error; }
-  }
-  const stat = await lstat(path);
-  if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o777) !== 0o700 || !owned(stat)) {
+function privateStat(descriptor: number): Stats {
+  const stat = fstatSync(descriptor);
+  if (!stat.isDirectory() || (stat.mode & 0o777) !== 0o700 || !owned(stat)) {
     throw new StateError("state directory must be an owned 0700 directory, not a link");
   }
+  return stat;
 }
 
-async function syncDirectory(path: string): Promise<void> {
-  const directory = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-  try { await directory.sync(); } finally { await directory.close(); }
+function privateDirectory(path: string, create: boolean): Stats {
+  const descriptor = openDirectory(path, create);
+  try { return privateStat(descriptor); } finally { closeSync(descriptor); }
 }
 
 /** Resolve a possibly not-yet-existing path through its deepest existing ancestor. */
@@ -66,44 +65,50 @@ async function canonicalFuture(path: string): Promise<string> {
 }
 
 /** Exclusive, durable, no-clobber publication: a staged 0600 file is hard-linked into place. */
-async function publish(path: string, bytes: Uint8Array): Promise<void> {
-  const staging = join(dirname(path), `.pending-${randomUUID()}`);
-  const handle = await open(staging, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+function publish(directory: number, name: string, bytes: Uint8Array): void {
+  const { descriptor, name: staging } = createTemporary(directory, `.pending-${randomUUID()}`);
   try {
-    await handle.writeFile(bytes);
-    await handle.sync();
+    try {
+      let offset = 0;
+      while (offset < bytes.length) {
+        const written = writeSync(descriptor, bytes, offset, bytes.length - offset);
+        if (written === 0) throw new StateError("snapshot write made no progress");
+        offset += written;
+      }
+      fsyncSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+    linkAt(directory, staging, name);
   } finally {
-    await handle.close();
+    unlinkAt(directory, staging);
   }
-  try {
-    await link(staging, path);
-  } finally {
-    await unlink(staging);
-  }
-  await syncDirectory(dirname(path));
+  fsyncSync(directory);
 }
 
-async function privateRead(path: string): Promise<Buffer> {
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+function privateRead(directory: number, name: string): Buffer {
+  const descriptor = openAt(directory, name, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
-    const before = await handle.stat();
+    const before = fstatSync(descriptor);
     if (!before.isFile() || (before.mode & 0o777) !== 0o600 || !owned(before) || before.nlink !== 1 || before.size > MAX_SNAPSHOT_BYTES) {
       throw new StateError("snapshot must be an owned, private, single-link regular file within its size bound");
     }
     const bytes = Buffer.alloc(before.size + 1);
     let length = 0;
     while (length < bytes.length) {
-      const { bytesRead } = await handle.read(bytes, length, bytes.length - length, length);
+      const bytesRead = readSync(descriptor, bytes, length, bytes.length - length, length);
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    const after = await lstat(path);
-    if (length !== before.size || after.ino !== before.ino || after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
+    const current = openAt(directory, name, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let after: Stats;
+    try { after = fstatSync(current); } finally { closeSync(current); }
+    if (length !== before.size || after.dev !== before.dev || after.ino !== before.ino || after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
       throw new StateError("snapshot changed while being read");
     }
     return bytes.subarray(0, length);
   } finally {
-    await handle.close();
+    closeSync(descriptor);
   }
 }
 
@@ -123,19 +128,34 @@ export async function openStore(dataRoot: string, repository: Repository): Promi
   for (const forbidden of [repository.repositoryRoot, repository.worktreeRoot, packageRoot]) {
     if (inside(await realpath(forbidden), external)) throw new StateError("data root must be outside the repository, worktree and package");
   }
-  await mkdir(external, { recursive: true, mode: 0o700 });
-  await privateDirectory(external, false);
+  let identity = privateDirectory(external, true);
   let root = external;
   for (const component of [FEATURE, repository.repositoryId, "snapshots"]) {
     root = join(root, component);
-    await privateDirectory(root, true);
+    identity = privateDirectory(root, true);
   }
   const directory = root;
+  const expected = identity;
+
+  function withDirectory<T>(action: (descriptor: number) => T): T {
+    let descriptor: number;
+    try { descriptor = openDirectory(directory); } catch (error) {
+      if (code(error) === "ENOTDIR" || code(error) === "ELOOP") throw new StateError("snapshot directory was replaced");
+      throw error;
+    }
+    try {
+      const current = privateStat(descriptor);
+      if (current.dev !== expected.dev || current.ino !== expected.ino) throw new StateError("snapshot directory was replaced");
+      return action(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+  }
 
   async function read(snapshotId: string): Promise<Snapshot> {
     assertSnapshotId(snapshotId);
     let bytes: Buffer;
-    try { bytes = await privateRead(join(directory, `${snapshotId}.json`)); } catch (error) {
+    try { bytes = withDirectory(descriptor => privateRead(descriptor, `${snapshotId}.json`)); } catch (error) {
       if (code(error) === "ENOENT") throw new StateError("snapshot not found");
       throw error;
     }
@@ -147,12 +167,14 @@ export async function openStore(dataRoot: string, repository: Repository): Promi
     return snapshot;
   }
 
-  async function* snapshotIds(): AsyncGenerator<string> {
+  function* snapshotIds(descriptor: number): Generator<string> {
     let count = 0;
-    for await (const entry of await opendir(directory)) {
-      if (entry.name.startsWith(".pending-")) continue;
-      if (!entry.isFile() || !entry.name.endsWith(".json")) throw new StateError("unexpected entry in snapshot directory");
-      const id = entry.name.slice(0, -".json".length);
+    for (const name of directoryNames(descriptor)) {
+      if (name.startsWith(".pending-")) continue;
+      if (!name.endsWith(".json")) throw new StateError("unexpected entry in snapshot directory");
+      const entry = openAt(descriptor, name, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      try { if (!fstatSync(entry).isFile()) throw new StateError("unexpected entry in snapshot directory"); } finally { closeSync(entry); }
+      const id = name.slice(0, -".json".length);
       try { assertSnapshotId(id); } catch { throw new StateError("unexpected entry in snapshot directory"); }
       if (++count > MAX_SNAPSHOTS) throw new StateError("snapshot limit exceeded");
       yield id;
@@ -160,25 +182,25 @@ export async function openStore(dataRoot: string, repository: Repository): Promi
   }
 
   async function list(): Promise<string[]> {
-    const names: string[] = [];
-    for await (const id of snapshotIds()) names.push(id);
-    return names.sort();
+    return withDirectory(descriptor => [...snapshotIds(descriptor)].sort());
   }
 
   async function record(recordedBy: Context, selection: Selection, observations: Observations, recordedAtMs: number): Promise<Snapshot> {
-    let count = 0;
-    for await (const id of snapshotIds()) {
-      if (++count >= MAX_SNAPSHOTS) throw new StateError(`snapshot limit reached at ${id}; no snapshot was published`);
-    }
-    const snapshot: Snapshot = {
-      schema: SNAPSHOT_SCHEMA, featureVersion: FEATURE_VERSION, coreVersion: CORE_VERSION,
-      snapshotId: newSnapshotId(recordedAtMs), recordedAtMs, recordedBy, repositoryId: repository.repositoryId, selection, observations,
-    };
-    parseSnapshot(JSON.parse(JSON.stringify(snapshot)) as unknown);
-    const bytes = new TextEncoder().encode(`${canonicalJson(snapshot as unknown as Json)}\n`);
-    if (bytes.byteLength > MAX_SNAPSHOT_BYTES) throw new StateError("snapshot exceeds its size bound");
-    await publish(join(directory, `${snapshot.snapshotId}.json`), bytes);
-    return snapshot;
+    return withDirectory(descriptor => {
+      let count = 0;
+      for (const id of snapshotIds(descriptor)) {
+        if (++count >= MAX_SNAPSHOTS) throw new StateError(`snapshot limit reached at ${id}; no snapshot was published`);
+      }
+      const snapshot: Snapshot = {
+        schema: SNAPSHOT_SCHEMA, featureVersion: FEATURE_VERSION, coreVersion: CORE_VERSION,
+        snapshotId: newSnapshotId(recordedAtMs), recordedAtMs, recordedBy, repositoryId: repository.repositoryId, selection, observations,
+      };
+      parseSnapshot(JSON.parse(JSON.stringify(snapshot)) as unknown);
+      const bytes = new TextEncoder().encode(`${canonicalJson(snapshot as unknown as Json)}\n`);
+      if (bytes.byteLength > MAX_SNAPSHOT_BYTES) throw new StateError("snapshot exceeds its size bound");
+      publish(descriptor, `${snapshot.snapshotId}.json`, bytes);
+      return snapshot;
+    });
   }
 
   return { root: directory, record, read, list };

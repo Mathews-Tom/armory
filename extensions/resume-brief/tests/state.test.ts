@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmod, lstat, readFile, symlink, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, lstat, mkdir, readFile, readdir, rename, symlink, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Context } from "../core/index.ts";
 import { observe, resolveRepository } from "../helpers/sources.ts";
@@ -106,3 +106,41 @@ test("the last permitted snapshot stays listable and further records refuse befo
   await writeFile(excess, "{}", { mode: 0o600 });
   await expect(store.list()).rejects.toThrow("snapshot limit");
 });
+
+test("a replaced snapshot-directory link cannot redirect publication", async () => {
+  const { item, selection } = await recorded();
+  const repository = await resolveRepository(item.root);
+  const store = await openStore(item.dataRoot, repository);
+  const observations = await observe(repository, selection, Date.now);
+  const outside = join(item.external, "foreign-snapshot-target");
+  await mkdir(outside, { mode: 0o700 });
+  await rename(store.root, `${store.root}-preserved`);
+  await symlink(outside, store.root);
+  let rejected = false;
+  try { await store.record(WHO, selection, observations, Date.now()); } catch { rejected = true; }
+  expect({ rejected, outside: await readdir(outside) }).toEqual({ rejected: true, outside: [] });
+});
+
+for (const operation of ["record", "read", "list"] as const) {
+  test(`a replaced storage ancestor cannot redirect ${operation}`, async () => {
+    const { item, selection } = await recorded();
+    const repository = await resolveRepository(item.root);
+    const store = await openStore(item.dataRoot, repository);
+    const observations = await observe(repository, selection, Date.now);
+    const snapshot = await store.record(WHO, selection, observations, Date.now());
+    const name = `${snapshot.snapshotId}.json`;
+    const original = await readFile(join(store.root, name));
+    const outside = join(item.external, "foreign-store");
+    const foreignSnapshots = join(outside, "snapshots");
+    await mkdir(foreignSnapshots, { recursive: true, mode: 0o700 });
+    await writeFile(join(foreignSnapshots, name), original, { mode: 0o600 });
+    await rename(dirname(store.root), `${dirname(store.root)}-preserved`);
+    await symlink(outside, dirname(store.root));
+    const action = operation === "record"
+      ? store.record(WHO, selection, observations, Date.now())
+      : operation === "read" ? store.read(snapshot.snapshotId) : store.list();
+    await expect(action).rejects.toThrow();
+    expect(await readdir(foreignSnapshots)).toEqual([name]);
+    expect(await readFile(join(foreignSnapshots, name))).toEqual(original);
+  });
+}
