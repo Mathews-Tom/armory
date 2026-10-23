@@ -1,7 +1,7 @@
 /**
  * OMP factory probe: loads one extension entry exactly as OMP's loader does
  * (default export or module-level factory), calls it with a recording
- * ExtensionAPI and prints the registered command names as JSON.
+ * ExtensionAPI, emits a recording session_start and prints command names.
  *
  * This is a test-kit check of the factory contract, not host proof: no OMP
  * session, model, UI or command handler runs.
@@ -28,11 +28,21 @@ if (typeof candidate !== "function") {
 
 const commands: string[] = [];
 const calls: string[] = [];
+const startupHandlers: Array<(event: unknown, context: unknown) => unknown> = [];
 const recorder = new Proxy(
   {},
   {
     get(_target, property) {
       const name = String(property);
+      if (name === "getCommands") {
+        return () => commands.map((command) => ({ name: command, source: "extension" }));
+      }
+      if (name === "on") {
+        return (event: string, handler: (event: unknown, context: unknown) => unknown) => {
+          if (event === "session_start") startupHandlers.push(handler);
+          calls.push(`on:${event}`);
+        };
+      }
       if (name === "registerCommand") {
         return (commandName: string) => {
           commands.push(commandName);
@@ -46,4 +56,7 @@ const recorder = new Proxy(
 ) as ExtensionAPI;
 
 await (candidate as ExtensionFactory)(recorder);
+for (const handler of startupHandlers) {
+  await handler({ type: "session_start" }, { mode: "print", hasUI: false });
+}
 process.stdout.write(`${JSON.stringify({ commands, calls })}\n`);

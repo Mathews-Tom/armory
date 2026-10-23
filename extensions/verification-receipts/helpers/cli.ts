@@ -1,10 +1,12 @@
 import { userInfo } from "node:os";
 import { join } from "node:path";
-import { FEATURE_VERSION, compareSnapshots, isSuccessfulProof } from "../core/index.ts";
-import type { Applicability, Context, Receipt, Snapshot } from "../core/index.ts";
+import { FEATURE_VERSION } from "../core/index.ts";
+import type { Context } from "../core/index.ts";
 import { assertContext, assertExecutionId } from "../core/validation.ts";
+import { projectReceipt } from "./evidence.ts";
+import type { ReceiptProjection } from "./evidence.ts";
 import { executeGate } from "./runner.ts";
-import { captureSnapshot, loadConfiguration, resolveRepository } from "./scope.ts";
+import { resolveRepository } from "./scope.ts";
 import { createStore } from "./storage.ts";
 
 const HELP = `Development-only verification receipts (${FEATURE_VERSION}); standalone host only.
@@ -66,32 +68,6 @@ function parseArguments(args: string[]): Arguments {
   return result;
 }
 
-interface Projection {
-  executionId: string;
-  status: Receipt["result"]["status"];
-  applicability: Applicability;
-  proof: boolean;
-  output: Pick<Receipt["artifact"], "sha256" | "capturedBytes" | "totalBytes" | "truncated">;
-}
-
-async function project(receipt: Receipt, args: Arguments, key: Uint8Array): Promise<Projection> {
-  let current: Snapshot | null = null;
-  try {
-    const repository = await resolveRepository(args.repositoryRoot);
-    const config = await loadConfiguration(repository.worktreeRoot, args.configPath);
-    if (repository.repositoryId === receipt.plan.repository.repositoryId
-      && repository.worktreeId === receipt.plan.repository.worktreeId
-      && config.configPath === receipt.plan.configPath) {
-      current = await captureSnapshot(repository.worktreeRoot, receipt.plan.gate.scope, config.configPath, key);
-    }
-  } catch { /* Historical applicability must not substitute for a current observation. */ }
-  const applicability = receipt.applicability === "unknown" ? "unknown" : compareSnapshots(receipt.plan.before, current);
-  return {
-    executionId: receipt.plan.executionId, status: receipt.result.status, applicability,
-    proof: isSuccessfulProof(receipt, current),
-    output: { sha256: receipt.artifact.sha256, capturedBytes: receipt.artifact.capturedBytes, totalBytes: receipt.artifact.totalBytes, truncated: receipt.artifact.truncated },
-  };
-}
 
 export async function main(args: string[]): Promise<number> {
   if (args.length === 1 && args[0] === "--help") { process.stdout.write(HELP); return 0; }
@@ -109,7 +85,7 @@ export async function main(args: string[]): Promise<number> {
     if (options.command === "run") {
       if (options.gateId === undefined) throw new Error("missing gate");
       const receipt = await executeGate({ ...options, gateId: options.gateId, signal: abort.signal });
-      const projection = await project(receipt, options, store.key);
+      const projection = await projectReceipt(receipt, options, store.key);
       process.stdout.write(`${JSON.stringify(projection)}\n`);
       if (interrupted === "SIGTERM") return 143;
       if (interrupted === "SIGINT" || receipt.result.status === "cancelled") return 130;
@@ -119,8 +95,8 @@ export async function main(args: string[]): Promise<number> {
     const receipts = options.command === "show"
       ? [await store.read(options.executionId ?? "")]
       : options.command === "reconcile" ? await store.reconcile() : await store.list();
-    const projections: Projection[] = [];
-    for (const receipt of receipts) projections.push(await project(receipt, options, store.key));
+    const projections: ReceiptProjection[] = [];
+    for (const receipt of receipts) projections.push(await projectReceipt(receipt, options, store.key));
     process.stdout.write(`${JSON.stringify(options.command === "show" ? projections[0] : projections)}\n`);
     return 0;
   } catch {

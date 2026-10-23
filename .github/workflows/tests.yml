@@ -50,6 +50,11 @@ jobs:
       - name: Install extension workspace
         run: bun install --cwd extensions --frozen-lockfile
 
+      # The locked SDK package also provides the native omp binary. Expose that
+      # exact installed version without a global install or credential changes.
+      - name: Expose pinned OMP native host
+        run: echo "${GITHUB_WORKSPACE}/extensions/node_modules/.bin" >> "${GITHUB_PATH}"
+
       # Version and per-platform SHA-256 live only in extensions/native-hosts.json;
       # the binary serves `claude plugin validate/test`, never a signed-in session.
       - name: Provision pinned Claude Code for static mod validation
@@ -82,9 +87,9 @@ jobs:
       # itself; the legacy validators it reuses predate strict typing.
       - name: Extension tooling lint and strict types
         run: |
-          uv run ruff check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py
-          uv run ruff format --check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py
-          uv run mypy --strict --follow-imports=silent scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py
+          uv run ruff check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py tests/test_omp_native_gate.py extensions/verification-receipts/tests/omp-smoke.py
+          uv run ruff format --check scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_extension*.py tests/test_omp_native_gate.py extensions/verification-receipts/tests/omp-smoke.py
+          uv run mypy --strict --follow-imports=silent scripts/build_extensions.py scripts/check_extensions.py scripts/extension_metadata.py scripts/extension_lifecycle.py scripts/acquire_claude.py tests/test_omp_native_gate.py extensions/verification-receipts/tests/omp-smoke.py
 
       - name: Extension workspace typecheck, lint, tests and build
         run: |

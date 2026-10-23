@@ -6,8 +6,8 @@ Exit status: 0 when every executed surface passed, 1 when any surface failed,
 requested gate is not yet implemented (incomplete). A JSON report on stdout
 names the selected stage, ``feature_complete`` and every exercised or
 unavailable surface. Static, test-kit and lifecycle passes never certify
-real-host compatibility; only ``--native-smoke`` can, and this revision has no
-real-host smoke driver, so that gate always reports incomplete.
+real-host compatibility. The OMP prefix additionally runs its feature-owned
+actual-host driver; full compatibility still requires both native adapters.
 """
 
 from __future__ import annotations
@@ -461,14 +461,84 @@ def _core_gates(report: Report, feature_dir: Path) -> str | None:
     return bun
 
 
-def _native_smoke_unavailable(report: Report, hosts: tuple[str, ...]) -> None:
-    for host in hosts:
-        report.note(
-            f"{host}-native-smoke",
-            "unavailable",
-            "no real-host smoke driver is implemented in this revision; static, test-kit and lifecycle "
-            "passes do not establish native compatibility",
+def omp_native_gate(feature_dir: Path) -> str:
+    """Require the feature's actual RPC journey, not a successful probe exit."""
+    driver = feature_dir / "tests" / "omp-smoke.py"
+    if driver.is_symlink() or not driver.is_file():
+        raise GateUnavailable("no feature-owned actual OMP smoke driver")
+    with tempfile.TemporaryDirectory(prefix="armory-omp-native-report-") as scratch:
+        report_path = Path(scratch) / "report.json"
+        result = _run(
+            [
+                sys.executable,
+                str(driver),
+                "--feature-dir",
+                str(feature_dir),
+                "--report",
+                str(report_path),
+            ],
+            feature_dir,
         )
+        try:
+            evidence = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise GateFailure("OMP native driver produced no valid report") from exc
+    if not isinstance(evidence, dict):
+        raise GateFailure("OMP native report must be an object")
+    reason = evidence.get("reasonCode")
+    if not isinstance(reason, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", reason):
+        reason = "native-prerequisite-unavailable"
+    if result.returncode == EXIT_INCOMPLETE and evidence.get("status") == "unavailable":
+        raise GateUnavailable(f"OMP RPC smoke unavailable: {reason}")
+    expected_version = json.loads(
+        (EXTENSION_TYPE.repo_dir / "package.json").read_text(encoding="utf-8")
+    )["devDependencies"]["@oh-my-pi/pi-coding-agent"]
+    scenarios = evidence.get("scenarios")
+    required = {
+        "success",
+        "failure",
+        "reopen",
+        "freshness",
+        "changed-during-run",
+        "cancellation",
+        "private-output",
+        "native-text",
+    }
+    if (
+        result.returncode != 0
+        or type(evidence.get("schemaVersion")) is not int
+        or evidence["schemaVersion"] != 1
+        or evidence.get("host") != "omp"
+        or evidence.get("mode") != "rpc"
+        or evidence.get("version") != expected_version
+        or evidence.get("status") != "passed"
+        or not isinstance(scenarios, list)
+        or len(scenarios) != len(required)
+        or any(
+            not isinstance(case, dict)
+            or not isinstance(case.get("name"), str)
+            or case.get("status") != "passed"
+            for case in scenarios
+        )
+        or {case["name"] for case in scenarios} != required
+    ):
+        raise GateFailure("OMP actual-host scenario evidence is failed or incomplete")
+    return f"OMP {expected_version} RPC: actual configured execution, persistence, scoped freshness and cancellation"
+
+
+def _native_smoke_gates(
+    report: Report, feature_dir: Path, hosts: tuple[str, ...]
+) -> None:
+    for host in hosts:
+        if host == "omp":
+            report.run("omp-native-smoke", lambda: omp_native_gate(feature_dir))
+        else:
+            report.note(
+                f"{host}-native-smoke",
+                "unavailable",
+                "no real-host smoke driver is implemented for this host; static, test-kit and "
+                "lifecycle passes do not establish native compatibility",
+            )
 
 
 def check_stage(feature_dir: Path, stage: str) -> Report:
@@ -476,9 +546,15 @@ def check_stage(feature_dir: Path, stage: str) -> Report:
     report = Report(scope=feature_dir.name, stage=stage)
     bun = _core_gates(report, feature_dir)
     if stage == "omp":
-        if bun is not None:
-            report.run("omp-adapter", lambda: omp_source_gate(bun, feature_dir))
-        _native_smoke_unavailable(report, ("omp",))
+        if bun is not None and report.exit_code == EXIT_OK:
+            if report.run("omp-adapter", lambda: omp_source_gate(bun, feature_dir)):
+                _native_smoke_gates(report, feature_dir, ("omp",))
+        else:
+            report.note(
+                "omp-native-smoke",
+                "unavailable",
+                "native launch requires passed core/type/lint/unit prerequisites",
+            )
     return report
 
 
@@ -528,7 +604,14 @@ def check_registered(feature_dir: Path, *, native_smoke: bool) -> Report:
             f"no native adapter declared for {', '.join(missing_hosts)}",
         )
     if native_smoke:
-        _native_smoke_unavailable(report, metadata.hosts)
+        if report.exit_code == EXIT_OK:
+            _native_smoke_gates(report, feature_dir, metadata.hosts)
+        else:
+            report.note(
+                "native-smoke",
+                "unavailable",
+                "native launch requires passed static, build and lifecycle prerequisites",
+            )
     else:
         report.note(
             "native-smoke", "not-run", "real-host proof requires --native-smoke"
