@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { GitObservation, Observations } from "../core/index.ts";
 import { canonicalSelection, MAX_BYTES, observe, resolveRepository, stableGit } from "../helpers/sources.ts";
 import type { Selection } from "../helpers/sources.ts";
+import { listBriefs } from "../helpers/brief.ts";
 import { ompSession, project, receipt } from "./fixture.ts";
 import type { Project } from "./fixture.ts";
 
@@ -39,7 +40,7 @@ test("observes git, plan, blockers, native session, handoff and receipt with has
   const observed = await observe(repository, { contextPath: "brief.json", ompSessionPath: sessionPath, ompHandoffPath: handoffPath, receiptPath }, () => 42);
   expect(observed.git).toMatchObject({ status: "ok", branch: "main", detached: false, worktreeRoot: item.root });
   expect(observed.sources.map((source) => [source.role, source.status])).toEqual([
-    ["context", "ok"], ["plan", "ok"], ["blockers", "ok"], ["receipt", "ok"], ["omp-session", "ok"], ["omp-handoff", "ok"],
+    ["context", "ok"], ["plan", "ok"], ["blockers", "ok"], ["receipt", "ok"], ["omp-session", "ok"], ["omp-handoff", "ok"], ["claude-session", "not-selected"],
   ]);
   expect(observed.plan?.lastCommit).toBe(await item.git("rev-parse", "HEAD"));
   expect(observed.ompSession?.cwdResolved).toBe(item.root);
@@ -109,4 +110,13 @@ test("git facts that change during observation are not reported as stable", () =
   const before: GitObservation = { status: "ok", repositoryId: null, worktreeId: null, worktreeRoot: "/w", branch: "main", detached: false, head: "a".repeat(40), upstream: null, dirty: false, diagnostic: null };
   expect(stableGit(before, { ...before })).toEqual(before);
   expect(stableGit(before, { ...before, branch: "other" })).toMatchObject({ status: "changed-during-read", branch: null, head: null });
+});
+
+test("listing cancelled after invocation refuses instead of finishing private-state work", async () => {
+  const item = await setup();
+  const abort = new AbortController();
+  const reason = new Error("the invoking session ended");
+  const pending = listBriefs({ repositoryRoot: item.root, dataRoot: item.dataRoot }, { signal: abort.signal });
+  abort.abort(reason);
+  await expect(pending).rejects.toBe(reason);
 });

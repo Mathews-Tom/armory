@@ -27,23 +27,23 @@ export function assertSnapshotId(value: string): void {
 // Strict structural validation of persisted state: an unexpected key, type or
 // enum value rejects the snapshot instead of being reinterpreted.
 
-type Check = (value: unknown, path: string) => void;
+export type Check = (value: unknown, path: string) => void;
 
 function fail(path: string, expected: string): never {
   throw new Error(`malformed snapshot at ${path}: expected ${expected}`);
 }
 
-const str = (maximum = 4096): Check => (value, path) => { if (typeof value !== "string" || value.length > maximum) fail(path, "bounded string"); };
-const int: Check = (value, path) => { if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) fail(path, "non-negative integer"); };
-const num: Check = (value, path) => { if (typeof value !== "number" || !Number.isFinite(value) || value < 0) fail(path, "non-negative number"); };
-const bool: Check = (value, path) => { if (typeof value !== "boolean") fail(path, "boolean"); };
-const oneOf = (...items: readonly unknown[]): Check => (value, path) => { if (!items.includes(value)) fail(path, items.join("|")); };
-const nullable = (check: Check): Check => (value, path) => { if (value !== null) check(value, path); };
-const list = (check: Check, maximum: number): Check => (value, path) => {
+export const str = (maximum = 4096): Check => (value, path) => { if (typeof value !== "string" || value.length > maximum) fail(path, "bounded string"); };
+export const int: Check = (value, path) => { if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) fail(path, "non-negative integer"); };
+export const num: Check = (value, path) => { if (typeof value !== "number" || !Number.isFinite(value) || value < 0) fail(path, "non-negative number"); };
+export const bool: Check = (value, path) => { if (typeof value !== "boolean") fail(path, "boolean"); };
+export const oneOf = (...items: readonly unknown[]): Check => (value, path) => { if (!items.includes(value)) fail(path, items.join("|")); };
+export const nullable = (check: Check): Check => (value, path) => { if (value !== null) check(value, path); };
+export const list = (check: Check, maximum: number): Check => (value, path) => {
   if (!Array.isArray(value) || value.length > maximum) fail(path, `list of at most ${maximum}`);
   value.forEach((item, index) => check(item, `${path}[${index}]`));
 };
-const shape = (fields: Record<string, Check>): Check => (value, path) => {
+export const shape = (fields: Record<string, Check>): Check => (value, path) => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail(path, "object");
   const record = value as Record<string, unknown>;
   for (const key of Object.keys(record)) if (!Object.hasOwn(fields, key)) fail(`${path}.${key}`, "no such field");
@@ -53,12 +53,12 @@ const shape = (fields: Record<string, Check>): Check => (value, path) => {
   }
 };
 
-const HOSTS: readonly Host[] = ["standalone", "omp", "claude"];
-const ROLES: readonly SourceRole[] = ["context", "plan", "blockers", "receipt", "omp-session", "omp-handoff"];
-const STATUSES: readonly SourceStatus[] = ["ok", "missing", "unreadable", "rejected", "too-large", "unsupported-schema", "malformed", "changed-during-read", "not-selected"];
-const sha = nullable((value, path) => { if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) fail(path, "sha256"); });
-const context = shape({ host: oneOf(...HOSTS), accountId: str(LIMITS.referenceChars), sessionId: str(LIMITS.referenceChars) });
-const approval = shape({
+export const HOSTS: readonly Host[] = ["standalone", "omp", "claude"];
+export const ROLES: readonly SourceRole[] = ["context", "plan", "blockers", "receipt", "omp-session", "omp-handoff", "claude-session"];
+export const STATUSES: readonly SourceStatus[] = ["ok", "missing", "unreadable", "rejected", "too-large", "unsupported-schema", "malformed", "changed-during-read", "not-selected"];
+export const sha = nullable((value, path) => { if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) fail(path, "sha256"); });
+export const context = shape({ host: oneOf(...HOSTS), accountId: str(LIMITS.referenceChars), sessionId: str(LIMITS.referenceChars) });
+export const approval = shape({
   id: str(128), scope: str(LIMITS.scopeChars),
   origin: shape({ host: oneOf(...HOSTS), accountId: nullable(str(LIMITS.referenceChars)), sessionId: nullable(str(LIMITS.referenceChars)) }),
   grantedAtMs: int, expiresAtMs: nullable(int), source: oneOf("context", "omp-session"),
@@ -92,6 +92,11 @@ const observations = shape({
     entryCount: int, lastEntryId: nullable(str(LIMITS.referenceChars)), lastEntryAt: nullable(str(64)), approvals: list(approval, LIMITS.approvals),
   })),
   ompHandoff: nullable(shape({ generatedAt: nullable(str(64)) })),
+  claudeSession: nullable(shape({
+    sessionId: str(LIMITS.referenceChars), cwd: str(), root: str(), startedAtMs: nullable(int), turns: nullable(int),
+    observedMessages: int, messagesComplete: bool, lastRole: oneOf(null, "user", "assistant"), toolUses: int,
+    cwdResolved: nullable(str()), rootResolved: nullable(str()),
+  })),
 });
 
 const snapshot = shape({
