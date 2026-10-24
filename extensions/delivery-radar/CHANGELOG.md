@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Mark native cleanup unproven before launching the first Claude host. Interrupted or unexpected cleanup failures retain owned scratch/PID evidence rather than deleting it while an owned process can remain alive.
+- Requalify both detached artifacts after the installed Claude Code update: OMP 18.12.6 RPC and Claude Code 2.1.310 interactive/headless on macOS arm64. Keep the earlier 2.1.309 qualification as historical evidence, not proof for an untested installed version.
+
 ## 1.0.0
 
 Package and shared core versions are 1.0.0. Native qualification is limited to the exact tested host versions and surfaces below; it does not imply general platform certification.

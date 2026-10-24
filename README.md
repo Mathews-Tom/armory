@@ -325,7 +325,7 @@ Native extensions (`extensions/<feature>/EXTENSION.md`) are optional executable 
 | --- | --- | --- |
 | [verification-receipts](extensions/verification-receipts/) | Run explicitly configured local checks; retain private exact results/output and recompute scoped freshness | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive, macOS arm64 |
 | [resume-brief](extensions/resume-brief/) | Record/reopen source-linked project cards; expose changed facts and non-executable approval holds | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive/headless, macOS arm64 |
-| [delivery-radar](extensions/delivery-radar/) | Read an explicit PR selection; separate implementation, verification, review, merge and publication without remote actions | OMP 18.12.6 RPC and Claude Code 2.1.309 interactive/headless, macOS arm64 |
+| [delivery-radar](extensions/delivery-radar/) | Read an explicit PR selection; separate implementation, verification, review, merge and publication without remote actions | OMP 18.12.6 RPC and Claude Code 2.1.310 interactive/headless, macOS arm64 |
 
 Extensions are never installed by profiles, presets, the interactive installer, "all" or the all-in-one Claude plugin. Install, update, disable or remove one explicitly per host:
 

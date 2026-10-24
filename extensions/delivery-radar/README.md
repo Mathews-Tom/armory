@@ -81,7 +81,7 @@ Actual detached-artifact qualification was exercised on macOS arm64 with the fol
 | Host | Exercised surface | Observed behavior |
 | --- | --- | --- |
 | OMP 18.12.6 | RPC | Literal command registration, selected public-PR identities and unknowns, semantic refresh deduplication, text, reopened session, in-flight reads overtaken by `new_session`, stale-publication suppression and owned process-group termination |
-| Claude Code 2.1.309 | Terminal interactive | Complete framed text/JSON, exact public-PR source identities, repeated refresh, invalid/unavailable selection, reopen, Ctrl-C helper plus detached `gh` termination, in-flight `/exit` suppression and private artifact/capture boundaries |
-| Claude Code 2.1.309 | Whole-native-command headless | Help, selected refresh, invalid selection and unavailable selection, without an ordinary model prompt |
+| Claude Code 2.1.310 | Terminal interactive | Complete framed text/JSON, exact public-PR source identities, repeated refresh, invalid/unavailable selection, reopen, Ctrl-C helper plus detached `gh` termination, in-flight `/exit` suppression and private artifact/capture boundaries |
+| Claude Code 2.1.310 | Whole-native-command headless | Help, selected refresh, invalid selection and unavailable selection, without an ordinary model prompt |
 
 The Claude development loader's generated SDK and exact extends-only root TypeScript configuration are allowed only in the disposable loader copy. Canonical source and complete production artifacts remained byte-equal. No feature persistence was introduced. OMP terminal-interactive UI, SDK/ACP, managed-installed loader behavior, other versions/operating systems and network-call metering are not certified by these native journeys.

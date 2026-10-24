@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Finite, opt-in Claude 2.1.309 Delivery Radar actual-host qualification.
+"""Finite, opt-in Claude Delivery Radar actual-host qualification.
 
 Uses the default HOME/authentication and explicitly reviewed additive settings.
 Only completion-discovered native commands are submitted. Never answers trust,
@@ -906,7 +906,7 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
     if not words:
         raise Unavailable("native-version-unavailable")
     report["version"] = words[0]
-    if words[0] != "2.1.309":
+    if words[0] != "2.1.310":
         raise Unavailable("installed-version-needs-native-interface-review")
     runtime = prepare_artifact(args, report, root)
     report["settingsSha256"] = hashlib.sha256(settings.read_bytes()).hexdigest()
@@ -964,6 +964,8 @@ def execute(args: argparse.Namespace, report: JsonObject, root: Path) -> None:
         }
         return value
 
+    # Unknown until every owned process/group has been proven absent.
+    report["_cleanupProven"] = False
     try:
         native = host()
         help_text = native.command(f"{COMMAND} help")

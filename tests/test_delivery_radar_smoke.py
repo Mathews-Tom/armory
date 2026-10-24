@@ -388,6 +388,96 @@ def test_unexpected_prerequisite_or_protocol_error_writes_sanitized_not_run_repo
     )
 
 
+@pytest.mark.parametrize("failure", ["interrupted", "unexpected"])
+def test_unproven_cleanup_retains_live_owned_process_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    driver = load_driver("claude")
+    artifacts = build_feature(FEATURE, tmp_path / "build")
+    settings = tmp_path / "synthetic-settings.json"
+    settings.write_text("{}")
+    report_path = tmp_path / "report.json"
+    roots: list[Path] = []
+    children: list[subprocess.Popen[bytes]] = []
+
+    def prepared(*args: Any) -> Path:
+        roots.append(args[2])
+        return artifacts["claude"]
+
+    class LocalOwnedHost:
+        def __init__(self, *args: object) -> None:
+            pass
+
+        def start(self) -> None:
+            child = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(60)"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            children.append(child)
+            (roots[0] / "owned.pid").write_text(str(child.pid))
+
+        def command(self, command: str) -> str:
+            raise driver.Failure("synthetic-scenario-stop")
+
+    def interrupted(*args: object) -> None:
+        raise driver.Unavailable("native-driver-interrupted")
+
+    def unexpected(*args: object) -> None:
+        raise RuntimeError("synthetic-cleanup-error")
+
+    tmp_path.chmod(0o700)
+    monkeypatch.setattr(driver, "context", lambda args: (tmp_path, settings))
+    monkeypatch.setattr(driver, "prepare_artifact", prepared)
+    monkeypatch.setattr(driver.shutil, "which", lambda name: sys.executable)
+    reviewed_version = driver.load_metadata(FEATURE).exercised["claude"][0].version
+    monkeypatch.setattr(
+        driver.shared, "finite", lambda *args: reviewed_version.encode()
+    )
+    monkeypatch.setattr(driver, "NativeTTY", LocalOwnedHost)
+    if failure == "interrupted":
+        monkeypatch.setattr(driver, "reversed", interrupted, raising=False)
+    else:
+        monkeypatch.setattr(driver, "quiesce_owned_work", unexpected)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "smoke",
+            "--feature-dir",
+            str(FEATURE),
+            "--artifact",
+            str(artifacts["claude"]),
+            "--report",
+            str(report_path),
+        ],
+    )
+    previous_umask = os.umask(0o077)
+    try:
+        if failure == "interrupted":
+            assert driver.main() == 1
+            report = json.loads(report_path.read_text())
+            assert report["status"] == "failed"
+            assert report["reasonCode"] == "native-cleanup-not-proven"
+            assert report["ownedScratchRetainedForUnprovenCleanup"] is True
+        else:
+            with pytest.raises(RuntimeError, match="synthetic-cleanup-error"):
+                driver.main()
+        assert children[0].poll() is None
+        assert (roots[0] / "owned.pid").read_text() == str(children[0].pid)
+    finally:
+        os.umask(previous_umask)
+        for child in children:
+            driver.shared.stop_process(child, graceful=False)
+        for root in roots:
+            if root.exists():
+                shutil.rmtree(root)
+
+
 def test_bundled_helper_refuses_invalid_selection_before_any_observation(
     tmp_path: Path,
 ) -> None:
