@@ -28,7 +28,7 @@ extension:
         surfaces:
           - rpc-macos-arm64
     claude:
-      - version: 2.1.309
+      - version: 2.1.310
         surfaces:
           - interactive-macos-arm64
           - headless-macos-arm64
