@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { chmod, cp, lstat, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, readFile, realpath, rename, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { admit, check, parseProbeResponse, parseResponse } from "../core/index.ts";
@@ -63,6 +63,51 @@ for (const source of ["interpreter-only", "unrelated-operand"] as const) {
     await expect(readFile(value.marker)).rejects.toThrow();
   });
 }
+
+test("admission refuses an equal-length source rewrite with restored mtime during observation", async () => {
+  const value = await selected();
+  const timestamp = Math.floor(Date.now() / 1000) - 1;
+  await utimes(value.sourcePath, timestamp, timestamp);
+  const { recordPath, invocationPath } = await issue(value);
+  const args = ["admit", "--config", value.configPath, "--declaration", value.declarationPath, "--record", recordPath, "--invocation", invocationPath];
+  const baseline = cli(value, "admit", ["--record", recordPath, "--invocation", invocationPath]);
+  expect(baseline.code).toBe(0);
+  expect(baseline.response.admitted).toBe(true);
+  const before = await lstat(value.sourcePath, { bigint: true });
+  const original = await readFile(value.sourcePath, "utf8");
+  const changed = " " + original.slice(1);
+  const racePath = join(value.root, "rewrite-during-observation.ts");
+  // The child intercepts scheduling only; reads, writes, timestamps and stats
+  // are real. The source has been hashed before the selected data is opened.
+  await writeFile(racePath, `
+import { mock } from "bun:test";
+import * as filesystem from "node:fs/promises";
+const actual = { ...filesystem };
+let changed = false;
+mock.module("node:fs/promises", () => ({ ...actual, lstat: async (...args) => {
+  const result = await actual.lstat(...args);
+  if (!changed && args[0] === ${JSON.stringify(value.dataPath)}) {
+    changed = true;
+    const source = ${JSON.stringify(value.sourcePath)};
+    const before = await actual.lstat(source);
+    await actual.writeFile(source, ${JSON.stringify(changed)});
+    await actual.utimes(source, before.atime, before.mtime);
+  }
+  return result;
+} }));
+const { main } = await import(${JSON.stringify(pathToFileURL(HELPER).href)});
+process.exitCode = await main(${JSON.stringify(args)});
+`);
+  const result = Bun.spawnSync([process.execPath, racePath], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  const after = await lstat(value.sourcePath, { bigint: true });
+  expect(after.ino).toBe(before.ino);
+  expect(after.size).toBe(before.size);
+  expect(after.mtimeNs).toBe(before.mtimeNs);
+  expect(after.ctimeNs).not.toBe(before.ctimeNs);
+  expect(await readFile(value.sourcePath, "utf8")).toBe(changed);
+  expect(result.exitCode).toBe(2);
+  expect(parseResponse(JSON.parse(new TextDecoder().decode(result.stdout)))).toMatchObject({ status: "blocked", admitted: false, admission: null });
+});
 
 for (const rootName of ["projectRoot", "packageRoot"] as const) {
   test(`admission refuses actual ${rootName} replacement during its final observation`, async () => {

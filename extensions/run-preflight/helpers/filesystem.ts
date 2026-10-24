@@ -18,7 +18,7 @@ function selectedPath(path: string): void {
   if (!isAbsolute(path) || resolve(path) !== path || path.length > 4096 || hasUnsafeCharacters(path)) throw new ObservationError();
 }
 /** Open only explicitly selected regular files; reject a final symlink and mutation during read. */
-export async function readSelected(path: string, json = false): Promise<{ fact: FileFact; document: unknown }> {
+async function readSelectedInput(path: string, json: boolean, snapshots?: Map<FileFact, BigIntStats>): Promise<{ fact: FileFact; document: unknown }> {
   selectedPath(path);
   const initial = await lstat(path, { bigint: true });
   if (!initial.isFile() || initial.isSymbolicLink()) throw new ObservationError();
@@ -46,8 +46,14 @@ export async function readSelected(path: string, json = false): Promise<{ fact: 
     if (json) {
       try { document = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, count))); } catch { throw new ValidationError(); }
     }
-    return { fact: { path, realPath: resolved, sha256: hash.digest("hex"), device: before.dev.toString(), inode: before.ino.toString(), size: count, modifiedNs: before.mtimeNs.toString() }, document };
+    const fact = { path, realPath: resolved, sha256: hash.digest("hex"), device: before.dev.toString(), inode: before.ino.toString(), size: count, modifiedNs: before.mtimeNs.toString() };
+    snapshots?.set(fact, before);
+    return { fact, document };
   } finally { await handle.close(); }
+}
+/** Observation-only stat snapshots never enter the public record or wire schema. */
+export function readSelected(path: string, json = false): Promise<{ fact: FileFact; document: unknown }> {
+  return readSelectedInput(path, json);
 }
 async function directory(path: string, needsWrite: boolean): Promise<DirectoryFact> {
   selectedPath(path);
@@ -68,8 +74,10 @@ function contained(root: string, child: string): boolean {
 }
 /** Reobserve selected state. No discovery, subprocess, auth, quota or owner-state writes. */
 export async function observe(configPath: string, declarationPath: string, helperEntry: string): Promise<Observation> {
-  const selectedConfig = await readSelected(configPath, true);
-  const selectedDeclaration = await readSelected(declarationPath, true);
+  const snapshots = new Map<FileFact, BigIntStats>();
+  const read = (path: string, json = false): Promise<{ fact: FileFact; document: unknown }> => readSelectedInput(path, json, snapshots);
+  const selectedConfig = await read(configPath, true);
+  const selectedDeclaration = await read(declarationPath, true);
   const config = parseConfig(selectedConfig.document);
   const declaration = parseDeclaration(selectedDeclaration.document);
   if (declaration.configSha256 !== selectedConfig.fact.sha256) throw new ObservationError();
@@ -77,14 +85,14 @@ export async function observe(configPath: string, declarationPath: string, helpe
   const projectRoot = await directory(config.projectRoot, false);
   const configuredHelper = resolve(config.packageRoot, config.helperPath);
   if (await realpath(helperEntry) !== await realpath(configuredHelper) || !contained(packageRoot.realPath, await realpath(configuredHelper))) throw new ObservationError();
-  const helper = await readSelected(configuredHelper);
+  const helper = await read(configuredHelper);
   const source = [];
   const configs = [];
   const data = [];
-  for (const binding of declaration.inputs.source) source.push((await readSelected(binding.path)).fact);
-  for (const binding of declaration.inputs.config) configs.push((await readSelected(binding.path)).fact);
-  for (const binding of declaration.inputs.data) data.push((await readSelected(binding.path)).fact);
-  const identityFile = await readSelected(declaration.inputs.identity.path, true);
+  for (const binding of declaration.inputs.source) source.push((await read(binding.path)).fact);
+  for (const binding of declaration.inputs.config) configs.push((await read(binding.path)).fact);
+  for (const binding of declaration.inputs.data) data.push((await read(binding.path)).fact);
+  const identityFile = await read(declaration.inputs.identity.path, true);
   const identity = parseIdentity(identityFile.document);
   const checkpoint = await directory(declaration.checkpoint.path, true);
   if (!source.some((file) => file.path === config.bridgeArgv[1]) || !configs.some((file) => file.path === config.contractPath) || !configs.some((file) => canonicalJson(file) === canonicalJson(selectedConfig.fact))) throw new ObservationError();
@@ -92,12 +100,12 @@ export async function observe(configPath: string, declarationPath: string, helpe
   if (executable === undefined) throw new ObservationError();
   await access(executable, constants.X_OK);
   const facts = { config: selectedConfig.fact, declaration: selectedDeclaration.fact, helper: helper.fact, source, configs, data, identityFile: identityFile.fact, identity, checkpoint, projectRoot, packageRoot };
-  // Detect replacements after earlier observations. This narrows, but cannot erase,
-  // the unavoidable filesystem-to-spawn race; the managed boundary re-runs admit.
-  const files = [facts.config, facts.declaration, facts.helper, ...source, ...configs, ...data, facts.identityFile];
-  for (const file of files) {
+  // Retain read-time ctime/mode privately: an equal-length in-place rewrite can
+  // restore mtime without restoring ctime. This still cannot erase the final
+  // filesystem-to-spawn race; the managed boundary re-runs admit.
+  for (const [file, before] of snapshots) {
     const current = await lstat(file.path, { bigint: true });
-    if (!current.isFile() || current.dev.toString() !== file.device || current.ino.toString() !== file.inode || current.size !== BigInt(file.size) || current.mtimeNs.toString() !== file.modifiedNs || await realpath(file.path) !== file.realPath) throw new ObservationError();
+    if (!current.isFile() || !sameStat(before, current) || await realpath(file.path) !== file.realPath) throw new ObservationError();
   }
   if (canonicalJson(await directory(declaration.checkpoint.path, true)) !== canonicalJson(checkpoint)
     || canonicalJson(await directory(config.projectRoot, false)) !== canonicalJson(projectRoot)
