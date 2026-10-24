@@ -6,7 +6,6 @@ an injectable library boundary for the separately authorized live run; it never
 persists prompts, assistant text, or raw OMP events.
 """
 
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -15,14 +14,22 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Final
+from typing import Final
 
 _REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from scripts.omp_preflight import (
+    PreflightAdmissionError,
+    ProjectAdmission,
+    canonical_dispatch_contract,
+    derive_runner_invocation,
+    revalidate_admission,
+)
 from scripts.omp_skillsbench import (
     OmpCell,
     OmpRunContract,
@@ -178,11 +185,26 @@ def dispatch_cell(
     cell: OmpCell,
     receipt_root: Path,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    *,
+    admission: ProjectAdmission | None = None,
 ) -> DerivedReceipt:
-    """Dispatch exactly one cell; intended only after a future execution gate."""
+    """Dispatch one admitted cell; this does not authorize an existing study."""
+    if not isinstance(admission, ProjectAdmission):
+        raise PreflightAdmissionError(
+            "managed dispatch requires a complete project admission"
+        )
+    if admission.purpose == "synthetic-local-sentinel" and runner is subprocess.run:
+        raise PreflightAdmissionError(
+            "synthetic admission requires an explicit local runner"
+        )
+    contract = canonical_dispatch_contract(admission, contract, cell)
     with tempfile.TemporaryDirectory(prefix="omp_skillsbench_cell_") as directory:
         prepared = prepare_cell(contract, cell, Path(directory) / "workspace")
         command = build_omp_command(contract, prepared)
+        invocation = derive_runner_invocation(
+            contract, prepared.cell, prepared.target, receipt_root
+        )
+        revalidate_admission(admission, invocation)
         try:
             completed = runner(
                 command,

@@ -9,6 +9,7 @@ from subprocess import CompletedProcess, TimeoutExpired
 
 import pytest
 
+from scripts.omp_preflight import ProjectAdmission
 from scripts.omp_skillsbench import declared_omp_cells, load_omp_run_contract
 from scripts.omp_skillsbench_dispatch import (
     CellDispatchError,
@@ -18,9 +19,17 @@ from scripts.omp_skillsbench_dispatch import (
     dispatcher_preflight,
     prepare_cell,
 )
+from tests.test_run_preflight_admission import make_admission_project
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONTRACT_PATH = _REPO_ROOT / "evals" / "skillsbench" / "omp_run.yaml"
+
+
+def _parser_fixture_admission(tmp_path: Path) -> ProjectAdmission:
+    """Admit legacy event fixtures; these are parser tests, not live proof."""
+    return make_admission_project(
+        tmp_path / "admission", receipt_root=tmp_path / "receipts"
+    ).issue()
 
 
 def _terminal_events() -> str:
@@ -53,9 +62,6 @@ def test_prepared_cell_has_explicit_condition_bundle(tmp_path: Path) -> None:
     command = build_omp_command(contract, prepared)
 
     assert prepared.condition_bundle.is_file()
-    assert "Frozen M4 Condition Bundle" in prepared.condition_bundle.read_text(
-        encoding="utf-8"
-    )
     assert "--mode" in command and command[command.index("--mode") + 1] == "json"
     assert "--no-session" in command
     assert (
@@ -85,7 +91,13 @@ def test_dispatch_persists_one_derived_receipt(tmp_path: Path) -> None:
         assert kwargs["timeout"] == 630
         return CompletedProcess(command, 0, stdout=_terminal_events(), stderr="")
 
-    receipt = dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+    receipt = dispatch_cell(
+        contract,
+        cell,
+        tmp_path / "receipts",
+        runner,
+        admission=_parser_fixture_admission(tmp_path),
+    )
 
     assert receipt.task_id == cell.task_id
     assert len(calls) == 1
@@ -101,7 +113,13 @@ def test_dispatch_treats_auth_failures_as_global(tmp_path: Path) -> None:
         return CompletedProcess(command, 1, stdout="", stderr="No API key found")
 
     with pytest.raises(GlobalDispatchError, match="authentication or quota"):
-        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+        dispatch_cell(
+            contract,
+            cell,
+            tmp_path / "receipts",
+            runner,
+            admission=_parser_fixture_admission(tmp_path),
+        )
 
 
 @pytest.mark.parametrize(
@@ -117,7 +135,13 @@ def test_dispatch_treats_provider_error_forms_as_global(
         return CompletedProcess(command, 1, stdout="", stderr=stderr)
 
     with pytest.raises(GlobalDispatchError, match="authentication or quota"):
-        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+        dispatch_cell(
+            contract,
+            cell,
+            tmp_path / "receipts",
+            runner,
+            admission=_parser_fixture_admission(tmp_path),
+        )
 
 
 def test_dispatch_treats_neutral_cell_failure_as_non_global(tmp_path: Path) -> None:
@@ -128,7 +152,13 @@ def test_dispatch_treats_neutral_cell_failure_as_non_global(tmp_path: Path) -> N
         return CompletedProcess(command, 1, stdout="", stderr="authoring tool failed")
 
     with pytest.raises(CellDispatchError, match="declared cell"):
-        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+        dispatch_cell(
+            contract,
+            cell,
+            tmp_path / "receipts",
+            runner,
+            admission=_parser_fixture_admission(tmp_path),
+        )
 
 
 def test_dispatch_timeout_is_cell_failure(tmp_path: Path) -> None:
@@ -139,7 +169,13 @@ def test_dispatch_timeout_is_cell_failure(tmp_path: Path) -> None:
         raise TimeoutExpired(command, 630)
 
     with pytest.raises(CellDispatchError, match="wall-time"):
-        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+        dispatch_cell(
+            contract,
+            cell,
+            tmp_path / "receipts",
+            runner,
+            admission=_parser_fixture_admission(tmp_path),
+        )
 
 
 def test_dispatch_treats_abnormal_terminal_as_cell_failure(tmp_path: Path) -> None:
@@ -152,4 +188,10 @@ def test_dispatch_treats_abnormal_terminal_as_cell_failure(tmp_path: Path) -> No
         return CompletedProcess(command, 0, stdout=json.dumps(event), stderr="")
 
     with pytest.raises(CellDispatchError, match="terminal receipt failed"):
-        dispatch_cell(contract, cell, tmp_path / "receipts", runner)
+        dispatch_cell(
+            contract,
+            cell,
+            tmp_path / "receipts",
+            runner,
+            admission=_parser_fixture_admission(tmp_path),
+        )

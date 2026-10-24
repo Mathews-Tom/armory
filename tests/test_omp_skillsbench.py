@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 from dataclasses import replace
 from pathlib import Path
-from subprocess import CompletedProcess, TimeoutExpired
 
 import pytest
 
-import scripts.omp_skillsbench as omp_skillsbench
+from scripts import omp_skillsbench
 from scripts.omp_skillsbench import (
     OmpRunConfigError,
     declared_omp_cells,
@@ -91,63 +94,6 @@ def test_rejects_unpinned_corpus_cardinality(monkeypatch: pytest.MonkeyPatch) ->
         load_omp_run_contract(_CONTRACT_PATH)
 
 
-def test_main_prints_no_cost_receipt(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    call_kwargs: dict[str, object] = {}
-
-    def usage_succeeds(*args: object, **kwargs: object) -> CompletedProcess[str]:
-        call_kwargs.update(kwargs)
-        return CompletedProcess(args=args[0], returncode=0, stdout=_USAGE, stderr="")
-
-    monkeypatch.setattr(omp_skillsbench.subprocess, "run", usage_succeeds)
-
-    assert omp_skillsbench.main(["--preflight"]) == 0
-    assert '"model_request_made": false' in capsys.readouterr().out
-    assert call_kwargs["timeout"] == 30
-    assert call_kwargs["stdin"] is omp_skillsbench.subprocess.DEVNULL
-    assert call_kwargs["capture_output"] is True
-
-
-def test_main_fails_loudly_when_omp_usage_fails(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(
-        omp_skillsbench.subprocess,
-        "run",
-        lambda *args, **kwargs: CompletedProcess(
-            args=args[0], returncode=1, stdout="", stderr="denied"
-        ),
-    )
-
-    assert omp_skillsbench.main(["--preflight"]) == 2
-    assert "omp usage failed: denied" in capsys.readouterr().err
-
-
-def test_main_fails_loudly_when_omp_is_missing(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    def missing_omp(*args: object, **kwargs: object) -> CompletedProcess[str]:
-        raise FileNotFoundError
-
-    monkeypatch.setattr(omp_skillsbench.subprocess, "run", missing_omp)
-
-    assert omp_skillsbench.main(["--preflight"]) == 2
-    assert "'omp' CLI not found in PATH" in capsys.readouterr().err
-
-
-def test_main_fails_loudly_when_usage_times_out(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    def timeout_omp(*args: object, **kwargs: object) -> CompletedProcess[str]:
-        raise TimeoutExpired(cmd=["omp", "usage"], timeout=30)
-
-    monkeypatch.setattr(omp_skillsbench.subprocess, "run", timeout_omp)
-
-    assert omp_skillsbench.main(["--preflight"]) == 2
-    assert "omp usage timed out after 30s" in capsys.readouterr().err
-
-
 def test_main_normalizes_frozen_input_validation_failure(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -158,3 +104,38 @@ def test_main_normalizes_frozen_input_validation_failure(
 
     assert omp_skillsbench.main(["--preflight"]) == 2
     assert "frozen input validation failed: inventory drift" in capsys.readouterr().err
+
+
+def test_preflight_cli_does_not_query_provider_accounts(tmp_path: Path) -> None:
+    """Offline contract validation must not query authenticated provider accounts."""
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    marker = tmp_path / "provider-usage-attempted"
+    executable = tools / "omp"
+    executable.write_text(
+        f"#!{sys.executable}\n"
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).write_text('provider usage was invoked')\n"
+        "raise SystemExit(23)\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    environment = dict(os.environ)
+    environment["PATH"] = str(tools) + os.pathsep + environment["PATH"]
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts/omp_skillsbench.py"), "--preflight"],
+        cwd=_REPO_ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        timeout=60,
+    )
+
+    assert not marker.exists(), result.stderr
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["subscription_observation"] == "unknown"
+    assert report["provider_request_made"] is False
+    assert report["model_request_made"] is False
