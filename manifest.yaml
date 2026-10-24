@@ -2708,6 +2708,19 @@ packages:
     runtime: bun
     commands:
     - armory-brief
+  - name: run-preflight
+    version: 1.0.0
+    description: Check explicitly declared OMP managed-run prerequisites in OMP and Claude Code, retain unknown quota, refuse
+      stale or unsupported admission at the owned dispatch boundary, and optionally exercise one bounded local sentinel without
+      a provider call.
+    path: extensions/run-preflight
+    source: https://github.com/Mathews-Tom/armory/blob/main/extensions/run-preflight/EXTENSION.md
+    hosts:
+    - claude
+    - omp
+    runtime: bun
+    commands:
+    - armory-preflight
   - name: verification-receipts
     version: 1.0.0
     description: Execute explicitly configured local verification gates and reopen private, scoped evidence with current input

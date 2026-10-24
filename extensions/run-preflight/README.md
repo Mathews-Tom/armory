@@ -1,8 +1,24 @@
 # Run Preflight
 
-Check the prerequisites of one explicitly declared OMP SkillsBench invocation and consume a complete admission record immediately before the owned dispatch boundary. This is an unregistered standalone implementation prefix: no native command, installable package, catalog entry or native-compatibility claim is activated by this delivery.
+Check the prerequisites of one explicitly declared OMP SkillsBench invocation and consume a complete admission record immediately before the owned dispatch boundary. The package provides a standalone helper, a versioned project-local admission consumer and `/armory-preflight` commands for OMP and Claude Code. A native readiness check is not consumed admission or authority to launch a study.
 
 The normal check reads selected local files and directory metadata. It does not query an authenticated account, infer quota from a signed-in profile, start OMP, request a model, launch the configured bridge or write feature state. Unknown quota remains `unknown`, with its observation time and reason. Exit zero means a normalized report was produced, not permission to launch a campaign.
+
+## Native commands
+
+```text
+/armory-preflight check {"config":"/absolute/project.json","declaration":"/absolute/declaration.json"} [--json]
+/armory-preflight probe {"config":"/absolute/project.json","declaration":"/absolute/declaration.json"} [--json]
+/armory-preflight help
+```
+
+Pass exactly two canonical absolute JSON paths; JSON strings preserve spaces. No selected project is inferred from cwd. The config must name the loaded detached package root and `helpers/cli.js`, not the source checkout or another installation. The helper is invoked using literal Bun argv, never a shell. Native commands expose no `admit` operation: only the project-local dispatch consumer can consume a complete record against an actual invocation.
+
+Text and JSON project nonsecret declared provider, identity kind, profile, run, cell, quota timestamps, status, reasons and scope limits. They omit the account fingerprint, full declaration/admission record, bridge argv, raw file identities and child output. Declared identity is an attestation, not an authenticated-account probe. Source strings remain inert text.
+
+Each native invocation owns bounded helper work. Replacement, cancellation and session revocation prevent stale publication and await owned cleanup; failed or unconfirmed cleanup blocks subsequent readiness. Neither adapter starts background refresh, a daemon, feature persistence or a model request. The explicit synthetic probe is the only managed-child route.
+
+OMP continues discovering ownership during both termination grace periods, including detached work created by termination handlers and descendants of already-observed owners. Cleanup checks process identity before signaling recorded groups. This is bounded process ownership, not a sandbox or a guarantee against arbitrary trusted code deliberately escaping observation.
 
 ## Standalone interface
 
@@ -28,7 +44,7 @@ The helper has three operations:
 
 The strict version-1 JSON vocabulary is defined in [`core/types.ts`](core/types.ts) and validated in [`core/validation.ts`](core/validation.ts). Extra fields, incompatible versions, duplicate bindings, malformed hashes/timestamps and control-bearing inputs are rejected. Public parsers validate and freeze the same fresh JSON snapshot; caller-owned getters, serialization hooks and malformed projections cannot replace an already-validated tree.
 
-Project configuration selects `schemaVersion: 1`, `coreVersion: "1.0.0"`, `adapterId: "omp-skillsbench"`, `adapterVersion: 1`, the absolute package/project/contract paths, and `helperPath` (`helpers/cli.ts` for this prefix, `helpers/cli.js` for a bundled helper). `bridgeArgv` explicitly names the executable, absolute entry script and literal arguments. It is trusted project code, not an extension-provided sandbox. Bind the actual entry script, not just its interpreter or an unrelated argv operand.
+Project configuration selects `schemaVersion: 1`, `coreVersion: "1.0.0"`, `adapterId: "omp-skillsbench"`, `adapterVersion: 1`, the absolute package/project/contract paths, and `helperPath` (`helpers/cli.ts` for the source helper, `helpers/cli.js` for a bundled native helper). `bridgeArgv` explicitly names the executable, absolute entry script and literal arguments. It is trusted project code, not an extension-provided sandbox. Bind the actual entry script, not just its interpreter or an unrelated argv operand.
 
 A declaration binds its run ID and purpose, issue/expiry interval, raw project-config hash, exact target/model/thinking/profile/cell/condition identity, checkpoint root, source/config/data hashes, nonsecret identity observation, quota observation, limits and authorizations. The account fingerprint is a local nonsecret identifier, never a credential. An attestation is not an authentication or provider-capacity probe.
 
@@ -51,13 +67,20 @@ uv run --python 3.12 python scripts/check_extensions.py --feature run-preflight 
 uv run --python 3.12 python -m pytest tests/test_omp_skillsbench.py tests/test_omp_skillsbench_dispatch.py tests/test_run_preflight_admission.py -q
 uv run --python 3.12 python scripts/omp_skillsbench.py --preflight
 uv run --python 3.12 python scripts/omp_skillsbench_dispatch.py --preflight
+uv run --python 3.12 python scripts/check_extensions.py --feature run-preflight
+uv run --python 3.12 python scripts/check_extensions.py --all --catalog
+uv run --python 3.12 python scripts/check_extensions.py --feature run-preflight --native-smoke
 ```
 
-These are credential-free local/core checks, not actual OMP or Claude compatibility qualification. Core acceptance includes real local process execution, complete-record consumption, changed/expired/unsupported/missing prerequisites and zero-spawn refusal. The two common preflight CLIs validate the unchanged frozen command matrix offline and do not query provider accounts.
+The core, full package and catalog checks are credential-free. The separate explicit `--native-smoke` command must execute detached artifacts in both installed hosts and fails closed on missing tools, unsupported controls, trust or incomplete scenarios. CI does not request authenticated native smoke and never reports it passed. Static/unit/adapter/build success alone is not native compatibility. Core acceptance includes real local process execution, complete-record consumption, changed/expired/unsupported/missing prerequisites and zero-spawn refusal. The two common preflight CLIs validate the unchanged frozen command matrix offline and do not query provider accounts.
+
+For Claude qualification, explicitly set `ARMORY_CLAUDE_NATIVE_CWD` to an existing canonical absolute directory already trusted by the installed host and `ARMORY_CLAUDE_NATIVE_SETTINGS` to a private reviewed additive settings file. The standalone driver also accepts `--trusted-cwd` and `--settings`. Selecting these paths never grants trust or changes authentication, hooks or enforcement; an actual host trust prompt still makes qualification fail.
+
+Detached artifacts were exercised on macOS arm64 with OMP 18.12.6 RPC and Claude Code 2.1.310 interactive. Both passed success/refusal/reopen/freshness/change-during-run/cancellation/private-output/native-text scenarios; Claude also passed five whole-native-command headless cases (help, check, probe, invalid admission and stale refusal). The actual project probe reached one harmless Python `pass` child with unknown quota and `terminal-receipt-unavailable`. These are command/process facts, not provider-capacity, hosted-network-usage or campaign-outcome measurements. Normal HOME/default authentication, genuine enforcement, all 58 configured Claude hooks and private capture/owned cleanup requirements were retained; ordinary host session/log/cache bookkeeping remained possible.
 
 ## Explicit local sentinel walkthrough
 
-Run from the repository root. This creates only disposable local JSON/identity/checkpoint files and authorizes a harmless Python `pass` invocation with acknowledged unknown quota. It does not authorize a live OMP cell. The adapter-owned inventory is reused instead of copying a potentially incomplete list of consumed files. Flags and bindings use the same canonical path spelling, including macOS's `/private/var` spelling for temporary data.
+Run from the repository root. This creates only disposable local JSON/identity/checkpoint files and authorizes a harmless Python `pass` invocation with acknowledged unknown quota. It does not authorize a live OMP cell. The adapter-owned inventory is reused instead of copying a potentially incomplete list of consumed files. Flags and bindings use the same canonical path spelling, including macOS's `/private/var` spelling for temporary data. For a native journey, first build a detached artifact with `scripts/build_extensions.py --feature run-preflight --output-dir PATH`, then explicitly set `ARMORY_PREFLIGHT_PACKAGE_ROOT` to its `extensions/run-preflight/omp` or `extensions/run-preflight/claude` directory before this walkthrough. Omit that variable for the source-helper walkthrough. When the variable is set, skip the source-helper `bun` check/probe commands below and use the native invocation described after this walkthrough instead.
 
 ```sh
 umask 077
@@ -83,6 +106,13 @@ from scripts.omp_skillsbench import declared_omp_cells, load_omp_run_contract
 
 repo = Path.cwd().resolve()
 root = Path(os.environ["ARMORY_PREFLIGHT_EXAMPLE_ROOT"]).resolve()
+package_selection = os.environ.get("ARMORY_PREFLIGHT_PACKAGE_ROOT")
+package_root = (
+    Path(package_selection).resolve(strict=True)
+    if package_selection is not None
+    else repo / "extensions/run-preflight"
+)
+helper_path = "helpers/cli.js" if package_selection is not None else "helpers/cli.ts"
 checkpoint = root / "checkpoint"
 checkpoint.mkdir()
 config_path = root / "project.json"
@@ -100,8 +130,8 @@ def bind(path):
 save(config_path, {
     "schemaVersion": 1, "coreVersion": "1.0.0",
     "adapterId": "omp-skillsbench", "adapterVersion": 1,
-    "packageRoot": str(repo / "extensions/run-preflight"),
-    "helperPath": "helpers/cli.ts", "projectRoot": str(repo),
+    "packageRoot": str(package_root),
+    "helperPath": helper_path, "projectRoot": str(repo),
     "contractPath": str(repo / "evals/skillsbench/omp_run.yaml"),
     "bridgeArgv": [
         sys.executable, str(repo / "scripts/omp_preflight_cli.py"),
@@ -171,3 +201,5 @@ bun extensions/run-preflight/helpers/cli.ts probe \
 ```
 
 The check remains unknown and launches no managed child. The explicit probe reports one local child with `terminal-receipt-unavailable`, while quota stays unknown and no OMP result is persisted. Append a newline to the disposable `identity.json` without updating the declaration and repeat the probe: its old binding is stale, so the child is refused. Do not edit frozen study inputs to demonstrate drift.
+
+For a native invocation, use the same generated absolute config/declaration paths in the JSON selection above, with the matching detached host artifact loaded through the host's supported session-local extension/plugin flag. The OMP and Claude artifacts have different package roots: generate a fresh selection for each, rather than reusing a declaration bound to the other artifact. Normal HOME/default authentication and genuine enforcement stay enabled; only disposable feature/lifecycle roots and supported containment of optional writers are used. Ordinary host logs, cache and session bookkeeping remain possible.

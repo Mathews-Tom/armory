@@ -110,6 +110,9 @@ excluded:
     name: resume-brief
     rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
   - package_type: extension
+    name: run-preflight
+    rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
+  - package_type: extension
     name: verification-receipts
     rationale: Native runtime outside the original seven-type study; excluded without changing the frozen sample, task matrix or treatment pins.
   - package_type: hook

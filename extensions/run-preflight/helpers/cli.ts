@@ -5,13 +5,13 @@ import { runBridge } from "./bridge.ts";
 import { observe, readSelected, sha256 } from "./filesystem.ts";
 import { hasUnsafeCharacters } from "../core/text.ts";
 
-const HELP = `Run Preflight standalone source-prefix CLI (core 1.0.0; protocol 1).
-Usage: bun <selected-prefix>/helpers/cli.ts check --config PATH --declaration PATH
-       bun <selected-prefix>/helpers/cli.ts admit --config PATH --declaration PATH --record PATH --invocation PATH
-       bun <selected-prefix>/helpers/cli.ts probe --config PATH --declaration PATH
+const HELP = `Run Preflight CLI (core 1.0.0; protocol 1).
+Usage: bun <selected-helper> check --config PATH --declaration PATH
+       bun <selected-helper> admit --config PATH --declaration PATH --record PATH --invocation PATH
+       bun <selected-helper> probe --config PATH --declaration PATH
 Optional: --format json|text (default json). All paths are explicit absolute JSON files.
 The config selects this exact package root/helper, a project root, frozen contract,
-and a trusted versioned bridge argv. No registered package or Armory checkout fallback.
+and a trusted versioned bridge argv. No inferred project or Armory checkout fallback.
 check: read-only observations; no managed child, quota/auth probe or provider call.
 admit: reobserve all prerequisites, consume a complete record and actual invocation.
 probe: explicit SYNTHETIC-LOCAL-ONLY project bridge, bounded to 30s / 64KiB output;
@@ -106,4 +106,5 @@ export async function main(args: readonly string[]): Promise<number> {
   process.stdout.write(options.format === "json" ? `${JSON.stringify(response)}\n` : `${renderPreflight(response)}\n`);
   return exitCode;
 }
-if (import.meta.main) process.exitCode = await main(process.argv.slice(2));
+// Virtual-entry production bundling folds import.meta.main to false.
+if (import.meta.path === Bun.main) process.exitCode = await main(process.argv.slice(2));
