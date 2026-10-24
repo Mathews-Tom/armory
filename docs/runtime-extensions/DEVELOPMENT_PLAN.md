@@ -378,7 +378,7 @@ Every terminal result prints the design verdict first, then exactly one merge ve
 
 No release-captain PR is required: each train declares no separate preparation artifacts and package version/CHANGELOG already ship in implementation. Canonical completion is every M9–M13 acceptance criterion, reviewed/current-green externally merged PRs, applicable credential-free merged-base acceptance, current local/manual compatibility evidence, preserved historical contracts/data and verified task-owned cleanup. Lane DONE is narrower: complete implementation, exercised verification, reviewed/current-green stack, evidence and verdict returned to the canonical owner; it excludes merge, ledger, release preparation and cleanup.
 
-Genuine human trust/policy, missing credentials/permissions, unavailable supported host/test vault, unrelated dirty state or an out-of-envelope prerequisite produces an explicit affected-scope NO-GO. Never call a mocked/skipped path complete, switch accounts, weaken policy or broaden authority to achieve unattended execution. Do not repeatedly request approval for operations already covered by the kickoff.
+Genuine human trust/policy, missing credentials/permissions, unavailable supported host or selected default Tessera service/context, unrelated dirty state or an out-of-envelope prerequisite produces an explicit affected-scope NO-GO. Never call a mocked/skipped path complete, switch accounts, weaken policy or broaden authority to achieve unattended execution. Do not repeatedly request approval for operations already covered by the kickoff.
 
 ### 17.9 Current executable limits
 
