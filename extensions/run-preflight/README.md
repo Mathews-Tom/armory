@@ -26,7 +26,7 @@ The helper has three operations:
 
 ## Versioned project and declaration
 
-The strict version-1 JSON vocabulary is defined in [`core/types.ts`](core/types.ts) and validated in [`core/validation.ts`](core/validation.ts). Extra fields, incompatible versions, duplicate bindings, malformed hashes/timestamps and control-bearing inputs are rejected.
+The strict version-1 JSON vocabulary is defined in [`core/types.ts`](core/types.ts) and validated in [`core/validation.ts`](core/validation.ts). Extra fields, incompatible versions, duplicate bindings, malformed hashes/timestamps and control-bearing inputs are rejected. Public parsers validate and freeze the same fresh JSON snapshot; caller-owned getters, serialization hooks and malformed projections cannot replace an already-validated tree.
 
 Project configuration selects `schemaVersion: 1`, `coreVersion: "1.0.0"`, `adapterId: "omp-skillsbench"`, `adapterVersion: 1`, the absolute package/project/contract paths, and `helperPath` (`helpers/cli.ts` for this prefix, `helpers/cli.js` for a bundled helper). `bridgeArgv` explicitly names the executable, absolute entry script and literal arguments. It is trusted project code, not an extension-provided sandbox. Bind the actual entry script, not just its interpreter or an unrelated argv operand.
 

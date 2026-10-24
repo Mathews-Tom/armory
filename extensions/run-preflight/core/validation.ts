@@ -47,8 +47,11 @@ export function freeze<T>(value: T): T {
   }
   return value;
 }
-// Parsing JSON into a fresh tree prevents caller-owned aliases from changing a validated record.
-function copy<T>(value: unknown): T { return freeze(JSON.parse(JSON.stringify(value)) as T); }
+// Snapshot before validation so caller getters and toJSON hooks cannot replace the
+// validated tree. Serialization failures use the same malformed-document boundary.
+function snapshot(value: unknown): unknown {
+  try { return JSON.parse(JSON.stringify(value)); } catch { return fail(); }
+}
 function binding(value: unknown): void { const item = object(value, ["path", "sha256"]); absolute(item.path); digest(item.sha256); }
 function invocation(value: unknown): void {
   const item = object(value, ["adapterId", "adapterVersion", "targetId", "targetModel", "targetThinking", "profile", "cell", "wallSeconds", "checkpointRoot"]);
@@ -61,7 +64,7 @@ function invocation(value: unknown): void {
   if (cell.targetId !== item.targetId) fail();
   integer(item.wallSeconds); absolute(item.checkpointRoot);
 }
-export function parseInvocation(value: unknown): Invocation { invocation(value); return copy(value); }
+export function parseInvocation(value: unknown): Invocation { const result = snapshot(value) as Invocation; invocation(result); return freeze(result); }
 function config(value: unknown): void {
   const item = object(value, ["schemaVersion", "adapterId", "adapterVersion", "coreVersion", "packageRoot", "helperPath", "projectRoot", "contractPath", "bridgeArgv"]);
   literal(item.schemaVersion, [SCHEMA_VERSION]); literal(item.adapterId, [ADAPTER_ID]); literal(item.adapterVersion, [ADAPTER_VERSION]); literal(item.coreVersion, [CORE_VERSION]);
@@ -71,14 +74,14 @@ function config(value: unknown): void {
   absolute((item.bridgeArgv as unknown[])[0]);
   absolute((item.bridgeArgv as unknown[])[1]);
 }
-export function parseConfig(value: unknown): ProjectConfig { config(value); return copy(value); }
+export function parseConfig(value: unknown): ProjectConfig { const result = snapshot(value) as ProjectConfig; config(result); return freeze(result); }
 function identity(value: unknown): void {
   const item = object(value, ["schemaVersion", "provider", "profile", "accountFingerprint", "kind", "auth", "observedAt", "expiresAt"]);
   literal(item.schemaVersion, [SCHEMA_VERSION]);
   for (const key of ["provider", "profile", "accountFingerprint"]) text(item[key]);
   literal(item.kind, ["synthetic-local", "managed"]); literal(item.auth, ["not-applicable", "attested"]); interval(item.observedAt, item.expiresAt);
 }
-export function parseIdentity(value: unknown): Identity { identity(value); return copy(value); }
+export function parseIdentity(value: unknown): Identity { const result = snapshot(value) as Identity; identity(result); return freeze(result); }
 function quota(value: unknown): void {
   const item = object(value, ["status", "observedAt", "expiresAt", "reason", "source", "remainingCalls"]);
   literal(item.status, ["observed", "unknown"]); interval(item.observedAt, item.expiresAt); text(item.reason, 512); text(item.source);
@@ -112,7 +115,7 @@ function declaration(value: unknown): void {
   if (limits.currency !== null) limit(limits.currency, true);
   quota(item.quota); array(item.authorizations, authorization, 0, 64);
 }
-export function parseDeclaration(value: unknown): Declaration { declaration(value); return copy(value); }
+export function parseDeclaration(value: unknown): Declaration { const result = snapshot(value) as Declaration; declaration(result); return freeze(result); }
 function fileFact(value: unknown): void {
   const item = object(value, ["path", "sha256", "realPath", "device", "inode", "size", "modifiedNs"]);
   absolute(item.path); absolute(item.realPath); digest(item.sha256); integer(item.size, 0);
@@ -132,7 +135,7 @@ function facts(value: unknown): void {
   identity(item.identity);
   for (const key of ["checkpoint", "projectRoot", "packageRoot"]) directoryFact(item[key]);
 }
-export function parseFacts(value: unknown): Facts { facts(value); return copy(value); }
+export function parseFacts(value: unknown): Facts { const result = snapshot(value) as Facts; facts(result); return freeze(result); }
 function capabilities(value: unknown): void {
   const item = object(value, ["wallSeconds", "runnerMaxSeconds", "calls", "workers", "concurrency", "tokens", "currency"]);
   literal(item.wallSeconds, [630]); literal(item.runnerMaxSeconds, [600]);
@@ -154,8 +157,8 @@ function record(value: unknown): void {
     || !typed.declaration.authorizations.some((auth) => canonicalJson(auth) === canonicalJson(typed.scope.authorization))
     || timestamp(typed.expiresAt) > Math.min(...[typed.declaration.expiresAt, typed.facts.identity.expiresAt, typed.declaration.quota.expiresAt, typed.scope.authorization.expiresAt].map(timestamp))) fail();
 }
-export function parseRecord(value: unknown): AdmissionRecord { record(value); return copy(value); }
-export function parseResponse(value: unknown): Response {
+export function parseRecord(value: unknown): AdmissionRecord { const result = snapshot(value) as AdmissionRecord; record(result); return freeze(result); }
+function response(value: unknown): void {
   const item = object(value, ["schemaVersion", "coreVersion", "status", "reasons", "quota", "admission", "admitted"]);
   literal(item.schemaVersion, [SCHEMA_VERSION]); literal(item.coreVersion, [CORE_VERSION]); literal(item.status, ["ready", "blocked", "unknown"]);
   array(item.reasons, (reason) => text(reason, 512), 0, 128); bool(item.admitted);
@@ -164,21 +167,22 @@ export function parseResponse(value: unknown): Response {
   if ((item.status === "blocked" && (item.admission !== null || item.admitted)) || (item.admitted && item.admission === null) || (item.status === "ready" && ((item.quota as Quota | null)?.status !== "observed" || item.admission === null)) || (item.status === "unknown" && (item.quota as Quota | null)?.status !== "unknown")) fail();
   const typed = value as Response;
   if (typed.admission !== null && canonicalJson(typed.quota) !== canonicalJson(typed.admission.declaration.quota)) fail();
-  return copy(value);
 }
-export function parseBridgeResult(value: unknown): BridgeResult {
+export function parseResponse(value: unknown): Response { const result = snapshot(value) as Response; response(result); return freeze(result); }
+function bridgeResult(value: unknown): void {
   const item = object(value, ["schemaVersion", "coreVersion", "status", "managedSpawns", "providerCalls", "reasons"]);
   literal(item.schemaVersion, [SCHEMA_VERSION]); literal(item.coreVersion, [CORE_VERSION]); literal(item.status, ["terminal-receipt-unavailable", "blocked"]);
   literal(item.providerCalls, [0]); literal(item.managedSpawns, item.status === "blocked" ? [0] : [1]);
   array(item.reasons, (reason) => { text(reason, 128); if (!/^[a-z0-9][a-z0-9-]*$/.test(reason)) fail(); }, 1, 128);
-  return copy(value);
 }
+export function parseBridgeResult(value: unknown): BridgeResult { const result = snapshot(value) as BridgeResult; bridgeResult(result); return freeze(result); }
 export function parseProbeResponse(value: unknown): ProbeResponse {
-  const item = object(value, ["schemaVersion", "coreVersion", "status", "reasons", "quota", "admission", "admitted", "probe"]);
-  const { probe, ...response } = item;
-  parseResponse(response);
-  if (probe !== null) parseBridgeResult(probe);
+  const result = snapshot(value) as ProbeResponse;
+  const item = object(result, ["schemaVersion", "coreVersion", "status", "reasons", "quota", "admission", "admitted", "probe"]);
+  const { probe, ...responseValue } = item;
+  response(responseValue);
+  if (probe !== null) bridgeResult(probe);
   if (item.admitted || (probe !== null && (probe as BridgeResult).status === "blocked" && item.status !== "blocked")
     || (probe !== null && (probe as BridgeResult).status === "terminal-receipt-unavailable" && (item.status !== "unknown" || (item.admission as AdmissionRecord | null)?.scope.purpose !== "synthetic-local-sentinel"))) fail();
-  return copy(value);
+  return freeze(result);
 }
