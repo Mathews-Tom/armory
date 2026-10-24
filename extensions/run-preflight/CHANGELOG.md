@@ -1,0 +1,16 @@
+# Changelog
+
+## 1.0.0
+
+Package and shared core versions are 1.0.0. Native qualification is a separate required gate for the exact advertised host versions and surfaces; credential-free CI does not establish native compatibility.
+
+- Add an explicit declared-run preflight core and standalone helper that preserve unknown quota, distinguish required facts from advice and refuse unsupported enforcement without querying accounts or providers.
+- Bind complete versioned admission and the actual consumed invocation/input inventory at the existing OMP SkillsBench dispatch boundary. Refuse changed source/config/data/account/cell/cap/checkpoint bindings and expired evidence immediately before the managed runner.
+- Permit only fresh explicitly bounded synthetic authority to exercise one real harmless Python `pass` child. Preserve unknown quota and honest `terminal-receipt-unavailable`, refuse derived model receipt persistence and leave frozen study inputs, live-study holds and no-live CLI behavior unchanged.
+- Add `/armory-preflight` check/probe/help commands for OMP and Claude Code, explicit two-path JSON selection, detached installed-helper identity validation, nonsecret declared observations and inert text/JSON. Native check is not consumed admission and there is no native admit or live-study launch command.
+- Require observed successful helper status, bounded owned work and awaited cleanup; cancellation, replacement and session changes prevent stale publication. Failed or unconfirmed cleanup blocks later readiness instead of becoming success.
+- Add self-contained host artifacts, package definition, static conformance cases, deterministic adapter/process integration coverage and detached real-host qualification drivers. Preserve default authentication and genuine enforcement; lifecycle qualification targets disposable owned roots with foreign-data sentinels.
+- Keep actual native qualification fail-closed and separate from credential-free type/unit/integration/offline SDK/build/package/catalog/lifecycle gates. Do not claim a shared call counter, financial enforcement, a universal bypass guard or a completed benchmark campaign.
+- Execute the actual production-bundled helper entry rather than accepting an empty zero-exit process, and resolve the OMP helper from the package root above its `omp/index.ts` bundle. Keep real failing-before/passing-after consumer regressions for both installation defects.
+- Qualify actual detached artifacts on macOS arm64: OMP 18.12.6 RPC and Claude Code 2.1.310 interactive pass all eight process/refusal/freshness/race/cancellation/reopening/privacy/text categories; Claude passes five whole-native-command headless cases. Retain genuine enforcement/default authentication, private captures and observed owned cleanup, without equating project-local zero provider calls with metered absence of all host traffic.
+- Preserve primary native failures alongside private cleanup diagnostics, bind OMP cwd by filesystem identity across macOS aliases, and release the owned Claude terminal before waiting for forced process shutdown. Cleanup failures remain failures, not successful qualification.
