@@ -99,7 +99,6 @@ MAX_CAPTURE, MAX_HEADLESS = 8 * 1024 * 1024, 2 * 1024 * 1024
 APPROVED_SETTINGS = Path(
     "/var/folders/yr/1rcvpjws5mjfcq327shzrrz00000gn/T/armory-extensions-control-20261022-e7ozqsb3/m10-native-qualification-yddnnr5q/claude-settings.json"
 )
-TRUSTED_CWD = Path("/Users/druk/WorkSpace/AetherForge")
 ANSI = re.compile(r"\x1b(?:\][^\x07]*(?:\x07|\x1b\\)|\[[0-?]*[ -/]*[@-~]|[@-_])")
 STOP_MARKERS = (
     "do you trust the files",
@@ -446,7 +445,8 @@ def context(
     if (
         not cwd.is_absolute()
         or not source.is_absolute()
-        or cwd.resolve() != TRUSTED_CWD
+        or not cwd.is_dir()
+        or cwd.resolve() != cwd
         or source.is_symlink()
         or not source.is_file()
         or stat.S_IMODE(source.stat().st_mode) & 0o077
@@ -1310,7 +1310,9 @@ def main() -> int:
     parser.add_argument("--report", required=True)
     parser.add_argument(
         "--trusted-cwd",
-        default=os.environ.get("ARMORY_CLAUDE_NATIVE_CWD", str(TRUSTED_CWD)),
+        default=os.environ.get("ARMORY_CLAUDE_NATIVE_CWD"),
+        required=not os.environ.get("ARMORY_CLAUDE_NATIVE_CWD"),
+        help="existing canonical absolute directory already trusted by Claude; never grants trust",
     )
     parser.add_argument(
         "--settings",
