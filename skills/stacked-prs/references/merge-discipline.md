@@ -50,6 +50,7 @@ Deleting a branch that an open PR uses as its base is unsafe whatever the provid
 | Endpoint | Finishes when |
 | --- | --- |
 | `pr` | Observation only: the packet is checked against provider facts; nothing is captured, promoted, retargeted, merged or deleted |
+| `renewed` | Existing manual PRs have verified renewed source heads/bases; no landing, post-merge acceptance or deletion. Read the registered lifecycle reference's Source-only renewal contract |
 | `merged` | Every selected node is landed and its post-merge checks passed. No feature branch is deleted |
 | `clean` | `merged`, plus proof-based cleanup of each selected node's stale branches and worktrees after its children were retargeted or landed |
 
@@ -61,17 +62,18 @@ A cleanup-only request selects only nodes the provider already reports merged; t
 
 ## Recovery: Deleted Parent Branch Closed A Child PR
 
-Use this path only for the specific provider failure where a child PR was closed unmerged because its base branch disappeared. It recreates the same manual PR; it never converts the stack to a native one or changes repository settings.
+Use these observations only to diagnose a child closed unmerged because its base branch disappeared. Closed PR recovery is not ordinary source renewal: the `renewed` endpoint preserves existing open PR identities and refuses closed ones. Do not replace or reopen a PR, hand-restack after landing, convert native membership or change repository settings under source-renewal authority.
 
 1. Confirm the closed child PR has `mergedAt: null`.
 2. Confirm the deleted branch was the closed PR's `baseRefName`.
 3. Confirm the child `headRefName` still exists on `origin`.
 4. Confirm the child head commit is still the intended stack slice.
-5. If its parent landed, restack the child onto the trunk tip with the standalone procedure in `references/sync-algorithm.md`, recording `F` from the old parent head.
-6. Recreate the PR against `<base>` or the current merged parent.
-7. Continue by delegating the remaining landing with a fresh stack decision packet; its gates wait for the recreated PR's checks.
+5. Preserve the original child head, fork and provider observations. Stop for an explicit supported recovery decision; the standalone pre-landing sync recipe is not a post-landing fallback.
+6. After separately authorized recovery establishes an open intended PR, reconcile its exact identity and obtain fresh applicability/review/CI evidence before delegating the requested endpoint with a new packet.
 
-## Stop Conditions
+## Landing Stop Conditions
+
+These conditions govern landing endpoints. Source-only renewal instead permits selected open parents and exact reviewed conflicting trees under the registered lifecycle contract; it never treats those exceptions as merge readiness.
 
 - An ancestor of the node is not merged.
 - Required checks are failing, pending, or not current for the node's head and base.

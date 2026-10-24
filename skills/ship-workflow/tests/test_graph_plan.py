@@ -497,7 +497,6 @@ INVALID: list[tuple[str, Change]] = [
     ("head-sha-short", set_head(12, "sha", "abc123")),
     ("head-sha-upper", set_head(12, "sha", oid(12).upper().replace("0", "A"))),
     ("base-space", set_at(12, "base", "feat/a ")),
-    ("fork-root", set_at(11, "fork", oid(99))),
     ("fork-symbolic", set_at(12, "fork", "HEAD")),
     ("fork-null", set_at(12, "fork", None)),
     ("fork-is-head", set_at(12, "fork", oid(12))),

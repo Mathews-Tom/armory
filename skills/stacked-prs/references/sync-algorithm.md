@@ -4,7 +4,7 @@ Sync moves each child's own commits onto its parent's new tip (the trunk tip onc
 
 ## Executable Owner
 
-The installed `ship-workflow` skill's `scripts/ship.py --stack-plan PATH` is the one execution owner of graph continuation once a parent has landed (packet: `references/stack-model.md` § Explicit Stack Decision Packet). It promotes each selected child after its parent landed, with Git plumbing only, pushes it under an expected-old lease, retargets it to the trunk and renews its gates, enforcing every invariant in this reference. Post-landing promotion and retargeting are never hand-run. This behavior is fixture-tested against local Git repositories and a stateful provider fixture; it is not a claim about every provider configuration.
+The installed `ship-workflow` skill's `scripts/ship.py --stack-plan PATH` is the one execution owner of graph continuation once a parent has landed (packet: `references/stack-model.md` § Explicit Stack Decision Packet). At landing endpoints it promotes each selected child after its parent landed, with Git plumbing only, pushes it under an expected-old lease, retargets it to the trunk and renews its gates, enforcing this reference's clean promotion proof. For separately authorized source-only work, its manual-graph `--until renewed` endpoint instead renews open parents and children without landing; independently reviewed conflicts and historical external landings use the registered lifecycle reference's **Source-only renewal** contract. Post-landing renewal, promotion and retargeting are never hand-run. Behavior is fixture-tested against local Git repositories and a stateful provider fixture, not every provider configuration.
 
 The hand-run recipe below is the standalone restack of an open stack before anything lands: a parent branch was rewritten or the trunk moved, and the children must follow it with the same proof. It never retargets a PR and never deletes a branch.
 
@@ -133,7 +133,7 @@ A conflict from `merge-tree` or during the replay stops the affected child and e
 
 ## Lease Failure
 
-A rejected `--force-with-lease=refs/heads/<branch>:<expected-old>` means the remote head is no longer the expected old OID; the remote is unchanged. Stop, re-inspect, and treat the new head as a topology change that needs fresh proof. Do not use plain `--force`.
+A refused expected-old push must be classified by re-observing the remote. If it still holds the expected old OID, publication was refused without advancing that ref; preserve the exact frozen proposal and resolve the reported hook, transport or provider refusal before renewing validation. A different head needs fresh proof and a new exact-old decision. An unknown outcome remains pending until observation confirms the proposed head or establishes refusal; never resend blindly or replace the lease with plain `--force`.
 
 ## Validation After Sync
 
