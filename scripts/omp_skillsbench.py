@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """Validate the no-cost OMP contract for the frozen SkillsBench run."""
 
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, cast
+from typing import Final, Literal, cast
 
 _REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 import re
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from scripts.run_skillsbench import CorpusManifest, load_corpus_manifest
 from scripts.validate_skillsbench import validate_strata
@@ -34,7 +33,6 @@ _EXPECTED_TASK_COUNT: Final = 50
 _EXPECTED_TARGET_COUNT: Final = 2
 _EXPECTED_REPETITIONS: Final = 3
 _EXPECTED_CELL_COUNT: Final = 900
-_USAGE_TIMEOUT_SECONDS: Final = 30
 
 
 class OmpRunConfigError(ValueError):
@@ -97,6 +95,10 @@ class PreflightReport:
     condition_hashes: dict[str, str]
     subscription_labels: tuple[str, ...]
     model_request_made: bool
+    subscription_observation: Literal["unknown", "caller-provided"]
+    subscription_observation_reason: str
+    checked_at: str
+    provider_request_made: bool
 
 
 def _mapping(value: object, location: str) -> dict[str, object]:
@@ -318,7 +320,7 @@ def declared_omp_cells(contract: OmpRunContract) -> tuple[OmpCell, ...]:
 
 
 def validate_subscription_usage(contract: OmpRunContract, usage_output: str) -> None:
-    """Require OMP's no-cost usage report to show every approved subscription."""
+    """Validate supplied account labels without querying provider accounts."""
     missing = [
         target.subscription_label
         for target in contract.targets
@@ -335,9 +337,12 @@ def validate_subscription_usage(contract: OmpRunContract, usage_output: str) -> 
         )
 
 
-def preflight(contract: OmpRunContract, usage_output: str) -> PreflightReport:
-    """Validate matrix, source revisions, and subscriptions without a model call."""
-    validate_subscription_usage(contract, usage_output)
+def preflight(
+    contract: OmpRunContract, usage_output: str | None = None
+) -> PreflightReport:
+    """Validate frozen inputs without inferring live capacity or run authority."""
+    if usage_output is not None:
+        validate_subscription_usage(contract, usage_output)
     cells = declared_omp_cells(contract)
     if len(cells) != len(set(cells)):
         raise OmpRunConfigError("OMP matrix contains duplicate cells")
@@ -356,6 +361,16 @@ def preflight(contract: OmpRunContract, usage_output: str) -> PreflightReport:
             target.subscription_label for target in contract.targets
         ),
         model_request_made=False,
+        subscription_observation=(
+            "unknown" if usage_output is None else "caller-provided"
+        ),
+        subscription_observation_reason=(
+            "No provider or account observation requested; study holds remain in force."
+            if usage_output is None
+            else "Caller-provided labels validated, not live authentication or quota."
+        ),
+        checked_at=datetime.now(UTC).isoformat(),
+        provider_request_made=False,
     )
 
 
@@ -372,27 +387,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     try:
         contract = load_omp_run_contract(args.contract)
-        try:
-            usage = subprocess.run(
-                ["omp", "usage"],
-                capture_output=True,
-                check=False,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                timeout=_USAGE_TIMEOUT_SECONDS,
-            )
-        except FileNotFoundError as exc:
-            raise OmpRunConfigError("'omp' CLI not found in PATH") from exc
-        except OSError as exc:
-            raise OmpRunConfigError(f"cannot execute omp usage: {exc}") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise OmpRunConfigError(
-                f"omp usage timed out after {_USAGE_TIMEOUT_SECONDS}s"
-            ) from exc
-        if usage.returncode != 0:
-            detail = usage.stderr.strip() or f"exit status {usage.returncode}"
-            raise OmpRunConfigError(f"omp usage failed: {detail}")
-        report = preflight(contract, usage.stdout)
+        report = preflight(contract)
     except ValueError as exc:
         print(f"OMP SkillsBench preflight failed: {exc}", file=sys.stderr)
         return 2

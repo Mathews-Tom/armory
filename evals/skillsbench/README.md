@@ -47,7 +47,7 @@ design gate authorizes the reviewed dispatcher.
 uv run python scripts/run_skillsbench.py --validate-manifest
 uv run python scripts/validate_skillsbench.py
 
-# Validate the 900-cell OMP subscription contract without a model request.
+# Validate the frozen 900-cell contract without provider/account/model requests.
 uv run python scripts/omp_skillsbench.py --preflight
 
 # Materialize reviewed treatment inputs and validate immutable receipt handling.
@@ -59,6 +59,8 @@ uv run python scripts/omp_skillsbench_dispatch.py --preflight
 # Legacy harness dry-run: validates M2 target linkage and task data only.
 uv run python scripts/run_skillsbench.py --dry-run
 ```
+
+The common OMP preflight is strictly local: it does not invoke `omp usage`, check signed-in accounts or probe provider quota. Its subscription observation is explicitly unknown, not an authentication or capacity verdict. The managed `dispatch_cell` callable additionally requires a complete current [Run Preflight admission](../../extensions/run-preflight/README.md), including the actual consumed inputs and canonical task/condition contract; neither a local sentinel nor a successful preflight clears the existing live-study hold.
 
 ## Task Set Scope
 
