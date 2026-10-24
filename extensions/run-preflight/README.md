@@ -18,6 +18,8 @@ Text and JSON project nonsecret declared provider, identity kind, profile, run, 
 
 Each native invocation owns bounded helper work. Replacement, cancellation and session revocation prevent stale publication and await owned cleanup; failed or unconfirmed cleanup blocks subsequent readiness. Neither adapter starts background refresh, a daemon, feature persistence or a model request. The explicit synthetic probe is the only managed-child route.
 
+OMP continues discovering ownership during both termination grace periods, including detached work created by termination handlers and descendants of already-observed owners. Cleanup checks process identity before signaling recorded groups. This is bounded process ownership, not a sandbox or a guarantee against arbitrary trusted code deliberately escaping observation.
+
 ## Standalone interface
 
 Use the repository-pinned Bun workspace and Python 3.12 project environment. Paths passed to the helper are explicit absolute paths; there is no checkout discovery or package-path fallback.

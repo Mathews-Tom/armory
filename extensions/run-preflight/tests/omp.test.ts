@@ -231,6 +231,56 @@ process.on("SIGTERM", () => { process.kill(-child.pid, "SIGTERM"); child.on("clo
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("cancellation discovers a detached descendant created by a termination handler", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "preflight-native-late-child-")));
+  const helper = join(root, "helper.js");
+  const ready = join(root, "ready");
+  const pidPath = join(root, "pid");
+  let pid = 0;
+  const alive = (): boolean => {
+    try { process.kill(pid, 0); return true; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ESRCH") return false; throw error; }
+  };
+  const awaitAbsent = async (): Promise<void> => {
+    const deadline = Date.now() + 2_000;
+    while (alive()) {
+      if (Date.now() >= deadline) throw new Error("fixture descendant cleanup unconfirmed");
+      await Bun.sleep(10);
+    }
+  };
+  try {
+    await writeFile(helper, `import { spawn } from "node:child_process"; import { writeFileSync } from "node:fs";
+const timer = setInterval(() => {}, 1000);
+process.once("SIGTERM", () => {
+  const child = spawn("bun", ["-e", "setInterval(() => {}, 1000)"], { detached: true, stdio: "ignore" });
+  writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
+  child.once("close", () => { clearInterval(timer); process.exitCode = 143; });
+});
+writeFileSync(${JSON.stringify(ready)}, "ready");`);
+    const abort = new AbortController();
+    const pending = executeHelper(["bun", helper], abort.signal, 5_000);
+    const deadline = Date.now() + 3_000;
+    while (!(await Bun.file(ready).exists())) {
+      if (Date.now() >= deadline) { abort.abort(); await pending; throw new Error("termination fixture did not start"); }
+      await Bun.sleep(10);
+    }
+    abort.abort();
+    const result = await pending;
+    pid = Number(await readFile(pidPath, "utf8"));
+    expect(result.exitCode).toBeNull();
+    expect(result.cleanupConfirmed).toBe(true);
+    expect(alive()).toBe(false);
+    expect(() => process.kill(-pid, 0)).toThrow();
+  } finally {
+    if (pid === 0 && await Bun.file(pidPath).exists()) pid = Number(await readFile(pidPath, "utf8"));
+    if (pid > 0 && alive()) {
+      process.kill(-pid, "SIGKILL");
+      await awaitAbsent();
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("an execution rejection cannot bypass the cleanup latch, including a cancelled owner", async () => {
   const entered = Promise.withResolvers<undefined>();
   const release = Promise.withResolvers<HelperExecution>();

@@ -69,13 +69,26 @@ export async function executeHelper(argv: readonly string[], signal: AbortSignal
       let current = item;
       const seen = new Set<number>();
       while (!seen.has(current.pid)) {
-        if (current.pid === pid) { owned.set(item.pid, item); break; }
+        const ancestor = owned.get(current.pid);
+        if (current.pid === pid && ancestor === undefined ||
+          ancestor !== undefined && ancestor.command === current.command && ancestor.group === current.group) {
+          owned.set(item.pid, item);
+          break;
+        }
         seen.add(current.pid);
         const parent = table.get(current.ppid);
         if (parent === undefined) break;
         current = parent;
       }
     }
+  };
+  const discoverDuringGrace = async (milliseconds: number): Promise<void> => {
+    const deadline = Date.now() + milliseconds;
+    while (Date.now() < deadline) {
+      try { await sample(); } catch { inventoryFailed = true; }
+      await sleep(25);
+    }
+    try { await sample(); } catch { inventoryFailed = true; }
   };
   const cancel = (): void => {
     failed = true;
@@ -86,8 +99,9 @@ export async function executeHelper(argv: readonly string[], signal: AbortSignal
       await sampling;
       try { await sample(); } catch { inventoryFailed = true; }
       if (pid !== undefined) kill(pid, "SIGTERM");
-      // The CLI's nested bridge has its own 100ms graceful cleanup deadline.
-      await sleep(750);
+      // Termination handlers can create detached work; retain discovery while
+      // giving the helper and its nested bridge their existing grace periods.
+      await discoverDuringGrace(750);
       try {
         const table = await inventory();
         for (const identity of owned.values()) {
@@ -95,7 +109,7 @@ export async function executeHelper(argv: readonly string[], signal: AbortSignal
           if (live !== undefined && live.command === identity.command && live.group === identity.group && identity.group === identity.pid) kill(identity.group, "SIGTERM");
         }
       } catch { inventoryFailed = true; }
-      await sleep(250);
+      await discoverDuringGrace(250);
       if (pid !== undefined && exists(pid)) kill(pid, "SIGKILL");
       try {
         const remaining = await inventory();
