@@ -19,15 +19,18 @@ from scripts.omp_skillsbench_dispatch import (
     dispatcher_preflight,
     prepare_cell,
 )
-from tests.test_run_preflight_admission import make_admission_project
+from tests.test_run_preflight_admission import (
+    make_admission_project,
+    make_managed_admission_project,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONTRACT_PATH = _REPO_ROOT / "evals" / "skillsbench" / "omp_run.yaml"
 
 
 def _parser_fixture_admission(tmp_path: Path) -> ProjectAdmission:
-    """Admit legacy event fixtures; these are parser tests, not live proof."""
-    return make_admission_project(
+    """Admit unit event fixtures, not real auth/capacity or live model proof."""
+    return make_managed_admission_project(
         tmp_path / "admission", receipt_root=tmp_path / "receipts"
     ).issue()
 
@@ -53,6 +56,31 @@ def _terminal_events() -> str:
             "toolResults": [],
         }
     )
+
+
+def test_synthetic_admission_cannot_persist_fabricated_model_receipt(
+    tmp_path: Path,
+) -> None:
+    project = make_admission_project(tmp_path)
+    admission = project.issue()
+    calls: list[list[str]] = []
+
+    def fixture_runner(command: list[str], **kwargs: object) -> CompletedProcess[str]:
+        # Unit fixture only: no subprocess or model request is made.
+        calls.append(command)
+        return CompletedProcess(command, 0, stdout=_terminal_events(), stderr="")
+
+    assert admission.purpose == "synthetic-local-sentinel"
+    with pytest.raises(CellDispatchError):
+        dispatch_cell(
+            project.contract,
+            project.cell,
+            project.receipts,
+            fixture_runner,
+            admission=admission,
+        )
+    assert len(calls) == 1
+    assert list(project.receipts.rglob("*.json")) == []
 
 
 def test_prepared_cell_has_explicit_condition_bundle(tmp_path: Path) -> None:

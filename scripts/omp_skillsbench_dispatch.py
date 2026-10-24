@@ -188,19 +188,24 @@ def dispatch_cell(
     *,
     admission: ProjectAdmission | None = None,
 ) -> DerivedReceipt:
-    """Dispatch one admitted cell; this does not authorize an existing study."""
+    """Dispatch one admitted cell; synthetic authority never yields a model receipt."""
     if not isinstance(admission, ProjectAdmission):
         raise PreflightAdmissionError(
             "managed dispatch requires a complete project admission"
         )
-    if admission.purpose == "synthetic-local-sentinel" and runner is subprocess.run:
+    synthetic = admission.purpose == "synthetic-local-sentinel"
+    if synthetic and runner is subprocess.run:
         raise PreflightAdmissionError(
             "synthetic admission requires an explicit local runner"
         )
     contract = canonical_dispatch_contract(admission, contract, cell)
     with tempfile.TemporaryDirectory(prefix="omp_skillsbench_cell_") as directory:
         prepared = prepare_cell(contract, cell, Path(directory) / "workspace")
-        command = build_omp_command(contract, prepared)
+        command = (
+            [sys.executable, "-c", "pass"]
+            if synthetic
+            else build_omp_command(contract, prepared)
+        )
         invocation = derive_runner_invocation(
             contract, prepared.cell, prepared.target, receipt_root
         )
@@ -222,6 +227,10 @@ def dispatch_cell(
             raise GlobalDispatchError(f"cannot launch OMP: {exc}") from exc
         if completed.returncode != 0:
             raise _classify_nonzero(completed.stderr)
+        if synthetic:
+            raise CellDispatchError(
+                "synthetic local child cannot produce an OMP terminal receipt"
+            )
         try:
             receipt = derive_receipt(
                 prepared.cell,

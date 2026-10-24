@@ -1,4 +1,4 @@
-"""Real helper/dispatch admission tests; all managed children are Python pass."""
+"""Real helper/dispatch admission tests; all subprocess children are Python pass."""
 
 from __future__ import annotations
 
@@ -187,6 +187,47 @@ def make_admission_project(
     )
 
 
+def make_managed_admission_project(
+    root: Path, *, receipt_root: Path | None = None
+) -> AdmissionProject:
+    """Unit-only attestation/capacity fixture, not observed provider evidence."""
+    project = make_admission_project(root, receipt_root=receipt_root)
+    identity = _object_file(project.identity)
+    target = next(
+        target
+        for target in project.contract.targets
+        if target.id == project.cell.target_id
+    )
+    identity.update(
+        provider=target.model.split("/")[0],
+        kind="managed",
+        auth="attested",
+        accountFingerprint="unit-fixture-no-account",
+    )
+    _json_file(project.identity, identity)
+    declaration = _object_file(project.declaration)
+    declaration.update(runId="managed-unit-fixture", purpose="managed")
+    cast(dict[str, object], declaration["inputs"])["identity"] = _binding(
+        project.identity
+    )
+    cast(dict[str, object], declaration["quota"]).update(
+        status="observed",
+        remainingCalls=1,
+        source="unit-fixture-no-provider-observation",
+        reason="Fabricated unit capacity only; no provider call or account probe",
+    )
+    authorization = cast(list[dict[str, object]], declaration["authorizations"])[0]
+    authorization.update(
+        runId="managed-unit-fixture",
+        purpose="managed",
+        accountFingerprint="unit-fixture-no-account",
+        scope="managed-invocation",
+        acknowledgeUnknownQuota=False,
+    )
+    _json_file(project.declaration, declaration)
+    return project
+
+
 class PythonPassRunner:
     """Count actual harmless children, not calls to a fabricated completion."""
 
@@ -196,11 +237,11 @@ class PythonPassRunner:
     def __call__(
         self, command: list[str], **kwargs: object
     ) -> subprocess.CompletedProcess[str]:
-        assert command[0] == "omp"  # This argv must never reach subprocess.run.
+        assert command == [sys.executable, "-c", "pass"]
         assert kwargs["timeout"] == 630
         assert kwargs["stdin"] is subprocess.DEVNULL
         child = subprocess.run(
-            [sys.executable, "-c", "pass"],
+            command,
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -219,7 +260,7 @@ def test_fresh_synthetic_admission_reaches_one_real_child_without_receipt(
     runner = PythonPassRunner()
     assert admission.status == "unknown"
     assert runner.children == []  # Normal check did not invoke this managed runner.
-    with pytest.raises(CellDispatchError, match="terminal receipt failed"):
+    with pytest.raises(CellDispatchError):
         dispatch_cell(
             project.contract,
             project.cell,
@@ -230,6 +271,45 @@ def test_fresh_synthetic_admission_reaches_one_real_child_without_receipt(
     assert len(runner.children) == 1
     assert runner.children[0].returncode == 0
     assert runner.children[0].stdout == ""
+    assert list(project.receipts.rglob("*.json")) == []
+
+
+def test_synthetic_admission_forwarding_runner_receives_only_python_pass(
+    tmp_path: Path,
+) -> None:
+    project = make_admission_project(tmp_path)
+    admission = project.issue()
+    children: list[subprocess.CompletedProcess[str]] = []
+
+    def forwarding_runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        # Fail before forwarding if dispatch supplies any OMP/provider argv.
+        assert command == [sys.executable, "-c", "pass"]
+        child = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            timeout=cast(int, kwargs["timeout"]),
+        )
+        children.append(child)
+        return child
+
+    assert admission.purpose == "synthetic-local-sentinel"
+    with pytest.raises(CellDispatchError, match="terminal receipt"):
+        dispatch_cell(
+            project.contract,
+            project.cell,
+            project.receipts,
+            forwarding_runner,
+            admission=admission,
+        )
+    assert len(children) == 1
+    assert children[0].args == [sys.executable, "-c", "pass"]
+    assert children[0].returncode == 0
+    assert children[0].stdout == ""
     assert list(project.receipts.rglob("*.json")) == []
 
 
@@ -721,7 +801,7 @@ def test_inline_task_inventory_binds_corpus_once_without_fragment(
     )
     assert required["data"] == (_REPO_ROOT / "evals" / "skillsbench" / "corpus.yaml",)
     runner = PythonPassRunner()
-    with pytest.raises(CellDispatchError, match="terminal receipt failed"):
+    with pytest.raises(CellDispatchError):
         dispatch_cell(
             project.contract,
             project.cell,
@@ -737,7 +817,7 @@ def test_dispatch_uses_private_canonical_prompt_snapshot(
 ) -> None:
     from scripts import omp_skillsbench_dispatch as dispatcher
 
-    project = make_admission_project(tmp_path)
+    project = make_managed_admission_project(tmp_path)
     admission = project.issue()
     task = next(
         task
@@ -760,8 +840,10 @@ def test_dispatch_uses_private_canonical_prompt_snapshot(
     def capture(
         command: list[str], **kwargs: object
     ) -> subprocess.CompletedProcess[str]:
+        assert command[0] == "omp"
         assert command[-1] == expected_prompt
-        return runner(command, **kwargs)
+        # Inspect managed argv, but never pass it to a subprocess.
+        return runner([sys.executable, "-c", "pass"], **kwargs)
 
     with pytest.raises(CellDispatchError, match="terminal receipt failed"):
         dispatcher.dispatch_cell(

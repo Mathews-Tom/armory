@@ -615,10 +615,6 @@ def synthetic_sentinel(config_path: Path, declaration_path: Path) -> dict[str, o
             python_pass,
             admission=admission,
         )
-        # A pass child cannot produce a valid OMP receipt.
-        raise PreflightAdmissionError(
-            "Python pass cannot produce an OMP terminal receipt"
-        )
     except CellDispatchError:
         status = "terminal-receipt-unavailable" if spawns == 1 else "blocked"
     except (PreflightAdmissionError, ValueError, OSError, KeyError, TypeError):
