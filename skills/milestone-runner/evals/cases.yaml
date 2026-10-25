@@ -137,33 +137,40 @@ cases:
 
   - id: direct_package_fix_over_control_plane
     prompt: >
-      The package evaluator found that skills/example has an observable trigger
-      regression and its existing eval can verify a focused description fix.
-      The release target is unresolved. Fix the package rather than starting a
-      new benchmark, telemetry pipeline, or release-control project.
-    fixtures: []
+      Read this milestone-runner package's evals/fixtures/product-workflow.md
+      (source checkout: skills/milestone-runner/evals/fixtures/product-workflow.md),
+      section S03 in full. In read-only decision mode, run the next design decision
+      for the focused skills/example trigger correction from EX-A/EX-P1/EX-E1/EX-O1.
+      Name the actual description correction and established verification, then
+      report implementation eligibility separately from unknown release preparation.
+      Do not edit files, run evaluators or models, launch lanes or mutate git/GitHub.
+    fixtures: ["evals/fixtures/product-workflow.md"]
     rubric:
-      - "prioritizes the focused package correction and its existing evaluator"
-      - "treats the unresolved release target as release-preparation work, not a package-fix blocker"
-      - "does not create benchmark, telemetry, dispatcher, dashboard, or control-plane work"
-      - "reports the smallest observable next action"
+      - "identifies the wrong grocery trigger and the actual correction to incident-log summarization while preserving unrelated boundaries"
+      - "permits the authorized focused correction and existing evaluator after a current design gate, without claiming an unperformed check or edit"
+      - "keeps the unresolved EX-P1 release field visible and blocks preparation only because no runtime consumer depends on it; invents neither version nor none"
+      - "does not create benchmark, telemetry, dispatcher, dashboard or release-control work"
+      - "reports literal NEXT STEPS with the concrete correction, actual evidence limits and release remediation"
     trigger_expected: true
     assertions:
       - type: contains
         target: "NEXT STEPS"
         weight: 1.0
       - type: matches_regex
-        target: "(package|skills/example).*(fix|correct|improve)|(fix|correct|improve).*(package|skills/example)"
+        target: "(?i)incident.log"
         weight: 1.0
       - type: matches_regex
-        target: "(existing eval|evaluator|focused).*verif"
-        weight: 0.9
-      - type: matches_regex
-        target: "(before|rather than|instead of|prioriti[sz]e)[^\\n]{0,80}(benchmark|telemetry|dispatcher|dashboard|control.plane|infrastructure)"
+        target: "(?i)grocer"
         weight: 1.0
       - type: matches_regex
-        target: "(release target|release preparation).*(defer|does not block|not a blocker)|(defer|does not block|not a blocker).*(release target|release preparation)"
+        target: "(?is)(description|trigger).*(correct|replace|restore)|(correct|replace|restore).*(description|trigger)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(existing eval|evaluate_package|established.*verif)"
         weight: 0.9
+      - type: matches_regex
+        target: "(?is)release[^\\n]*(unresolved|unknown|missing).*?(prepar|BLOCKED)"
+        weight: 1.0
 
   - id: negative_generate_plan_prompts
     prompt: >
@@ -183,17 +190,20 @@ cases:
 
   - id: design_reconciliation_before_parallel_wave
     prompt: >
-      M5 and M6 are currently independent and ready for a parallel implementation wave. Before
-      launch, M5's design gate finds that a shared authentication assumption invalidates both
-      milestones. Reconcile the plan and prompts, preserve the gitignored local history, and
-      only then decide whether either implementation lane may run.
-    fixtures: []
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      section S08 Shared authentication drift PT-H1, before deciding M5/M6.
+      The source-checkout path is skills/milestone-runner/evals/fixtures/product-workflow.md.
+      Give read-only decisions for the proposed parallel wave and required
+      reconciliation, including capsule/review freshness. Do not launch lanes,
+      write artifacts, mutate git/GitHub or run models.
+    fixtures: ["evals/fixtures/product-workflow.md"]
     rubric:
       - "serializes design reconciliation before launching or continuing parallel implementation"
       - "updates the current and every affected downstream milestone, then rebuilds the DAG and waves"
       - "requires a reviewed green merged docs-only reconciliation PR before dependent code PRs"
       - "preserves one canonical ignored history ledger without concurrent writes"
       - "halts every affected implementation lane and rejects continued scaffolding or partial code work"
+      - "invalidates both affected capsules and comprehension/design evidence when H1 disproves H0, despite green CI and disjoint files"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -495,4 +505,218 @@ cases:
         weight: 1.0
       - type: matches_regex
         target: "(?i)(lane|you)[^\\n]*not[^\\n]*canonical owner"
+        weight: 1.0
+
+  - id: resume_product_capsule_and_lane_handoff
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md
+      (source checkout: skills/milestone-runner/evals/fixtures/product-workflow.md),
+      shared PT-A/PT-P1/PT-E1/PT-O1 and S04. Resume M2 in read-only
+      decision/handoff mode without conversation or the ignored ledger. Render
+      the seven-field capsule and complete lane-visible contract, identify actual
+      predecessor progress and remaining workflow, and give the next design action.
+      Also read the S01 → S04 → S06 continuity protocol: use actual supplied S01
+      artifacts for that variant, or name their absence without substituting PT-P1.
+      Do not launch implementation, write files, run checks/models or mutate git/GitHub.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "derives all seven populated fields from current PT-A/PT-P1/PT-E1 with inspected source/revision, not a separate store or conversation"
+      - "reports only add/list and preserved-write predecessor observations; show/full output and installed integration remain unobserved"
+      - "handoff includes preservation, non-goals, source revision, focused proof stage, issue tracking off and canonical-only authority/topology/ledger/issues"
+      - "requires current design review before launch without claiming an independent review happened in this exercise"
+      - "continuity variant retains actual S01 artifacts and TASK-1 purpose when supplied; missing artifacts are named, not replaced with Pocket Tasks or invented output"
+      - "prints literal NEXT STEPS with current action, release state and remaining workflow"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?s)PRODUCT OUTCOME:.*SHORTEST COMPLETE WORKFLOW:.*THIS MILESTONE'S CONTRIBUTION:.*WORKING BEHAVIOR AND SAFETY TO PRESERVE:.*NON-GOALS:.*DEMONSTRATION AND EXPECTED RESULT:.*AUTHORITATIVE SOURCE / REVISION:"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)PT-P1"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(show|installed).*?(remain|missing|unobserved|pending)"
+        weight: 0.9
+      - type: contains
+        target: "NEXT STEPS:"
+        weight: 1.0
+
+  - id: shortest_workflow_preserves_safety_prerequisites
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      shared target and both independent S05 variants PT-T1/PT-D1. The source path
+      is skills/milestone-runner/evals/fixtures/product-workflow.md. In read-only
+      mode decide whether simplifying the shortest workflow permits either unsafe
+      path to ship; name affected consumers, concrete repair/proof and unrelated
+      safe work. Do not execute changes, migrations, checks, models or git/GitHub.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "blocks tenant-crossing lookup until authenticated tenant context and Store predicate prevent blue from reading Red secret"
+      - "blocks irreversible migration on failed preservation, missing backup/restore proof and mandatory explicit human approval, retaining the 10-to-9 failure"
+      - "names each actual technical/safety/mandatory-rule consumer and affected closure, preserving unrelated safe M4 with its own current GO"
+      - "does not mistake optional color/metrics machinery or unknown release identity for a blanket safety dependency"
+      - "does not waive first-use safety, approval, historical evidence or data ownership to simplify the workflow"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?is)(tenant|authoriz).*?(block|NO-GO|stop)|(block|NO-GO|stop).*?(tenant|authoriz)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(backup|restore|rollback)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(human|explicit).*approv"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)M4"
+        weight: 0.9
+
+  - id: green_but_unreachable_is_not_complete
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      shared PT-A/PT-P1/PT-E1 and S06 before deciding the lane's request to mark M2
+      complete. Source path: skills/milestone-runner/evals/fixtures/product-workflow.md.
+      Give a read-only completion decision, actual user progress/interaction/result,
+      remaining workflow and bounded next actions. Do not write, merge, launch,
+      run commands/models or mutate git/GitHub.
+      Also inspect the continuity protocol's tasks-list variant against actual S01
+      artifacts if supplied; otherwise report that missing input, not a flow pass.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "rejects M2 completion despite green checks, GO, review and open PR because pocket show is unreachable"
+      - "identifies missing cli-to-Store.get-to-render interaction and expected complete title/note, without inventing a cloud/dashboard destination"
+      - "separates observed add/list progress and unknown-command failure from unobserved M2, post-merge and installed proof"
+      - "requires repair or bounded tracked-plan reconciliation within independent PT-A authority; cannot silently retire acceptance"
+      - "prints literal NEXT STEPS with current repair/retry gate, release state and dependent M3 status"
+      - "continuity variant rejects missing tasks list under TASK-1 and preserves partial add progress; never reports S01-to-S06 qualification without supplied actual artifacts"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(NO-GO|not complete|reject.*complet|cannot.*complet)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(pocket show|unknown command show)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(title|note)"
+        weight: 0.9
+      - type: contains
+        target: "NEXT STEPS:"
+        weight: 1.0
+
+  - id: operator_workflow_and_justified_prerequisite
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      S07 Config Apply CA-A/CA-P1/CA-E1/CA-O1. Source checkout:
+      skills/milestone-runner/evals/fixtures/product-workflow.md. Give read-only
+      design-readiness decisions for M1 schema and its M2 operator-command consumer.
+      Name technical/safety authority, why they cannot combine and evidence still
+      owed. Do not apply configuration, run checks/models or mutate files/git/GitHub.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "recognizes configctl validate/apply as useful operator product behavior without demanding a GUI"
+      - "permits prerequisite-only M1 only on concrete signed-ABI dependency, named M2 consumer and appliance sign-off/access separation"
+      - "does not claim signed v3 acceptance or delivered commands from the supplied v2/prototype observations"
+      - "retains unsupported-key rejection, bounded writes, confirmation, snapshots and restore proof at first use"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)configctl"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(signed|signature|ABI-3)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(M1|schema).*?(M2|consumer)"
+        weight: 0.9
+
+  - id: cold_reader_rejects_clear_wrong_goal
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      independent PT-A plus S08 Clear but wrong destination PT-C1/PT-CE1.
+      Source path: skills/milestone-runner/evals/fixtures/product-workflow.md.
+      As a cold reader, reconstruct the proposed workflow and compare it with
+      independently authorized requirements, then decide design readiness and
+      bounded reconciliation. Do not accept author rationale or launch/write/run
+      anything, mutate git/GitHub or claim an actual independent reviewer ran.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "understands the proposed account/upload/cloud dashboard workflow but rejects it against offline local PT-A"
+      - "flags unauthorized network, Store replacement and changed data ownership despite clear artifacts and green CI"
+      - "treats goal/scope/acceptance mismatch as material within the existing design gate, not optional nits or a third gate"
+      - "requires bounded reconciliation of both tracked artifacts under canonical ownership and current external gates; no invented replacement authority or unbounded review loop"
+      - "keeps review isolation/evidence honest and invalidates affected capsule/review/design results"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)PT-A"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)(cloud|upload).*?(offline|local)|(offline|local).*?(cloud|upload)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(DESIGN NO-GO|not ready|reconcil|mismatch)"
+        weight: 1.0
+
+  - id: old_prompt_reconstruction_and_review_freshness
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      shared documents and all three independent S09 variants: sufficient PT-OLD1,
+      insufficient PT-THIN1 and revised PT-P2/PT-E2/PT-A2. Source checkout:
+      skills/milestone-runner/evals/fixtures/product-workflow.md. Give separate
+      read-only launch decisions. Render the sufficient variant's complete capsule
+      and lane contract, name missing authority in the thin variant, and identify
+      stale fields/reviews and exact affected rechecks for the revision.
+      No writes, launches, checks/models or git/GitHub mutations.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "reconstructs all seven populated fields for PT-OLD1 from current sufficient authority and exposes source identities before any launch"
+      - "does not block a sufficient old prompt solely because capsule labels are absent or require bulk prompt migration"
+      - "blocks PT-THIN1 for bounded authoritative goal/scope/acceptance and preservation/interface clarification, not guessing from probably cloud"
+      - "invalidates affected capsule, prior comprehension/design and downstream evidence after PT-P2/PT-E2, rechecking privacy redaction and --include-note acceptance"
+      - "does not call an author's reread independent or invent a third gate; unresolved material findings escalate without indefinite review"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?s)PRODUCT OUTCOME:.*SHORTEST COMPLETE WORKFLOW:.*THIS MILESTONE'S CONTRIBUTION:.*WORKING BEHAVIOR AND SAFETY TO PRESERVE:.*NON-GOALS:.*DEMONSTRATION AND EXPECTED RESULT:.*AUTHORITATIVE SOURCE / REVISION:"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?is)PT-THIN1.*?(block|NO-GO|reconcil)|(block|NO-GO|reconcil).*?PT-THIN1"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(invalidat|stale|recheck|repeat)"
+        weight: 1.0
+      - type: contains
+        target: "--include-note"
+        weight: 0.9
+
+  - id: staged_interaction_and_clean_install_proof
+    prompt: >
+      Read this milestone-runner package's evals/fixtures/product-workflow.md,
+      shared PT-A/PT-P1/PT-E1 and all S10 observations. Source checkout:
+      skills/milestone-runner/evals/fixtures/product-workflow.md. Give separate
+      read-only acceptance decisions for ordinary M2, final M3 integration and
+      early installation capability M2-I. State observed interaction/safety evidence
+      and exact missing proof at each stage. Do not execute installation, tests,
+      commands, models, file changes or git/GitHub operations.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "recognizes ordinary M2 focused full-output/unknown-ID/no-mutation proof and applicable CI while retaining review/merge/post-merge gates"
+      - "does not demand comprehensive installed campaigns before unrelated ordinary behavior, but final M3 cannot complete without clean installed full workflow and safety proof"
+      - "requires immediate clean-environment install/run repair and proof for M2-I after pocket.render import failure instead of deferring to M3"
+      - "does not suppress the import failure, use a fake fallback or equate source tests/archive/static fixture output with observed installed behavior"
+      - "reports distinct proof states and literal NEXT STEPS without fabricating execution"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(focused|ordinary|increment)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(clean|installed|installation)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)(pocket\\.render|ModuleNotFoundError)"
+        weight: 1.0
+      - type: contains
+        target: "NEXT STEPS:"
         weight: 1.0
