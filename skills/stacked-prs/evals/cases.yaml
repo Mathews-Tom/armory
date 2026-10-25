@@ -534,6 +534,35 @@ cases:
         target: "git push origin --delete"
         weight: 0.9
 
+  - id: source_only_postlanding_renewal
+    prompt: "Renew this existing manual stack after I merged its ancestors in the UI. Keep both PRs open, preserve the child on its renewed parent and use the independently reviewed conflict trees. No merges, inference or branch cleanup."
+    fixtures: []
+    rubric:
+      - "delegates post-landing renewal to the registered ship-workflow graph-only renewed endpoint"
+      - "uses exact-input reviewed resolution evidence and proves external ancestor landing reachability"
+      - "captures old child slices before rewriting the parent and preserves source provenance and existing PRs"
+      - "does not substitute observation-only pr, hand-run rebases or a merge-capable endpoint"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "ship-workflow"
+        weight: 1.0
+      - type: matches_regex
+        target: "--until renewed"
+        weight: 1.0
+      - type: matches_regex
+        target: "(resolution|reviewed).*(tree|fork|head|onto)"
+        weight: 0.9
+      - type: not_contains
+        target: "--until merged"
+        weight: 1.0
+      - type: not_contains
+        target: "--until clean"
+        weight: 1.0
+      - type: not_contains
+        target: "gh pr merge"
+        weight: 1.0
+
   - id: negative_single_pr
     prompt: "Open a normal PR for my current branch against main."
     fixtures: []
