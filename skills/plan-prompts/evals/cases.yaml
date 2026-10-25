@@ -59,24 +59,16 @@ cases:
 
   - id: greenfield_verification_surface
     prompt: >
-      I have architecture notes in specs/ for a greenfield CLI tool. Turn them into .docs/DEVELOPMENT_PLAN.md
-      and .docs/EXECUTION_PROMPTS.md. There is no repo setup yet, so include whatever first milestone is needed to make later work verifiable.
-    fixtures: []
+      Read this package's evals/fixtures/product-workflow.md S01 in full; fixtures are
+      not automatically materialized. Use its source notes and observations to generate
+      the two planning artifacts only, including populated execution goals.
+    fixtures: ["evals/fixtures/product-workflow.md"]
     rubric:
-      - "plans a first milestone that establishes project skeleton and verification surface"
-      - "does not assume an existing CI, linter, type checker, or test runner without evidence"
-      - "keeps later milestones self-verifiable through the M1 tooling"
+      - "S01: first useful slice supports add then list with minimum setup and focused checks, not skeleton-only success"
+      - "does not assume existing tooling; defers orchestration, integrations and qualification without losing authorized requirements"
+      - "carries the same user/workflow/preservation/demo/source through all seven capsule fields"
+      - "fixture and rubric are NOT RUN specifications, not observed model success"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(M1|first milestone).*(verification|test|CI|skeleton|scaffold)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(greenfield|no repo setup|verification surface)"
-        weight: 0.6
-      - type: contains
-        target: "DEVELOPMENT_PLAN.md"
-        weight: 0.6
 
   - id: shared_release_train_planning
     prompt: >
@@ -106,25 +98,18 @@ cases:
 
   - id: unresolved_release_target
     prompt: >
-      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for source docs that do not identify a release target.
-      The repository has VERSION and CHANGELOG.md, but no documented release policy. Do not infer a version, changelog entry,
-      tag, or publication action.
+      Generate both planning artifacts for this authorized local correction: the task
+      CLI lists tasks in insertion order but must list by numeric ID. Existing acceptance
+      is add IDs 2 then 1 and assert list returns 1 then 2; preserve task text and storage.
+      Current unit checks and CLI smoke checks exist. VERSION and CHANGELOG.md exist but
+      release policy and target are absent. No runtime code reads release identity.
+      Do not implement, invent a version, or hide missing metadata as none.
     fixtures: []
     rubric:
-      - "emits a visible release-target GAP rather than inventing a semantic version"
-      - "propagates the unresolved release target into the release-aware NO-GO path"
-      - "does not prescribe a version bump, changelog entry, tag, or publication action without source evidence"
+      - "keeps visible release-target GAP and blocks release preparation without inventing release artifacts"
+      - "permits correction and ordinary verification; no blanket implementation or merge NO-GO for metadata alone"
+      - "generated verdict supports visible unresolved target and blocked preparation while retaining actual safety/review/CI blockers"
     trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(> GAP:|GAP:|unresolved release target|release target.*unresolved)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(NO-GO.*RELEASE|RELEASE.*NO-GO|REASON.*blocking)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(do not infer|do not invent|not requested|without source evidence)"
-        weight: 0.8
 
   - id: negative_existing_plan_review
     prompt: >
@@ -350,3 +335,66 @@ cases:
       - type: not_contains
         target: "issue (on only):"
         weight: 0.9
+
+  - id: brownfield_product_replan_s02
+    prompt: >
+      Read this package's evals/fixtures/product-workflow.md S02 completely. Replan its
+      old plan into DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md only. Do not execute
+      product work. Use the independent request and all observations, not only the old plan.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "classifies all five reality categories with cited evidence and explicit unknowns"
+      - "preserves working retrieval, data ownership, tenant safety and unresolved migration failure"
+      - "maps every old milestone and requirement to retained/combined/deferred/retired with reasons"
+      - "generates bounded goals for missing result detail without first building optional process machinery"
+    trigger_expected: true
+
+  - id: operator_prerequisite_s07
+    prompt: >
+      Read this package's evals/fixtures/product-workflow.md S07 completely and generate
+      the plan/goals. Assess the prerequisite evidence rather than forbidding infrastructure
+      or accepting every proposed setup step.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "recognizes validate/apply operator command as a complete useful product workflow without requiring a UI"
+      - "permits schema prerequisite with named consuming command, evidence, why-not-combined and mandatory authority"
+      - "does not make optional orchestration a dependency"
+    trigger_expected: true
+
+  - id: independent_requirements_and_shared_drift_s08
+    prompt: >
+      Read this package's evals/fixtures/product-workflow.md S08, including both variants.
+      Reconcile the existing planning artifacts against the independent request. Describe
+      the fresh comprehension/critique/readiness review inputs and bounded next decision.
+      Do not implement or claim any synthetic check status is real CI.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "detects clear cloud plan is off-goal against independent local-only requirements; readability is insufficient"
+      - "blocks all lanes affected by shared authentication mismatch and preserves unrelated safe work"
+      - "review excludes author rationale, resolves/evidence-rebuts substantive findings, escalates remaining decisions and avoids endless nit loops"
+    trigger_expected: true
+
+  - id: old_prompt_capsule_and_revision_s09
+    prompt: >
+      Read this package's evals/fixtures/product-workflow.md S09 completely. For each
+      variant regenerate the bounded goal or identify required reconciliation. Render
+      the runner lane handoff expectations without executing it or using conversation/history.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "complete plan permits source-exposed reconstruction of all seven fields and lane consumption"
+      - "missing goal/scope/acceptance blocks bounded work instead of guessed purpose or empty capsule"
+      - "material authority revision invalidates affected capsule and comprehension/design evidence; in-session reread is not independent"
+    trigger_expected: true
+
+  - id: staged_interaction_verification_s10
+    prompt: >
+      Read this package's evals/fixtures/product-workflow.md S10 completely. Generate
+      verification and completion contracts for its ordinary increment, final integration,
+      and installation-capability variant. Do not run commands or claim observed results.
+    fixtures: ["evals/fixtures/product-workflow.md"]
+    rubric:
+      - "ordinary increment includes concrete interaction/result, focused behavior/safety checks and existing CI"
+      - "comprehensive installed workflow occurs at final integration, not as universal prerequisite machinery"
+      - "installation capability requires clean-environment proof immediately; first-use safety is never deferred"
+      - "completion requires observed useful behavior and remaining workflow gaps, not green CI alone"
+    trigger_expected: true

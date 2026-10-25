@@ -79,6 +79,21 @@ The upstream repo structures prompts as Python functions returning f-strings. We
 **Re-sync policy:** Prompt templates are pinned to the commit SHA above. Re-sync opportunistically when the upstream repo makes substantive prompt changes — do not auto-update. Compare diffs against the pinned commit before merging any upstream changes.
 
 
+### elephant-goldfish — concepts used by `plan-prompts` and `milestone-runner`
+
+**Upstream repository:** [vshvedov/elephant-goldfish](https://github.com/vshvedov/elephant-goldfish/tree/b8ebb3d6b00e39fbb6c619faa27f5bb994091d78)
+**Pinned revision:** `b8ebb3d6b00e39fbb6c619faa27f5bb994091d78`
+**Repository license:** MIT.
+**Concept sources:** `claude/commands/eg-new-feature.md`, `eg-prd.md`, `eg-fix-bug.md` and `eg-precommit-review.md`.
+
+**Adopted concepts, independently authored:** concrete user workflows and observable outcomes; a fresh reader reconstructing purpose without the author's narrative; comparison against independent authorized requirements; distinguishing comprehension, substantive critique and readiness; bounded correction and affected-review repetition. Armory applies these within its existing plan, emitted goals, design gate and completion contract, without adding a new skill or runtime dependency. This is a source/provenance record, not a measured effectiveness claim.
+
+**Not copied or adopted:** upstream command text, code, templates, branding, a universal multi-pass review ritual, automatic implementation or precommit orchestration, a new framework, evaluator engine or persistent goal store. The package text and synthetic scenarios are independently authored; no upstream repository expression is copied or closely adapted, so no package-local MIT notice is required for this conceptual use. Any future copied or closely adapted material must carry the upstream MIT notice inside every affected standalone package.
+
+**Article attribution:** Dave Rensin's [“Elephants, Goldfish, and the New Golden Age of Software Engineering”](https://drensin.medium.com/elephants-goldfish-and-the-new-golden-age-of-software-engineering-c33641a48874) explains the context-rich author/fresh-reader asymmetry. No article text is copied. The repository's MIT license does not license the article.
+
+**Re-sync policy:** manual, evidence-backed comparison against the pinned revision when revisiting the adopted concepts; no upstream auto-sync or copied content pipeline. Revalidate Armory's independent requirements, standalone contracts and safety boundaries before adopting any change.
+
 ### tufte-data-viz — used by `chart-clarity`
 
 **Upstream repo:** [caylent/tufte-data-viz](https://github.com/caylent/tufte-data-viz)
