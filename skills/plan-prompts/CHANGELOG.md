@@ -14,7 +14,7 @@ Regenerate goals from the current authoritative plan. Older prompts missing the 
 
 ### Changed
 
-- Brownfield replans map every old milestone and requirement to an explicit disposition, preserve completed evidence and retain unresolved historical failures.
+- Brownfield replans map every old milestone and requirement to an explicit disposition in `DEVELOPMENT_PLAN.md`, preserve completed evidence and retain unresolved historical failures. Each execution goal cites its applicable dispositions.
 - Increment verification includes concrete interaction/result and immediate safety checks; comprehensive installed proof belongs at final integration unless installation is itself the increment's outcome.
 - Fresh artifact review reconstructs purpose without author rationale and compares against independent authorized requirements. Material revisions invalidate affected evidence; unresolved decisions escalate through bounded critique/readiness rather than indefinite review loops.
 - Completion contracts report demonstrated product progress, remaining workflow gaps and prerequisite consumers alongside existing review, CI, merge and literal NEXT STEPS obligations. Issue identity/privacy, canonical ownership and destructive-operation safeguards remain unchanged.

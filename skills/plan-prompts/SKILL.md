@@ -204,7 +204,7 @@ For enabled goals, emit the conditional execution rule shown below. The canonica
 ```text
 /goal Deliver milestone M1 (<title>) from DEVELOPMENT_PLAN.md as a reviewed stack of PRs.
 
-CONTEXT: DEVELOPMENT_PLAN.md §6 M1 + source docs. Preconditions: <none | Mx merged>. Repo: <language, package manager, test runner, type/lint/CI surface>.
+CONTEXT: DEVELOPMENT_PLAN.md §6 M1 + source docs; for replans, cite this goal's applicable old-milestone and requirement dispositions in §1. Preconditions: <none | Mx merged>. Repo: <language, package manager, test runner, type/lint/CI surface>.
 OBJECTIVE: <objective and acceptance criteria as the success contract>.
 PRODUCT OUTCOME: <authorized user and useful result>
 SHORTEST COMPLETE WORKFLOW: <trigger -> concrete interactions -> result>
@@ -213,7 +213,7 @@ WORKING BEHAVIOR AND SAFETY TO PRESERVE: <components, invariants, constraints>
 NON-GOALS: <explicit exclusions>
 DEMONSTRATION AND EXPECTED RESULT: <steps, observable output, applicable safety check>
 AUTHORITATIVE SOURCE / REVISION: <current plan section and inspected identity>
-RELEASE TRAIN: target=<named version | unversioned | none | > GAP: unresolved>; included milestones=<Mx>; preparation trigger=<all included milestones externally merged>; required artifacts=<version update | CHANGELOG.md | both | none>; release verification=<exact command or binary manual check>; publication=<required command/workflow | not requested>.
+RELEASE TRAIN: target=<named version | unversioned | none | > GAP: unresolved>; included milestones=<Mx>; preparation trigger=<all included milestones externally merged>; required artifacts=<version update | CHANGELOG.md | both | none | visible GAP>; release verification=<exact command or binary manual check>; publication=<required command/workflow | not requested>.
 ISSUE_TRACKING: <off | on; plan=<public-safe-stable-key>>.
 
 PRE-IMPLEMENTATION DESIGN GATE:
