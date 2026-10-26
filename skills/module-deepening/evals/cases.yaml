@@ -1,0 +1,69 @@
+cases:
+  - id: scan_hot_spots_offline_report
+    prompt: "Find deepening opportunities in this repo. I don't have a specific area in mind; we keep changing the billing code and every change touches six files."
+    fixtures: []
+    rubric:
+      - "Selects scan mode and reads references/vocabulary.md before exploring"
+      - "Scopes by the user's billing hint or by git log hot spots and records the chosen scope"
+      - "Reads docs/agents/domain.md, CONTEXT.md or CONTEXT-MAP.md and ADRs in the scoped area, or states they are absent"
+      - "Applies the deletion test and classifies each candidate's dependency category"
+      - "Writes one self-contained HTML report with inline CSS and SVG only (no CDN, no script) to $TMPDIR or /tmp as architecture-review-<timestamp>.html, opens it and prints the absolute path"
+      - "Each card has files, problem, solution, glossary-term wins, before/after diagram, strength badge and dependency tag; ends with a top recommendation"
+      - "Asks which candidate to explore and does not propose interfaces or edit code before the pick"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "architecture-review-"
+        weight: 1.0
+  - id: design_named_module_twice
+    prompt: "Deepen the OrderIntake module in src/orders/intake/. Design its interface a few different ways and tell me which one you would pick."
+    fixtures: []
+    rubric:
+      - "Selects design mode without running a repository-wide scan"
+      - "Reads the module, its callers and tests, then frames constraints, the dependency category and an illustrative sketch"
+      - "Produces at least three radically different interfaces (minimal, flexible, common-caller-first, plus ports and adapters when a dependency crosses a seam), each with interface, usage example, hidden implementation, dependency strategy and trade-offs"
+      - "Uses parallel sub-agents when available or the labelled sequential fallback"
+      - "Compares by depth, locality and seam placement and gives an opinionated recommendation, proposing a hybrid if warranted"
+      - "Asks one question at a time, stops at an agreed decision and hands implementation to codebase-advisor or /tdd without editing code"
+    trigger_expected: true
+  - id: seam_placement_question
+    prompt: "Where should the seam go for our payment gateway calls? Right now the checkout module news up a Stripe client inline and the tests mock half the module."
+    fixtures: []
+    rubric:
+      - "Treats the question as design mode on the checkout module"
+      - "Classifies Stripe as a true external dependency and proposes an injected port with production and mock adapters, explaining why two adapters make the seam real"
+      - "Keeps internal seams out of the external interface and recommends replacing tests that mock past the interface with tests at the interface"
+      - "Walks the decision one question at a time and does not change code"
+    trigger_expected: true
+  - id: rejection_adr_gate
+    prompt: "We looked at your top candidate and we're not merging the invoice modules because finance audits require them to deploy separately; we chose that over a shared library last year after a failed audit. Should this be recorded?"
+    fixtures: []
+    rubric:
+      - "Applies the conjunctive ADR-candidate test (hard to reverse, surprising without context, real trade-off) against the stated evidence before offering an ADR"
+      - "Offers the ADR only if all three hold and hands the summary to adr-writer by name rather than writing the ADR"
+      - "Does not edit CONTEXT.md or code"
+    trigger_expected: true
+  - id: scored_architecture_review_negative
+    prompt: "Do a full architecture review of this service with scores for scalability, security, performance and operational readiness."
+    fixtures: []
+    rubric:
+      - "Does not activate; scored multi-dimension architecture reviews belong to architecture-reviewer"
+    trigger_expected: false
+  - id: improvement_backlog_negative
+    prompt: "Audit the repo and write a prioritized backlog of agent-executable implementation plans for what we should improve next."
+    fixtures: []
+    rubric:
+      - "Does not activate; improvement plan backlogs belong to codebase-advisor"
+    trigger_expected: false
+  - id: local_simplification_negative
+    prompt: "This function has five levels of nesting. Simplify it without changing its behaviour."
+    fixtures: []
+    rubric:
+      - "Does not activate; local simplification belongs to code-refiner or /refactor"
+    trigger_expected: false
+  - id: domain_terminology_negative
+    prompt: "Ordering and Billing both say 'Cancellation' but mean different things. Help us settle the terms in CONTEXT.md."
+    fixtures: []
+    rubric:
+      - "Does not activate; ambiguous domain terminology belongs to domain-modeling"
+    trigger_expected: false

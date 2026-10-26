@@ -1,8 +1,8 @@
 ---
 name: decision-map
-description: 'Use when mapping unresolved architecture, policy, or scope decisions before planning, working one decision ticket, or testing one unresolved state-model or UI question with throwaway prototype evidence. Also applies to "map the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general UI generation, or adopting experimental code into production.'
+description: 'Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general UI generation, standalone prototypes outside a decision map (use prototype), or adopting experimental code into production.'
 metadata:
-  version: 1.1.0
+  version: 2.0.2
   category: development
   tags: [planning, issue-tracker, decisions, discovery, frontier, pre-planning]
   difficulty: advanced
@@ -13,6 +13,7 @@ metadata:
     - project-context-setup
     - adr-writer
     - plan-review
+    - prototype
 ---
 
 # Decision Map
@@ -42,7 +43,7 @@ A ticket holds one question, exactly one type, exactly one interaction mode, blo
 
 ## Prerequisites
 
-Use `gh --version` and require `gh` 2.96.0 or newer only when the user explicitly selects GitHub as the tracker. Verify authentication with `gh auth status` before that path. `frontier.py` requires Python 3.12 and only the standard library. `.docs/agents/issue-tracker.md`, when present, is the authoritative backend choice. Otherwise store maps locally in `.docs/decision-maps/<effort>/`; select GitHub only when the user expressly asks for it. Do not infer GitHub selection from a remote or authentication. Report the selected backend once and mention `project-context-setup` when the choice should be persisted.
+Use `gh --version` and require `gh` 2.96.0 or newer only when the user explicitly selects GitHub as the tracker. Verify authentication with `gh auth status` before that path. `frontier.py` requires Python 3.12 and only the standard library. Prototype tickets require the `prototype` package to build their artifact; when it is absent, stop with `BLOCKED: install prototype` before claiming the ticket. `.docs/agents/issue-tracker.md`, when present, is the authoritative backend choice. Otherwise store maps locally in `.docs/decision-maps/<effort>/`; select GitHub only when the user expressly asks for it. Do not infer GitHub selection from a remote or authentication. Report the selected backend once and mention `project-context-setup` when the choice should be persisted.
 Probe GitHub capability before using native relationships. When older GitHub Enterprise or an older CLI rejects `blockedBy`, take the degraded path: generated child links in the map and `Blocked by: #N` lines in ticket bodies. The degraded index exists only to emulate absent tracker relationships.
 
 ## Workflow
@@ -61,10 +62,10 @@ Charting resolves nothing, runs no research, implements nothing, and never colla
 
 ### Mode B — Work Through the Map
 
-1. Load the map body and select the requested ticket or the first frontier item returned by `frontier.py`. A continuation may return to this session's already-claimed open ticket; verify that claim rather than acquiring a second one. Establish visible ownership.
-2. Acquire and verify the session claim before substantive work, or re-verify the existing claim on continuation. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment.
+1. Load the map body and select the requested ticket or the first frontier item returned by `frontier.py`. A continuation may return to this session's already-claimed open ticket; verify that claim rather than acquiring a second one. For a newly selected `prototype` ticket, check that the `prototype` package is installed before taking ownership; if it is absent, stop with `BLOCKED: install prototype` and leave the ticket untouched (no assignment, no claim). Establish visible ownership.
+2. Acquire and verify the session claim before substantive work, or re-verify the existing claim on continuation. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment. A continuation whose prototype package has gone missing keeps its claim and follows the unresolved path in `references/prototyping.md`.
 3. Work exactly one ticket by its type. A HITL ticket requires the human's judgment; an agent answering it alone has broken the ticket.
-   For a `prototype` ticket, read `references/prototyping.md` before creating an artifact: it selects one shareable logic/state HTML versus structurally different UI variants and defines browser evidence and scratch-only boundaries. The prototype tests only this ticket's question; its interaction mode still controls who may give the verdict.
+   For a `prototype` ticket, read `references/prototyping.md` before creating an artifact: it requires the `prototype` package (which builds and observes the logic/state or UI artifact), fixes who owns the verdict, and defines the evidence record and unresolved path. The prototype tests only this ticket's question; its interaction mode still controls who may give the verdict.
 4. Record the outcome using `references/tracker-operations.md`:
    - Answered or legitimately retired: choose `RESOLVED`, `OUT_OF_SCOPE`, or `INVALIDATED`, record the decision/evidence, close through the matching backend path, and add only a pointer in `Decisions so far` or `Out of scope`.
    - Still unanswered: report `UNRESOLVED_WITH_EVIDENCE`, append partial evidence and the exact pending human/browser/input prerequisite, and retain the ticket `OPEN` with its existing claim held. This is a work outcome, not a new tracker status or closure path. Preserve the map's resolution sections and blocker edges; do not create or select a second ticket. Continue the same ticket within the existing claim when the prerequisite arrives, subject to normal stale-claim rules.
@@ -107,6 +108,7 @@ An empty frontier does not mean completion. Evaluate the ordered ladder: actiona
 | Empty frontier with open tickets | run `frontier.py` | report `WAITING` or `BLOCKED`, never complete |
 | Map and tickets drift | inspect map pointers and backend graph | repair generated degraded index or resolution pointers |
 | Malformed local claim lock | inspect the lock contents | stop; preserve it for diagnosis rather than overwriting it |
+| Prototype ticket but `prototype` package absent | check the installed packages for `prototype` | stop with `BLOCKED: install prototype`; no claim, no artifact, ticket untouched |
 
 Fail loudly when the map label is absent, a ticket has missing or multiple type or interaction labels, the capability probe is ambiguous, or claim verification fails. Do not silently create a replacement map.
 
@@ -145,7 +147,6 @@ uv run python skills/decision-map/scripts/frontier.py --local .docs/decision-map
 | `references/tracker-operations.md` | GitHub, degraded, and local backend operations |
 | `references/elicitation.md` | Discovery questions and vocabulary discipline |
 | `references/research-resolution.md` | Self-contained AFK research protocol |
-| `references/prototyping.md` | When working a prototype ticket: question-first logic/UI selection, scratch artifacts, browser evidence and verdict |
+| `references/prototyping.md` | When working a prototype ticket: prototype-package precondition, HITL verdict ownership, evidence record, unresolved path and stop |
 | `scripts/frontier.py` | Normalized frontier and state computation |
 | `references/upstream/provenance.md` | When reviewing the original wayfinder/tracker attribution or manually comparing that source |
-| `references/upstream/prototype-provenance.md` | When reviewing prototype attribution or manually comparing the separately pinned prototype source |

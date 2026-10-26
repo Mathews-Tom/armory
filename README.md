@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 156](https://img.shields.io/badge/packages-156-informational)](manifest.yaml)
+[![packages: 158](https://img.shields.io/badge/packages-158-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -28,7 +28,7 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 | Situation | Package | Output |
 |---|---|---|
-| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and a disposable prototype when uncertainty needs executable evidence |
+| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and prototype evidence (built by [prototype](skills/prototype/)) when uncertainty needs executable evidence |
 | Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | Size-matched `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` (or one prompt for one-PR work) with user-observable acceptance |
 | Feature is specified and needs implementation slices | [task-decomposer](skills/task-decomposer/) | Phased task board with dependencies and test matrix |
 | Existing plan needs a pre-implementation challenge | [plan-review](skills/plan-review/) | Severity-ranked plan review |
@@ -36,7 +36,7 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 `decision-map` stops at resolved decisions. It recommends `plan-prompts` after a complete map and never creates implementation milestones or tasks.
 
-Disposable prototypes are evidence within `decision-map`, not a separate package or a substitute for production implementation.
+Disposable prototypes are built by `prototype` and recorded as ticket evidence by `decision-map`; neither is a substitute for production implementation.
 
 Start with the shortest complete user workflow, not a tooling-only milestone. `plan-prompts` sizes the plan to the work, writes acceptance as `Done when <user> can <interaction> and sees <result>`, and moves unsourced checks to suggested follow-ups. `milestone-runner` restates each milestone's GOAL, NON-GOALS and DONE WHEN, does only the work acceptance requires, and treats a reviewed, green, merged milestone with an observed interaction as done.
 
@@ -48,7 +48,7 @@ Both packages use the `3.0.0` contract; 2.x prompts still run. Missing release m
 
 ## Package Catalog
 
-156 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
+158 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -114,7 +114,8 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
 | [pr-explainer](skills/pr-explainer/)             | Explain pushed PRs, whole stacks, or one stack member through source-grounded functional briefings and domain-knowledge updates; not defect review or merge approval |
 | [plan-prompts](skills/plan-prompts/)             | Plan size-matched vertical increments from repository reality with user-observable acceptance; one prompt for one-PR work, unsourced checks as follow-ups |
-| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
+| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; record prototype-package evidence on decision tickets before implementation planning |
+| [prototype](skills/prototype/)                   | Answer one design question with a throwaway, scratch-only artifact — a shareable state demo or switchable UI variants — observed in a browser before any verdict |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones toward the plan's goal with one design check, observed outcome, CI, review and merge; resume from merged-PR evidence |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
@@ -144,6 +145,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [architecture-reviewer](skills/architecture-reviewer/) | Architecture reviews across 7 scored dimensions — structural integrity, scalability, security, performance, enterprise readiness, operations, data  |
 | [codebase-advisor](skills/codebase-advisor/)           | Senior repo advisor — audits codebase evidence, vets findings, and writes self-contained implementation plans for executor agents                   |
 | [code-refiner](skills/code-refiner/)                   | Deep code simplification and refactoring — structural complexity analysis, anti-pattern detection, idiomatic rewrites across Python, Go, TS, Rust   |
+| [module-deepening](skills/module-deepening/)           | Find shallow modules worth deepening (offline HTML report) or design one module's interface several ways; one question at a time, stops at a decision, never edits code |
 | [citation-audit](skills/citation-audit/)               | Citation verification for manuscripts — checks that references are real, correctly attributed, and accurately described                              |
 | [figure-rhetoric](skills/figure-rhetoric/)             | Figure and plot communication audit — evaluates whether visuals support the claims they are meant to carry                                      |
 | [figure-table-quality](skills/figure-table-quality/)   | Figure and table rendering audit — checks readability, label collisions, accessibility, formatting, and consistency                              |

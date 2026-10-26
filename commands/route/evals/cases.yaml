@@ -219,7 +219,23 @@ cases:
     prompt: "/route Our design destination is uncertain; use a disposable prototype to gather evidence before resolving the decision."
     fixtures: []
     rubric:
-      - "recommends decision-map with its prototype evidence branch"
-      - "does not invent a separate prototype skill or route directly to production implementation"
+      - "recommends decision-map for the decision, with the prototype skill building the evidence artifact"
+      - "does not route directly to production implementation"
       - "keeps implementation planning under plan-prompts only after decisions are resolved"
+    trigger_expected: true
+
+  - id: route_standalone_prototype
+    prompt: "/route I want a throwaway clickable demo to check whether our subscription pause/cancel state model feels right. There is no decision map."
+    fixtures: []
+    rubric:
+      - "recommends the prototype skill rather than decision-map"
+      - "does not create a decision map or ticket to justify the prototype"
+    trigger_expected: true
+
+  - id: route_module_deepening
+    prompt: "/route Find shallow modules in our billing code worth deepening and help me decide where the seam should go."
+    fixtures: []
+    rubric:
+      - "recommends module-deepening rather than architecture-reviewer or code-refiner"
+      - "does not present routing as authority to refactor the code"
     trigger_expected: true

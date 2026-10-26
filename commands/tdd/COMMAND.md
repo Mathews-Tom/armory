@@ -11,7 +11,7 @@ description: 'Test-driven development workflow for functions, modules, or featur
 
   '
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [tdd, testing, red-green-refactor, test-first]
   difficulty: intermediate
@@ -51,6 +51,8 @@ RED: one behavior test -> GREEN: minimal implementation -> repeat
 
 Prefer behavior that proves the path end-to-end before edge cases. Test names should use the
 project's domain terms when a glossary exists.
+
+For questions about the interface's shape or where its seam belongs, settle them with the `module-deepening` skill before starting cycles.
 
 ## Step 3: Write One Failing Test (RED)
 

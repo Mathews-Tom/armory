@@ -9,7 +9,7 @@ description: >-
   "help me pick a skill", "discover packages". Use this command when unsure
   which armory skill, agent, or command to use for a task.
 metadata:
-  version: 1.3.0
+  version: 1.3.1
   category: operations
   tags: [discovery, routing, meta, navigation]
   difficulty: beginner
@@ -61,7 +61,8 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Record architecture decisions | `adr-writer` skill | `architecture-reviewer` skill |
 | Plan a full project | `project-planner` agent | `task-decomposer`, `estimate-calibrator` |
 | Turn repo findings into implementation plans | `codebase-advisor` skill | `codebase-auditor` for report-only audit |
-| Resolve an unknown destination or design, optionally using a disposable prototype as evidence | `decision-map` skill | `plan-prompts` once decisions are resolved; a prototype is a decision-map branch, not a duplicate skill |
+| Resolve an unknown destination or design decision, optionally using a disposable prototype as evidence for that decision | `decision-map` skill | `plan-prompts` once decisions are resolved; `decision-map` records the evidence and the `prototype` skill builds the artifact |
+| Build a standalone throwaway prototype to answer one design question (state model or UI layout) | `prototype` skill | `decision-map` when the question belongs to a decision ticket |
 
 ## Build Phase — "I need to write code"
 
@@ -96,6 +97,7 @@ When the user invokes `/route [task]`, match their task to the best armory packa
 | Review a PR | `pr-review` skill | `code-refiner` |
 | Full codebase audit / release quality gate | `codebase-auditor` agent | `codebase-advisor` when plan files are requested |
 | Architecture review | `architecture-reviewer` skill | `architecture-diagram` |
+| Find shallow modules worth deepening, or design one module's interface and seam | `module-deepening` skill | `architecture-reviewer` for a scored review; `codebase-advisor` or `/tdd` to implement the decision |
 | Security review | `security-reviewer` agent | `secret-scanner` agent |
 | Scan for secrets/credentials | `secret-scanner` agent | — |
 | Security scan (command) | `/security-scan` command | `security-reviewer` agent |

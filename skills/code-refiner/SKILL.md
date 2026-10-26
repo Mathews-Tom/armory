@@ -1,8 +1,8 @@
 ---
 name: code-refiner
-description: 'Deep code simplification and refactoring preserving behavior across Python, Go, TypeScript, Rust. Targets complexity, anti-patterns, readability debt. Triggers on: "simplify this code", "refactor for clarity", "reduce complexity", "make this more readable", "tech debt cleanup", "too much nesting".'
+description: 'Deep code simplification and refactoring preserving behavior across Python, Go, TypeScript, Rust. Targets complexity, anti-patterns, readability debt. Triggers on: "simplify this code", "refactor for clarity", "reduce complexity", "make this more readable", "tech debt cleanup", "too much nesting". NOT for deepening shallow modules or redesigning a module''s interface or seam, use module-deepening.'
 metadata:
-  version: 1.1.1
+  version: 1.1.2
   category: review
   tags: [refactoring, code-quality, simplification, readability]
   difficulty: intermediate

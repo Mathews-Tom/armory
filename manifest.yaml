@@ -18,6 +18,7 @@ packages:
     phase: plan
     complements:
     - decision-map
+    - module-deepening
   - name: agent-builder
     version: 1.1.1
     description: 'Build AI agents and automate Claude Code programmatically via the Claude Agent SDK and headless CLI mode.
@@ -115,10 +116,11 @@ packages:
     complements:
     - tldraw
   - name: architecture-reviewer
-    version: 1.1.1
+    version: 1.1.2
     description: 'Architecture reviews across 7 dimensions (structural, scalability, enterprise readiness, performance, security,
       ops, data) with scored reports. Triggers on: "review architecture", "critique design", "audit system", "assess scalability",
-      "enterprise readiness", "technical due diligence". NOT for diagrams, use architecture-diagram.'
+      "enterprise readiness", "technical due diligence". NOT for diagrams, use architecture-diagram. NOT for interactively
+      finding shallow modules or designing one module''s interface and seam, use module-deepening.'
     path: skills/architecture-reviewer
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/architecture-reviewer/SKILL.md
     tags:
@@ -129,6 +131,8 @@ packages:
     category: review
     difficulty: advanced
     phase: review
+    complements:
+    - module-deepening
   - name: arxiv-figures
     version: 1.0.0
     description: 'Optimize and prepare figures for arXiv submission: format conversion (EPS/PDF/PNG/JPG), size reduction,
@@ -267,10 +271,11 @@ packages:
     difficulty: advanced
     phase: review
   - name: code-refiner
-    version: 1.1.1
+    version: 1.1.2
     description: 'Deep code simplification and refactoring preserving behavior across Python, Go, TypeScript, Rust. Targets
       complexity, anti-patterns, readability debt. Triggers on: "simplify this code", "refactor for clarity", "reduce complexity",
-      "make this more readable", "tech debt cleanup", "too much nesting".'
+      "make this more readable", "tech debt cleanup", "too much nesting". NOT for deepening shallow modules or redesigning
+      a module''s interface or seam, use module-deepening.'
     path: skills/code-refiner
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/code-refiner/SKILL.md
     tags:
@@ -282,12 +287,13 @@ packages:
     difficulty: intermediate
     phase: review
   - name: codebase-advisor
-    version: 1.0.0
+    version: 1.0.1
     description: 'Senior codebase advisor that audits a repository, vets findings, and writes self-contained implementation
       plans for other agents to execute. Triggers on: "write improvement plans", "create an implementation backlog", "audit
       and plan fixes", "turn findings into plans", "agent-executable plans", "reconcile plans", "execute this plan", "what
       should we improve next". Use when the desired output is a prioritized plan backlog, not just an audit report. NOT for
-      report-only quality gates; use codebase-auditor.'
+      report-only quality gates; use codebase-auditor. NOT for interactively finding deepening opportunities or designing
+      one module''s interface, use module-deepening.'
     path: skills/codebase-advisor
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/codebase-advisor/SKILL.md
     tags:
@@ -298,6 +304,8 @@ packages:
     category: planning
     difficulty: advanced
     phase: plan
+    complements:
+    - module-deepening
   - name: competitive-analyzer
     version: 1.0.1
     description: 'Competitive landscape analysis: Porter''s Five Forces, competitor discovery, feature/pricing matrices, positioning
@@ -348,11 +356,11 @@ packages:
     difficulty: intermediate
     phase: build
   - name: decision-map
-    version: 1.1.0
-    description: Use when mapping unresolved architecture, policy, or scope decisions before planning, working one decision
-      ticket, or testing one unresolved state-model or UI question with throwaway prototype evidence. Also applies to "map
-      the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans,
-      general UI generation, or adopting experimental code into production.
+    version: 2.0.2
+    description: Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision
+      ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the
+      decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general
+      UI generation, standalone prototypes outside a decision map (use prototype), or adopting experimental code into production.
     path: skills/decision-map
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/decision-map/SKILL.md
     complements:
@@ -361,6 +369,7 @@ packages:
     - project-context-setup
     - adr-writer
     - plan-review
+    - prototype
     tags:
     - planning
     - issue-tracker
@@ -403,12 +412,14 @@ packages:
     difficulty: intermediate
     phase: review
   - name: domain-modeling
-    version: 1.0.0
+    version: 1.0.1
     description: Use when domain terms or entity relationships are ambiguous, existing definitions conflict with a concrete
       business scenario, or code contradicts an agreed domain model. Not for reading an unchanged glossary, scaffolding generic
       project context, implementing a fix, or writing an ADR.
     path: skills/domain-modeling
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/domain-modeling/SKILL.md
+    complements:
+    - module-deepening
     tags:
     - domain-modeling
     - vocabulary
@@ -957,6 +968,31 @@ packages:
     category: development
     difficulty: advanced
     phase: ship
+  - name: module-deepening
+    version: 1.0.1
+    description: 'Use when looking for shallow modules worth deepening, deciding where a seam belongs, or designing a chosen
+      module''s interface several ways before refactoring. Scan mode renders candidates as an offline HTML report; design
+      mode compares alternative interfaces and recommends one. Asks one question at a time, stops at an agreed decision and
+      never edits code. Triggers on: "find deepening opportunities", "shallow modules", "where should the seam go", "design
+      it twice", "deepen this module", "make this testable through its interface", "AI-navigable codebase". NOT for scored
+      multi-dimension architecture reviews, use architecture-reviewer. NOT for improvement plan backlogs, use codebase-advisor.
+      NOT for local simplification, use code-refiner or /refactor. NOT for domain terminology, use domain-modeling.'
+    path: skills/module-deepening
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/module-deepening/SKILL.md
+    complements:
+    - architecture-reviewer
+    - domain-modeling
+    - adr-writer
+    - codebase-advisor
+    tags:
+    - architecture
+    - deep-modules
+    - seams
+    - testability
+    - interface-design
+    category: review
+    difficulty: advanced
+    phase: review
   - name: notebooklm
     version: 1.1.1
     description: 'Full NotebookLM API via notebooklm-py CLI: create notebooks, add sources, generate podcasts, videos, infographics,
@@ -1165,6 +1201,29 @@ packages:
     category: development
     difficulty: intermediate
     phase: build
+  - name: prototype
+    version: 1.0.2
+    description: 'Use when a design question is cheaper to answer by clicking a throwaway artifact than by debating it: whether
+      a state model or business rule behaves right, or which of several structurally different UI layouts works. Builds one
+      scratch-only artifact (a self-contained shareable state demo, or switchable UI variants), observes it in a browser and
+      reports evidence with a verdict or "inconclusive". Production routes, data and code stay untouched. Triggers on: "prototype
+      this", "throwaway prototype", "clickable state demo", "does this state model feel right", "try a few UI variants", "compare
+      layouts before committing". NOT for working a decision-map ticket, use decision-map. NOT for finished HTML deliverables
+      such as dashboards or infographics, use static-web-artifacts-builder. NOT for UX audits or redesigns, use ux-expert.'
+    path: skills/prototype
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/prototype/SKILL.md
+    complements:
+    - decision-map
+    - ux-expert
+    tags:
+    - prototyping
+    - throwaway
+    - state-model
+    - ui-variants
+    - design-questions
+    category: development
+    difficulty: intermediate
+    phase: define
   - name: qa-systematic
     version: 1.0.1
     description: 'Systematic web application QA testing with issue taxonomy, health scoring, and regression tracking. Triggers
@@ -1370,10 +1429,11 @@ packages:
     - milestone-runner
     - plan-prompts
   - name: static-web-artifacts-builder
-    version: 1.1.1
+    version: 1.1.2
     description: 'Build self-contained static HTML artifacts opened in a browser: interactive diagrams, dashboards, infographics.
       Pure HTML5+CSS3+inline SVG, zero toolchain. Triggers on: "interactive HTML", "open in browser", "HTML artifact", "visual
-      dashboard", "HTML infographic". NOT for PNG/SVG output, use concept-to-image.'
+      dashboard", "HTML infographic". NOT for PNG/SVG output, use concept-to-image. NOT for throwaway prototypes that answer
+      a state-model or layout question, use prototype.'
     path: skills/static-web-artifacts-builder
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/static-web-artifacts-builder/SKILL.md
     tags:
@@ -1522,10 +1582,11 @@ packages:
     category: review
     difficulty: intermediate
   - name: ux-expert
-    version: 1.0.0
+    version: 1.0.1
     description: 'UX design expert for auditing and redesigning pages, dashboards, and data-dense interfaces via 4-phase collaborative
       reviews across 8 UX dimensions. Triggers on: "review UX", "audit this page", "redesign the dashboard", "UX review",
-      "improve the layout", "dashboard UX audit", "component recommendations".'
+      "improve the layout", "dashboard UX audit", "component recommendations". NOT for building throwaway switchable UI variants
+      to compare layouts, use prototype.'
     path: skills/ux-expert
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/ux-expert/SKILL.md
     tags:
@@ -1539,6 +1600,7 @@ packages:
     phase: review
     complements:
     - chart-clarity
+    - prototype
   - name: walkthrough
     version: 1.0.1
     description: Use when an unavoidable human-only operation needs a repeatable guided procedure, such as dashboard consent,
@@ -2320,7 +2382,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.3.0
+    version: 1.3.1
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
@@ -2387,7 +2449,7 @@ packages:
     difficulty: advanced
     phase: ship
   - name: tdd
-    version: 1.0.0
+    version: 1.0.1
     description: 'Test-driven development workflow for functions, modules, or features. Guides Claude through the red-green-refactor
       cycle: understand requirements, write a failing test first, implement minimal code to pass, refactor, repeat. Enforces
       test-first discipline with rules for naming, assertion specificity, edge case generation, and cycle termination. Triggers

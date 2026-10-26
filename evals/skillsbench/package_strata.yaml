@@ -353,6 +353,9 @@ excluded:
     name: milestone-runner
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
+    name: module-deepening
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
     name: notebooklm
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
@@ -384,6 +387,9 @@ excluded:
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
     name: prompt-lab
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
+    name: prototype
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
     name: qa-systematic

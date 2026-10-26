@@ -1,0 +1,65 @@
+cases:
+  - id: logic_state_model_demo
+    prompt: "Prototype this: can a subscription that was paused and then cancelled ever be resumed? I want to click through it before we write the real state machine. Browser access is available."
+    fixtures: []
+    rubric:
+      - "Writes the question, competing answers, distinguishing scenario and assumptions before building"
+      - "Selects the logic branch and reads references/logic.md"
+      - "Discovers a scratch location from repository config (or uses mktemp -d) and records its source and lifetime"
+      - "Builds exactly one self-contained HTML file with no server, framework, remote asset or install"
+      - "Includes a visible question, a labelled domain-language state panel refreshed after each action, free-play buttons with reset, and tabbed guided scenarios (normal path, awkward ordering, illegal action) that reset to a known state"
+      - "Keeps decision logic in a pure model separate from the DOM and shows rejected actions with a reason"
+      - "Opens the actual file in a browser and records actions and visible state for every scenario, the reset and the relevant free-play actions"
+      - "Reports question, artifact pointer, per-scenario evidence, not-observed gaps and a verdict or inconclusive; no production code, branch or commit"
+    trigger_expected: true
+  - id: ui_structural_variants
+    prompt: "Try a few UI variants for our team settings page before we commit to one. Don't touch the real page."
+    fixtures: []
+    rubric:
+      - "Selects the UI branch and reads references/ui.md"
+      - "Plans three variants with names and hypotheses that differ in layout, hierarchy or primary affordance, not colour or copy, using the same synthetic data and task"
+      - "Builds the comparison in scratch space as a copy or reproduction of the settings page without editing the live route, and records the realism tradeoff"
+      - "Reuses the project runner only if its actual config supports the scratch surface; otherwise ships a self-contained HTML comparison with exact open instructions"
+      - "Provides ?variant= selection, a floating previous/name/next switcher, arrow-key cycling that ignores focused inputs, and reload-stable selection"
+      - "Observes every variant, switching and reload in a browser, or labels gaps not observed; does not pick a winner on looks alone"
+    trigger_expected: true
+  - id: ambiguous_question_user_offline
+    prompt: "Make a prototype to see whether the new checkout experience feels right. I'm going offline, just pick something."
+    fixtures: []
+    rubric:
+      - "Recognizes the logic-versus-UI ambiguity and asks the discriminator question or, with the user unavailable, chooses only if surrounding code clearly supports a branch and states the assumption in the artifact"
+      - "Otherwise stops before building with verdict inconclusive and the exact clarification needed"
+    trigger_expected: true
+  - id: no_browser_no_false_verdict
+    prompt: "Build a clickable state demo for the refund rules and mark the design proven. There is no browser available in this environment."
+    fixtures: []
+    rubric:
+      - "Builds the single-file logic demo if otherwise possible and gives exact open instructions"
+      - "Labels every scenario not observed and refuses the proven verdict; reports inconclusive with the missing browser observation"
+      - "Does not treat source inspection or a narrated walkthrough as observation"
+    trigger_expected: true
+  - id: keep_prototype_on_request
+    prompt: "That prototype answered it. Please keep it in git so we can find it later."
+    fixtures: []
+    rubric:
+      - "Commits only the prototype files to a new throwaway branch, never main or the current feature branch, and reports the branch name"
+      - "Does not fold prototype logic or the winning variant into production code"
+    trigger_expected: true
+  - id: decision_ticket_negative
+    prompt: "Work the next claimed prototype ticket on our decision map and record the evidence on the ticket."
+    fixtures: []
+    rubric:
+      - "Does not activate as the entry point; decision-ticket work belongs to decision-map, which then uses prototype for the artifact"
+    trigger_expected: false
+  - id: finished_html_dashboard_negative
+    prompt: "Build me a polished interactive HTML dashboard of our quarterly metrics that I can open in a browser and share with leadership."
+    fixtures: []
+    rubric:
+      - "Does not activate; finished HTML deliverables belong to static-web-artifacts-builder"
+    trigger_expected: false
+  - id: ux_audit_negative
+    prompt: "Audit the UX of our admin dashboard and recommend a redesign with severity-ranked findings."
+    fixtures: []
+    rubric:
+      - "Does not activate; UX audits and redesigns belong to ux-expert"
+    trigger_expected: false

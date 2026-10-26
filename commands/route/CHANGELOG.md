@@ -1,5 +1,11 @@
 # Changelog — Route
 
+## 1.3.1
+
+- Route standalone throwaway prototypes to `prototype`; keep prototypes used as evidence for a decision on `decision-map`, which now delegates the artifact to `prototype`.
+- Route shallow-module scans and single-module interface/seam design to `module-deepening`.
+- Add routing cases for both; these are not live execution evidence.
+
 ## 1.3.0
 
 - Route asynchronous external-recipient discovery to `intake`, persistent human learning to `learning-workspace`, active domain challenge to `domain-modeling`, and unavoidable human operations to `walkthrough`.
