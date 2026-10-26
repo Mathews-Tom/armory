@@ -2382,7 +2382,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: route
-    version: 1.3.0
+    version: 1.3.1
     description: 'Skill router that maps user tasks to the best armory packages. Provides a decision-tree organized by development
       lifecycle phase (define, plan, build, verify, review, ship) plus cross-cutting domains (research, content, business).
       Triggers on: "/route", "which skill", "what package", "find the right skill", "help me pick a skill", "discover packages".
