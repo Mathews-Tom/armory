@@ -356,7 +356,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: decision-map
-    version: 2.0.1
+    version: 2.0.2
     description: Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision
       ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the
       decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general
@@ -1202,7 +1202,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: prototype
-    version: 1.0.1
+    version: 1.0.2
     description: 'Use when a design question is cheaper to answer by clicking a throwaway artifact than by debating it: whether
       a state model or business rule behaves right, or which of several structurally different UI layouts works. Builds one
       scratch-only artifact (a self-contained shareable state demo, or switchable UI variants), observes it in a browser and
