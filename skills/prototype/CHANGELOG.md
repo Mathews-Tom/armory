@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 — 2026-10-26
+
+- The "skip the polish" boundary forbids new framework setup but allows a UI scratch copy to use the project's existing framework when the UI reference reuses its runner.
+
 ## 1.0.1 — 2026-10-26
 
 - Keeping a prototype in git now uses a separate worktree on a throwaway branch, copies `mktemp -d` artifacts under `prototype/<topic>/`, stages only the requested paths with `git add -f` (scratch directories are usually ignored) and leaves the user's checkout untouched.

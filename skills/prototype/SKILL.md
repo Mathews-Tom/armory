@@ -2,7 +2,7 @@
 name: prototype
 description: 'Use when a design question is cheaper to answer by clicking a throwaway artifact than by debating it: whether a state model or business rule behaves right, or which of several structurally different UI layouts works. Builds one scratch-only artifact (a self-contained shareable state demo, or switchable UI variants), observes it in a browser and reports evidence with a verdict or "inconclusive". Production routes, data and code stay untouched. Triggers on: "prototype this", "throwaway prototype", "clickable state demo", "does this state model feel right", "try a few UI variants", "compare layouts before committing". NOT for working a decision-map ticket, use decision-map. NOT for finished HTML deliverables such as dashboards or infographics, use static-web-artifacts-builder. NOT for UX audits or redesigns, use ux-expert.'
 metadata:
-  version: 1.0.1
+  version: 1.0.2
   category: development
   tags: [prototyping, throwaway, state-model, ui-variants, design-questions]
   difficulty: intermediate
@@ -36,7 +36,7 @@ These boundaries hold in every branch:
 - **No branch or commit by default.** Commit the prototype only if the user explicitly asks, and then only to a new throwaway branch (see Output).
 - **Never lift prototype logic into production.** No extraction, winner promotion or automatic cutover. The verdict is input to separately authorized implementation work.
 - **Browser before verdict.** An empirical verdict requires observing the actual artifact in a browser (any authorized browser automation or a browser the user drives and reports back from). Anything not exercised is labelled **not observed**.
-- **Skip the polish.** Only the structure and error handling needed to run the experiment. No framework, reusable architecture or test suite for the prototype.
+- **Skip the polish.** Only the structure and error handling needed to run the experiment. No new framework setup, reusable architecture or test suite for the prototype; a UI scratch copy may use the project's existing framework when `references/ui.md` reuses its runner.
 
 ## Workflow
 
