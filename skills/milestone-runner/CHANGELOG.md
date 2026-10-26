@@ -10,7 +10,7 @@
 - Merge-and-clean requires an explicit merge request; status and CI questions are read-only.
 - Review is one pass per PR plus one whole-stack check, by a fresh subagent when available; re-review covers only code changed by fixes. Independent review is no longer a blocking prerequisite.
 - Removed: seven-field capsule reconstruction, the history ledger, docs-only reconciliation PRs, opt-in per-PR issue tracking, mandatory independent verification lanes and release-train state machinery. Release handoff to `release-captain` after all of a release's milestones merge is unchanged.
-- `SKILL.md` reduced from 5,921 to about 1,380 words.
+- `SKILL.md` reduced from 5,921 to about 1,440 words.
 
 ### Migration
 

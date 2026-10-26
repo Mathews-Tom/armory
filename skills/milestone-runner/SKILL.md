@@ -80,7 +80,7 @@ Treat a lane's own claims as hints and confirm from provider and command output:
 | Gate | Requirement |
 | --- | --- |
 | Outcome | The `Done when` interaction was exercised and produced the expected result. Green CI without the interaction is not done. |
-| Checks | CI green; every listed verification command passes. |
+| Checks | CI green; every listed verification command that can run now passes. A listed check needing unavailable credentials, spend or human review follows "Stay on the goal" unless the plan or owner made it a gate. |
 | Review | One review per PR plus one whole-stack check (bases, CI, cumulative acceptance). Use a fresh subagent when available; otherwise review directly and say so. Re-review only code changed by fixes. |
 | Topology | Root targets the intended base; children target the preceding branch. |
 | Cleanliness | No stray non-ignored files in the worktree. |
@@ -96,7 +96,7 @@ A failed gate stops that milestone and its dependents; other independent milesto
 
 ### 6. Release
 
-Only when the plan names a release. After every milestone in that release has merged, hand `release-captain` the plan's release target, version source and changelog with citations. It prepares the release PR through `ship-workflow`; that PR goes through the same review, CI and merge gates. Never invent a version; a missing release decision blocks release preparation only. Do not tag or publish without explicit plan or owner authority.
+Only when the plan names a release. After every milestone in that release has merged, hand `release-captain` the plan's release target, version source, changelog and base branch with citations. It prepares the release PR through `ship-workflow`; that PR goes through the same review, CI and merge gates. Never invent a version; a missing release decision blocks release preparation only. Do not tag or publish without explicit plan or owner authority.
 
 ## Output format
 
