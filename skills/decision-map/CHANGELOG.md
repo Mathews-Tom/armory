@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0 — 2026-10-26
+
+- BREAKING: prototype tickets now require the `prototype` package, which builds and observes the logic/state or UI artifact. Without it, prototype work stops with `BLOCKED: install prototype` before claiming the ticket.
+- Reduce `references/prototyping.md` to the ticket wrapper: package and claim preconditions, HITL verdict ownership, evidence record format, `UNRESOLVED_WITH_EVIDENCE` path, frontier recompute and stop.
+- Remove the moved artifact-building protocol and `references/upstream/prototype-provenance.md`; that attribution now lives in the `prototype` package. The original wayfinder provenance and LICENSE are unchanged.
+- Route standalone prototype requests outside a decision map to `prototype`; add eval cases for the missing-package stop and the standalone route.
+
 ## 1.1.0 — 2026-10-19
 
 - Add a bounded prototype resolution path: one shareable logic/state HTML or structurally different UI variants, scratch-only artifacts, observed browser evidence and a ticket-governed verdict.

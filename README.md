@@ -28,7 +28,7 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 | Situation | Package | Output |
 |---|---|---|
-| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and a disposable prototype when uncertainty needs executable evidence |
+| Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and prototype evidence (built by [prototype](skills/prototype/)) when uncertainty needs executable evidence |
 | Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | Size-matched `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` (or one prompt for one-PR work) with user-observable acceptance |
 | Feature is specified and needs implementation slices | [task-decomposer](skills/task-decomposer/) | Phased task board with dependencies and test matrix |
 | Existing plan needs a pre-implementation challenge | [plan-review](skills/plan-review/) | Severity-ranked plan review |
@@ -36,7 +36,7 @@ unknown destination → decision-map → known design → plan-prompts → task-
 
 `decision-map` stops at resolved decisions. It recommends `plan-prompts` after a complete map and never creates implementation milestones or tasks.
 
-Disposable prototypes are evidence within `decision-map`, not a separate package or a substitute for production implementation.
+Disposable prototypes are built by `prototype` and recorded as ticket evidence by `decision-map`; neither is a substitute for production implementation.
 
 Start with the shortest complete user workflow, not a tooling-only milestone. `plan-prompts` sizes the plan to the work, writes acceptance as `Done when <user> can <interaction> and sees <result>`, and moves unsourced checks to suggested follow-ups. `milestone-runner` restates each milestone's GOAL, NON-GOALS and DONE WHEN, does only the work acceptance requires, and treats a reviewed, green, merged milestone with an observed interaction as done.
 
@@ -114,7 +114,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
 | [pr-explainer](skills/pr-explainer/)             | Explain pushed PRs, whole stacks, or one stack member through source-grounded functional briefings and domain-knowledge updates; not defect review or merge approval |
 | [plan-prompts](skills/plan-prompts/)             | Plan size-matched vertical increments from repository reality with user-observable acceptance; one prompt for one-PR work, unsourced checks as follow-ups |
-| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
+| [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; record prototype-package evidence on decision tickets before implementation planning |
 | [prototype](skills/prototype/)                   | Answer one design question with a throwaway, scratch-only artifact — a shareable state demo or switchable UI variants — observed in a browser before any verdict |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones toward the plan's goal with one design check, observed outcome, CI, review and merge; resume from merged-PR evidence |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |

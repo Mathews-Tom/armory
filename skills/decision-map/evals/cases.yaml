@@ -66,7 +66,7 @@ cases:
     prompt: "Work only the local billing map's frontier prototype ticket: can a partially cancelled order be refunded twice? It is AFK, and the session claim is available. Build decision evidence for normal refund, cancel-then-refund, and a second refund attempt. Browser access is available; do not implement billing."
     fixtures: []
     rubric:
-      - "Verifies ownership and the session claim using the existing local backend before work and loads references/prototyping.md"
+      - "Verifies ownership and the session claim using the existing local backend before work, loads references/prototyping.md and builds the artifact with the prototype package"
       - "States one question and assumptions, selects the logic/state branch, and creates exactly one scratch self-contained HTML with no server or production persistence"
       - "Shows every question-relevant state field, free-play actions/reset and guided normal, awkward-ordering and illegal-action scenarios with known-state resets"
       - "Opens the actual HTML in the browser and records actions and visible outcomes for every guided scenario, reset and relevant free-play action; does not invent observations"
@@ -104,6 +104,14 @@ cases:
       - "Records the pending clarification and UNRESOLVED_WITH_EVIDENCE, leaves the ticket OPEN with its existing claim held and reports WAITING when no other ticket is actionable"
       - "Keeps continuation on the same ticket under normal stale-claim rules rather than inventing a second ticket, claim release, guessed artifact or resolved HITL decision"
     trigger_expected: true
+  - id: prototype_ticket_missing_prototype_package
+    prompt: "Work the next frontier ticket on our local decision map. It is an AFK prototype ticket about whether a refund can follow a partial cancellation. The prototype package is not installed in this environment."
+    fixtures: []
+    rubric:
+      - "Checks for the prototype package before claiming the prototype ticket"
+      - "Stops with BLOCKED: install prototype; builds no artifact, takes no claim and leaves the ticket and map untouched"
+      - "Does not fall back to hand-building a prototype from memory or resolve the ticket without evidence"
+    trigger_expected: true
   - id: local_initial_question_preserves_backend_headers
     prompt: "Chart a local decision map for an unresolved record layout. Keep the initial ticket question-only, but use our existing local tracker schema. Do not duplicate GitHub labels in a GitHub body."
     fixtures: []
@@ -136,6 +144,13 @@ cases:
     rubric:
       - "Does not activate decision-map merely because several UI variants were requested; routes general UI creation outside this package"
       - "Does not manufacture tracker tickets or a decision map to justify prototyping"
+    trigger_expected: false
+  - id: standalone_prototype_without_map
+    prompt: "Prototype this: I want a clickable demo of our subscription pause/cancel state model so I can see whether resume-after-cancel is possible. We don't use decision maps."
+    fixtures: []
+    rubric:
+      - "Does not activate decision-map for a standalone prototype request; routes it to the prototype package"
+      - "Does not create a decision map or ticket to justify the prototype"
     trigger_expected: false
   - id: adopt_experimental_code_into_production
     prompt: "The decision is already made. Copy our experimental reducer into production, wire it to the real billing database and commit the winner."

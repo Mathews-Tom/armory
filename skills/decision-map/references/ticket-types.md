@@ -27,7 +27,7 @@ Later evidence and verdict use the concrete GitHub-comment or local quoted-appen
 |---|---|---|---|
 | `discussion` | `decision-map:discussion` | HITL | Ask the human using `references/elicitation.md`. |
 | `research` | `decision-map:research` | AFK | Use `references/research-resolution.md`; link findings. |
-| `prototype` | `decision-map:prototype` | HITL | Follow `references/prototyping.md` for bounded logic/state or structurally different UI evidence and a justified verdict; obtain human judgment when HITL. |
+| `prototype` | `decision-map:prototype` | HITL | Follow `references/prototyping.md`: the `prototype` package builds and observes the logic/state or UI artifact; record its evidence and a justified verdict; obtain human judgment when HITL. |
 | `unblock` | `decision-map:unblock` | Either | Produce minimal evidence, access, measurement, setup, or experiment. |
 
 Interaction is exactly one authoritative GitHub label or local `Interaction:` header: `decision-map:hitl` or `decision-map:afk`. GitHub ticket bodies do not repeat labels; local bodies must contain their required headers.
