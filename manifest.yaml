@@ -356,7 +356,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: decision-map
-    version: 2.0.0
+    version: 2.0.1
     description: Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision
       ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the
       decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general
