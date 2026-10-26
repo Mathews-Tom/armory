@@ -90,8 +90,8 @@ A failed gate stops that milestone and its dependents; other independent milesto
 ### 5. Merge and record
 
 1. Delegate landing to `ship-workflow`; never merge, retarget, restack or delete branches by hand. For a single PR, run it with `--pr N`. For a stack, have `stacked-prs` author its stack decision packet selecting this milestone's PRs, then run `ship-workflow` with `--stack-plan`. Use `--until merged` for "merge"; the default `clean` endpoint also removes branches it proves merged.
-2. Relay its status, confirmed merges and cleanup. `NEEDS_JUDGMENT` or `BLOCKED` stops this milestone and its dependents until the named decision or prerequisite is resolved.
-3. Re-run the milestone's interaction on the merged base.
+2. Relay its status, confirmed merges and cleanup. Continue only on `COMPLETE`. `WAITING` means landing is pending: resume its returned run (`--resume RUN_ID`) before any merged-base check or dependent work. `NEEDS_JUDGMENT` or `BLOCKED` stops this milestone and its dependents until the named decision or prerequisite is resolved.
+3. After `COMPLETE`, re-run the milestone's interaction on the merged base.
 4. Recompute the dependency table; continue with the next ready milestone.
 
 ### 6. Release
