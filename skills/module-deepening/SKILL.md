@@ -130,7 +130,8 @@ Not done here: code changes
 
 | Situation | Action |
 |---|---|
-| Not a git repository, or history too short to show hot spots | Ask the user for a direction and scan those files without `git log`; record that scope came from the user and hot-spot evidence is unavailable |
+| Not a git repository | If the user gave a direction, scan those files without `git log`; otherwise ask for one. Record the scope as user-provided and hot-spot evidence as unavailable because this is not a git repository |
+| History too short or scattered to show hot spots | Widen the `git log` window and scan again, as in Scan mode step 1; if it still shows none, ask the user for a direction and record that |
 | No `CONTEXT.md`, `CONTEXT-MAP.md` or `docs/agents/domain.md` | Use names from the code; offer `domain-modeling` once if terms are ambiguous |
 | Scan finds no candidate that passes the deletion test | Write the zero-candidate report (scope and every module examined with its drop reason), print its path and stop without asking for a pick; do not invent speculative cards to fill the report |
 | `$TMPDIR` unset or unwritable | Fall back to `/tmp`; if that fails, stop and report the error rather than writing into the repository |

@@ -2,7 +2,7 @@
 
 ## 1.0.1 — 2026-10-26
 
-- Scan outside a git repository: scan the user-named files without `git log` and record that hot-spot evidence is unavailable.
+- Scan outside a git repository: scan the user-named files without `git log` (asking for a direction only when none was given) and record that hot-spot evidence is unavailable. Short or scattered history in a git repository widens the `git log` window first.
 - A scan with zero candidates is complete: the report lists every examined module with its drop reason and the session stops without a recommendation or pick question.
 - Design completion distinguishes an accepted design (interface, invariants, error modes, seam, test-replacement strategy) from a rejection (reason recorded, then stop).
 
