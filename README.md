@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 157](https://img.shields.io/badge/packages-157-informational)](manifest.yaml)
+[![packages: 158](https://img.shields.io/badge/packages-158-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -48,7 +48,7 @@ Both packages use the `3.0.0` contract; 2.x prompts still run. Missing release m
 
 ## Package Catalog
 
-157 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
+158 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -115,6 +115,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [pr-explainer](skills/pr-explainer/)             | Explain pushed PRs, whole stacks, or one stack member through source-grounded functional briefings and domain-knowledge updates; not defect review or merge approval |
 | [plan-prompts](skills/plan-prompts/)             | Plan size-matched vertical increments from repository reality with user-observable acceptance; one prompt for one-PR work, unsourced checks as follow-ups |
 | [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
+| [prototype](skills/prototype/)                   | Answer one design question with a throwaway, scratch-only artifact — a shareable state demo or switchable UI variants — observed in a browser before any verdict |
 | [milestone-runner](skills/milestone-runner/)     | Run milestones toward the plan's goal with one design check, observed outcome, CI, review and merge; resume from merged-PR evidence |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |

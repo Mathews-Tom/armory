@@ -389,6 +389,9 @@ excluded:
     name: prompt-lab
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
+    name: prototype
+    rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
+  - package_type: skill
     name: qa-systematic
     rationale: Excluded from the fixed one-package skill stratum; its type is represented by the registered sample.
   - package_type: skill
