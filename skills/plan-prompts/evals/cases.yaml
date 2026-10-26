@@ -1,14 +1,14 @@
 cases:
   - id: docs_folder_to_plan_and_prompts
     prompt: >
-      Use the system docs in docs/ to create a source-faithful development plan and execution prompts.
-      Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md. Make the review process in each execution prompt robust enough for per-PR and whole-stack review, and make every milestone end with a structured GO/NO-GO merge decision.
+      Use the system docs in docs/ to create a development plan and execution prompts for a new multi-milestone service.
+      Save the outputs as .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md.
     fixtures: []
     rubric:
-      - "creates DEVELOPMENT_PLAN.md, EXECUTION_PROMPTS.md, and the mandatory ignored DEVELOPMENT_PLAN_HISTORY.md ledger under .docs"
-      - "includes source map, assumptions/gaps, dependency graph, milestones, acceptance, and verification"
-      - "includes one /goal block per milestone with detailed per-PR and whole-stack review criteria"
-      - "requires every milestone run to report GO/NO-GO with evidence for merge readiness"
+      - "states the size class before writing and chooses the large class for several dependent milestones"
+      - "creates DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md under .docs and no other files"
+      - "each milestone has a user-observable outcome, Done when acceptance and exact verification"
+      - "each /goal block stays within 600 words and ends with a literal NEXT STEPS: block"
     trigger_expected: true
     assertions:
       - type: contains
@@ -17,21 +17,15 @@ cases:
       - type: contains
         target: ".docs/EXECUTION_PROMPTS.md"
         weight: 1.0
+      - type: matches_regex
+        target: "(size class|Size|Large|Medium|Small)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(Done when|DONE WHEN)"
+        weight: 0.8
       - type: contains
-        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
-        weight: 0.9
-      - type: matches_regex
-        target: "(gitignore|gitignored|check-ignore)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(Source Map|Assumptions|Gaps|Dependency Graph|Milestones)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(/goal|PLANNED STACK|Per PR|Whole stack|whole-stack|GO/NO-GO)"
-        weight: 0.8
-      - type: output_format
-        target: markdown_table
-        weight: 0.6
+        target: "NEXT STEPS:"
+        weight: 0.7
 
   - id: explicit_files_with_stack_depth
     prompt: >
@@ -53,63 +47,118 @@ cases:
       - type: matches_regex
         target: "(> ASSUMPTION:|> GAP:|Assumptions & Gaps)"
         weight: 0.8
-      - type: contains
-        target: "EXECUTION_PROMPTS.md"
-        weight: 0.6
 
-  - id: greenfield_verification_surface
+  - id: small_change_gets_one_prompt
     prompt: >
-      Read this package's evals/fixtures/product-workflow.md S01 in full; fixtures are
-      not automatically materialized. Use its source notes and observations to generate
-      the two planning artifacts only, including populated execution goals.
-    fixtures: ["evals/fixtures/product-workflow.md"]
+      Plan the work to add a --json flag to the existing `tasks list` command in this repo and generate the execution prompt for it.
+    fixtures: []
     rubric:
-      - "S01: first useful slice supports add then list with minimum setup and focused checks, not skeleton-only success"
-      - "does not assume existing tooling; defers orchestration, integrations and qualification without losing authorized requirements"
-      - "carries the same user/workflow/preservation/demo/source through all seven capsule fields"
-      - "fixture and rubric are NOT RUN specifications, not observed model success"
+      - "classifies the request as the small size class because it fits in one PR"
+      - "returns a single /goal prompt of about 200 words in chat, writes no plan files and references no plan file or plan section"
+      - "acceptance is a user-observable Done when row plus the repo's existing checks; no added review rounds or qualification"
     trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(small|one PR|single PR)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(no plan files|without writing|not writing|in chat)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(Done when|DONE WHEN)"
+        weight: 0.7
+      - type: not_contains
+        target: "--- FILE:"
+        weight: 0.9
+      - type: not_contains
+        target: "Plan §"
+        weight: 0.8
+
+  - id: unsourced_validation_becomes_follow_up
+    prompt: >
+      Create DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md from docs/spec.md for two skill wording changes. The spec asks only for the
+      edited skill text and the repo's existing validators. While planning you notice fresh-model behavioral runs and a paid qualification
+      campaign could add confidence.
+    fixtures: []
+    rubric:
+      - "acceptance is limited to the edited text, the repo validators and an observable check the executor can run now"
+      - "fresh-model runs and paid qualification appear only under Suggested follow-ups, not as acceptance or a BLOCKED state"
+      - "does not invent requirement-ID catalogues, scenario suites or evidence tiers absent from the spec"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(Suggested follow-ups|follow-up)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(not (an )?acceptance|out of scope|not required|optional)"
+        weight: 0.8
 
   - id: shared_release_train_planning
     prompt: >
       Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for a repository where M1 and M2 both ship in v2.4.0.
       The repository stores its version in VERSION, maintains CHANGELOG.md, and does not publish tags automatically.
-      Keep version and changelog preparation deferred until both milestones merge; do not create one release entry per milestone.
     fixtures: []
     rubric:
-      - "assigns M1 and M2 to the shared v2.4.0 release train"
-      - "records VERSION and CHANGELOG.md as release artifacts, with no publication step"
-      - "requires release preparation only after every train milestone merges"
-      - "emits release-aware GO/NO-GO verdicts that name the target release"
+      - "assigns M1 and M2 to the v2.4.0 release"
+      - "prepares the release once, after both milestones merge, not per milestone"
+      - "does not invent tagging or publication steps"
     trigger_expected: true
     assertions:
-      - type: matches_regex
-        target: "(Release Trains|release train|Target release|v2\\.4\\.0)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(VERSION|CHANGELOG\\.md)"
+      - type: contains
+        target: "v2.4.0"
         weight: 0.9
       - type: matches_regex
-        target: "(all.*milestones.*merge|all included milestones.*merged|deferred|release preparation)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(GO.*RELEASE|NO-GO.*RELEASE|RELEASE PREP)"
-        weight: 0.9
+        target: "(after (both|all)|once).*(merge)"
+        weight: 0.8
 
   - id: unresolved_release_target
     prompt: >
-      Generate both planning artifacts for this authorized local correction: the task
-      CLI lists tasks in insertion order but must list by numeric ID. Existing acceptance
-      is add IDs 2 then 1 and assert list returns 1 then 2; preserve task text and storage.
-      Current unit checks and CLI smoke checks exist. VERSION and CHANGELOG.md exist but
-      release policy and target are absent. No runtime code reads release identity.
-      Do not implement, invent a version, or hide missing metadata as none.
+      Create the plan and prompts from docs/. The docs say a release will happen but never name a version, and the repo has no VERSION file.
     fixtures: []
     rubric:
-      - "keeps visible release-target GAP and blocks release preparation without inventing release artifacts"
-      - "permits correction and ordinary verification; no blanket implementation or merge NO-GO for metadata alone"
-      - "generated verdict supports visible unresolved target and blocked preparation while retaining actual safety/review/CI blockers"
+      - "records a visible > GAP: for the release target"
+      - "blocks release preparation only, not implementation"
+      - "never invents a version number"
     trigger_expected: true
+    assertions:
+      - type: contains
+        target: "> GAP:"
+        weight: 0.9
+      - type: matches_regex
+        target: "(release preparation only|blocks? release preparation)"
+        weight: 0.8
+
+  - id: brownfield_replan
+    prompt: >
+      Replan .docs/DEVELOPMENT_PLAN.md. M1 shipped working search; M2 and M3 were six layered infrastructure milestones that never
+      produced a usable result. Regenerate both files around the shortest path to a user-visible detail view.
+    fixtures: []
+    rubric:
+      - "reads the existing plan and prompts before regenerating"
+      - "maps every old milestone to keep, combine, defer or drop with a reason"
+      - "preserves working search and keeps unresolved historical failures visible"
+      - "replaces layer milestones with a usable vertical slice"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(keep|combine|defer|drop)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(vertical slice|usable|user-visible)"
+        weight: 0.8
+
+  - id: destructive_human_gate
+    prompt: >
+      Plan the milestones for a data-retention feature whose M3 permanently deletes expired customer records.
+    fixtures: []
+    rubric:
+      - "adds the HUMAN REVIEW GATE to the destructive milestone"
+      - "keeps the gate tied to dry-run output, rollback notes and audit/tombstone logging"
+    trigger_expected: true
+    assertions:
+      - type: contains
+        target: "HUMAN REVIEW GATE"
+        weight: 1.0
 
   - id: negative_existing_plan_review
     prompt: >
@@ -127,274 +176,9 @@ cases:
       - "executing stacked PRs is stacked-prs territory, not plan/prompt generation"
     trigger_expected: false
 
-  - id: adaptive_milestone_design_gate
-    prompt: >
-      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for M1 through M6. M4 changed
-      the persistence interface that M5 and M6 depend on. Before M5 implementation, require an
-      evidence-backed design gate that updates M5 and every affected future milestone before code
-      can start.
-    fixtures: []
-    rubric:
-      - "adds a mandatory DESIGN GO or DESIGN NO-GO gate before implementation"
-      - "requires repository and predecessor-evidence analysis rather than relying on the old plan"
-      - "updates the current milestone and every affected transitive dependent prompt and plan section"
-      - "blocks code when the design is invalid or reconciliation is incomplete"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(DESIGN GO|DESIGN NO-GO|design gate|design reconciliation)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(predecessor|merged PR|current codebase|repository evidence)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(dependent|downstream|transitive|M6)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(block.*code|before.*implementation|do not.*implement)"
-        weight: 0.9
-
-  - id: ignored_plan_history_ledger
-    prompt: >
-      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md with one local,
-      gitignored .docs/DEVELOPMENT_PLAN_HISTORY.md ledger. It must record each design-gate
-      decision, evidence, plan/prompt changes, and downstream impact, but the committed plan
-      and prompts remain authoritative.
-    fixtures: []
-    rubric:
-      - "creates exactly one additional history artifact at the requested path"
-      - "ensures the exact history path is gitignored without assuming a broader ignore rule"
-      - "treats the ledger as local evidence rather than authoritative planning state"
-      - "records no-change and changed design-gate decisions with evidence and impact"
-    trigger_expected: true
-    assertions:
-      - type: contains
-        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
-        weight: 1.0
-      - type: matches_regex
-        target: "(gitignore|gitignored|check-ignore)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(authoritative|source of truth|committed plan)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(evidence|downstream impact|PLAN REVISION)"
-        weight: 0.8
-
-  - id: terminal_next_steps_contract
-    prompt: >
-      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for M4 and M5 in release v3.1.0,
-      plus M6 in independent release v3.2.0. Every milestone must report concrete next steps:
-      a green M4 stack needs merge, deferred v3.1.0 preparation, and its next milestone; a
-      migration-verification NO-GO for M4 needs remediation and may skip to independent M6.
-      Do not tag or publish without source evidence.
-    fixtures: []
-    rubric:
-      - "requires ordered NEXT STEPS after both GO and NO-GO terminal verdicts"
-      - "links GO handoff to merge state, deferred or required release preparation, and a next dependency-ready milestone"
-      - "links NO-GO handoff to the failed gate, remediation and retry, and only an independent milestone that may proceed"
-      - "does not invent tag or publication work"
-    trigger_expected: true
-    assertions:
-      - type: contains
-        target: "NEXT STEPS"
-        weight: 1.0
-      - type: matches_regex
-        target: "(GO.*merge|merge.*GO|NO-GO)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(release preparation|RELEASE PREP|deferred)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(migration|remediat|retry)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(M6|independent|SKIP.*RUN)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(do not tag|do not publish|without source evidence)"
-        weight: 0.8
-  - id: isolated_ingestion_lanes
-    prompt: >
-      The source material is a docs/ folder with fourteen large design documents plus an existing
-      repository. Create .docs/DEVELOPMENT_PLAN.md and .docs/EXECUTION_PROMPTS.md without loading
-      every document into one context, and audit the written artifacts before reporting.
-    fixtures: []
-    rubric:
-      - "dispatches read-only ingestion and repository-grounding subagents in one batch instead of reading everything inline"
-      - "keeps authority resolution, gap calls, and artifact authoring in the planning session"
-      - "re-checks cited paths and sections before planning from returned evidence"
-      - "audits the written artifacts with a fresh read-only context that has no authoring history"
-      - "never lets a subagent write .docs artifacts, the history ledger, or .gitignore"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(subagent|isolated lane|read-only lane)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(one batch|single batch|parallel|concurrent)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(re-check|vet|verify).*(citation|path|section)|citation.*(re-check|vet|verify)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(audit|fresh context).*(artifact|written|quality gate)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(returns findings|never writes|writes nothing|only this session writes)"
-        weight: 0.8
-
   - id: negative_unresolved_destination
     prompt: "The destination itself is still unclear. Identify the questions we must resolve."
     fixtures: []
     rubric:
       - "Does not activate; unresolved pre-planning decisions belong to decision-map"
     trigger_expected: false
-
-  - id: opt_in_per_pr_issue_stubs
-    prompt: >
-      Generate DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md for a solo developer with
-      ISSUE_TRACKING=on. M3 has two planned implementation PRs. Include separate public-safe
-      issue stubs that the canonical owner can use for tracking and later factory intake.
-      The goals may run directly without milestone-runner. Account for repeated design
-      reconciliation and a lane discovering an extra PR. Do not create any GitHub issues,
-      branches, or PRs while planning.
-    fixtures: []
-    rubric:
-      - "emits ISSUE_TRACKING on explicitly and states that the default is off"
-      - "puts one issue title and short behavior-level body stub with a stable key under each planned PR"
-      - "assigns issue operations to the canonical milestone owner, including direct goal execution without a runner"
-      - "defers product-PR issues until PLAN REVISION none and uses distinct reconciliation ordinals"
-      - "includes an issue key, title, and body slot under every planned PR in the goal template"
-      - "instructs lanes to stop and report extra PRs before branching"
-      - "requires Tracks linkage in every PR body and Closes when default-targeting, and prevents lanes from mutating issues"
-      - "keeps issue text public-safe without private plan content, local paths, or ignored-file references"
-      - "only generates planning artifacts and never creates issues, branches, or PRs"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)ISSUE_TRACKING[^\\n]*on"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(default[^\\n]*off|off[^\\n]*default)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?is)PLANNED STACK.*PR-1.*issue[^\\n]*title.*(body|stub).*PR-2.*issue[^\\n]*title.*(body|stub)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(stable[^\\n]*(key|marker)|(key|marker)[^\\n]*stable)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?is)DESIGN GO.*(create|reuse).*before[^\\n]*branch"
-        weight: 1.0
-      - type: matches_regex
-        target: "Closes #"
-        weight: 1.0
-      - type: matches_regex
-        target: "Tracks #"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(direct[^\\n]*/goal|/goal[^\\n]*(owner|session)|no runner|without[^\\n]*runner)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)(public.safe|private plan|local paths|ignored.file)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)(never|not|no)[^\\n]*(creat|mutat)[^\\n]*(issue|GitHub)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)reconcile-(1|<ordinal>|[0-9])"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?is)(defer|only after)[^\\n]*product.*PLAN REVISION: none"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(extra|another) PR.*stop.*report.*before[^\\n]*branch"
-        weight: 1.0
-
-  - id: default_off_emits_no_issue_work
-    prompt: >
-      Generate the plan and execution goals for M2 from its source documents.
-      ISSUE_TRACKING is not provided. Show only the emitted execution actions,
-      not examples of disabled GitHub commands.
-    fixtures: []
-    rubric:
-      - "emits ISSUE_TRACKING off with no issue stubs or issue mutation actions"
-      - "keeps planning limited to the authoritative artifacts and ignored local evidence"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)ISSUE_TRACKING[^\\n]*off"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue create"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue edit"
-        weight: 1.0
-      - type: not_contains
-        target: "issue (on only):"
-        weight: 0.9
-
-  - id: brownfield_product_replan_s02
-    prompt: >
-      Read this package's evals/fixtures/product-workflow.md S02 completely. Replan its
-      old plan into DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md only. Do not execute
-      product work. Use the independent request and all observations, not only the old plan.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "classifies all five reality categories with cited evidence and explicit unknowns"
-      - "preserves working retrieval, data ownership, tenant safety and unresolved migration failure"
-      - "maps every old milestone and requirement to retained/combined/deferred/retired with reasons"
-      - "generates bounded goals for missing result detail without first building optional process machinery"
-    trigger_expected: true
-
-  - id: operator_prerequisite_s07
-    prompt: >
-      Read this package's evals/fixtures/product-workflow.md S07 completely and generate
-      the plan/goals. Assess the prerequisite evidence rather than forbidding infrastructure
-      or accepting every proposed setup step.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "recognizes validate/apply operator command as a complete useful product workflow without requiring a UI"
-      - "permits schema prerequisite with named consuming command, evidence, why-not-combined and mandatory authority"
-      - "does not make optional orchestration a dependency"
-    trigger_expected: true
-
-  - id: independent_requirements_and_shared_drift_s08
-    prompt: >
-      Read this package's evals/fixtures/product-workflow.md S08, including both variants.
-      Reconcile the existing planning artifacts against the independent request. Describe
-      the fresh comprehension/critique/readiness review inputs and bounded next decision.
-      Do not implement or claim any synthetic check status is real CI.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "detects clear cloud plan is off-goal against independent local-only requirements; readability is insufficient"
-      - "blocks all lanes affected by shared authentication mismatch and preserves unrelated safe work"
-      - "review excludes author rationale, resolves/evidence-rebuts substantive findings, escalates remaining decisions and avoids endless nit loops"
-    trigger_expected: true
-
-  - id: old_prompt_capsule_and_revision_s09
-    prompt: >
-      Read this package's evals/fixtures/product-workflow.md S09 completely. For each
-      variant regenerate the bounded goal or identify required reconciliation. Render
-      the runner lane handoff expectations without executing it or using conversation/history.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "complete plan permits source-exposed reconstruction of all seven fields and lane consumption"
-      - "missing goal/scope/acceptance blocks bounded work instead of guessed purpose or empty capsule"
-      - "material authority revision invalidates affected capsule and comprehension/design evidence; in-session reread is not independent"
-    trigger_expected: true
-
-  - id: staged_interaction_verification_s10
-    prompt: >
-      Read this package's evals/fixtures/product-workflow.md S10 completely. Generate
-      verification and completion contracts for its ordinary increment, final integration,
-      and installation-capability variant. Do not run commands or claim observed results.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "ordinary increment includes concrete interaction/result, focused behavior/safety checks and existing CI"
-      - "comprehensive installed workflow occurs at final integration, not as universal prerequisite machinery"
-      - "installation capability requires clean-environment proof immediately; first-use safety is never deferred"
-      - "completion requires observed useful behavior and remaining workflow gaps, not green CI alone"
-    trigger_expected: true

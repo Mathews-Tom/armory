@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.0 — 2026-10-26
+
+### BREAKING — Goal-bound execution without process inflation
+
+- New "Stay on the goal" contract: restate GOAL, NON-GOALS and DONE WHEN before each milestone; do only the work acceptance requires; a check that cannot run now (credentials, hosted spend, human-only review) is a follow-up unless the plan or owner named it; do not repeat passing checks without a relevant change; a reviewed, green, merged milestone is done.
+- One design check per milestone: `DESIGN GO`, `DESIGN GO — PLAN UPDATE` (small drift fixed in the stack's first commit) or `DESIGN NO-GO` (outcome or acceptance change; ask the owner).
+- New resume/status mode rebuilds state from merged PRs, CI and current code rather than checkboxes, replacing per-project plan-completion audits.
+- Merge-and-clean requires an explicit merge request; status and CI questions are read-only.
+- Review is one pass per PR plus one whole-stack check, by a fresh subagent when available; re-review covers only code changed by fixes. Independent review is no longer a blocking prerequisite.
+- Removed: seven-field capsule reconstruction, the history ledger, docs-only reconciliation PRs, opt-in per-PR issue tracking, mandatory independent verification lanes and release-train state machinery. Release handoff to `release-captain` after all of a release's milestones merge is unchanged.
+- `SKILL.md` reduced from 5,921 to about 1,440 words.
+
+### Migration
+
+- 2.x prompts still run; capsule fields map to GOAL and DONE WHEN. `ISSUE_TRACKING: on` prompts no longer get automated issue mutations.
+
 ## 2.0.0
 
 ### BREAKING — Purpose-preserving execution and demonstrated completion

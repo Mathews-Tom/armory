@@ -29,18 +29,18 @@ unknown destination → decision-map → known design → plan-prompts → task-
 | Situation | Package | Output |
 |---|---|---|
 | Destination or design is unresolved | [decision-map](skills/decision-map/) | Tracker-backed decision map, frontier, recorded decisions, and a disposable prototype when uncertainty needs executable evidence |
-| Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | Product-led `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` with usable increments and source-bound purpose capsules |
+| Design is known and needs milestones | [plan-prompts](skills/plan-prompts/) | Size-matched `DEVELOPMENT_PLAN.md` and `EXECUTION_PROMPTS.md` (or one prompt for one-PR work) with user-observable acceptance |
 | Feature is specified and needs implementation slices | [task-decomposer](skills/task-decomposer/) | Phased task board with dependencies and test matrix |
 | Existing plan needs a pre-implementation challenge | [plan-review](skills/plan-review/) | Severity-ranked plan review |
-| Approved plan needs execution across sessions | [milestone-runner](skills/milestone-runner/) | Goal-preserving execution with demonstrated user progress and independently verified PR gates |
+| Approved plan needs execution across sessions | [milestone-runner](skills/milestone-runner/) | Goal-bound execution: one design check, observed outcome, CI, review and merge per milestone |
 
 `decision-map` stops at resolved decisions. It recommends `plan-prompts` after a complete map and never creates implementation milestones or tasks.
 
 Disposable prototypes are evidence within `decision-map`, not a separate package or a substitute for production implementation.
 
-Start with the shortest complete user workflow, not a tooling-only milestone. `plan-prompts` distinguishes shipped behavior, missing behavior, defects, optional enhancements and process machinery; each blocking prerequisite names its consumer and technical, safety or mandatory repository authority. `milestone-runner` derives the same seven-field purpose capsule from the current plan on resume and in lane handoffs, then requires an observed interaction/result before reporting product completion. Working components, retrieval, historical failures and safety gates remain in scope to preserve.
+Start with the shortest complete user workflow, not a tooling-only milestone. `plan-prompts` sizes the plan to the work, writes acceptance as `Done when <user> can <interaction> and sees <result>`, and moves unsourced checks to suggested follow-ups. `milestone-runner` restates each milestone's GOAL, NON-GOALS and DONE WHEN, does only the work acceptance requires, and treats a reviewed, green, merged milestone with an observed interaction as done.
 
-Both packages use the `2.0.0` output contract. For older goals, reconstruct missing purpose fields only from sufficient current authoritative plan evidence and expose that source; otherwise reconcile the bounded goal/scope/acceptance gap before execution. Missing release metadata blocks release preparation, not unrelated authorized implementation unless release identity is demonstrably required at runtime. Focused behavior/safety proof accompanies each increment; comprehensive installed-product proof belongs at final integration, or immediately when installation is itself the capability. Static conformance and package/adapter checks do not establish live skill effectiveness.
+Both packages use the `3.0.0` contract; 2.x prompts still run. Missing release metadata blocks release preparation only. Static conformance and package/adapter checks do not establish live skill effectiveness.
 
 ---
 
@@ -113,9 +113,9 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [walkthrough](skills/walkthrough/) | Deliver sourced, repeatable procedures for unavoidable human-only operations; keep agent-doable setup and repository onboarding with the agent |
 | [stacked-prs](skills/stacked-prs/)               | Manage dependent branch stacks and stacked pull requests — inspect, split, publish, sync, validate, and record provenance; existing stacks land and clean up through ship-workflow |
 | [pr-explainer](skills/pr-explainer/)             | Explain pushed PRs, whole stacks, or one stack member through source-grounded functional briefings and domain-knowledge updates; not defect review or merge approval |
-| [plan-prompts](skills/plan-prompts/)             | Plan usable vertical increments from repository reality, preserve working behavior and emit source-bound purpose capsules with concrete demonstrations |
+| [plan-prompts](skills/plan-prompts/)             | Plan size-matched vertical increments from repository reality with user-observable acceptance; one prompt for one-PR work, unsourced checks as follow-ups |
 | [decision-map](skills/decision-map/)             | Map unresolved architecture, policy, and scope decisions; use disposable prototypes as decision evidence before implementation planning |
-| [milestone-runner](skills/milestone-runner/)     | Preserve authorized product purpose through design reconciliation, resume and delegation; require demonstrated progress alongside review, CI and merge gates |
+| [milestone-runner](skills/milestone-runner/)     | Run milestones toward the plan's goal with one design check, observed outcome, CI, review and merge; resume from merged-PR evidence |
 | [to-markdown](skills/to-markdown/)               | Convert any file or URL to clean Markdown via MarkItDown — PDF, DOCX, XLSX, PPTX, HTML, images, audio, CSV, JSON, XML, YouTube, EPub                        |
 | [web-fetch](skills/web-fetch/)                   | Web content fetching via curl and WebFetch — replaces the Fetch MCP server with native HTTP operations and jq parsing                                       |
 | [lightpanda-browser](skills/lightpanda-browser/) | Lightweight headless browser automation via Lightpanda + agent-browser CDP — 9x lower memory, 11x faster, for scraping, DOM extraction, and form automation |

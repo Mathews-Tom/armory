@@ -4,23 +4,23 @@ cases:
       Run the milestone prompts in .docs/EXECUTION_PROMPTS.md one after another. For each milestone, after the stack reports GO and external gates pass, merge the stack root-to-leaf and clean merged branches before continuing.
     fixtures: []
     rubric:
-      - "parses EXECUTION_PROMPTS.md and identifies milestone /goal blocks"
-      - "runs dependent milestones sequentially rather than launching the whole file blindly"
-      - "uses external gates such as PR state, CI, verification commands, and review status before advancing"
-      - "merges automatically only after a GO verdict and external gates clear, then cleans verified merged branches"
+      - "restates each milestone's GOAL, NON-GOALS and DONE WHEN from the plan before work"
+      - "runs dependent milestones sequentially after a design check"
+      - "uses external gates such as PR state, CI, verification commands and review before advancing"
+      - "merges root-to-leaf only after gates clear, then cleans verified merged branches"
     trigger_expected: true
     assertions:
       - type: matches_regex
         target: "(EXECUTION_PROMPTS\\.md|/goal|milestone)"
         weight: 0.8
       - type: matches_regex
-        target: "(sequential|one after another|dependency|Depends on)"
+        target: "(DESIGN GO|design check)"
         weight: 0.8
       - type: matches_regex
         target: "(CI|checks|verification|PR state|review)"
         weight: 0.8
       - type: matches_regex
-        target: "(merge|root-to-leaf|GO|NO-GO|cleanup|merged branches)"
+        target: "(merge|root-to-leaf|cleanup|merged branches)"
         weight: 0.7
 
   - id: parallel_independent_milestones
@@ -28,19 +28,19 @@ cases:
       The plan has M2 and M3 with no dependency between them. Run the independent milestone prompts in parallel, but keep the runs isolated and stop the sequence if either one fails.
     fixtures: []
     rubric:
-      - "detects independent milestones from the dependency graph"
-      - "uses isolated worktrees or sessions for concurrent runs"
-      - "halts downstream work if any parallel lane fails"
+      - "runs design checks serially, then launches each milestone in its own worktree"
+      - "requires no dependency and no shared files before running in parallel"
+      - "honors the requested stop: if either lane fails, stops the sequence rather than continuing other work"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(independent|parallel|wave|dependency graph|DAG)"
+        target: "(independent|parallel|shared files)"
         weight: 0.8
       - type: matches_regex
-        target: "(worktree|isolated|separate session|profile)"
+        target: "(worktree|isolated|separate session)"
         weight: 0.8
       - type: matches_regex
-        target: "(fail|halt|stop|downstream)"
+        target: "(fail|stop|dependents)"
         weight: 0.7
 
   - id: merge_stack_and_cleanup
@@ -48,129 +48,120 @@ cases:
       Let's merge the stack for the current milestone. Ensure CI is green for each PR. Once done, clean up all local and remote merged branches.
     fixtures: []
     rubric:
-      - "routes merge-and-clean workflow through stacked PR discipline"
-      - "requires green CI/checks before each merge"
-      - "treats explicit merge request as equivalent to a GO merge decision when gates are green"
+      - "routes merge-and-clean through stacked PR discipline root-to-leaf"
+      - "requires green CI before each merge and rechecks after retargets"
       - "cleans only branches verified as merged"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(merge root|root-to-leaf|stacked-prs|stack order)"
+        target: "(root-to-leaf|stacked-prs)"
         weight: 0.8
       - type: matches_regex
         target: "(CI|checks|green)"
         weight: 0.8
       - type: matches_regex
-        target: "(clean|cleanup|local.*remote|merged branches)"
+        target: "(verified as merged|merged branches)"
         weight: 0.7
 
-  - id: shared_release_train_preparation
+  - id: ci_status_question_is_read_only
     prompt: >
-      M1 and M2 both target release v2.4.0. M1 is merged, but M2 is still open; do not update release artifacts yet.
-      After M2 merges, prepare the release using the repository's VERSION file and CHANGELOG.md, create a reviewed green
-      release-preparation PR, and do not tag or publish because the plan does not require it.
+      Is CI green on the current milestone stack?
     fixtures: []
     rubric:
-      - "defers release preparation while M2 remains unmerged"
-      - "recomputes release-train completion from external merge state"
-      - "hands the cited v2.4.0 target, VERSION and CHANGELOG.md artifacts, and named base to release-captain only after the train completes"
-      - "has release-captain edit and verify VERSION and CHANGELOG.md and publish them through ship-workflow only until the PR exists"
-      - "requires the release-preparation PR to be reviewed, green, and externally merged, then runs post-merge release verification"
-      - "does not tag or publish without an explicit release-train requirement"
+      - "reports CI and gate state for each PR in the stack"
+      - "does not merge, retarget or clean branches without an explicit merge request"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(release train|v2\\.4\\.0|M1|M2)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(unmerged|incomplete|defer|Continue within release train)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(release-captain|release preparation|release-preparation PR)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(VERSION|CHANGELOG\\.md)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(do not tag|do not publish|not.*publish)"
+        target: "(CI|checks|green)"
         weight: 0.8
+      - type: matches_regex
+        target: "(read-only|not merg|no merge|explicit merge)"
+        weight: 0.9
 
-  - id: open_release_pr_is_not_release_completion
+  - id: unavailable_qualification_is_not_a_blocker
     prompt: >
-      Release train v2.6.0 is complete. release-captain updated pyproject.toml and CHANGELOG.md and its
-      ship-workflow run returned COMPLETE at endpoint pr with release PR #88 open and CI pending. Record the
-      release as done and start the next milestone that depends on v2.6.0.
+      Continue the milestone sequence. M1's stack is reviewed, CI is green and the Done when interaction was observed. A note in the
+      previous session suggested paid fresh-model qualification runs before merging, but the plan's acceptance does not list them and
+      no budget was authorized.
     fixtures: []
     rubric:
-      - "treats the open release PR as prepared, not as a completed or merged release"
-      - "keeps v2.6.0 release preparation pending until PR #88 is reviewed, green, and externally merged and post-merge verification passes"
-      - "does not merge PR #88 or advance the dependent milestone as a side effect of the PR-only run"
-      - "does not tag or publish"
-      - "reports ordered NEXT STEPS naming the pending release gate"
-    trigger_expected: true
-
-  - id: failed_release_preparation_isolation
-    prompt: >
-      Release v2.4.0 has completed its train, but its release-preparation PR fails CI. Preserve that branch and PR for remediation,
-      stop v2.4.0 and only milestones whose declared dependency closure includes it, and continue the independent v2.5.0 train
-      in an isolated lane. Do not tag or publish either release without an explicit requirement.
-    fixtures: []
-    rubric:
-      - "marks v2.4.0 release preparation as NO-GO and preserves its branch and PR"
-      - "stops only the affected train and declared dependency-closure consumers"
-      - "permits the independent v2.5.0 train to continue in an isolated lane"
-      - "does not tag or publish without an explicit train requirement"
+      - "treats M1 as done once acceptance, CI, review and the observed interaction pass"
+      - "reports the paid qualification as a suggested follow-up, not a BLOCKED gate"
+      - "does not start paid runs or a validation campaign"
+      - "moves on to merge M1 and the next ready milestone"
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(v2\\.4\\.0|release preparation).*(NO-GO|fail|failed|pending)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(leave.*branch.*PR|preserve.*branch.*PR|intact for remediation)"
+        target: "(follow-up|not (a )?block|out of scope)"
         weight: 0.9
       - type: matches_regex
-        target: "(dependency closure|affected train|independent.*v2\\.5\\.0|isolated lane)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(do not tag|do not publish|not.*publish)"
+        target: "(merge|next milestone|M2)"
         weight: 0.8
 
-  - id: direct_package_fix_over_control_plane
+  - id: resume_status_from_external_evidence
     prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md
-      (source checkout: skills/milestone-runner/evals/fixtures/product-workflow.md),
-      section S03 in full. In read-only decision mode, run the next design decision
-      for the focused skills/example trigger correction from EX-A/EX-P1/EX-E1/EX-O1.
-      Name the actual description correction and established verification, then
-      report implementation eligibility separately from unknown release preparation.
-      Do not edit files, run evaluators or models, launch lanes or mutate git/GitHub.
-    fixtures: ["evals/fixtures/product-workflow.md"]
+      Where are we on the milestone sequence? The plan's checkboxes say M1-M4 are done, but I am not sure that is true. Then continue.
+    fixtures: []
     rubric:
-      - "identifies the wrong grocery trigger and the actual correction to incident-log summarization while preserving unrelated boundaries"
-      - "permits the authorized focused correction and existing evaluator after a current design gate, without claiming an unperformed check or edit"
-      - "keeps the unresolved EX-P1 release field visible and blocks preparation only because no runtime consumer depends on it; invents neither version nor none"
-      - "does not create benchmark, telemetry, dispatcher, dashboard or release-control work"
-      - "reports literal NEXT STEPS with the concrete correction, actual evidence limits and release remediation"
+      - "rebuilds status from merged PRs, CI and current code rather than plan checkboxes"
+      - "reports what the user can do now, what is merged and what remains"
+      - "continues with the next dependency-ready milestone"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(merged PRs|provider|current code|not (from )?checkboxes)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(User can now|can now)"
+        weight: 0.7
+
+  - id: design_drift_handling
+    prompt: >
+      Before running M3, you find the module its prompt names was renamed in M2, and separately M4's prompt would change the user-facing
+      acceptance agreed in the plan. Continue the sequence.
+    fixtures: []
+    rubric:
+      - "treats the rename as small drift: DESIGN GO with a plan update in the stack's first commit"
+      - "treats M4's acceptance change as DESIGN NO-GO and asks the owner"
+      - "continues independent milestones"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(PLAN UPDATE|update the plan)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(DESIGN NO-GO|ask the owner)"
+        weight: 0.9
+
+  - id: green_but_unreachable
+    prompt: >
+      M2's PRs are green and reviewed, but the `report export` command its Done when row promises is not wired into the CLI. Merge it.
+    fixtures: []
+    rubric:
+      - "refuses to call M2 done because the promised interaction is unreachable"
+      - "names the missing command and fixes it before merging"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(not done|unreachable|missing command)"
+        weight: 0.9
+
+  - id: release_after_train_merges
+    prompt: >
+      M1 and M2 both ship in v2.4.0 per the plan. M1 is merged and M2 just merged. Continue.
+    fixtures: []
+    rubric:
+      - "hands the v2.4.0 release to release-captain only after both milestones merged"
+      - "does not tag or publish without explicit plan or owner authority"
     trigger_expected: true
     assertions:
       - type: contains
-        target: "NEXT STEPS"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)incident.log"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)grocer"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(description|trigger).*(correct|replace|restore)|(correct|replace|restore).*(description|trigger)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(existing eval|evaluate_package|established.*verif)"
+        target: "release-captain"
         weight: 0.9
-      - type: matches_regex
-        target: "(?is)release[^\\n]*(unresolved|unknown|missing).*?(prepar|BLOCKED)"
-        weight: 1.0
+      - type: contains
+        target: "v2.4.0"
+        weight: 0.7
 
   - id: negative_generate_plan_prompts
     prompt: >
@@ -187,536 +178,3 @@ cases:
     rubric:
       - "repairing one existing stack is stacked-prs territory, not milestone orchestration"
     trigger_expected: false
-
-  - id: design_reconciliation_before_parallel_wave
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      section S08 Shared authentication drift PT-H1, before deciding M5/M6.
-      The source-checkout path is skills/milestone-runner/evals/fixtures/product-workflow.md.
-      Give read-only decisions for the proposed parallel wave and required
-      reconciliation, including capsule/review freshness. Do not launch lanes,
-      write artifacts, mutate git/GitHub or run models.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "serializes design reconciliation before launching or continuing parallel implementation"
-      - "updates the current and every affected downstream milestone, then rebuilds the DAG and waves"
-      - "requires a reviewed green merged docs-only reconciliation PR before dependent code PRs"
-      - "preserves one canonical ignored history ledger without concurrent writes"
-      - "halts every affected implementation lane and rejects continued scaffolding or partial code work"
-      - "invalidates both affected capsules and comprehension/design evidence when H1 disproves H0, despite green CI and disjoint files"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(design gate|design reconciliation|DESIGN GO|DESIGN NO-GO)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(serial|sequential|before.*parallel|rebuild.*DAG|reload.*plan)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(docs-only|reconciliation.*PR|reviewed.*green)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(history.*canonical|single.*history|concurrent.*write)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(halt all|stop all|no.*scaffolding|do not.*continue.*code)"
-        weight: 0.9
-
-  - id: missing_ignored_history_reconstruction
-    prompt: >
-      Start M5 in a fresh worktree where the gitignored
-      .docs/DEVELOPMENT_PLAN_HISTORY.md is absent. The committed plan and prompts, merged
-      predecessor PRs, CI evidence, and current codebase are available. Reconstruct the required
-      design context and decide whether implementation may begin.
-    fixtures: []
-    rubric:
-      - "does not treat a missing ignored ledger as authoritative plan loss"
-      - "reconstructs design evidence from committed artifacts, merged predecessors, CI, and current code"
-      - "restores the local ledger after evidence is verified"
-      - "blocks implementation when reconciliation finds plan drift"
-    trigger_expected: true
-    assertions:
-      - type: contains
-        target: ".docs/DEVELOPMENT_PLAN_HISTORY.md"
-        weight: 1.0
-      - type: matches_regex
-        target: "(merged PR|CI|current codebase|committed plan)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(reconstruct|restore|regenerate)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(block|DESIGN NO-GO|drift)"
-        weight: 0.8
-
-  - id: isolated_lane_execution_and_verification
-    prompt: >
-      M7 and M8 are independent and ready. Gather each design gate's evidence without filling this
-      session with predecessor diffs and CI logs, run both implementations concurrently, and confirm
-      the merge gates without trusting either lane's own completion report.
-    fixtures: []
-    rubric:
-      - "collects design-gate evidence in dedicated read-only subagents while keeping verdicts and ledger appends serialized in the canonical session"
-      - "launches each implementation as an independent session in its own worktree with absolute paths"
-      - "verifies merge gates through a context that did not implement the milestone"
-      - "requires cited evidence rather than a lane's self-reported success"
-      - "keeps merge, rebase, retarget, cleanup, and release commands in the canonical session"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(subagent|isolated lane|evidence lane)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(worktree|independent session|claude -p)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(serial|canonical session|one writer|single writer)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(did not implement|independent verification|not.*self-report|unverified)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(cited evidence|citation|exact output|check conclusion)"
-        weight: 0.8
-
-  - id: overlapping_parallel_milestones
-    prompt: >
-      M5 and M6 have no dependency edge and both report DESIGN GO, but their reconciled plans
-      modify the same authentication files. Run them in parallel anyway unless an explicit
-      exception is required.
-    fixtures: []
-    rubric:
-      - "detects file overlap after reconciliation before launching the implementation wave"
-      - "runs overlapping milestones sequentially unless the user explicitly accepts conflict risk"
-      - "does not treat dependency independence as sufficient parallel-safety evidence"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(overlap|same files|shared files|file conflict)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(sequential|serialize|one at a time)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(explicit.*accept|user.*accept|conflict risk)"
-        weight: 0.8
-
-  - id: terminal_next_steps_handoff
-    prompt: >
-      M4 is NO-GO because migration verification fails. M5 shares M4's v3.1.0 release train and
-      depends on M4. M6 is dependency-independent and targets v3.2.0. Report the required
-      terminal next steps without tagging or publishing.
-    fixtures: []
-    rubric:
-      - "reports an ordered NEXT STEPS handoff after the NO-GO verdict"
-      - "names migration remediation and a retry gate"
-      - "blocks dependent M5 and v3.1.0 release preparation"
-      - "permits only independent M6 to proceed and explicitly identifies the skip"
-      - "does not tag or publish"
-    trigger_expected: true
-    assertions:
-      - type: contains
-        target: "NEXT STEPS"
-        weight: 1.0
-      - type: matches_regex
-        target: "(migration|verification).*(remediat|retry|fix)|(remediat|retry|fix).*(migration|verification)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(M5|dependent|blocked)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(M6|independent|SKIP.*RUN)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(release preparation|RELEASE PREP|deferred|blocked)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(do not tag|do not publish|not.*publish)"
-        weight: 0.8
-
-  - id: opt_in_canonical_per_pr_issue_tracking
-    prompt: >
-      Run M3 with ISSUE_TRACKING=on in its prompt and two planned PRs. The current
-      design gate is GO. This is a resume: one issue already has the stable marker
-      for PR-1, but that issue is closed and no mapped PR has merged into its intended
-      base. Matching work-type labels exist. PR-2 will target PR-1's non-default stack
-      branch. Ensure each PR has its own tracking issue before its branch, without
-      duplicates or private plan content. Explain later design NO-GO, retargeting,
-      and merge outcomes, and how completed closed matches differ from pending work.
-    fixtures: []
-    rubric:
-      - "keeps tracking opt-in and default-off; only the canonical runner mutates issues"
-      - "searches open and closed issues by exact stable marker, reopens PR-1's pending closed match with one public-safe comment, and creates only PR-2's missing issue; a completed closed match is reused without reopening"
-      - "creates or reuses one issue per planned PR after DESIGN GO and before its branch"
-      - "applies existing matching labels without creating labels; requires Tracks linkage in every PR body and Closes when default-targeting, with canonical closure after default-branch integration and verified acceptance"
-      - "comments public-safe design NO-GO and observed PR merge outcomes idempotently"
-      - "excludes private plan content, local paths, and ignored-file references from titles, bodies, and comments"
-      - "passes issue mappings to lanes without authorizing them to create or edit issues"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)(default[^\\n]*off|off[^\\n]*default)"
-        weight: 0.8
-      - type: matches_regex
-        target: "(?i)canonical[^\\n]*(issue|mutat)|(issue|mutat)[^\\n]*canonical"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(?:(open.*closed|closed.*open).*marker|marker.*(open.*closed|closed.*open))"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)reus[^\\n]*(PR-1|existing|match)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)DESIGN GO.*(create|reuse).*before[^\\n]*branch"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(each|per|one)[^\\n]*(planned PR|PR.*issue|issue.*PR)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(existing|matching)[^\\n]*label"
-        weight: 0.8
-      - type: matches_regex
-        target: "Closes #"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(comment.*NO-GO|NO-GO.*comment)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?is)(comment.*merge|merge.*comment)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)(public.safe|private plan|local paths|ignored.file)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)(lane|subagent)[^\\n]*(never|not|no)[^\\n]*(creat|edit|mutat)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)reopen[^\\n]*PR-1|PR-1[^\\n]*reopen"
-        weight: 1.0
-      - type: matches_regex
-        target: "Tracks #"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)default.branch.*acceptance|acceptance.*default.branch"
-        weight: 1.0
-
-  - id: tracking_absent_or_off_has_no_issue_mutations
-    prompt: >
-      Run independent M2 and M3 sequentially. M2 has no ISSUE_TRACKING setting;
-      M3 explicitly has ISSUE_TRACKING=off. No user override enables tracking.
-      Report only actions you will execute, without examples of disabled commands.
-    fixtures: []
-    rubric:
-      - "performs no issue creation, editing, labeling, closure, or comments for either milestone"
-      - "continues normal design and implementation gates without adding issue prerequisites"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)(no|zero)[^\\n]*issue[^\\n]*mutat|issue tracking[^\\n]*off"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue create"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue edit"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue comment"
-        weight: 1.0
-      - type: not_contains
-        target: "gh issue close"
-        weight: 1.0
-
-  - id: tracking_uncertain_create_and_marker_conflict
-    prompt: >
-      M4 has tracking enabled and current DESIGN GO. Creating PR-1's issue timed
-      out without a definitive response. A subsequent complete lookup finds one
-      exact marker match. The repository has no matching labels. PR-2's lookup
-      returns two issues with its exact marker. Give the next actions for each
-      PR and whether either branch may be created.
-    fixtures: []
-    rubric:
-      - "repeats complete paginated open and closed exact-marker lookup before retrying an uncertain create"
-      - "reuses PR-1's single match without issuing another create and leaves it unlabeled"
-      - "blocks PR-2 before branching because duplicate markers require canonical resolution"
-      - "does not create labels or silently turn tracking off"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?is)(uncertain|timed out|timeout).*look.?up.*(open.*closed|closed.*open)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)PR-1[^\\n]*reus|reus[^\\n]*PR-1"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(unlabeled|without[^\\n]*label)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)PR-2[^\\n]*(block|stop)|(?:block|stop)[^\\n]*PR-2"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(duplicate|two|multiple)[^\\n]*marker"
-        weight: 1.0
-      - type: not_contains
-        target: "gh label create"
-        weight: 1.0
-
-  - id: tracking_revision_sync_and_reproducible_keys
-    prompt: >
-      Tracking is enabled by user override on an old M5 prompt without issue keys.
-      Its repository, milestone title and ID, ordered PR positions, and first planned
-      commit subjects are authoritative. The ignored ledger is missing. Design
-      reconciliation is required for a second time after the first reconciliation
-      PR merged, and a closed reconcile-1 issue exists in repository history. The
-      revised plan removes one product PR, reorders surviving PRs, and changes a
-      surviving PR's first commit subject and acceptance. Explain issue actions
-      now and after PLAN REVISION none, including a lane that later needs an extra PR.
-    fixtures: []
-    rubric:
-      - "creates only the second ordinal reconciliation issue now and defers product-PR issues until the no-revision gate"
-      - "derives fallback keys only when no keys are present, deterministically from pre-revision authoritative content; reconciliation writes in-use plan/milestone/PR keys into revised issue slots and preserves surviving work's keys rather than recomputing them by the new positions or subjects"
-      - "rewrites reused issue titles/bodies preserving markers and comments/closes removed-key issues as superseded"
-      - "tells lanes that the runner owns the milestone, they are not the canonical owner, they must use the provided mapping, and they may not create/edit/comment/label/close issues; they stop/report extra PRs before branching"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)reconcile-2"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(defer|only after)[^\\n]*product.*PLAN REVISION[^\\n]*none"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(deterministic|SHA-?256).*(repository|owner/name).*(title).*(position).*(commit subject)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(rewrit|updat)[^\\n]*(title|body)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)comment.*clos.*superseded"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(extra|another) PR.*stop.*report.*before[^\\n]*branch"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(writ|persist)[^\\n]*(key|identit)[^\\n]*(prompt|slot)|(?:prompt|slot)[^\\n]*(persist|in.use)[^\\n]*key"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(preserv|retain)[^\\n]*(surviv|key)|surviv[^\\n]*(preserv|retain)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(lane|you)[^\\n]*not[^\\n]*canonical owner"
-        weight: 1.0
-
-  - id: resume_product_capsule_and_lane_handoff
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md
-      (source checkout: skills/milestone-runner/evals/fixtures/product-workflow.md),
-      shared PT-A/PT-P1/PT-E1/PT-O1 and S04. Resume M2 in read-only
-      decision/handoff mode without conversation or the ignored ledger. Render
-      the seven-field capsule and complete lane-visible contract, identify actual
-      predecessor progress and remaining workflow, and give the next design action.
-      Also read the S01 → S04 → S06 continuity protocol: use actual supplied S01
-      artifacts for that variant, or name their absence without substituting PT-P1.
-      Do not launch implementation, write files, run checks/models or mutate git/GitHub.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "derives all seven populated fields from current PT-A/PT-P1/PT-E1 with inspected source/revision, not a separate store or conversation"
-      - "reports only add/list and preserved-write predecessor observations; show/full output and installed integration remain unobserved"
-      - "handoff includes preservation, non-goals, source revision, focused proof stage, issue tracking off and canonical-only authority/topology/ledger/issues"
-      - "requires current design review before launch without claiming an independent review happened in this exercise"
-      - "continuity variant retains actual S01 artifacts and TASK-1 purpose when supplied; missing artifacts are named, not replaced with Pocket Tasks or invented output"
-      - "prints literal NEXT STEPS with current action, release state and remaining workflow"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?s)PRODUCT OUTCOME:.*SHORTEST COMPLETE WORKFLOW:.*THIS MILESTONE'S CONTRIBUTION:.*WORKING BEHAVIOR AND SAFETY TO PRESERVE:.*NON-GOALS:.*DEMONSTRATION AND EXPECTED RESULT:.*AUTHORITATIVE SOURCE / REVISION:"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)PT-P1"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(show|installed).*?(remain|missing|unobserved|pending)"
-        weight: 0.9
-      - type: contains
-        target: "NEXT STEPS:"
-        weight: 1.0
-
-  - id: shortest_workflow_preserves_safety_prerequisites
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      shared target and both independent S05 variants PT-T1/PT-D1. The source path
-      is skills/milestone-runner/evals/fixtures/product-workflow.md. In read-only
-      mode decide whether simplifying the shortest workflow permits either unsafe
-      path to ship; name affected consumers, concrete repair/proof and unrelated
-      safe work. Do not execute changes, migrations, checks, models or git/GitHub.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "blocks tenant-crossing lookup until authenticated tenant context and Store predicate prevent blue from reading Red secret"
-      - "blocks irreversible migration on failed preservation, missing backup/restore proof and mandatory explicit human approval, retaining the 10-to-9 failure"
-      - "names each actual technical/safety/mandatory-rule consumer and affected closure, preserving unrelated safe M4 with its own current GO"
-      - "does not mistake optional color/metrics machinery or unknown release identity for a blanket safety dependency"
-      - "does not waive first-use safety, approval, historical evidence or data ownership to simplify the workflow"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?is)(tenant|authoriz).*?(block|NO-GO|stop)|(block|NO-GO|stop).*?(tenant|authoriz)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(backup|restore|rollback)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(human|explicit).*approv"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)M4"
-        weight: 0.9
-
-  - id: green_but_unreachable_is_not_complete
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      shared PT-A/PT-P1/PT-E1 and S06 before deciding the lane's request to mark M2
-      complete. Source path: skills/milestone-runner/evals/fixtures/product-workflow.md.
-      Give a read-only completion decision, actual user progress/interaction/result,
-      remaining workflow and bounded next actions. Do not write, merge, launch,
-      run commands/models or mutate git/GitHub.
-      Also inspect the continuity protocol's tasks-list variant against actual S01
-      artifacts if supplied; otherwise report that missing input, not a flow pass.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "rejects M2 completion despite green checks, GO, review and open PR because pocket show is unreachable"
-      - "identifies missing cli-to-Store.get-to-render interaction and expected complete title/note, without inventing a cloud/dashboard destination"
-      - "separates observed add/list progress and unknown-command failure from unobserved M2, post-merge and installed proof"
-      - "requires repair or bounded tracked-plan reconciliation within independent PT-A authority; cannot silently retire acceptance"
-      - "prints literal NEXT STEPS with current repair/retry gate, release state and dependent M3 status"
-      - "continuity variant rejects missing tasks list under TASK-1 and preserves partial add progress; never reports S01-to-S06 qualification without supplied actual artifacts"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)(NO-GO|not complete|reject.*complet|cannot.*complet)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(pocket show|unknown command show)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(title|note)"
-        weight: 0.9
-      - type: contains
-        target: "NEXT STEPS:"
-        weight: 1.0
-
-  - id: operator_workflow_and_justified_prerequisite
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      S07 Config Apply CA-A/CA-P1/CA-E1/CA-O1. Source checkout:
-      skills/milestone-runner/evals/fixtures/product-workflow.md. Give read-only
-      design-readiness decisions for M1 schema and its M2 operator-command consumer.
-      Name technical/safety authority, why they cannot combine and evidence still
-      owed. Do not apply configuration, run checks/models or mutate files/git/GitHub.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "recognizes configctl validate/apply as useful operator product behavior without demanding a GUI"
-      - "permits prerequisite-only M1 only on concrete signed-ABI dependency, named M2 consumer and appliance sign-off/access separation"
-      - "does not claim signed v3 acceptance or delivered commands from the supplied v2/prototype observations"
-      - "retains unsupported-key rejection, bounded writes, confirmation, snapshots and restore proof at first use"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)configctl"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(signed|signature|ABI-3)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(M1|schema).*?(M2|consumer)"
-        weight: 0.9
-
-  - id: cold_reader_rejects_clear_wrong_goal
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      independent PT-A plus S08 Clear but wrong destination PT-C1/PT-CE1.
-      Source path: skills/milestone-runner/evals/fixtures/product-workflow.md.
-      As a cold reader, reconstruct the proposed workflow and compare it with
-      independently authorized requirements, then decide design readiness and
-      bounded reconciliation. Do not accept author rationale or launch/write/run
-      anything, mutate git/GitHub or claim an actual independent reviewer ran.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "understands the proposed account/upload/cloud dashboard workflow but rejects it against offline local PT-A"
-      - "flags unauthorized network, Store replacement and changed data ownership despite clear artifacts and green CI"
-      - "treats goal/scope/acceptance mismatch as material within the existing design gate, not optional nits or a third gate"
-      - "requires bounded reconciliation of both tracked artifacts under canonical ownership and current external gates; no invented replacement authority or unbounded review loop"
-      - "keeps review isolation/evidence honest and invalidates affected capsule/review/design results"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)PT-A"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)(cloud|upload).*?(offline|local)|(offline|local).*?(cloud|upload)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(DESIGN NO-GO|not ready|reconcil|mismatch)"
-        weight: 1.0
-
-  - id: old_prompt_reconstruction_and_review_freshness
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      shared documents and all three independent S09 variants: sufficient PT-OLD1,
-      insufficient PT-THIN1 and revised PT-P2/PT-E2/PT-A2. Source checkout:
-      skills/milestone-runner/evals/fixtures/product-workflow.md. Give separate
-      read-only launch decisions. Render the sufficient variant's complete capsule
-      and lane contract, name missing authority in the thin variant, and identify
-      stale fields/reviews and exact affected rechecks for the revision.
-      No writes, launches, checks/models or git/GitHub mutations.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "reconstructs all seven populated fields for PT-OLD1 from current sufficient authority and exposes source identities before any launch"
-      - "does not block a sufficient old prompt solely because capsule labels are absent or require bulk prompt migration"
-      - "blocks PT-THIN1 for bounded authoritative goal/scope/acceptance and preservation/interface clarification, not guessing from probably cloud"
-      - "invalidates affected capsule, prior comprehension/design and downstream evidence after PT-P2/PT-E2, rechecking privacy redaction and --include-note acceptance"
-      - "does not call an author's reread independent or invent a third gate; unresolved material findings escalate without indefinite review"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?s)PRODUCT OUTCOME:.*SHORTEST COMPLETE WORKFLOW:.*THIS MILESTONE'S CONTRIBUTION:.*WORKING BEHAVIOR AND SAFETY TO PRESERVE:.*NON-GOALS:.*DEMONSTRATION AND EXPECTED RESULT:.*AUTHORITATIVE SOURCE / REVISION:"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?is)PT-THIN1.*?(block|NO-GO|reconcil)|(block|NO-GO|reconcil).*?PT-THIN1"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(invalidat|stale|recheck|repeat)"
-        weight: 1.0
-      - type: contains
-        target: "--include-note"
-        weight: 0.9
-
-  - id: staged_interaction_and_clean_install_proof
-    prompt: >
-      Read this milestone-runner package's evals/fixtures/product-workflow.md,
-      shared PT-A/PT-P1/PT-E1 and all S10 observations. Source checkout:
-      skills/milestone-runner/evals/fixtures/product-workflow.md. Give separate
-      read-only acceptance decisions for ordinary M2, final M3 integration and
-      early installation capability M2-I. State observed interaction/safety evidence
-      and exact missing proof at each stage. Do not execute installation, tests,
-      commands, models, file changes or git/GitHub operations.
-    fixtures: ["evals/fixtures/product-workflow.md"]
-    rubric:
-      - "recognizes ordinary M2 focused full-output/unknown-ID/no-mutation proof and applicable CI while retaining review/merge/post-merge gates"
-      - "does not demand comprehensive installed campaigns before unrelated ordinary behavior, but final M3 cannot complete without clean installed full workflow and safety proof"
-      - "requires immediate clean-environment install/run repair and proof for M2-I after pocket.render import failure instead of deferring to M3"
-      - "does not suppress the import failure, use a fake fallback or equate source tests/archive/static fixture output with observed installed behavior"
-      - "reports distinct proof states and literal NEXT STEPS without fabricating execution"
-    trigger_expected: true
-    assertions:
-      - type: matches_regex
-        target: "(?i)(focused|ordinary|increment)"
-        weight: 0.9
-      - type: matches_regex
-        target: "(?i)(clean|installed|installation)"
-        weight: 1.0
-      - type: matches_regex
-        target: "(?i)(pocket\\.render|ModuleNotFoundError)"
-        weight: 1.0
-      - type: contains
-        target: "NEXT STEPS:"
-        weight: 1.0
