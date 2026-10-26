@@ -5,10 +5,11 @@
 ### BREAKING — Judicious, size-matched planning
 
 - New "Be judicious" contract: report a size class (small, medium, large) before writing. A change that fits in one PR gets a single ≤200-word `/goal` in chat and no plan files; medium and large plans cap each prompt at 600 words.
+- Small-class prompts trace to the request and repository rules and carry no plan-file references.
 - Every check, gate and deliverable must trace to a source, owner constraint or repository rule. Unsourced hardening, qualification runs, paid validation, extra review rounds, benchmarks, dashboards and docs move to `Suggested follow-ups`, never acceptance.
 - Acceptance is written as `Done when <user> can <interaction> and sees <result>` plus checks that can run inside the milestone. Optional evidence can no longer leave a milestone `BLOCKED` or pending.
 - Removed: the seven-field purpose capsule (replaced by GOAL / PRESERVE / NON-GOALS lines), the `.docs/DEVELOPMENT_PLAN_HISTORY.md` ledger, docs-only reconciliation PRs (small drift is fixed in the stack's first commit; outcome or acceptance changes go to the owner), opt-in per-PR issue tracking, the five-way reality classification table, release-train tables (a release is prepared once after its milestones merge) and the mandatory fresh-context audit (one optional `plan-review` pass).
-- `SKILL.md` reduced from 4,488 to about 1,590 words.
+- `SKILL.md` reduced from 4,488 to about 1,630 words.
 
 ### Migration
 

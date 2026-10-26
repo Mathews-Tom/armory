@@ -33,8 +33,8 @@ The plan's goal is the destination. Every action must move a user closer to the 
 | --- | --- | --- |
 | Sequential | "run milestones", "one after another" | Default. Run the next dependency-ready milestone through the loop below, merge, continue. |
 | Parallel | "run independent milestones in parallel" | Only for milestones with no dependency and no shared files. Run design checks serially, then launch each in its own worktree. |
-| Resume / status | "continue the milestone sequence", "where are we" | Rebuild state from the plan, merged PRs, CI and current code, not from checkboxes or notes. Report what the user can do now, what is merged, what remains, then continue with the next ready milestone. |
-| Merge and clean | "merge the stack", "ensure CI is green" | Verify gates, merge root-to-leaf, clean merged branches, check release readiness. |
+| Resume / status | "continue the milestone sequence", "where are we", "is CI green" | Rebuild state from the plan, merged PRs, CI and current code, not from checkboxes or notes. Report what the user can do now, what is merged, what remains. Continue with the next ready milestone only when asked to continue; a status or CI question is read-only. |
+| Merge and clean | "merge the stack", "merge and clean up" | Requires an explicit merge request. Verify gates, merge root-to-leaf, clean merged branches, check release readiness. |
 
 ## Milestone loop
 

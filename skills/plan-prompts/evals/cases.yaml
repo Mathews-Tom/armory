@@ -54,7 +54,7 @@ cases:
     fixtures: []
     rubric:
       - "classifies the request as the small size class because it fits in one PR"
-      - "returns a single /goal prompt of about 200 words in chat and writes no plan files"
+      - "returns a single /goal prompt of about 200 words in chat, writes no plan files and references no plan file or plan section"
       - "acceptance is a user-observable Done when row plus the repo's existing checks; no added review rounds or qualification"
     trigger_expected: true
     assertions:

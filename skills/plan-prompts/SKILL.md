@@ -112,7 +112,9 @@ Rules:
 
 ### Phase 2 — Write execution prompts
 
-One `/goal` per milestone, ≤600 words (≤200 for the small size class). Trace every line to the plan. Do not copy plan prose into the prompt.
+One `/goal` per milestone, ≤600 words, traced to the plan. Do not copy plan prose into the prompt.
+
+For the small size class there is no plan: write one `/goal` of ≤200 words traced to the request and repository rules. Use the milestone block below without the file header, global rules or any plan-file reference; `CONTEXT` names the request and the repo, and the `/goal` line states the change in one PR.
 
 ```markdown
 # Execution Prompts — <System>
