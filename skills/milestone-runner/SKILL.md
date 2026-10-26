@@ -2,7 +2,7 @@
 name: milestone-runner
 description: 'Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design. Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.'
 metadata:
-  version: 3.0.0
+  version: 3.0.1
   category: development
   tags: [milestones, orchestration, adaptive-planning, stacked-prs, ci, release-management, execution-prompts, subagents]
   difficulty: advanced
@@ -15,7 +15,7 @@ metadata:
 
 # Milestone Runner
 
-Run the milestones in `.docs/EXECUTION_PROMPTS.md` (or an explicit authorized path) until each one's user-visible outcome works, is reviewed, green and merged. The runner executes the plan; it does not author a new one. It uses `stacked-prs` for stack topology and hands completed release trains to the `release-captain` agent.
+Run the milestones in `.docs/EXECUTION_PROMPTS.md` (or an explicit authorized path) until each one's user-visible outcome works, is reviewed, green and merged. The runner executes the plan; it does not author a new one. It uses `stacked-prs` for stack topology, `ship-workflow` to land and clean up PRs, and hands completed release trains to the `release-captain` agent.
 
 ## Stay on the goal
 
@@ -34,7 +34,7 @@ The plan's goal is the destination. Every action must move a user closer to the 
 | Sequential | "run milestones", "one after another" | Default. Run the next dependency-ready milestone through the loop below, merge, continue. |
 | Parallel | "run independent milestones in parallel" | Only for milestones with no dependency and no shared files. Run design checks serially, then launch each in its own worktree. |
 | Resume / status | "continue the milestone sequence", "where are we", "is CI green" | Rebuild state from the plan, merged and open PRs with their branches, CI and current code, not from checkboxes or notes. Resume in-progress PRs instead of duplicating them. Report what the user can do now, what is merged, what is open, what remains. Continue with the next ready milestone only when asked to continue; a status or CI question is read-only. |
-| Merge and clean | "merge the stack", "merge and clean up" | Requires an explicit merge request. Verify gates, merge root-to-leaf, clean merged branches, check release readiness. |
+| Merge and clean | "merge the stack", "merge and clean up" | Requires an explicit merge request. Verify gates, delegate landing and cleanup to `ship-workflow` (step 5), check release readiness. |
 
 ## Milestone loop
 
@@ -89,9 +89,9 @@ A failed gate stops that milestone and its dependents; other independent milesto
 
 ### 5. Merge and record
 
-1. Merge with `stacked-prs` root-to-leaf; recheck CI after each retarget.
-2. Clean only branches verified as merged.
-3. Re-run the milestone's interaction on the merged base.
+1. Delegate landing to `ship-workflow`; never merge, retarget, restack or delete branches by hand. For a single PR, run it with `--pr N`. For a stack, have `stacked-prs` author its stack decision packet selecting this milestone's PRs, then run `ship-workflow` with `--stack-plan`. Use `--until merged` for "merge"; the default `clean` endpoint also removes branches it proves merged.
+2. Relay its status, confirmed merges and cleanup. Continue only on `COMPLETE`. `WAITING` means landing is pending: resume its returned run (`--resume RUN_ID`) before any merged-base check or dependent work. `NEEDS_JUDGMENT` or `BLOCKED` stops this milestone and its dependents until the named decision or prerequisite is resolved.
+3. After `COMPLETE`, re-run the milestone's interaction on the merged base.
 4. Recompute the dependency table; continue with the next ready milestone.
 
 ### 6. Release
@@ -132,7 +132,7 @@ For merge-and-clean requests, also report each PR's base, pre-merge CI, merge re
 | Merge conflict | Resolve through `stacked-prs`; do not launch dependent work. |
 | Promised interaction unreachable despite green checks | Not done; name the missing command/route and fix it. |
 | A check needs unavailable credentials, spend or human review | Report it as a follow-up or owner gate; do not block unrelated progress or start a validation campaign. |
-| `release-captain` or `ship-workflow` missing when a release is due | Report release preparation blocked; do not edit release artifacts by hand. |
+| `ship-workflow` missing when landing, or `release-captain`/`ship-workflow` missing when a release is due | Stop that landing or release preparation as blocked; never merge, clean up or edit release artifacts by hand. |
 | A lane merged, rebased, cleaned branches or edited the plan | Stop it, restore unauthorized local writes, re-derive state from the provider. |
 
 ## Before yielding
@@ -141,5 +141,5 @@ For merge-and-clean requests, also report each PR's base, pre-merge CI, merge re
 - No code began before `DESIGN GO`; no dependent milestone advanced past a failed gate.
 - Every completed milestone shows an observed interaction, green CI, review and merge.
 - No work was added beyond acceptance; extras are listed as follow-ups.
-- Only merged branches were cleaned.
+- Landing and cleanup ran through `ship-workflow`; only branches it proved merged were removed.
 - The literal `NEXT STEPS:` block is present.

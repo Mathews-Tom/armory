@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1 — 2026-10-26
+
+### Fixed
+
+- Landing, retargeting and cleanup are delegated to `ship-workflow` (`--pr N` for one PR, or `--stack-plan` from a `stacked-prs` stack decision packet), matching the ownership contract in `stacked-prs` and `ship-workflow`. The runner no longer merges or deletes branches by hand, and a missing `ship-workflow` blocks landing. It continues only on `COMPLETE`; `WAITING` resumes the returned run before merged-base checks or dependent work.
+
 ## 3.0.0 — 2026-10-26
 
 ### BREAKING — Goal-bound execution without process inflation

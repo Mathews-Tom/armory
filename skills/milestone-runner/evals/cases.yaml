@@ -48,13 +48,16 @@ cases:
       Let's merge the stack for the current milestone. Ensure CI is green for each PR. Once done, clean up all local and remote merged branches.
     fixtures: []
     rubric:
-      - "routes merge-and-clean through stacked PR discipline root-to-leaf"
-      - "requires green CI before each merge and rechecks after retargets"
-      - "cleans only branches verified as merged"
+      - "delegates landing, retargeting and cleanup to ship-workflow using a stacked-prs stack decision packet; no hand-run merges or branch deletions"
+      - "requires green CI before landing"
+      - "removes only branches ship-workflow proved merged"
     trigger_expected: true
     assertions:
+      - type: contains
+        target: "ship-workflow"
+        weight: 0.9
       - type: matches_regex
-        target: "(root-to-leaf|stacked-prs)"
+        target: "(stack decision packet|--stack-plan|stacked-prs)"
         weight: 0.8
       - type: matches_regex
         target: "(CI|checks|green)"
