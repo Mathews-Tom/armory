@@ -1,7 +1,7 @@
 # armory
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![packages: 156](https://img.shields.io/badge/packages-156-informational)](manifest.yaml)
+[![packages: 157](https://img.shields.io/badge/packages-157-informational)](manifest.yaml)
 [![evals: 100%](https://img.shields.io/badge/eval_coverage-100%25-success)](skills/)
 [![GitHub stars](https://img.shields.io/github/stars/Mathews-Tom/armory?style=social)](https://github.com/Mathews-Tom/armory/stargazers)
 [![catalog](https://img.shields.io/badge/catalog-browse_packages-58a6ff)](https://mathews-tom.github.io/armory/)
@@ -48,7 +48,7 @@ Both packages use the `3.0.0` contract; 2.x prompts still run. Missing release m
 
 ## Package Catalog
 
-156 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
+157 package definitions across seven prompt/automation types and the optional native extension type. This is an unversioned rolling catalog; individual packages carry their own versions.
 
 ### Agents — Orchestrators
 
@@ -144,6 +144,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [architecture-reviewer](skills/architecture-reviewer/) | Architecture reviews across 7 scored dimensions — structural integrity, scalability, security, performance, enterprise readiness, operations, data  |
 | [codebase-advisor](skills/codebase-advisor/)           | Senior repo advisor — audits codebase evidence, vets findings, and writes self-contained implementation plans for executor agents                   |
 | [code-refiner](skills/code-refiner/)                   | Deep code simplification and refactoring — structural complexity analysis, anti-pattern detection, idiomatic rewrites across Python, Go, TS, Rust   |
+| [module-deepening](skills/module-deepening/)           | Find shallow modules worth deepening (offline HTML report) or design one module's interface several ways; one question at a time, stops at a decision, never edits code |
 | [citation-audit](skills/citation-audit/)               | Citation verification for manuscripts — checks that references are real, correctly attributed, and accurately described                              |
 | [figure-rhetoric](skills/figure-rhetoric/)             | Figure and plot communication audit — evaluates whether visuals support the claims they are meant to carry                                      |
 | [figure-table-quality](skills/figure-table-quality/)   | Figure and table rendering audit — checks readability, label collisions, accessibility, formatting, and consistency                              |
