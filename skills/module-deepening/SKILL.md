@@ -2,7 +2,7 @@
 name: module-deepening
 description: 'Use when looking for shallow modules worth deepening, deciding where a seam belongs, or designing a chosen module''s interface several ways before refactoring. Scan mode renders candidates as an offline HTML report; design mode compares alternative interfaces and recommends one. Asks one question at a time, stops at an agreed decision and never edits code. Triggers on: "find deepening opportunities", "shallow modules", "where should the seam go", "design it twice", "deepen this module", "make this testable through its interface", "AI-navigable codebase". NOT for scored multi-dimension architecture reviews, use architecture-reviewer. NOT for improvement plan backlogs, use codebase-advisor. NOT for local simplification, use code-refiner or /refactor. NOT for domain terminology, use domain-modeling.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: review
   tags: [architecture, deep-modules, seams, testability, interface-design]
   difficulty: advanced
@@ -39,7 +39,7 @@ This skill decides. It does not implement. Every session ends at an agreed decis
 - **Domain language.** Read the project's domain context: `docs/agents/domain.md` when present (it routes to the authoritative files), then `CONTEXT.md` or `CONTEXT-MAP.md` and the context-local `CONTEXT.md` for the area in scope. Name modules after those concepts: "the Order intake module", not "the FooBarHandler" and not "the Order service". If no domain context exists, say so once and use the names the code already uses.
 - **Decisions already made.** Read ADRs that touch the area, following the lookup route in `docs/agents/domain.md` or the repository's existing ADR directory. Do not re-litigate them unless the friction is real enough to warrant reopening (see the report's ADR callout rule).
 - **Sub-agents.** Exploration and design-it-twice use sub-agents when the harness provides them (for example Claude Code's Task tool with a read-only exploration agent). Without them, follow each reference's sequential fallback and say which path ran.
-- **Git.** Scan mode uses `git log` to find hot spots. Outside a git repository, ask the user for a direction instead.
+- **Git.** Scan mode uses `git log` to find hot spots. Outside a git repository, ask the user for a direction, scan those files without history and record that hot-spot evidence is unavailable.
 
 ## Interaction Contract (both modes)
 
@@ -58,7 +58,7 @@ This skill decides. It does not implement. Every session ends at an agreed decis
 
 ### Scan mode
 
-1. **Scope before you scan (YAGNI).** Deepening pays off by making future change easier, so weight what changes. If the user named a direction, it is the scope; run `git log --oneline -n 200 --name-only -- <paths in that direction>` only to find the hot spots inside it. Otherwise run `git log --oneline -n 200 --name-only` over the whole repository (widen the window if the history is short or scattered) and list the files and directories that keep recurring. Record the scope, the hot spots you chose and why.
+1. **Scope before you scan (YAGNI).** Deepening pays off by making future change easier, so weight what changes. If the user named a direction, it is the scope; run `git log --oneline -n 200 --name-only -- <paths in that direction>` only to find the hot spots inside it. Otherwise run `git log --oneline -n 200 --name-only` over the whole repository (widen the window if the history is short or scattered) and list the files and directories that keep recurring. Outside a git repository, skip `git log` entirely: scope to the direction the user gave (ask for one if they gave none), inspect those files directly and record "hot-spot evidence unavailable: not a git repository". Record the scope, the hot spots you chose (or why there are none) and why.
 2. **Read the context.** Domain files and ADRs for the scoped area, as in Prerequisites. Note the domain terms that will name candidates.
 3. **Explore.** Spawn a read-only exploration sub-agent with the scope, the vocabulary terms and these prompts; without sub-agents, explore directly. Explore organically and note friction:
    - Where does understanding one concept require bouncing between many small modules?
@@ -74,6 +74,8 @@ This skill decides. It does not implement. Every session ends at an agreed decis
 
 **Scan is complete when** the report exists at a printed absolute path, every card carries every required field, the top recommendation names one candidate, and the user has been asked to pick. A candidate list in chat without the report is not completion.
 
+**Zero candidates is also a complete scan.** If nothing passes the deletion test, write the report with the scope and every module examined, each with the reason it was dropped, and no cards or top recommendation. Print its path, say no deepening candidate was found, and stop: skip steps 7–8 and do not ask the user to pick.
+
 ### Design mode
 
 1. **Identify the module** and read its implementation, its callers and its tests. Confirm the name in domain language.
@@ -83,7 +85,12 @@ This skill decides. It does not implement. Every session ends at an agreed decis
 5. **Recommend.** Name the strongest design and why. Propose a hybrid when parts of different designs combine well. Be opinionated: the user wants a strong read, not a menu.
 6. **Walk the decision** through the interaction contract until the user agrees an interface shape and seam placement, or rejects the deepening.
 
-**Design is complete when** the user has agreed or rejected a specific design, the agreed interface states its invariants, error modes and seam, and the test strategy says which existing tests are replaced. Three designs without a recommendation is not completion.
+**Design is complete when** the user has made a decision on a specific recommended design:
+
+- **Accepted:** the agreed interface states its invariants, error modes and seam, and the test strategy says which existing tests are replaced.
+- **Rejected:** the reason is recorded (and checked against the ADR-candidate test below), and the session stops; no interface or test strategy is required.
+
+Three designs without a recommendation is not completion.
 
 ## Decision Handoffs
 
@@ -123,9 +130,9 @@ Not done here: code changes
 
 | Situation | Action |
 |---|---|
-| Not a git repository, or history too short to show hot spots | Ask the user for a direction; record that scope came from the user |
+| Not a git repository, or history too short to show hot spots | Ask the user for a direction and scan those files without `git log`; record that scope came from the user and hot-spot evidence is unavailable |
 | No `CONTEXT.md`, `CONTEXT-MAP.md` or `docs/agents/domain.md` | Use names from the code; offer `domain-modeling` once if terms are ambiguous |
-| Scan finds no candidate that passes the deletion test | Report that with the modules examined; do not invent speculative cards to fill the report |
+| Scan finds no candidate that passes the deletion test | Write the zero-candidate report (scope and every module examined with its drop reason), print its path and stop without asking for a pick; do not invent speculative cards to fill the report |
 | `$TMPDIR` unset or unwritable | Fall back to `/tmp`; if that fails, stop and report the error rather than writing into the repository |
 | No browser opener available (`open`, `xdg-open`, `start`) | Print the absolute path and say the report was not opened |
 | No sub-agent support | Explore directly and run design-it-twice sequentially per its fallback; say so in the output |

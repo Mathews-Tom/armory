@@ -120,6 +120,8 @@ Marker and gradient ids are document-global: suffix them per figure (`arr-3-befo
 
 One larger card: the candidate's title, one sentence on why it comes first, and an in-page link (`<a href="#candidate-N">`) to its card. Nothing else.
 
+**Zero candidates.** When nothing passes the deletion test, replace both `#candidates` and `#top-recommendation` with one `<section id="examined">`: a heading "No deepening candidate found", the scope, and a list of every module examined with the one-line reason it was dropped (for example "pass-through deleted → complexity reappears in 4 callers: earning its keep").
+
 ## Style
 
 - Editorial, not a corporate dashboard. Generous whitespace; a serif for headings is fine.

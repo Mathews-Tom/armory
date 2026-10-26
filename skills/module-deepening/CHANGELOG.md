@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-10-26
+
+- Scan outside a git repository: scan the user-named files without `git log` and record that hot-spot evidence is unavailable.
+- A scan with zero candidates is complete: the report lists every examined module with its drop reason and the session stops without a recommendation or pick question.
+- Design completion distinguishes an accepted design (interface, invariants, error modes, seam, test-replacement strategy) from a rejection (reason recorded, then stop).
+
 ## 1.0.0 — 2026-10-26
 
 - Add `module-deepening`, adapted from Matt Pocock's `improve-codebase-architecture` and `codebase-design` at `5beb35b040e3de97e54fa9e386d7e42d15c295c2`.
