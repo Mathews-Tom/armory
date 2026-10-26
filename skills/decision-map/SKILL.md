@@ -2,7 +2,7 @@
 name: decision-map
 description: 'Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general UI generation, standalone prototypes outside a decision map (use prototype), or adopting experimental code into production.'
 metadata:
-  version: 2.0.1
+  version: 2.0.2
   category: development
   tags: [planning, issue-tracker, decisions, discovery, frontier, pre-planning]
   difficulty: advanced

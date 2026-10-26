@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 — 2026-10-26
+
+- Closing a prototype ticket now requires complete prototype-package evidence (every guided scenario, reset and relevant free-play action, or every variant, switch, reload and decision task) with nothing `not observed`, a non-`inconclusive` verdict and the right verdict authority.
+
 ## 2.0.1 — 2026-10-26
 
 - Work mode checks for the `prototype` package when a prototype ticket is selected, before taking visible ownership or a claim, so a missing package leaves the ticket untouched. A continuation that already holds the claim keeps it and follows the unresolved path.
