@@ -2,11 +2,13 @@
 name: domain-modeling
 description: Use when domain terms or entity relationships are ambiguous, existing definitions conflict with a concrete business scenario, or code contradicts an agreed domain model. Not for reading an unchanged glossary, scaffolding generic project context, implementing a fix, or writing an ADR.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [domain-modeling, vocabulary, bounded-contexts, cardinality]
   difficulty: intermediate
   phase: define
+  complements:
+    - module-deepening
 ---
 
 # Domain Modeling

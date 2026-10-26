@@ -1,8 +1,8 @@
 ---
 name: architecture-reviewer
-description: 'Architecture reviews across 7 dimensions (structural, scalability, enterprise readiness, performance, security, ops, data) with scored reports. Triggers on: "review architecture", "critique design", "audit system", "assess scalability", "enterprise readiness", "technical due diligence". NOT for diagrams, use architecture-diagram.'
+description: 'Architecture reviews across 7 dimensions (structural, scalability, enterprise readiness, performance, security, ops, data) with scored reports. Triggers on: "review architecture", "critique design", "audit system", "assess scalability", "enterprise readiness", "technical due diligence". NOT for diagrams, use architecture-diagram. NOT for interactively finding shallow modules or designing one module''s interface and seam, use module-deepening.'
 metadata:
-  version: 1.1.1
+  version: 1.1.2
   category: review
   tags: [architecture, scalability, enterprise, security-audit]
   difficulty: advanced

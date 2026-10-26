@@ -1,8 +1,8 @@
 ---
 name: ux-expert
-description: 'UX design expert for auditing and redesigning pages, dashboards, and data-dense interfaces via 4-phase collaborative reviews across 8 UX dimensions. Triggers on: "review UX", "audit this page", "redesign the dashboard", "UX review", "improve the layout", "dashboard UX audit", "component recommendations".'
+description: 'UX design expert for auditing and redesigning pages, dashboards, and data-dense interfaces via 4-phase collaborative reviews across 8 UX dimensions. Triggers on: "review UX", "audit this page", "redesign the dashboard", "UX review", "improve the layout", "dashboard UX audit", "component recommendations". NOT for building throwaway switchable UI variants to compare layouts, use prototype.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: review
   tags: [ux, dashboard, audit, redesign, b2b-saas]
   difficulty: intermediate

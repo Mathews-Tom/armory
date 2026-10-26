@@ -1,9 +1,9 @@
 ---
 name: codebase-advisor
-description: 'Senior codebase advisor that audits a repository, vets findings, and writes self-contained implementation plans for other agents to execute. Triggers on: "write improvement plans", "create an implementation backlog", "audit and plan fixes", "turn findings into plans", "agent-executable plans", "reconcile plans", "execute this plan", "what should we improve next". Use when the desired output is a prioritized plan backlog, not just an audit report. NOT for report-only quality gates; use codebase-auditor.'
+description: 'Senior codebase advisor that audits a repository, vets findings, and writes self-contained implementation plans for other agents to execute. Triggers on: "write improvement plans", "create an implementation backlog", "audit and plan fixes", "turn findings into plans", "agent-executable plans", "reconcile plans", "execute this plan", "what should we improve next". Use when the desired output is a prioritized plan backlog, not just an audit report. NOT for report-only quality gates; use codebase-auditor. NOT for interactively finding deepening opportunities or designing one module''s interface, use module-deepening.'
 license: MIT
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: planning
   tags: [codebase-audit, implementation-plans, agent-handoff, tech-debt]
   difficulty: advanced

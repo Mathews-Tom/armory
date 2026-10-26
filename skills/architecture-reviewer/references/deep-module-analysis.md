@@ -3,6 +3,8 @@
 Use this reference during Structural Integrity review when assessing module boundaries,
 testability, and AI navigability.
 
+This is the review lens: it finds and reports shallow modules as findings inside a scored review. For an interactive session that scans for deepening candidates, designs a module's interface several ways or decides where a seam goes, use the `module-deepening` package instead.
+
 ## Vocabulary
 
 | Term | Meaning |
@@ -53,3 +55,7 @@ Use this shape for actionable recommendations:
 - Do not introduce a seam unless there is a real second adapter, a testing need at a stable boundary, or a volatile external dependency.
 - Prefer domain-named modules from `CONTEXT.md` when project context exists.
 - Respect ADRs. If a deepening recommendation contradicts an ADR, call out the conflict and justify reopening the decision.
+
+## Attribution
+
+The vocabulary, shallow-module signals and deletion test in this reference derive from Matt Pocock's deep-module design vocabulary, now published as `skills/engineering/codebase-design/SKILL.md` in https://github.com/mattpocock/skills (compared at `5beb35b040e3de97e54fa9e386d7e42d15c295c2`; the exact revision used when this reference was added in #68 was not recorded). MIT License, Copyright (c) 2026 Matt Pocock; the verbatim notice is in `references/upstream/LICENSE`.
