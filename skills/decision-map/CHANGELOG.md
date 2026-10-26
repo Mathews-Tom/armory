@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 — 2026-10-26
+
+- Work mode checks for the `prototype` package when a prototype ticket is selected, before taking visible ownership or a claim, so a missing package leaves the ticket untouched. A continuation that already holds the claim keeps it and follows the unresolved path.
+
 ## 2.0.0 — 2026-10-26
 
 - BREAKING: prototype tickets now require the `prototype` package, which builds and observes the logic/state or UI artifact. Without it, prototype work stops with `BLOCKED: install prototype` before claiming the ticket.

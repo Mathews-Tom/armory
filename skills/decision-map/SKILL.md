@@ -2,7 +2,7 @@
 name: decision-map
 description: 'Use when mapping unresolved architecture, policy, or scope decisions before planning, or working one decision ticket, including a prototype ticket whose throwaway evidence the prototype package builds. Also applies to "map the decisions", "decision map", and "wayfinder". Not for implementation slices of a known feature, milestone plans, general UI generation, standalone prototypes outside a decision map (use prototype), or adopting experimental code into production.'
 metadata:
-  version: 2.0.0
+  version: 2.0.1
   category: development
   tags: [planning, issue-tracker, decisions, discovery, frontier, pre-planning]
   difficulty: advanced
@@ -62,8 +62,8 @@ Charting resolves nothing, runs no research, implements nothing, and never colla
 
 ### Mode B — Work Through the Map
 
-1. Load the map body and select the requested ticket or the first frontier item returned by `frontier.py`. A continuation may return to this session's already-claimed open ticket; verify that claim rather than acquiring a second one. Establish visible ownership.
-2. Acquire and verify the session claim before substantive work, or re-verify the existing claim on continuation. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment.
+1. Load the map body and select the requested ticket or the first frontier item returned by `frontier.py`. A continuation may return to this session's already-claimed open ticket; verify that claim rather than acquiring a second one. For a newly selected `prototype` ticket, check that the `prototype` package is installed before taking ownership; if it is absent, stop with `BLOCKED: install prototype` and leave the ticket untouched (no assignment, no claim). Establish visible ownership.
+2. Acquire and verify the session claim before substantive work, or re-verify the existing claim on continuation. Follow `references/claim-protocol.md`; do not infer exclusivity from assignment. A continuation whose prototype package has gone missing keeps its claim and follows the unresolved path in `references/prototyping.md`.
 3. Work exactly one ticket by its type. A HITL ticket requires the human's judgment; an agent answering it alone has broken the ticket.
    For a `prototype` ticket, read `references/prototyping.md` before creating an artifact: it requires the `prototype` package (which builds and observes the logic/state or UI artifact), fixes who owns the verdict, and defines the evidence record and unresolved path. The prototype tests only this ticket's question; its interaction mode still controls who may give the verdict.
 4. Record the outcome using `references/tracker-operations.md`:
