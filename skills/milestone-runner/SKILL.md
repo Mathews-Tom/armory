@@ -85,7 +85,7 @@ Treat a lane's own claims as hints and confirm from provider and command output:
 | Topology | Root targets the intended base; children target the preceding branch. |
 | Cleanliness | No stray non-ignored files in the worktree. |
 
-A failed gate stops that milestone and its dependents. Fix the specific failure and re-run only the affected gate.
+A failed gate stops that milestone and its dependents; other independent milestones may continue unless the user asked to stop the whole sequence on any failure. Fix the specific failure and re-run only the affected gate.
 
 ### 5. Merge and record
 

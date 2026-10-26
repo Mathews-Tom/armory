@@ -67,6 +67,12 @@ cases:
       - type: matches_regex
         target: "(Done when|DONE WHEN)"
         weight: 0.7
+      - type: not_contains
+        target: "--- FILE:"
+        weight: 0.9
+      - type: not_contains
+        target: "Plan §"
+        weight: 0.8
 
   - id: unsourced_validation_becomes_follow_up
     prompt: >
