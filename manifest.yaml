@@ -969,7 +969,7 @@ packages:
     difficulty: advanced
     phase: ship
   - name: module-deepening
-    version: 1.0.0
+    version: 1.0.1
     description: 'Use when looking for shallow modules worth deepening, deciding where a seam belongs, or designing a chosen
       module''s interface several ways before refactoring. Scan mode renders candidates as an offline HTML report; design
       mode compares alternative interfaces and recommends one. Asks one question at a time, stops at an agreed decision and
@@ -1202,7 +1202,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: prototype
-    version: 1.0.0
+    version: 1.0.1
     description: 'Use when a design question is cheaper to answer by clicking a throwaway artifact than by debating it: whether
       a state model or business rule behaves right, or which of several structurally different UI layouts works. Builds one
       scratch-only artifact (a self-contained shareable state demo, or switchable UI variants), observes it in a browser and
