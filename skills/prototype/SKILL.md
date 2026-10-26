@@ -2,7 +2,7 @@
 name: prototype
 description: 'Use when a design question is cheaper to answer by clicking a throwaway artifact than by debating it: whether a state model or business rule behaves right, or which of several structurally different UI layouts works. Builds one scratch-only artifact (a self-contained shareable state demo, or switchable UI variants), observes it in a browser and reports evidence with a verdict or "inconclusive". Production routes, data and code stay untouched. Triggers on: "prototype this", "throwaway prototype", "clickable state demo", "does this state model feel right", "try a few UI variants", "compare layouts before committing". NOT for working a decision-map ticket, use decision-map. NOT for finished HTML deliverables such as dashboards or infographics, use static-web-artifacts-builder. NOT for UX audits or redesigns, use ux-expert.'
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [prototyping, throwaway, state-model, ui-variants, design-questions]
   difficulty: intermediate
@@ -112,7 +112,14 @@ Follow-up questions: <questions raised but not prototyped>
 
 A verdict needs browser evidence for the distinguishing scenario or for every variant. Without it the verdict is `inconclusive`. When the user (or a calling ticket) reserves the judgment for a human, present the evidence and report `awaiting human judgment` instead of choosing.
 
-**Keeping the prototype.** Only when the user explicitly asks to keep it in git: create a new throwaway branch (for example `prototype/<topic>`) from the current commit, commit only the prototype files there, switch back, and report the branch name. Never commit to the main or current feature branch.
+**Keeping the prototype.** Only when the user explicitly asks to keep it in git. Do not switch or touch the user's current checkout; use a separate worktree:
+
+1. `git worktree add -b prototype/<topic> <new-temp-dir> HEAD` creates the throwaway branch from the current commit.
+2. Copy only the requested prototype files into the worktree. An artifact from a `mktemp -d` directory (outside the repository) goes under `prototype/<topic>/`; an artifact in an ignored scratch directory keeps its relative path.
+3. Stage those exact paths with `git -C <new-temp-dir> add -f -- <paths>`. `-f` is required because scratch directories are usually ignored; never use `git add -A` or `.`.
+4. Commit in the worktree, run `git worktree remove <new-temp-dir>`, and report the branch name and committed paths.
+
+Never commit to the main or current feature branch.
 
 ## Error Handling
 

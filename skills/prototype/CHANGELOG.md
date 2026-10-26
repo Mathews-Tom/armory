@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — 2026-10-26
+
+- Keeping a prototype in git now uses a separate worktree on a throwaway branch, copies `mktemp -d` artifacts under `prototype/<topic>/`, stages only the requested paths with `git add -f` (scratch directories are usually ignored) and leaves the user's checkout untouched.
+
 ## 1.0.0 — 2026-10-26
 
 - Add `prototype` as a standalone package, adapted from Matt Pocock's `prototype` skill at `5beb35b040e3de97e54fa9e386d7e42d15c295c2` and from decision-map 1.1.0's prototyping protocol.
