@@ -16,9 +16,9 @@
 
 ## Checklist
 
-CI enforces frontmatter validity, naming, description length, semver format, manifest freshness, file references, self-containment, eval schema and minimum cases, template sync, secret scan and static conformance. Check only what it cannot:
+CI enforces frontmatter validity, naming, description length, semver format, manifest freshness, file references, self-containment, eval schema and minimum cases, template sync, secret scan and static conformance. Check only what it cannot; for PRs that change no package, mark the package items N/A:
 
-- [ ] Version bumped according to semver (MAJOR/MINOR/PATCH)
-- [ ] Description names distinct invocation contexts and adjacent boundaries; no angle brackets or pushy language
-- [ ] Positive eval cases cover every distinct invocation branch
+- [ ] Changed package: version bumped according to semver (MAJOR/MINOR/PATCH)
+- [ ] Changed package: description names distinct invocation contexts and adjacent boundaries; no angle brackets or pushy language
+- [ ] Changed package: positive eval cases cover every distinct invocation branch
 - [ ] No internal URLs in any file
