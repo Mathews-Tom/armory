@@ -1,41 +1,24 @@
 ## Summary
 
-<!-- Brief description of what this PR adds or changes. -->
+<!-- What this PR adds or changes, and why. -->
 
-## Static Conformance Results
+## Risk
 
-<!-- Run the repository evaluator for each changed package and paste its actual JSON
-     list output, invocation and exit status. For example:
-       uv run python scripts/evaluate_package.py --path skills/your-skill-name --json
-     Report-v2 separates static PASS/FAIL from live NOT_MEASURED.
-     Do not fabricate output or turn skipped checks into a pass. -->
+<!-- Low / Medium / High — set by the change, not the author — plus one line on why. Low: wording, docs, eval cases. Medium: package behavior, package scripts. High: CI workflows, release/packaging scripts, installers, extensions. -->
 
-```text
-(actual command, exit status and JSON output)
-```
+## Testing
 
-## Authored Findings and Behavioral Evidence
+<!-- CI runs frontmatter, reference, eval-schema, manifest, template-sync, secret-scan and static-conformance checks on changed packages; do not paste their output here. Record the behavioral evidence CI cannot produce: the actual invocations or artifacts you checked and their limits. Name skipped/unmeasured cases and missing prerequisites. Static conformance and authored cases do not establish effectiveness. Live model sessions or paid checks require separate authorization; this template does not grant it. -->
 
-<!-- List source-backed authored findings separately from the machine report.
-     Record actual authorized checks, invocation/artifact evidence and their limits.
-     Name skipped/unmeasured cases and missing prerequisites. Static conformance and
-     authored cases do not establish effectiveness. Live model sessions or paid
-     checks require separate authorization; this template does not grant it. -->
+## How to revert
+
+<!-- Usually "revert this PR". Name anything a revert does not undo, e.g. published release assets or already-installed copies. -->
 
 ## Checklist
 
-- [ ] Definition file has valid YAML frontmatter with `name`, `description`, and `metadata.version`
-- [ ] Version bumped according to semver (MAJOR/MINOR/PATCH)
-- [ ] Manifest regenerated: `uv run scripts/generate_manifest.py`
-- [ ] Package name is kebab-case, at most 64 characters
-- [ ] Description satisfies the current 50–1024 character validator range and names distinct invocation contexts and adjacent boundaries
-- [ ] No angle brackets or pushy language in description
-- [ ] No secrets, credentials, or internal URLs in any file
-- [ ] Actual authorized local checks and behavioral evidence recorded, with unmeasured/skipped cases and prerequisites explicit
-- [ ] All file references in the definition file resolve to existing files within the package directory
-- [ ] No cross-package references (`../other-package/`) — package is fully self-contained
-- [ ] Eval cases exist in `evals/cases.yaml` with 2+ positive cases covering every distinct invocation branch and 2+ adjacent negatives
-- [ ] Eval schema validated: `uv run python scripts/validate_evals.py` (not a behavioral pass)
-- [ ] Templates synced (if using shared templates): `uv run python scripts/sync_templates.py`
-- [ ] Report-v2 static conformance is PASS; actual output and separate authored findings attached
-- [ ] Frontmatter/reference validation and applicable authored-review findings resolved; effectiveness claims limited to separately authorized measured evidence
+CI enforces frontmatter validity, naming, description length, semver format, manifest freshness, file references, self-containment, eval schema and minimum cases, template sync, secret scan and static conformance. Check only what it cannot; for PRs that change no package, mark the package items N/A:
+
+- [ ] Changed package: version bumped according to semver (MAJOR/MINOR/PATCH)
+- [ ] Changed package: description names distinct invocation contexts and adjacent boundaries; no angle brackets or pushy language
+- [ ] Changed package: positive eval cases cover every distinct invocation branch
+- [ ] No internal URLs in any file

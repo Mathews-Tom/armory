@@ -26,7 +26,8 @@ TERMINATION CONDITIONS (all must hold before you report done):
    full review whose body describes a finding via a blob permalink instead of
    an inline comment; scan every COMMENTED/CHANGES_REQUESTED review's body,
    not just reviewThreads)
-5. No new feedback landed in the last ~10 minutes (quiet window)
+5. No new feedback landed in the last ~10 minutes (quiet window) — unless the
+   ROUND CAP below stopped you; then report the PR as not done
 6. Working tree clean; local HEAD matches the pushed remote head
 7. The repository's own test/typecheck/lint gate passes on the merged tree
 
@@ -41,7 +42,8 @@ feedback already unresolved from before this run started — that is normal
 starting state, not a reason to wait. Read the checks output and the PR's
 existing reviews/threads now. If anything above is already actionable (a
 check already reporting FAILURE, an unresolved review thread, or a
-body-only review finding), fix it as your first action. Being unable to
+body-only review finding), act on it first — review findings go through
+TRIAGE below, so only Important ones get a fix. Being unable to
 force a fresh CI rerun (`gh run rerun` requires repo admin rights you do
 not have) is never a reason to stall — pushing your fix triggers a
 genuinely fresh run on its own.
@@ -52,12 +54,36 @@ exists. If clean, `git merge <base> -m "..."` and push rather than replaying
 commits with rebase (fixup commits tailored to an older base can conflict
 individually even when the net merge doesn't).
 
+TRIAGE: every fix push triggers another bot review round, so fixing every
+comment never converges. Tag each finding (inline thread or review body)
+before touching code, then act by tag:
+- Important (bug, regression, security, broken contract, failing check):
+  fix it.
+- Nit (style, naming, "consider", docstring polish, speculative hardening):
+  reply with a one-line reason and resolve the thread; no commit.
+- Pre-existing (code this PR did not change): reply "pre-existing, out of
+  scope for this PR" and resolve; no commit.
+- Repeat of a finding already answered: reply pointing to the earlier
+  answer and resolve; no commit.
+When fixing, name the bug class and fix every instance in this PR's diff in
+the same push. Replies carry no @-mentions. A body-only finding has no thread
+to resolve: answer it with one `gh pr comment` citing the review URL plus
+the fixing commit SHA (Important) or the one-line reason (declined).
+
+ROUND CAP: a round is one push answering review feedback plus the bot
+re-review it triggers; merge-only and CI-flake pushes do not count. Round 1
+may re-verify the whole PR; from round 2 on, re-verify only the files the
+latest push changed. If new Important findings still arrive after round 3,
+stop pushing and report the recurring findings, their bug class, and
+whether the approach needs rethinking — a fourth round is the user's call.
+
 WATCH LOOP: after each push, CI starts a new run. Poll per-job status via
 `gh pr checks {PR_NUMBER}`, not just the run-level aggregate — the moment
 any single non-skipped check reports FAILURE, or new review feedback lands,
 stop waiting on the rest of that run's still-pending checks and act on it
-immediately. You never need every check in a run to finish, or the full
-~10-minute quiet window to elapse, before reacting to something already
+immediately (review feedback goes through TRIAGE first). You never need
+every check in a run to finish, or the full ~10-minute quiet window to
+elapse, before reacting to something already
 actionable. Only treat the ~10-minute wait as genuine idle time once every
 currently-visible check is passing or still pending with zero failures and
 there is no unaddressed feedback. Reset the quiet-window timer on any new
@@ -65,6 +91,7 @@ feedback or push. Run one extra quiet window before declaring done, as
 insurance against reviewer lag.
 
 Report your final status against every termination condition explicitly —
-don't just say "done." If you cannot reach all seven conditions, report
-exactly which ones are unmet and why, rather than declaring partial success.
+don't just say "done" — plus the number of review rounds used. If you cannot
+reach all seven conditions, report exactly which ones are unmet and why,
+rather than declaring partial success.
 ```

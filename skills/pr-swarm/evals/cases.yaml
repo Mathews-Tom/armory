@@ -51,6 +51,22 @@ cases:
         target: "worktree"
         weight: 0.6
 
+  - id: review_loop_round_cap
+    prompt: "Drive PR #540 and PR #547 to green in parallel. Last time the bot reviewer kept posting nitpicks and the agents went back and forth for dozens of rounds overnight."
+    fixtures: []
+    rubric:
+      - "activates pr-swarm for two independent PRs"
+      - "lanes triage findings: nits and pre-existing issues get a reasoned reply and resolution, not a fix commit"
+      - "caps review rounds at three and reports a still-failing PR unresolved instead of looping further"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)round cap|three rounds|3 rounds|after round 3"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)nit"
+        weight: 0.6
+
   - id: negative_single_sequential_pr
     prompt: "Resolve the merge conflicts on PR #77 and get it through CI."
     fixtures: []

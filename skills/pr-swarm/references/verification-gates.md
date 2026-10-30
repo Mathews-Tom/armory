@@ -1,6 +1,6 @@
 # Verification Gates
 
-Contents: [Termination conditions](#termination-conditions) · [First-failure reaction](#react-to-the-first-failing-check-not-the-full-matrix) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Quiet window](#quiet-window)
+Contents: [Termination conditions](#termination-conditions) · [First-failure reaction](#react-to-the-first-failing-check-not-the-full-matrix) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Quiet window](#quiet-window) · [Review triage and round cap](#review-triage-and-round-cap)
 
 These are GitHub API/`gh` CLI behaviors, not agent-specific — they apply regardless of which lane process produced the work.
 
@@ -12,7 +12,7 @@ A PR/lane is genuinely done only when **all** of the following hold simultaneous
 2. `mergeStateStatus == CLEAN` and `mergeable == MERGEABLE`
 3. Latest CI: every non-skipped check passed, none pending
 4. Unresolved review threads = 0, **and** no unaddressed finding embedded in a body-only review (see below)
-5. No new feedback landed in the last ~10-minute quiet window
+5. No new feedback landed in the last ~10-minute quiet window — a lane stopped by the [round cap](#review-triage-and-round-cap) has not met this condition
 6. Worktree clean; local HEAD matches the pushed remote head
 7. The repo's own test/lint/typecheck gate ran green on the merged tree, not just on the pre-merge branch
 
@@ -67,7 +67,7 @@ gh api graphql -f query='
   }' -F owner=<o> -F repo=<r> -F n=<N>
 ```
 
-Read every `COMMENTED`/`CHANGES_REQUESTED` review's `body` for severity badges, blocking/should-fix markers, or blob-permalink references. Cross-reference flagged lines against the branch's commit history to check whether a later commit already fixed it. A body-only review has no `resolveReviewThread` mutation to apply — the correct closure signal is a `gh pr comment` reply citing the review's timestamp/URL and the fixing commit SHA, not a thread-resolve call.
+Read every `COMMENTED`/`CHANGES_REQUESTED` review's `body` for severity badges, blocking/should-fix markers, or blob-permalink references. Cross-reference flagged lines against the branch's commit history to check whether a later commit already fixed it. A body-only review has no `resolveReviewThread` mutation to apply — the correct closure signal is a `gh pr comment` reply citing the review's timestamp/URL, not a thread-resolve call. For an Important fix the reply cites the fixing commit SHA; for a declined Nit, Pre-existing or Repeat finding it gives the one-line reason instead.
 
 ## Stale `statusCheckRollup` entries
 
@@ -81,4 +81,11 @@ A closed PR is not automatically safe to reopen or replace with a fresh PR — s
 
 ## Quiet window
 
-After each push, CI restarts and `mergeStateStatus` typically goes `UNSTABLE` while pending. Wait roughly 10 minutes, re-check every condition. If new feedback landed during the wait, fix it, push, and reset the quiet-window timer — including feedback that lands in the few minutes right after a lane's own final self-check but before the orchestrator's external re-check catches it (a real race, not a bug in either check). One extra quiet window as insurance against reviewer lag before declaring a lane done is worth the wall-clock cost.
+After each push, CI restarts and `mergeStateStatus` typically goes `UNSTABLE` while pending. Wait roughly 10 minutes, re-check every condition. If new feedback landed during the wait, triage it (see below), push the Important fixes, and reset the quiet-window timer — including feedback that lands in the few minutes right after a lane's own final self-check but before the orchestrator's external re-check catches it (a real race, not a bug in either check). One extra quiet window as insurance against reviewer lag before declaring a lane done is worth the wall-clock cost.
+
+## Review triage and round cap
+
+An agent author and an agent reviewer can keep each other busy indefinitely: a person waves off a nit in seconds, an agent fixes it, which means another commit and another review round. Two rules keep a lane converging:
+
+- **Triage before fixing.** Each finding is Important (fix it), Nit or Pre-existing (reply with a one-line reason and resolve the thread, no commit), or a Repeat of an answered finding (point to the earlier reply and resolve, no commit). Fixes name the bug class and cover every instance in the PR's diff in one push. A resolved thread with a decline reason counts as addressed for condition 4.
+- **Cap rounds at three.** A round is one feedback-answering push plus the re-review it triggers; merge-only and CI-flake pushes don't count. After round 1, re-verify only the files the latest push changed. If new Important findings still arrive after round 3, the lane stops pushing and reports the recurring findings and their bug class; the orchestrator reports that PR unresolved and the user decides whether to rethink the approach or allow another round.
