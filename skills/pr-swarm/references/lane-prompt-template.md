@@ -66,7 +66,9 @@ before touching code, then act by tag:
 - Repeat of a finding already answered: reply pointing to the earlier
   answer and resolve; no commit.
 When fixing, name the bug class and fix every instance in this PR's diff in
-the same push. Replies carry no @-mentions.
+the same push. Replies carry no @-mentions. A body-only finding has no thread
+to resolve: answer it with one `gh pr comment` citing the review URL plus
+the fixing commit SHA (Important) or the one-line reason (declined).
 
 ROUND CAP: a round is one push answering review feedback plus the bot
 re-review it triggers; merge-only and CI-flake pushes do not count. Round 1

@@ -67,7 +67,7 @@ gh api graphql -f query='
   }' -F owner=<o> -F repo=<r> -F n=<N>
 ```
 
-Read every `COMMENTED`/`CHANGES_REQUESTED` review's `body` for severity badges, blocking/should-fix markers, or blob-permalink references. Cross-reference flagged lines against the branch's commit history to check whether a later commit already fixed it. A body-only review has no `resolveReviewThread` mutation to apply — the correct closure signal is a `gh pr comment` reply citing the review's timestamp/URL and the fixing commit SHA, not a thread-resolve call.
+Read every `COMMENTED`/`CHANGES_REQUESTED` review's `body` for severity badges, blocking/should-fix markers, or blob-permalink references. Cross-reference flagged lines against the branch's commit history to check whether a later commit already fixed it. A body-only review has no `resolveReviewThread` mutation to apply — the correct closure signal is a `gh pr comment` reply citing the review's timestamp/URL, not a thread-resolve call. For an Important fix the reply cites the fixing commit SHA; for a declined Nit, Pre-existing or Repeat finding it gives the one-line reason instead.
 
 ## Stale `statusCheckRollup` entries
 
