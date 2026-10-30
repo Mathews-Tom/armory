@@ -2,7 +2,7 @@
 name: pr-swarm
 description: 'Parallelizes two or more independent "own PR to green" loops for a single repository using isolated git worktrees and separate headless Claude Code sessions per PR — resolving merge conflicts, clearing review feedback, and watching CI to completion without one PR''s diff or feedback leaking into another''s context. Triggers on: "parallelize these PRs", "drive PR #123 and #456 to green in parallel", "own-PR-to-green fleet", "run these PRs concurrently", "isolated worktree loops for my PRs", "pr-swarm". Use this skill when a user has two or more already-open, file-disjoint pull requests in the same repository that each need conflict resolution, review-feedback triage, and CI monitoring, and wants them driven to merge-ready at the same time instead of one after another.'
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   category: operations
   tags: [git-worktree, parallel-execution, pull-requests, headless-cli, ci-monitoring]
   difficulty: advanced
@@ -24,8 +24,8 @@ A repository checkout can only have one branch active at a time. A user with N i
 |File|Contents|Load When|
 |---|---|---|
 |`references/launch-mechanics.md`|`claude -p` flags, detached background launch pattern, watchdog/liveness checks, exit-code capture|Phase 5 (Launch)|
-|`references/verification-gates.md`|GitHub API correctness pitfalls: stale `mergeStateStatus`, body-only bot reviews, stale `statusCheckRollup` entries, review-thread pagination, reacting to the first failing check instead of waiting for the full CI matrix|Phase 6 (Monitor & Verify)|
-|`references/lane-prompt-template.md`|The literal per-lane task prompt (termination conditions, orientation, conflict resolution, watch loop)|Phase 4 (Lane Prompt)|
+|`references/verification-gates.md`|GitHub API correctness pitfalls: stale `mergeStateStatus`, body-only bot reviews, stale `statusCheckRollup` entries, review-thread pagination, reacting to the first failing check instead of waiting for the full CI matrix, review triage and the three-round cap|Phase 6 (Monitor & Verify)|
+|`references/lane-prompt-template.md`|The literal per-lane task prompt (termination conditions, orientation, conflict resolution, review triage, round cap, watch loop)|Phase 4 (Lane Prompt)|
 
 ## Scope boundary
 
@@ -99,7 +99,7 @@ A lane inheriting a PR that already has red CI or open feedback at launch is nor
 
 ### Phase 7 — Report
 
-Per PR: final `state`/`mergeStateStatus`, CI conclusion, unresolved-thread count (including the body-only-review scan), worktree clean/dirty, lane process exit code. A lane that exited non-zero, or whose PR isn't independently confirmed clean by the checks above, is reported unresolved — a lane's own "done" message is never sufficient on its own.
+Per PR: final `state`/`mergeStateStatus`, CI conclusion, unresolved-thread count (including the body-only-review scan), review rounds used, worktree clean/dirty, lane process exit code. A lane that exited non-zero, stopped at the round cap, or whose PR isn't independently confirmed clean by the checks above, is reported unresolved — a lane's own "done" message is never sufficient on its own.
 
 ### Phase 8 — Teardown
 
@@ -130,8 +130,8 @@ STOP — #{N} and #{M} both touch {path}; resolve before proceeding
 ...
 
 ## Fleet status
-| PR | state | mergeStateStatus | CI | unresolved threads | worktree | exit code |
-|---|---|---|---|---|---|---|
+| PR | state | mergeStateStatus | CI | unresolved threads | review rounds | worktree | exit code |
+|---|---|---|---|---|---|---|---|
 
 ## Teardown
 #{N}: removed / left in place (reason)
@@ -161,6 +161,7 @@ A PR missing from the "Fleet status" table (dropped in resolution or blocked by 
 | Worktree directory already exists from a prior run | Reuse it if the branch matches; otherwise stop and ask (don't silently overwrite) |
 | Hoisted-linker install fails in one lane | That lane's setup fails independently; other lanes proceed unaffected |
 | PR already has failing CI checks or unresolved feedback when the swarm launches | Not a stop condition — the lane starts by fixing what's already visible instead of waiting on a clean baseline (see `references/verification-gates.md`) |
+| Lane still receives new Important findings after three review rounds | Lane stops pushing and reports the recurring bug class; report the PR unresolved and let the user decide between rethinking the approach and another round (see "Review triage and round cap" in `references/verification-gates.md`) |
 | `gh` not authenticated, or missing `repo`/`workflow` scopes | Stop before Phase 1 — nothing downstream can function without it |
 
 ## Verification
@@ -178,3 +179,4 @@ A PR missing from the "Fleet status" table (dropped in resolution or blocked by 
 - Removing a worktree for a lane whose PR isn't confirmed clean, because the batch as a whole finished
 - Counting `reviewThreads.isResolved == false` as the complete unresolved-feedback signal without also scanning review bodies
 - A lane waiting for a full CI matrix to finish, or for an admin-gated `gh run rerun`, before reacting to a check that already failed or feedback that already landed
+- A lane pushing a commit for every nit, or running a fourth review round without the user's decision
