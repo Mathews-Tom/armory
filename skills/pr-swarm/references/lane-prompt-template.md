@@ -19,23 +19,28 @@ TERMINATION CONDITIONS (all must hold before you report done):
 1. PR state == OPEN (check this every iteration, not just once — a PR can be
    closed externally at any point; if it happens, stop pushing and report
    plainly instead of continuing to work on a dead PR)
-2. mergeStateStatus == CLEAN and mergeable == MERGEABLE
-3. Latest CI: every non-skipped check passed, none pending
-4. Zero unresolved review threads — including findings embedded in a review's
-   raw body text with no inline comment backing it (a bot reviewer can post a
-   full review whose body describes a finding via a blob permalink instead of
-   an inline comment; scan every COMMENTED/CHANGES_REQUESTED review's body,
-   not just reviewThreads)
-5. No new feedback landed in the last ~10 minutes (quiet window) — unless the
-   ROUND CAP below stopped you; then report the PR as not done
+2. Current mergeability and provider-required protections/reviews applicable at
+   this readiness stage are satisfied; a display state alone is not proof
+3. Required, repository-mandated and unclassified applicable CI passed in the
+   current required context; report explicitly advisory jobs separately
+4. Substantive inline and body-only findings are fixed or have an authorized
+   disposition; optional feedback has a reasoned disposition, not a fix commit.
+   Preserve provider-required review/thread rules
+5. Final current-state read shows no new blocker; no fixed quiet window
 6. Working tree clean; local HEAD matches the pushed remote head
-7. The repository's own test/typecheck/lint gate passes on the merged tree
+7. Observed acceptance and required local checks passed. Without a merge queue
+   on the base branch, report ordinary merge readiness. Only for a queue-backed
+   base, report an open, unqueued PR ready-for-enrollment separately from
+   candidate validation. Required merge_group/integration-candidate checks must
+   pass on the actual candidate before landing; if already queued, pending
+   candidate checks block that stage. Do not enqueue or merge: enrollment can
+   itself authorize auto-merge.
 
 ORIENTATION:
   gh auth status
   gh pr view {PR_NUMBER} --repo {REPO} \
     --json state,mergeable,mergeStateStatus,headRefOid,headRefName,baseRefName
-  gh pr checks {PR_NUMBER} --repo {REPO} | grep -v skipping
+  gh pr checks {PR_NUMBER} --repo {REPO}
 
 A freshly-launched lane commonly inherits a PR with CI already red or
 feedback already unresolved from before this run started — that is normal
@@ -57,8 +62,8 @@ individually even when the net merge doesn't).
 TRIAGE: every fix push triggers another bot review round, so fixing every
 comment never converges. Tag each finding (inline thread or review body)
 before touching code, then act by tag:
-- Important (bug, regression, security, broken contract, failing check):
-  fix it.
+- Important (bug, regression, security, broken contract, failing required or
+  repository-mandated check): fix the substantive failure.
 - Nit (style, naming, "consider", docstring polish, speculative hardening):
   reply with a one-line reason and resolve the thread; no commit.
 - Pre-existing (code this PR did not change): reply "pre-existing, out of
@@ -72,23 +77,22 @@ the fixing commit SHA (Important) or the one-line reason (declined).
 
 ROUND CAP: a round is one push answering review feedback plus the bot
 re-review it triggers; merge-only and CI-flake pushes do not count. Round 1
-may re-verify the whole PR; from round 2 on, re-verify only the files the
-latest push changed. If new Important findings still arrive after round 3,
+may re-verify the whole PR; from round 2 on, re-verify changed code and
+affected interactions, broadening only when a contract or base invalidates evidence.
+If new Important findings still arrive after round 3,
 stop pushing and report the recurring findings, their bug class, and
 whether the approach needs rethinking — a fourth round is the user's call.
 
-WATCH LOOP: after each push, CI starts a new run. Poll per-job status via
-`gh pr checks {PR_NUMBER}`, not just the run-level aggregate — the moment
-any single non-skipped check reports FAILURE, or new review feedback lands,
-stop waiting on the rest of that run's still-pending checks and act on it
-immediately (review feedback goes through TRIAGE first). You never need
-every check in a run to finish, or the full ~10-minute quiet window to
-elapse, before reacting to something already
-actionable. Only treat the ~10-minute wait as genuine idle time once every
-currently-visible check is passing or still pending with zero failures and
-there is no unaddressed feedback. Reset the quiet-window timer on any new
-feedback or push. Run one extra quiet window before declaring done, as
-insurance against reviewer lag.
+WATCH LOOP: inspect individual jobs so a failed blocking check is actionable
+while other jobs run. Use ship-workflow's sourced required/advisory policy;
+never classify a job as advisory merely because it is slow, red or a bot.
+Batch substantive fixes before a coherent push. Re-run checks covering
+changed inputs or integration context, not passing unrelated checks.
+Once acceptance, required checks and reviews pass, read current PR state,
+head/base and feedback again and report readiness. No quiet timer or extra
+insurance wait applies. Pending or unreadable required evidence still
+blocks; pending advisory feedback does not. Report a later substantive
+finding when received without requiring every advisory bot to become silent.
 
 Report your final status against every termination condition explicitly —
 don't just say "done" — plus the number of review rounds used. If you cannot

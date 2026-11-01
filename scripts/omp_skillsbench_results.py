@@ -7,7 +7,6 @@ approved treatment inputs in temporary isolated directories, validates the exact
 without retaining prompts, assistant content, or stream events.
 """
 
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -200,8 +199,7 @@ def materialize_condition(
         raise OmpResultError(f"undeclared treatment condition: {condition}")
     destination.mkdir(parents=True, exist_ok=False)
     for treatment in contract.treatments:
-        relative = treatment.source.relative_to(_REPO_ROOT)
-        output = _safe_destination(destination, relative)
+        output = _safe_destination(destination, treatment.destination)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(_condition_content(treatment, condition), encoding="utf-8")
     content_hash, files = _bundle_hash(destination)

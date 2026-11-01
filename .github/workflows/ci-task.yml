@@ -1,0 +1,90 @@
+name: CI Task
+
+on:
+  workflow_call:
+    inputs:
+      task:
+        required: true
+        type: string
+      suite:
+        default: ''
+        type: string
+      base:
+        default: ''
+        type: string
+      native:
+        default: false
+        type: boolean
+      bun:
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: '0.6.14'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - if: inputs.bun || inputs.native
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: extensions/package.json
+      - if: inputs.bun || inputs.native
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('extensions/bun.lock', 'extensions/package.json') }}
+      - if: inputs.bun || inputs.native
+        run: bun install --cwd extensions --frozen-lockfile
+      - if: inputs.native
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/claude-code
+          key: claude-static-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('extensions/native-hosts.json') }}
+      - name: Expose credential-free pinned native tools
+        if: inputs.native
+        run: |
+          echo "${GITHUB_WORKSPACE}/extensions/node_modules/.bin" >> "${GITHUB_PATH}"
+          uv run --locked python scripts/acquire_claude.py --dest "${RUNNER_TEMP}/claude-code"
+          echo "${RUNNER_TEMP}/claude-code" >> "${GITHUB_PATH}"
+      - name: Run shared local command
+        env:
+          CI_TASK: ${{ inputs.task }}
+          CI_SUITE: ${{ inputs.suite }}
+          CI_BASE: ${{ inputs.base }}
+        run: uv run --locked python scripts/ci.py run "$CI_TASK" --suite "$CI_SUITE" --base "$CI_BASE"
+      - name: Package reproducible adapter artifacts
+        shell: bash
+        if: inputs.task == 'package'
+        run: |
+          pack() {
+            dir="$1"; out="$2"; shift 2
+            tar --sort=name --mtime='UTC 1980-01-01' \
+              --owner=0 --group=0 --numeric-owner --format=gnu \
+              -cf - -C "$dir" "$@" | gzip -n > "dist/$out"
+          }
+          pack adapters/cursor armory-cursor.tar.gz .cursor
+          pack adapters/codex armory-codex.tar.gz AGENTS.md standards agents workflows skills
+          pack adapters/gemini armory-gemini.tar.gz .gemini
+      - name: Stage full release artifacts
+        if: inputs.task == 'package' && github.event_name == 'push'
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: packages
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7

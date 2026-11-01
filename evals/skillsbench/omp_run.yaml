@@ -26,6 +26,8 @@ targets:
 # The reduced condition keeps reviewed load-bearing sections; strengthened-contract
 # appends the stated invariant to the complete pinned source. Materialization
 # records fresh content hashes; it does not authorize a live comparison run.
+# An immutable snapshot may supply source bytes while source retains the logical
+# materialization path, preserving historical bundle and condition identities.
 treatments:
   - package: agent/security-reviewer
     source: agents/security-reviewer/AGENT.md
@@ -54,6 +56,7 @@ treatments:
     strengthened_append: "Security exceptions require an explicit owner, compensating control, expiry, and verification command; undocumented exceptions are rejected."
   - package: skill/pr-review
     source: skills/pr-review/SKILL.md
+    snapshot: evals/skillsbench/source-snapshots/pr-review-776a618c/SKILL.md
     source_sha256: 776a618c37d1b9c0ae5466f5af06f506056d69b574c3dd93557217b5bef96c54
     reduced_sections: ["Workflow", "Output Format", "Error Handling", "Calibration Rules", "Verification"]
     strengthened_append: "Every approval must identify the tested behavioral contract and name unresolved risks; a green test suite alone is not an approval rationale."

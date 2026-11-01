@@ -2,104 +2,67 @@ name: Package All
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
-  # Packaging used to be main-only, so a break in it was invisible until after merge.
-  # PRs run every build and validation step; the release steps below stay gated on
-  # main and tags.
-  # No base-branch filter: a pull request stacked on another pull request's
-  # branch must be gated too.
+    branches: [main]
+    tags: ['v*']
   pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  build:
+    uses: ./.github/workflows/ci-task.yml
+    with:
+      task: package
+      bun: true
+      # No base means all packages. Queue/main/tag builds always validate the
+      # checked-out integration candidate; only PR archives may be selected.
+      base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+
   package:
+    name: package
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Required package readiness
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python scripts/ci.py ready --needs "$CI_NEEDS" --expect build
+
+  release:
+    # Never release PR refs, merge queue candidates, or manually supplied refs.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           version: '0.6.14'
-
-      - name: Install project environment
-        run: uv sync --locked
-
-      # Native extension archives bundle helpers with the workspace-pinned Bun.
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          bun-version-file: extensions/package.json
-
-      - name: Install extension workspace
-        run: bun install --cwd extensions --frozen-lockfile
-
-      - name: Verify native fixture archives
-        run: uv run python -m pytest tests/test_extensions_packaging.py::test_native_package_archives_are_reproducible -q
-
-      - name: Validate manifest
-        run: |
-          uv run python scripts/generate_manifest.py
-          git diff --exit-code manifest.yaml
-
-      - name: Generate and validate adapters
-        run: uv run python scripts/generate_adapters.py --validate
-
-      - name: Package adapter artifacts
-        run: |
-          mkdir -p dist
-          # tar records mtimes and gzip records its own timestamp, so an unchanged
-          # tree still produced a different tarball on every run. Pinning both keeps
-          # the artifacts byte-identical, which is what checksum-based release syncing
-          # and download verification depend on.
-          pack() {
-            dir="$1"; out="$2"; shift 2
-            tar --sort=name \
-                --mtime='UTC 1980-01-01' \
-                --owner=0 --group=0 --numeric-owner \
-                --format=gnu \
-                -cf - -C "${dir}" "$@" | gzip -n > "dist/${out}"
-          }
-          pack adapters/cursor armory-cursor.tar.gz .cursor
-          pack adapters/codex  armory-codex.tar.gz AGENTS.md standards agents workflows skills
-          pack adapters/gemini armory-gemini.tar.gz .gemini
-          echo "Adapter artifacts:"
-          ls -lh dist/armory-*.tar.gz
-
-      - name: Package all items
-        run: |
-          mkdir -p dist
-          # Registered native extensions (extensions/<name>/EXTENSION.md) package as
-          # one built archive per host; unregistered prefix sources and fixtures
-          # carry no top-level definition and are never packaged.
-          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md extensions:EXTENSION.md"
-
-          for mapping in $DEFINITION_MAP; do
-            type_dir="${mapping%%:*}"
-            def_file="${mapping#*:}"
-            if [ -d "${type_dir}" ]; then
-              for pkg_dir in ${type_dir}/*/; do
-                if [ -f "${pkg_dir}${def_file}" ]; then
-                  echo "Packaging ${pkg_dir}..."
-                  uv run python scripts/package.py "${pkg_dir}" --output-dir dist
-                else
-                  echo "Skipping ${pkg_dir} — no ${def_file} found"
-                fi
-              done
-            fi
-          done
-
+          name: packages
+          path: dist
       - name: Write release notes
         if: github.ref == 'refs/heads/main'
         run: |
@@ -110,35 +73,20 @@ jobs:
           For stable releases, use a versioned tag (e.g., `v1.0.0`).
           NOTES
           echo "" >> dist-notes.md
-          echo "**Last updated:** ${{ github.sha }}" >> dist-notes.md
-
-      # Both release steps sync through scripts/sync_release_assets.py rather than
-      # re-uploading dist/* wholesale. Uploading every artifact on every push cost two
-      # API calls per package in a burst and eventually failed the job with GitHub's
-      # secondary rate limit. The script compares each artifact against a checksums.txt
-      # manifest stored on the release and uploads only what changed, with throttled
-      # batches and retry-with-backoff for the cold-start case.
+          echo "**Last updated:** ${GITHUB_SHA}" >> dist-notes.md
       - name: Create versioned release
         if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          uv run python scripts/sync_release_assets.py \
-            --tag "${GITHUB_REF_NAME}" \
-            --dist dist \
-            --target "${GITHUB_SHA}" \
-            --prune
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+        run: |
+          uv run --locked python scripts/sync_release_assets.py \
+            --tag "${GITHUB_REF_NAME}" --dist dist --target "${GITHUB_SHA}" --prune
       - name: Update latest release
         if: github.ref == 'refs/heads/main'
-        run: |
-          uv run python scripts/sync_release_assets.py \
-            --tag latest \
-            --dist dist \
-            --target "${GITHUB_SHA}" \
-            --title "Latest Packages (rolling)" \
-            --notes-file dist-notes.md \
-            --prerelease \
-            --no-make-latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run --locked python scripts/sync_release_assets.py \
+            --tag latest --dist dist --target "${GITHUB_SHA}" \
+            --title "Latest Packages (rolling)" --notes-file dist-notes.md \
+            --prerelease --no-make-latest

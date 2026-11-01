@@ -66,12 +66,36 @@ def _fingerprint(data: dict[str, Any]) -> str:
     """Identity of a decision; routine is the default level and adds nothing to it."""
     if data.get("assurance") == "routine":
         del data["assurance"]
+    if not data.get("advisory_checks"):
+        data.pop("advisory_checks", None)
     decision = data.get("decision")
     if isinstance(decision, dict) and decision.get("assurance") == "routine":
         del decision["assurance"]
+    if isinstance(decision, dict) and not decision.get("advisory_checks"):
+        decision.pop("advisory_checks", None)
     return hashlib.sha256(
         json.dumps(data, sort_keys=True, ensure_ascii=True).encode()
     ).hexdigest()
+
+
+@dataclass(frozen=True)
+class AdvisoryCheck:
+    """Exact sourced logical-job identity, never a display-name exemption."""
+
+    check: str
+    publisher: str
+    app_id: int
+    workflow_id: int | None
+    event: str | None
+
+    def matches(self, check: Check) -> bool:
+        return (
+            self.check == check.name
+            and self.publisher == check.app_slug
+            and self.app_id == check.app_id
+            and self.workflow_id == check.workflow_id
+            and self.event == check.event
+        )
 
 
 @dataclass(frozen=True)
@@ -89,6 +113,7 @@ class Policy:
     protected_refs: tuple[str, ...] = ()
     ci_free: bool = False
     assurance: str = "routine"
+    advisory_checks: tuple[AdvisoryCheck, ...] = ()
 
     @property
     def fingerprint(self) -> str:
@@ -152,6 +177,7 @@ _DECISION_FIELDS = {
     "protected_refs",
     "ci_free",
     "assurance",
+    "advisory_checks",
 }
 _OID_PATTERN = r"(?:[a-f0-9]{40}|[a-f0-9]{64})"
 
@@ -169,6 +195,7 @@ class Decision:
     protected_refs: tuple[str, ...]
     ci_free: bool
     assurance: str = "routine"
+    advisory_checks: tuple[AdvisoryCheck, ...] = ()
 
     def bound(self, head_sha: str, base_sha: str) -> Policy:
         return Policy(
@@ -183,6 +210,7 @@ class Decision:
             self.protected_refs,
             self.ci_free,
             self.assurance,
+            self.advisory_checks,
         )
 
 
@@ -275,6 +303,54 @@ def load_policy(path: Path) -> Policy:
     return parse_decision(raw).bound(str(revisions[0]), str(revisions[1]))
 
 
+def _advisory_checks(value: object) -> tuple[AdvisoryCheck, ...]:
+    if not isinstance(value, list) or len(value) > 256:
+        raise ValueError(
+            "advisory_checks must be a list of at most 256 exact identities"
+        )
+    result: list[AdvisoryCheck] = []
+    for row in value:
+        if not isinstance(row, dict) or set(row) != {
+            "check",
+            "publisher",
+            "app_id",
+            "workflow_id",
+            "event",
+        }:
+            raise ValueError(
+                "advisory check needs check, publisher, app_id, workflow_id and event"
+            )
+        for field in ("check", "publisher"):
+            text = row[field]
+            if (
+                not isinstance(text, str)
+                or not text.strip()
+                or re.search(r"[\x00-\x1f\x7f*?]", text)
+            ):
+                raise ValueError(f"advisory {field} must be an exact nonempty identity")
+        app_id, workflow_id, event = row["app_id"], row["workflow_id"], row["event"]
+        if type(app_id) is not int or app_id <= 0:
+            raise ValueError("advisory app_id must be a positive publisher ID")
+        if workflow_id is not None and (
+            type(workflow_id) is not int or workflow_id <= 0
+        ):
+            raise ValueError("advisory workflow_id must be a positive ID or null")
+        if event is not None and (
+            not isinstance(event, str) or re.fullmatch(r"[a-z_]+", event) is None
+        ):
+            raise ValueError("advisory event must be an exact event or null")
+        if (workflow_id is None) != (event is None):
+            raise ValueError(
+                "advisory workflow_id and event must both be present or null"
+            )
+        result.append(
+            AdvisoryCheck(row["check"], row["publisher"], app_id, workflow_id, event)
+        )
+    if len(set(result)) != len(result):
+        raise ValueError("advisory_checks must be unique")
+    return tuple(result)
+
+
 def parse_decision(raw: dict[str, object]) -> Decision:
     assurance = raw.get("assurance", "routine")
     if assurance not in ASSURANCES:
@@ -289,6 +365,9 @@ def parse_decision(raw: dict[str, object]) -> Decision:
         "sources",
         empty=False,
     )
+    advisory = _advisory_checks(raw.get("advisory_checks", []))
+    if advisory and ("sources" not in raw or sources == PROVIDER_SOURCES):
+        raise ValueError("advisory_checks requires explicit repository policy sources")
     expected = (
         _strings(raw.get("expected_checks"), "expected_checks")
         if explicit_expected or not routine
@@ -326,6 +405,7 @@ def parse_decision(raw: dict[str, object]) -> Decision:
         protected,
         ci_free,
         str(assurance),
+        advisory,
     )
 
 
@@ -389,7 +469,47 @@ def _identity(check: Check) -> dict[str, object]:
     }
 
 
+def _is_advisory(check: Check, observation: Observation, policy: Policy) -> bool:
+    # Both provider mandates (including publisher-specific ones) and the sourced
+    # repository blocking inventory outrank an advisory declaration.
+    mandatory = (
+        set(observation.required_checks)
+        | set(policy.expected_checks)
+        | {name for name, _ in observation.required_apps}
+    )
+    return check.name not in mandatory and any(
+        identity.matches(check) for identity in policy.advisory_checks
+    )
+
+
 def evaluate(
+    observation: Observation, policy: Policy | None, *, native_stack: bool = False
+) -> Gate:
+    gate = _evaluate(observation, policy, native_stack=native_stack)
+    if policy is None:
+        return gate
+    advisory = [
+        {
+            **_identity(check),
+            "app_id": check.app_id,
+            "head_sha": check.head_sha,
+            "base_sha": check.base_sha,
+            "status": check.status,
+            "conclusion": check.conclusion,
+            "url": check.url,
+            "retargeted": check.retargeted,
+        }
+        for check in observation.checks
+        if _is_advisory(check, observation, policy)
+    ]
+    if advisory:
+        return Gate(
+            gate.status, gate.reason, {**gate.details, "advisory_checks": advisory}
+        )
+    return gate
+
+
+def _evaluate(
     observation: Observation, policy: Policy | None, *, native_stack: bool = False
 ) -> Gate:
     """Decide from current identity, all applicable checks and provider policy.
@@ -401,10 +521,9 @@ def evaluate(
     With ``policy=None`` a routine observation is judged by the provider-derived
     decision (:func:`routine_policy`); a high-assurance observation always needs
     an explicit decision. A decision and the observation it judges must share
-    one assurance level. Every applicable current row is judged on its own: rows
-    sharing a display name (push versus pull_request, different workflows or
-    publishers) are never merged or rejected as ambiguous, and any one failing or
-    pending row keeps the gate closed.
+    one assurance level. Unclassified rows remain blocking independently of other
+    rows sharing their display name. Only exact sourced advisory identities that
+    are not provider- or repository-mandated are excluded from readiness.
     """
     pr = observation.pr
     if pr.state == "CLOSED":
@@ -512,6 +631,11 @@ def evaluate(
                 "issues": incomplete,
             },
         )
+    blocking_checks = tuple(
+        check
+        for check in observation.checks
+        if not _is_advisory(check, observation, policy)
+    )
     unresolved_checkout = [
         issue
         for issue in observation.issues
@@ -528,7 +652,7 @@ def evaluate(
                 or observation.require_current_base
                 and check.name in observation.required_checks
             )
-            for check in observation.checks
+            for check in blocking_checks
         )
     ):
         return Gate(
@@ -564,7 +688,7 @@ def evaluate(
                 "missing_checks": missing,
             },
         )
-    if not present and not policy.ci_free:
+    if not blocking_checks and not policy.ci_free:
         return Gate("NEEDS_JUDGMENT", "empty CI is not evidence of GREEN", {})
     for name, app_id in observation.required_apps:
         candidates = [
@@ -604,7 +728,7 @@ def evaluate(
             "the PR head does not contain the current base required by strict policy",
             {"base_sha": pr.base_sha},
         )
-    for check in observation.checks:
+    for check in blocking_checks:
         if check.head_sha != pr.head_sha:
             return Gate(
                 "WAITING",

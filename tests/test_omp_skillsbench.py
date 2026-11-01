@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts import omp_skillsbench
 from scripts.omp_skillsbench import (
@@ -79,6 +80,19 @@ def test_rejects_source_revision_drift(tmp_path: Path) -> None:
     )
 
     with pytest.raises(OmpRunConfigError, match="source revision changed"):
+        load_omp_run_contract(path)
+
+
+@pytest.mark.parametrize(
+    "snapshot", ["../escape.md", "/escape.md", None, "", "missing.md"]
+)
+def test_rejects_invalid_snapshot_source(tmp_path: Path, snapshot: object) -> None:
+    document = yaml.safe_load(_CONTRACT_PATH.read_text(encoding="utf-8"))
+    document["treatments"][0]["snapshot"] = snapshot
+    path = tmp_path / "omp_run.yaml"
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+
+    with pytest.raises(OmpRunConfigError, match="snapshot|source file is unavailable"):
         load_omp_run_contract(path)
 
 

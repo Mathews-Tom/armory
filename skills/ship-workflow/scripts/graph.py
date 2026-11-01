@@ -580,6 +580,8 @@ def _decision_json(decision: Decision) -> dict[str, object]:
     # decision keeps the identity it was saved with; an absent key is "routine".
     if decision.assurance != "routine":
         row["assurance"] = decision.assurance
+    if decision.advisory_checks:
+        row["advisory_checks"] = [asdict(check) for check in decision.advisory_checks]
     if (
         decision.assurance == "routine"
         and not decision.expected_checks

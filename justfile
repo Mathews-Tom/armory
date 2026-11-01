@@ -78,3 +78,15 @@ check:
     just validate
     just test
     just check-extensions
+
+# The same full validation tasks as CI, with isolated package interpreters.
+# Pass a base commit/ref for PR comparison, including staged/unstaged/untracked edits.
+ci base="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    uv sync --locked
+    bun install --cwd extensions --frozen-lockfile
+    host_cache="${XDG_CACHE_HOME:-$HOME/.cache}/armory/claude-code"
+    uv run --locked python scripts/acquire_claude.py --dest "$host_cache"
+    export PATH="$PWD/extensions/node_modules/.bin:$host_cache:$PATH"
+    uv run --locked python scripts/ci.py run all --base {{quote(base)}}

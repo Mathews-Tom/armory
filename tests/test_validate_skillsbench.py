@@ -99,7 +99,7 @@ def test_included_sample_is_the_frozen_treatment_population() -> None:
 
     assert included == {treatment["package"] for treatment in treatments}
     for treatment in treatments:
-        source = _REPO_ROOT / treatment["source"]
+        source = _REPO_ROOT / treatment.get("snapshot", treatment["source"])
         assert (
             hashlib.sha256(source.read_bytes()).hexdigest()
             == treatment["source_sha256"]

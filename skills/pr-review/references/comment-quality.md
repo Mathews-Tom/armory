@@ -54,7 +54,7 @@ Search for ways comments could be misinterpreted:
 ### Summary
 Brief overview of scope and findings.
 
-### Critical Issues (factually incorrect or misleading)
+### Blocking Issues (misleading contracts with a concrete failing use)
 - `file:line` — Issue description. Suggested rewrite.
 
 ### Improvement Opportunities
@@ -67,5 +67,4 @@ Brief overview of scope and findings.
 - Well-written comments that serve as good examples.
 ```
 
-This analysis is advisory only — identify issues and suggest improvements, do not
-modify code directly.
+This analysis is read-only. Apply impact-based severity: misleading usage or safety contracts can block, but ordinary wording, removal and completeness suggestions remain optional. Omit optional polish unless useful or requested; do not create another fix/review cycle for it.

@@ -7,8 +7,8 @@ cases:
     rubric:
       - "states the size class before writing and chooses the large class for several dependent milestones"
       - "creates DEVELOPMENT_PLAN.md and EXECUTION_PROMPTS.md under .docs and no other files"
-      - "each milestone has a user-observable outcome, Done when acceptance and exact verification"
-      - "each /goal block stays within 600 words and ends with a literal NEXT STEPS: block"
+      - "each active milestone has a user-observable outcome, Done when acceptance and exact verification; distant roadmap items have no invented check detail"
+      - "only actionable milestones have /goal blocks within 600 words, each carrying the project destination and contribution and ending with literal NEXT STEPS:"
     trigger_expected: true
     assertions:
       - type: contains
@@ -34,7 +34,7 @@ cases:
     fixtures: []
     rubric:
       - "treats the first explicit file as primary source of truth"
-      - "caps each milestone planned stack at the requested depth"
+      - "defaults to a single cohesive PR; uses the hint only as a ceiling for a justified shallow stack, not four required PRs"
       - "keeps assumptions and gaps visible rather than burying them in prose"
     trigger_expected: true
     assertions:
@@ -56,6 +56,7 @@ cases:
       - "classifies the request as the small size class because it fits in one PR"
       - "returns a single /goal prompt of about 200 words in chat, writes no plan files and references no plan file or plan section"
       - "acceptance is a user-observable Done when row plus the repo's existing checks; no added review rounds or qualification"
+      - "carries the project workflow and bounded contribution and identifies the prompt as runnable by milestone-runner without generating plan files"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -159,6 +160,86 @@ cases:
       - type: contains
         target: "HUMAN REVIEW GATE"
         weight: 1.0
+
+  - id: necessary_now_not_merely_vision_relevant
+    prompt: >
+      Plan the first usable CSV import from docs/spec.md. The approved vision includes third-party import plugins and multiple databases,
+      but the current workflow imports one local CSV into the existing database. An internal proposal wants a plugin registry,
+      universal storage adapter and metrics dashboard first. Import must prevent duplicate records on retry, and the new record ID
+      will become a permanent external identifier. Choose what belongs now and what should wait.
+    fixtures: []
+    rubric:
+      - "keeps current import correctness including duplicate prevention and the irreversible external-ID constraint in the usable slice"
+      - "defers the plugin registry, universal storage adapter and dashboard absent a necessary-now consumer despite their relevance to the vision"
+      - "gives concrete revisit conditions such as an approved second importer or second database, not vague future hardening"
+      - "preserves an ordinary maintainable boundary rather than replacing deferred abstractions with equivalent infrastructure work"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(defer|not now|follow-up)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(duplicate|retry|external.{0,20}(ID|identifier)|irreversible)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(revisit|second importer|second database)"
+        weight: 0.8
+
+  - id: rolling_wave_actionable_prompts_only
+    prompt: >
+      Generate the plan and execution prompts for an approved reporting product. M1 lets an operator export the current report as CSV
+      using the existing CLI; its acceptance and local checks are known. Later M2 adds scheduled delivery once the owner chooses the
+      delivery channel, and M3 adds multi-team access after the tenancy decision. Only M1 is ready. Keep the project destination visible.
+    fixtures: []
+    rubric:
+      - "details M1's working workflow, acceptance and verification and emits its actionable prompt with the project destination and contribution"
+      - "keeps M2 and M3 to roadmap outcomes, dependencies and unresolved constraints, without invented PR/file/check detail or placeholder prompts"
+      - "explains that the runner materializes a next-ready prompt from approved outcomes and constraints using current repo detail without routine owner approval"
+      - "retains owner approval for delivery/tenancy decisions and any outcome or acceptance changes"
+      - "defaults M1 to one cohesive PR and does not turn later roadmap items into mandatory stack layers"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(roadmap|rolling.wave)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(materializ|render|activat).{0,100}(prompt|ready)"
+        weight: 0.8
+
+  - id: roadmap_only_has_no_synthetic_execution
+    prompt: >
+      Update DEVELOPMENT_PLAN.md with only the approved future outcome: teams can share a report once the owner resolves tenancy.
+      There is no actionable implementation milestone yet. Keep it as a roadmap rather than inventing scope or acceptance.
+    fixtures: []
+    rubric:
+      - "records the outcome and unresolved tenancy constraint without speculative implementation, checks or PR breakdown"
+      - "does not write EXECUTION_PROMPTS.md or a placeholder /goal just to satisfy a universal two-file rule"
+      - "does not claim that future roadmap work has runnable acceptance or completed verification"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(roadmap|not actionable|no actionable)"
+        weight: 0.9
+
+  - id: active_prompt_delegates_ci_and_bounds_review
+    prompt: >
+      Generate an execution prompt for the approved export milestone. Repo policy requires unit and security checks and explicitly
+      classifies the nightly performance report as advisory. It also requires local CLI preflight. The work fits one PR, though
+      the planning template previously used two PRs by default. Keep correctness review substantive without an open-ended loop.
+    fixtures: []
+    rubric:
+      - "uses one cohesive PR and carries local preflight plus the observed export interaction"
+      - "preserves unit/security required checks and delegates classification/landing to repository policy and ship-workflow"
+      - "reports an advisory failure without calling it green and does not exempt an unclassified failing job"
+      - "specifies one primary review, targeted re-review after fixes and escalation after at most three unsuccessful fix rounds without merging defects"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(advisory|ship-workflow)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(three|3).{0,70}(round|fix|unsuccessful)"
+        weight: 0.8
 
   - id: negative_existing_plan_review
     prompt: >

@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from github_ops import Check, Observation, PullRequest, Repository
 from lifecycle import (
+    AdvisoryCheck,
     Binding,
     Decision,
     Policy,
@@ -108,6 +109,236 @@ def test_failed_nonrequired_job_still_prevents_green() -> None:
     result = evaluate(current, policy())
     assert result.status == "NEEDS_JUDGMENT"
     assert result.details["check"] == "security"
+
+
+def advisory_job() -> Check:
+    return replace(
+        observed().checks[0],
+        name="metrics",
+        app_id=15368,
+        workflow_id=42,
+        event="pull_request",
+    )
+
+
+def advisory_policy(assurance: str = "high") -> Policy:
+    return replace(
+        policy(assurance),
+        advisory_checks=(
+            AdvisoryCheck("metrics", "github-actions", 15368, 42, "pull_request"),
+        ),
+    )
+
+
+@pytest.mark.parametrize("assurance", ["routine", "high"])
+@pytest.mark.parametrize(
+    "status,conclusion",
+    [
+        ("completed", "failure"),
+        ("in_progress", None),
+        ("queued", None),
+    ],
+)
+def test_explicit_advisory_red_or_pending_is_reported_without_veto(
+    assurance: str, status: str, conclusion: str | None
+) -> None:
+    current = observed(assurance)
+    advisory = replace(
+        advisory_job(),
+        status=status,
+        conclusion=conclusion,
+        base_sha="c" * 40,
+        retargeted=True,
+    )
+    current = replace(
+        current,
+        checks=current.checks + (advisory,),
+        require_current_base=True,
+        head_contains_base=True,
+    )
+    result = evaluate(current, advisory_policy(assurance))
+    assert result.status == "READY"
+    assert result.details["advisory_checks"] == [
+        {
+            "check": "metrics",
+            "publisher": "github-actions",
+            "app_id": 15368,
+            "workflow_id": 42,
+            "event": "pull_request",
+            "head_sha": HEAD,
+            "base_sha": "c" * 40,
+            "status": status,
+            "conclusion": conclusion,
+            "url": advisory.url,
+            "retargeted": True,
+        }
+    ]
+
+
+@pytest.mark.parametrize("ci_free", [False, True])
+def test_advisory_only_ci_needs_explicit_ci_free_authority(
+    tmp_path: Path, ci_free: bool
+) -> None:
+    packet = tmp_path / "policy.json"
+    packet.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "head_sha": HEAD,
+                "base_sha": BASE,
+                "sources": ["repository CI policy at the bound base"],
+                "merge_method": "squash",
+                "ci_free": ci_free,
+                "advisory_checks": [
+                    {
+                        "check": "metrics",
+                        "publisher": "github-actions",
+                        "app_id": 15368,
+                        "workflow_id": 42,
+                        "event": "pull_request",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    current = replace(observed("routine"), required_checks=(), checks=(advisory_job(),))
+    result = evaluate(current, load_policy(packet))
+    assert result.status == ("READY" if ci_free else "NEEDS_JUDGMENT")
+
+
+@pytest.mark.parametrize("mandate", ["provider", "publisher", "repository"])
+def test_required_advisory_conflict_keeps_failure_blocking(mandate: str) -> None:
+    current = observed()
+    current = replace(
+        current,
+        checks=current.checks + (replace(advisory_job(), conclusion="failure"),),
+    )
+    decision = advisory_policy()
+    if mandate == "repository":
+        decision = replace(decision, expected_checks=("tests", "metrics"))
+    elif mandate == "provider":
+        current = replace(current, required_checks=("tests", "metrics"))
+        decision = replace(decision, expected_checks=("tests", "metrics"))
+    else:
+        current = replace(current, required_apps=(("metrics", 15368),))
+    result = evaluate(current, decision)
+    assert result.status == "NEEDS_JUDGMENT"
+    assert result.details["check"] == "metrics"
+    assert "advisory_checks" not in result.details
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"workflow_id": 43},
+        {"event": "push"},
+        {"app_id": 999},
+        {"app_slug": "other-publisher"},
+        {"name": "other-job"},
+    ],
+)
+def test_advisory_identity_does_not_exempt_other_jobs(
+    changes: dict[str, object],
+) -> None:
+    current = observed()
+    extra = replace(advisory_job(), conclusion="failure", **changes)
+    current = replace(current, checks=current.checks + (extra,))
+    assert evaluate(current, advisory_policy()).status == "NEEDS_JUDGMENT"
+
+
+@pytest.mark.parametrize(
+    "issue",
+    [
+        "checks-unavailable: denied",
+        "actions-run-unresolved: missing",
+        "retarget-freshness-unavailable: unreadable",
+    ],
+)
+def test_advisory_classification_never_hides_unreadable_evidence(issue: str) -> None:
+    current = replace(
+        observed(), issues=(issue,), checks=(observed().checks[0], advisory_job())
+    )
+    assert evaluate(current, advisory_policy()).status == "NEEDS_JUDGMENT"
+
+
+@pytest.mark.parametrize("schema", [1, 2])
+def test_policy_packet_roundtrip_retains_advisory_identity(
+    tmp_path: Path, schema: int
+) -> None:
+    packet: dict[str, object] = {
+        "schema_version": schema,
+        "merge_method": "squash",
+        "sources": ["ci-policy.md at current base"],
+        "advisory_checks": [
+            {
+                "check": "metrics",
+                "publisher": "github-actions",
+                "app_id": 15368,
+                "workflow_id": 42,
+                "event": "pull_request",
+            }
+        ],
+    }
+    if schema == 1:
+        packet.update(head_sha=HEAD, base_sha=BASE)
+    else:
+        packet["binding"] = {"head": HEAD, "base": {"ref": "main", "oid": BASE}}
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps(packet))
+    loaded = load_decision(path)
+    decision = loaded.bind(HEAD, BASE) if isinstance(loaded, Binding) else loaded
+    current = replace(
+        observed("routine"),
+        checks=(
+            observed("routine").checks[0],
+            replace(advisory_job(), conclusion="failure"),
+        ),
+    )
+    assert evaluate(current, decision).status == "READY"
+    assert decision.advisory_checks == advisory_policy("routine").advisory_checks
+    assert decision.fingerprint != replace(decision, advisory_checks=()).fingerprint
+    assert (
+        evaluate(
+            replace(current, pr=replace(current.pr, base_sha="c" * 40)), decision
+        ).status
+        == "NEEDS_JUDGMENT"
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"sources": ["provider"]},
+        {"sources": []},
+        {"advisory_checks": ["metrics"]},
+        {"advisory_checks": [{"check": "*"}]},
+    ],
+)
+def test_advisory_packets_need_sourced_exact_classification(
+    tmp_path: Path, change: dict[str, object]
+) -> None:
+    packet: dict[str, object] = {
+        "schema_version": 1,
+        "head_sha": HEAD,
+        "base_sha": BASE,
+        "merge_method": "squash",
+        "sources": ["ci-policy.md"],
+        "advisory_checks": [
+            {
+                "check": "metrics",
+                "publisher": "github-actions",
+                "app_id": 15368,
+                "workflow_id": 42,
+                "event": "pull_request",
+            }
+        ],
+    }
+    packet.update(change)
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps(packet))
+    with pytest.raises(ValueError):
+        load_policy(path)
 
 
 @pytest.mark.parametrize(
@@ -779,3 +1010,54 @@ def test_saved_assurance_never_silently_weakens() -> None:
     for saved in ("high", None):
         refusal = assurance_refusal(saved, "routine")
         assert refusal is not None and "assurance" in refusal[0]
+
+
+def test_native_gate_uses_the_same_advisory_policy() -> None:
+    current = observed()
+    current = replace(
+        current,
+        pr=replace(current.pr, native=True),
+        checks=current.checks + (replace(advisory_job(), conclusion="failure"),),
+    )
+    assert evaluate(current, advisory_policy()).status == "BLOCKED"
+    result = evaluate(current, advisory_policy(), native_stack=True)
+    assert result.status == "READY"
+    assert result.details["advisory_checks"]
+
+
+def test_advisory_never_hides_missing_required_publisher() -> None:
+    current = observed()
+    current = replace(
+        current,
+        checks=current.checks + (replace(advisory_job(), app_id=None),),
+        required_apps=(("metrics", 15368),),
+    )
+    result = evaluate(current, advisory_policy())
+    assert result.status == "NEEDS_JUDGMENT"
+    assert result.reason == "required check publisher identity is unavailable"
+    assert "advisory_checks" not in result.details
+
+
+def test_only_exact_external_check_publisher_can_be_advisory() -> None:
+    current = observed()
+    extra = replace(
+        advisory_job(),
+        app_slug="quality-service",
+        app_id=81,
+        workflow_id=None,
+        event=None,
+        conclusion="failure",
+    )
+    current = replace(current, checks=current.checks + (extra,))
+    decision = replace(
+        policy(),
+        advisory_checks=(AdvisoryCheck("metrics", "quality-service", 81, None, None),),
+    )
+    assert evaluate(current, decision).status == "READY"
+    assert (
+        evaluate(
+            replace(current, checks=current.checks + (replace(extra, app_id=None),)),
+            decision,
+        ).status
+        == "NEEDS_JUDGMENT"
+    )

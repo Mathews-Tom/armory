@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.1.0 — 2026-11-01
+
+### Changed
+
+- Separate the north-star project workflow from near-term commitments. Enablers and architecture must be necessary now for a current consumer, correctness/safety, mandatory rule or irreversible constraint; otherwise defer with a concrete revisit condition while preserving ordinary maintainability.
+- Use rolling-wave detail: active milestones receive actionable prompts, distant roadmap items only outcomes, dependencies and unresolved constraints. The runner can materialize a newly ready prompt and routine detail without an approval cycle, preserving authorized outcomes and acceptance.
+- Default to one cohesive PR, with shallow stacks only for a real review, integration or dependency benefit. Unmerged interface dependencies require explicit owner or approved-plan authority.
+- Carry concise project destination and milestone contribution in active prompts; small chat `/goal` prompts hand directly to the runner without synthetic plan files. Roadmap-only requests need no execution file.
+- Delegate CI classification and landing to repository policy and `ship-workflow`, preserving required gates and truthful advisory reporting. Use one substantive review per PR, cumulative stack integration checks and targeted re-review; escalate after three unsuccessful fix rounds without merging defects.
+- Add scenarios for necessity-now tradeoffs, rolling-wave activation, roadmap-only output and direct small-goal handoff. These are authored specifications, not executed behavioral evidence.
+
 ## 3.0.0 — 2026-10-26
 
 ### BREAKING — Judicious, size-matched planning

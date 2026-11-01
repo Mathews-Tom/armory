@@ -2,7 +2,7 @@
 name: stacked-prs
 description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs", "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use when local branches or one source branch need a dependency-ordered PR stack with correct parent bases, validation, synchronization and optional GitHub-native stack support, or when an existing stack needs its topology, provenance and native membership resolved before its landing and cleanup are delegated to the ship-workflow lifecycle.'
 metadata:
-  version: 0.5.0
+  version: 0.6.0
   category: development
   tags: [git, pull-requests, stacked-prs, github-native, workflow]
   difficulty: advanced
@@ -39,6 +39,8 @@ Landing, post-landing promotion and retargeting, and cleanup of an existing manu
 | An existing stack must be landed or cleaned after landing (delegated in §5) | General Git commands for unrelated branch cleanup |
 
 ## Core Rules
+
+- Prefer one cohesive PR unless real dependencies, review boundaries or safe incremental integration justify a stack. Keep the dependency chain shallow; a template or depth ceiling is not a target PR count. Honor an explicitly requested stack without silently widening its scope.
 
 - Run `git rev-parse --show-toplevel` before any workflow.
 - Run `git status --porcelain` before rebases, pushes, PR creation and PR retargeting.
@@ -160,9 +162,9 @@ Start at the first branch above the base and continue toward the leaf. Stop on c
 
 ### 4. Validate
 
-Validate the stack as reviewable slices. Run cheap checks on every branch when practical; run expensive full checks on the leaf when branch-by-branch validation is not reasonable. Record exactly what ran in each PR body.
+Validate each slice's changed behavior with focused local checks and one primary review. Use the repository's preflight before coherent pushes; expensive cumulative checks belong on the integration candidate when that repository's policy permits, not automatically on every intermediate edit. The whole-stack check verifies topology, cumulative acceptance and integration rather than repeating every line review. Record exactly what ran; local or leaf success cannot waive a required per-PR gate.
 
-Use the target repository's detected local gate and provider checks. Do not run armory package-evaluation commands when operating on another repository's stack.
+Use the target repository's declared local/PR/integration-candidate/mainline policy and `ship-workflow`'s explicit advisory classification. Provider-required and repository-mandated checks remain blocking; unclassified checks stay strict. Renew affected evidence after promotion or retargeting, but reuse passing evidence only for unchanged covered inputs and context. Do not run Armory package-evaluation commands when operating on another repository's stack.
 
 For this armory package implementation only, use:
 
@@ -193,6 +195,8 @@ Landing, post-landing promotion and retargeting, post-merge acceptance and clean
 The run enforces parent-first order, slice-preserving promotion, expected-old leases, fresh gates per node, open-base retention and landing proofs (`references/merge-discipline.md`), and lands a native selection with one guarded request (`references/github-native.md` § Landing policy).
 
 Routine delegated shipping uses the repository's current provider checks, reviews, protections and merge policy. A selected node can request `assurance: "high"` explicitly; routine nodes do not need pinned checkout logs or renamed CI jobs. Supply `--gates` when local validation is requested; use `per_commit: true` for every replayed commit and each gate's own timeout. Validation precedes push and preserves existing hooks. Definite refusals with unchanged inputs reuse the exact verified replay objects; uncertain mutations reconcile before retry. Saved assurance and validation survive resume; incompatible legacy authority stops for an explicit decision.
+
+Where the repository already uses a merge queue, validate the actual candidate through the supported provider path and include `merge_group` workflows. Queue enrollment is not landing, and one request or one merge-limit setting does not promise one CI build or atomic landing for a whole stack. Broad mainline checks complement pre-merge integration checks. On mainline regression, contain affected landing/release work and prefer a safe revert or focused repair; never weaken gates to restore a green badge.
 
 ## Splitting One Branch Into A Stack
 

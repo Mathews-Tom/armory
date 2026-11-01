@@ -2,7 +2,7 @@
 name: pr-swarm
 description: 'Parallelizes two or more independent "own PR to green" loops for a single repository using isolated git worktrees and separate headless Claude Code sessions per PR — resolving merge conflicts, clearing review feedback, and watching CI to completion without one PR''s diff or feedback leaking into another''s context. Triggers on: "parallelize these PRs", "drive PR #123 and #456 to green in parallel", "own-PR-to-green fleet", "run these PRs concurrently", "isolated worktree loops for my PRs", "pr-swarm". Use this skill when a user has two or more already-open, file-disjoint pull requests in the same repository that each need conflict resolution, review-feedback triage, and CI monitoring, and wants them driven to merge-ready at the same time instead of one after another.'
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   category: operations
   tags: [git-worktree, parallel-execution, pull-requests, headless-cli, ci-monitoring]
   difficulty: advanced
@@ -93,13 +93,13 @@ See `references/launch-mechanics.md` for the exact `claude -p` invocation, detac
 
 ### Phase 6 — Monitor and verify
 
-Poll every ~60-120s with jitter: tail each lane's log, check liveness (see `references/launch-mechanics.md` for the zombie-PID trap). **Never treat a lane's own self-reported completion as the gate.** After a lane's process exits, independently re-verify via the checks in `references/verification-gates.md` — merge state, CI conclusion, unresolved review threads (including body-only bot reviews), and current `state` (a maintainer-closed PR looks identical to a healthy one on every other field).
+Monitor active lanes at a bounded cadence; use the launch reference for liveness checks. After a lane exits, independently verify current PR state, required and repository-mandated checks, applicable review requirements and substantive feedback dispositions using `references/verification-gates.md`. Report explicitly advisory checks separately. A lane's self-report is not evidence.
 
-A lane inheriting a PR that already has red CI or open feedback at launch is normal input, not a swarm-level stop condition — the independence check (Phase 2) governs whether the swarm proceeds, not the target PR's current health. Each lane's own orientation and watch loop react to that starting state directly (see `references/lane-prompt-template.md`): fix what's already visible first, and react to the first individually-failing check rather than waiting for every check in a CI run to finish, or for an admin-gated `gh run rerun` that a non-admin lane can't invoke anyway (see "React to the first failing check, not the full matrix" in `references/verification-gates.md`).
+Existing red CI or feedback is normal input. Triage actionable blocking failures as soon as they appear; do not wait for the full matrix. Batch fixes before pushing. Once current gates and acceptance pass, report readiness immediately: no fixed quiet window, second insurance wait or requirement that advisory bots become silent. New substantive feedback arriving before the final state read is still actionable.
 
 ### Phase 7 — Report
 
-Per PR: final `state`/`mergeStateStatus`, CI conclusion, unresolved-thread count (including the body-only-review scan), review rounds used, worktree clean/dirty, lane process exit code. A lane that exited non-zero, stopped at the round cap, or whose PR isn't independently confirmed clean by the checks above, is reported unresolved — a lane's own "done" message is never sufficient on its own.
+Per PR: final state and mergeability, blocking CI and advisory CI separately, substantive feedback dispositions, review rounds used, worktree state and lane exit code. Report ordinary merge readiness when the base branch has no merge queue. Only for a queue-backed base branch, distinguish ready-for-enrollment on an open, unqueued PR from validated queue-candidate readiness; required candidate checks still gate landing. A stopped-at-cap or unverified lane remains unresolved. Readiness authorizes neither enrollment nor merge.
 
 ### Phase 8 — Teardown
 
@@ -130,8 +130,8 @@ STOP — #{N} and #{M} both touch {path}; resolve before proceeding
 ...
 
 ## Fleet status
-| PR | state | mergeStateStatus | CI | unresolved threads | review rounds | worktree | exit code |
-|---|---|---|---|---|---|---|---|
+| PR | state | readiness stage | mergeStateStatus | CI | unresolved threads | review rounds | worktree | exit code |
+|---|---|---|---|---|---|---|---|---|
 
 ## Teardown
 #{N}: removed / left in place (reason)
@@ -145,10 +145,10 @@ A PR missing from the "Fleet status" table (dropped in resolution or blocked by 
 
 ## Capacity sanity check
 
-- N concurrent `bun`/`npm`/test-suite runs is the real resource cost, not git or the GitHub API. Confirm core/RAM headroom before fanning out wide; on constrained machines, have lanes run targeted tests per iteration and reserve full suites for the final gate.
-- GitHub's REST/GraphQL rate limit (5000/hr authenticated) is nowhere near the ceiling at a 60-120s polling cadence for any realistic swarm size.
-- Disk: each worktree needs its own `node_modules` (or equivalent) under a hoisted linker. Budget accordingly — this is the correct tradeoff for true isolation, not a shortcut to avoid.
-- Lane wall-clock is asymmetric: a PR that's already mergeable can self-verify and exit in minutes; a PR needing real conflict resolution plus a native rebuild can run for hours with all-green CI. Don't read one lane's fast exit as a signal the others are stuck.
+- Bound active lanes by local CPU/RAM and remote CI/review capacity, not just the number of PRs. Queue excess PRs rather than saturating runners and increasing everyone's wait.
+- Use focused local checks during edits, repository preflight before coherent pushes, and required integration-candidate checks before merge. Preserve broad mainline/release coverage; local success does not replace provider gates.
+- Each worktree needs the dependency environment its own lockfile selects. Preserve unresolved worktrees for debugging.
+- Release finished lanes when their current gates pass; different lane durations do not justify extra waiting or more speculative work.
 
 ## Error Handling
 
@@ -168,7 +168,7 @@ A PR missing from the "Fleet status" table (dropped in resolution or blocked by 
 
 - [ ] Every reported-clean PR was checked with the current `state`, not a cached read from earlier in the run
 - [ ] Independence check (Phase 2) ran and passed before any worktree was created
-- [ ] Every unresolved-thread count includes the body-only-review scan (`references/verification-gates.md`), not just `reviewThreads`
+- [ ] Feedback assessment includes review bodies and inline threads, with optional findings explicitly dispositioned and provider-required thread rules preserved
 - [ ] Every lane's exit code was captured, not inferred from log tail alone
 - [ ] Teardown only ran for lanes independently confirmed clean
 
@@ -180,3 +180,5 @@ A PR missing from the "Fleet status" table (dropped in resolution or blocked by 
 - Counting `reviewThreads.isResolved == false` as the complete unresolved-feedback signal without also scanning review bodies
 - A lane waiting for a full CI matrix to finish, or for an admin-gated `gh run rerun`, before reacting to a check that already failed or feedback that already landed
 - A lane pushing a commit for every nit, or running a fourth review round without the user's decision
+- Waiting through a fixed quiet window after required checks and review are already satisfied
+- Treating every advisory status or optional comment as a merge veto, or ignoring a provider-required check

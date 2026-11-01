@@ -36,31 +36,22 @@ changes, specific files, PR diff).
 
 ## Confidence Scoring
 
-Rate each issue 0-100. Only report issues scoring >= 80.
+Rate confidence 0–100 and report only issues scoring >=80. Confidence measures whether the scenario is supported, not the severity of its consequence. Apply the skill's impact-based Critical / Important / Suggestion classification.
 
-| Range  | Meaning                                      |
-| ------ | -------------------------------------------- |
-| 91-100 | Critical bug or explicit CLAUDE.md violation |
-| 80-90  | Important issue requiring attention          |
-| 51-75  | Valid but low-impact (do not report)         |
-| 26-50  | Minor nitpick (do not report)                |
-| 0-25   | Likely false positive (do not report)        |
+| Range | Meaning |
+| --- | --- |
+| 80–100 | Concrete scenario supported by code, a contract or observed evidence |
+| Below 80 | Uncertain claim; investigate further or omit |
 
 ## Output Format
 
 Start by listing files under review. For each issue:
 
 ```text
-**[CRITICAL]** (confidence: 95) `src/auth.py:42`
-Description of the issue.
-Rule: [CLAUDE.md rule or bug category]
-Fix: Concrete suggestion with code example.
+**[IMPORTANT]** (confidence: 95) `src/auth.py:42`
+Scenario and consumer-visible consequence.
+Rule: [project rule or bug class]
+Fix: Smallest correction covering the bug class in this diff.
 ```
 
-Group by severity:
-
-1. **Critical** (90-100): Must fix before merge
-2. **Important** (80-89): Should fix, significant quality impact
-
-If no issues >= 80 confidence exist, confirm the code meets standards with a brief
-summary of what was reviewed.
+Group by impact, not confidence. Blocking findings need a demonstrated defect, required behavior gap or evidenced maintainability problem. Optional polish and hypothetical future features do not block. A clean review is valid; no minimum finding count applies. On a fix pass, inspect changed code and affected contracts rather than restarting the review of unchanged code.

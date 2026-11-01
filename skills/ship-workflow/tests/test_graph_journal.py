@@ -290,6 +290,39 @@ def test_progressed_journal_survives_a_save_and_a_fresh_load(common: Path) -> No
     ]
 
 
+def test_advisory_policy_survives_graph_save_load_and_resume(common: Path) -> None:
+    packet = stack_packet()
+    nodes = cast("list[Payload]", packet["nodes"])
+    decision = cast("Payload", nodes[0]["decision"])
+    decision["advisory_checks"] = [
+        {
+            "check": "metrics",
+            "publisher": "github-actions",
+            "app_id": 15368,
+            "workflow_id": 42,
+            "event": "pull_request",
+        }
+    ]
+    plan = parse_stack_plan(packet)
+    journal = new_journal(
+        plan,
+        run_id=GRAPH_RUN,
+        endpoint="merged",
+        code_identity=CODE,
+        created_at=NOW,
+    )
+    Store(common).save_graph(journal)
+    loaded = Store(common).load_graph(GRAPH_RUN)
+    restored = resumed_plan(loaded, None)
+    assert restored == plan
+    restored_decision = restored.node(11).decision
+    assert restored_decision is not None
+    assert restored_decision.advisory_checks[0].workflow_id == 42
+    assert loaded.node(11).decision_identity == decision_identity(restored_decision)
+    del decision["advisory_checks"]
+    assert parse_stack_plan(packet).identity != restored.identity
+
+
 def test_saved_graph_bytes_are_canonical_private_json(common: Path) -> None:
     os.umask(0)
     journal = progressed()

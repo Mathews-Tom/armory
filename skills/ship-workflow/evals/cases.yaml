@@ -312,3 +312,60 @@ cases:
       - "does not activate ship workflow"
       - "tagging and package publication are release authority that ordinary shipping never acquires"
     trigger_expected: false
+
+  - id: explicit_advisory_does_not_weaken_required_ci
+    prompt: "Ship PR 91. Our revision-bound ci-policy.md says the metrics job in workflow 42, pull_request event, github-actions publisher app 15368 is advisory. It is red; the required tests job is green. Do not weaken required checks or wait for the optional metrics run."
+    fixtures: []
+    rubric:
+      - "uses an explicit sourced advisory_checks identity in the current revision-bound policy"
+      - "keeps required checks, required publishers, repository mandates and unclassified jobs blocking"
+      - "reports the advisory failure truthfully without giving it merge veto or discarding required freshness"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "advisory_checks"
+        weight: 1.0
+      - type: matches_regex
+        target: "(workflow_id|workflow)[^\\n]*42"
+        weight: 0.8
+      - type: matches_regex
+        target: "(required|mandat)[^\\n]*(block|authoritative|preserv|remain)"
+        weight: 1.0
+
+  - id: advisory_review_is_not_automatic_bot_veto
+    prompt: "PR 92 has an advisory automation comment and a formal change request from a reviewer with read-only repository permission. Required current-head human approval and CI are already satisfied. Can we land it? Do not ignore a provider-required review or guess from the bot login."
+    fixtures: []
+    rubric:
+      - "distinguishes provider-verified review authority from advisory comments or read-only formal reviews"
+      - "does not blanket-ignore bots: write-capable formal change requests and required protections remain authoritative"
+      - "retains human current-head approvals and stale-head safeguards"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(permission|authority|write access)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(advisory|non.authoritative)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(required|provider)[^\\n]*(review|protect|approval)"
+        weight: 1.0
+
+  - id: bounded_review_and_mainline_recovery
+    prompt: "We have completed three unsuccessful fix/re-review rounds on this stack. Can we restart full review of every PR and mark the failing mainline gate optional so we can ship?"
+    fixtures: []
+    rubric:
+      - "escalates unresolved defects after three unsuccessful rounds instead of restarting full stack review"
+      - "uses changed-code re-review and a cumulative integration check rather than duplicate primary reviews"
+      - "contains mainline failure by an authorized revert or focused repair without weakening checks"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(escalat|stop[^\\n]*loop)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(revert|focused repair)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(never|not|do not|without)[^\\n]*(weaken|optional|advisory|disabl)"
+        weight: 1.0

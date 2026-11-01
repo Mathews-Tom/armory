@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.0 — 2026-11-01
+
+### Changed
+
+- Execute explicitly supplied small `/goal` prompts without a plan-file cycle. For ready rolling-wave items, materialize prompts and routine detail in the existing planning artifacts while preserving approved outcomes and acceptance; owner decisions and material changes still require approval.
+- Carry the project destination and current contribution through each active milestone. Apply necessary-now to enablers/architecture; defer optional work with concrete revisit conditions rather than treating long-term relevance as authorization.
+- Default to one cohesive PR. Stable unmerged interface dependencies require explicit owner or approved-plan authority, current interface/revision evidence and unchanged landing protections; merged predecessors remain the default.
+- Separate local preflight, observed runtime behavior and required CI from explicitly advisory jobs under repository/`ship-workflow` policy. Report advisory failures honestly, fail closed for unclassified failures and preserve head/base/context freshness.
+- Keep one primary substantive review per PR and one cumulative stack integration check; target changed code and affected contracts after fixes, escalating after three unsuccessful rounds without merging defects.
+- Contain mainline failure with revert or focused repair through normal landing authority before dependents advance. Read-only status, dirty-workspace safeguards, lane limits and release authority remain intact.
+- Add scenarios for small-goal handoff, ready prompt activation versus future deferral, authorized dependencies, CI classification, bounded reviews and post-merge containment. Authored scenarios are not executed behavioral evidence.
+
 ## 3.0.1 — 2026-10-26
 
 ### Fixed

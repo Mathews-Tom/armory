@@ -43,15 +43,15 @@ Examine the type for all implicit and explicit invariants:
 - Is it impossible to create invalid instances?
 - Are runtime checks appropriate and comprehensive?
 
-## Anti-Patterns to Flag
+## Patterns to Investigate
 
-- **Anemic domain models** — types with no behavior, just data bags
-- **Exposed mutable internals** — returning references to internal collections
-- **Documentation-only invariants** — constraints described in comments but not enforced
-- **Too many responsibilities** — type doing multiple unrelated things
-- **Missing construction validation** — no checks in constructor/factory
-- **Inconsistent enforcement** — some mutation methods check, others don't
-- **External invariant maintenance** — relying on callers to maintain type's constraints
+Report these only when a current consumer can violate a required invariant or the design creates an evidenced maintenance defect; a data-only type or a low rating alone is not a finding.
+
+- Exposed mutable internals that allow a concrete invalid state
+- Documentation-only invariants that required consumers rely on
+- Responsibilities whose coupling demonstrably breaks the current workflow
+- Missing or inconsistent validation at an actual trust/mutation boundary
+- Caller-maintained invariants that existing call paths can violate
 
 ## Key Principles
 

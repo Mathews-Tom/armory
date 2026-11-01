@@ -58,3 +58,39 @@ cases:
       - "does not activate plan review workflow"
       - "diagram creation is different from plan audit"
     trigger_expected: false
+
+  - id: necessity_now_and_evolvable_architecture
+    prompt: >
+      Review a plan for letting a user import one local document and search it. M1 builds a distributed job platform,
+      M2 adds a provider plugin framework with one provider, and M3 finally wires import/search. Sources require no
+      multi-host deployment or second provider. The next release must preserve private document access. M4-M8 have
+      only outcomes and dependencies because they are not ready to implement.
+      End with one decision per line: "Distributed platform: build now" or "Distributed platform: defer";
+      "Provider plugins: build now" or "Provider plugins: defer"; and "Private access: preserve now" or
+      "Private access: defer". Explain the selected scope and concrete revisit conditions in the review.
+    fixtures: []
+    rubric:
+      - "challenges infrastructure-first sequencing and recommends the smallest usable import/search slice"
+      - "defers unused distributed/plugin capability with a concrete revisit condition while preserving private access"
+      - "accepts outcome-level distant milestones rather than demanding premature execution prompts"
+      - "uses the default combined lens without a configuration pause or invented dashboards/10x qualification"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Distributed platform:[ \t]*defer[ \t]*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?i)\bimport\b'
+        weight: 0.9
+      - type: matches_regex
+        target: '(?i)\bsearch\b'
+        weight: 0.9
+      - type: matches_regex
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Provider plugins:[ \t]*defer[ \t]*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Private access:[ \t]*preserve now[ \t]*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>Distributed platform|Provider plugins|Private access):[ \t]*(?:build now|defer|preserve now)[ \t]*$\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):[ \t]*(?:build now|defer|preserve now)[ \t]*$)'
+        weight: 1.0

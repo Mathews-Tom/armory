@@ -55,6 +55,7 @@ class TreatmentVariant:
 
     package: str
     source: Path
+    destination: Path
     source_sha256: str
     reduced_sections: tuple[str, ...]
     strengthened_append: str
@@ -170,7 +171,14 @@ def _load_treatment(raw: object, index: int) -> TreatmentVariant:
         raise OmpRunConfigError(
             f"{location}.source: expected a safe repository-relative path"
         )
-    source = (_REPO_ROOT / source_value).resolve()
+    snapshot_value = Path(
+        _string(treatment.get("snapshot", str(source_value)), f"{location}.snapshot")
+    )
+    if snapshot_value.is_absolute() or ".." in snapshot_value.parts:
+        raise OmpRunConfigError(
+            f"{location}.snapshot: expected a safe repository-relative path"
+        )
+    source = (_REPO_ROOT / snapshot_value).resolve()
     if not source.is_relative_to(_REPO_ROOT) or not source.is_file():
         raise OmpRunConfigError(f"{location}.source: source file is unavailable")
     source_sha256 = _string(treatment.get("source_sha256"), f"{location}.source_sha256")
@@ -188,6 +196,7 @@ def _load_treatment(raw: object, index: int) -> TreatmentVariant:
     return TreatmentVariant(
         package=_string(treatment.get("package"), f"{location}.package"),
         source=source,
+        destination=source_value,
         source_sha256=source_sha256,
         reduced_sections=sections,
         strengthened_append=_string(

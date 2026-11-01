@@ -5,6 +5,15 @@ on:
     branches:
       - main
   pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gitleaks:
@@ -14,11 +23,37 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Run Gitleaks
+        if: github.event_name != 'merge_group'
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The pinned action rejects merge_group before scanning. Run its exact
+      # bundled CLI version against the integration range, without pretending
+      # the event is a push or giving untrusted code additional permissions.
+      - name: Scan integration candidate with pinned Gitleaks
+        if: github.event_name == 'merge_group'
+        shell: bash
+        env:
+          CI_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          test -n "$CI_BASE"
+          git merge-base --is-ancestor "$CI_BASE" "$GITHUB_SHA"
+          scanner="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "$scanner"
+          archive="$scanner/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' \
+            9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c "$archive" \
+            | sha256sum --check -
+          tar -xzf "$archive" -C "$scanner" gitleaks
+          "$scanner/gitleaks" git --redact --exit-code 1 \
+            --log-opts="${CI_BASE}..${GITHUB_SHA}"
 
   file-checks:
     runs-on: ubuntu-latest
