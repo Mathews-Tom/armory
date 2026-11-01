@@ -14,7 +14,7 @@ A PR/lane is genuinely done only when **all** of the following hold simultaneous
 4. Every substantive in-scope finding has a verified fix or authorized disposition, including body-only review findings. Optional feedback has a reasoned disposition without a fix commit; preserve provider-required thread-resolution and reviewer rules.
 5. A final current-state read confirms no new blocking evidence. No fixed quiet window or bot-silence requirement applies.
 6. Worktree clean; local HEAD matches the pushed remote head.
-7. Acceptance was exercised and repository-required local preflight passed. An open, unqueued PR can be **ready-for-enrollment** without candidate validation: queue-only checks have not run yet, not passed or been waived. Required `merge_group`/integration-candidate checks must pass on the actual candidate before landing; pending required candidate checks block validation of an already-queued PR. Do not enqueue or merge without separate authority: enrollment can itself trigger automatic landing.
+7. Acceptance was exercised and repository-required local preflight passed. Without a merge queue on the base branch, report ordinary merge readiness. Only for a queue-backed base branch can an open, unqueued PR be **ready-for-enrollment** without candidate validation: queue-only checks have not run yet, not passed or been waived. Required `merge_group`/integration-candidate checks must pass on the actual candidate before landing; pending required candidate checks block validation of an already-queued PR. Do not enqueue or merge without separate authority: enrollment can itself trigger automatic landing.
 
 ## React to the first failing check, not the full matrix
 

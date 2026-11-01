@@ -99,7 +99,7 @@ Existing red CI or feedback is normal input. Triage actionable blocking failures
 
 ### Phase 7 — Report
 
-Per PR: final state and mergeability, blocking CI and advisory CI separately, substantive feedback dispositions, review rounds used, worktree state and lane exit code. Distinguish ready-for-enrollment on an open, unqueued PR from validated queue-candidate readiness; required candidate checks still gate landing. A stopped-at-cap or unverified lane remains unresolved. Readiness authorizes neither enrollment nor merge.
+Per PR: final state and mergeability, blocking CI and advisory CI separately, substantive feedback dispositions, review rounds used, worktree state and lane exit code. Report ordinary merge readiness when the base branch has no merge queue. Only for a queue-backed base branch, distinguish ready-for-enrollment on an open, unqueued PR from validated queue-candidate readiness; required candidate checks still gate landing. A stopped-at-cap or unverified lane remains unresolved. Readiness authorizes neither enrollment nor merge.
 
 ### Phase 8 — Teardown
 

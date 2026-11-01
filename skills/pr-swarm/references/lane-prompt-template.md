@@ -28,11 +28,13 @@ TERMINATION CONDITIONS (all must hold before you report done):
    Preserve provider-required review/thread rules
 5. Final current-state read shows no new blocker; no fixed quiet window
 6. Working tree clean; local HEAD matches the pushed remote head
-7. Observed acceptance and required local checks passed. For an open, unqueued
-   PR, report ready-for-enrollment separately from candidate validation.
-   Required merge_group/integration-candidate checks must pass on the actual
-   candidate before landing; if already queued, pending candidate checks block
-   that stage. Do not enqueue or merge: enrollment can itself authorize auto-merge.
+7. Observed acceptance and required local checks passed. Without a merge queue
+   on the base branch, report ordinary merge readiness. Only for a queue-backed
+   base, report an open, unqueued PR ready-for-enrollment separately from
+   candidate validation. Required merge_group/integration-candidate checks must
+   pass on the actual candidate before landing; if already queued, pending
+   candidate checks block that stage. Do not enqueue or merge: enrollment can
+   itself authorize auto-merge.
 
 ORIENTATION:
   gh auth status

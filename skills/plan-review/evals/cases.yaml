@@ -77,7 +77,7 @@ cases:
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: '(?im)^Distributed platform:\s*defer\s*$'
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Distributed platform:[ \t]*defer[ \t]*$'
         weight: 1.0
       - type: matches_regex
         target: '(?i)\bimport\b'
@@ -86,8 +86,8 @@ cases:
         target: '(?i)\bsearch\b'
         weight: 0.9
       - type: matches_regex
-        target: '(?im)^Provider plugins:\s*defer\s*$'
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Provider plugins:[ \t]*defer[ \t]*$'
         weight: 1.0
       - type: matches_regex
-        target: '(?im)^Private access:\s*preserve now\s*$'
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Private access:[ \t]*preserve now[ \t]*$'
         weight: 1.0
