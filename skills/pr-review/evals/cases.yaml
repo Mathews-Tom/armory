@@ -117,9 +117,11 @@ cases:
           return export_report(rows)
       ```
 
-      Report null behavior as "Null handling: None returns <result>" on its own line and discuss the affected
-      caller. Conclude with "Blockers: none" or "Blockers: <concrete defect>", and
-      "Optional suggestions: blocking" or "Optional suggestions: non-blocking", one decision per line.
+      Report null behavior as "Null handling: None returns <result>" on its own line; an explanatory
+      parenthetical after the result is allowed. Describe the caller on a separate line in the form
+      "Caller handling: download_report <delegation to export_report>". Conclude with "Blockers: none"
+      or "Blockers: <concrete defect>", and "Optional suggestions: blocking" or
+      "Optional suggestions: non-blocking", one decision per line.
     fixtures: []
     rubric:
       - "reviews changed null handling and affected callers rather than restarting unchanged dimensions"
@@ -136,8 +138,11 @@ cases:
         weight: 0.9
       - type: matches_regex
         target: >-
-          (?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Null handling:[ \t]*`?(?:None|null)`?[ \t]+(?:returns?|produces?|yields?)[ \t]+(?:(?:an?|the)[ \t]+)?(?:empty[ \t]+string|`?(?:""|'')`?)[.!]?[ \t]*$
+          (?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Null handling:[ \t]*`?(?:None|null)`?[ \t]+(?:returns?|produces?|yields?)[ \t]+(?:(?:an?|the)[ \t]+)?(?:empty[ \t]+string|`?(?:""|'')`?)(?:[ \t]+\([^\n]*\))?[.!]?[ \t]*$
         weight: 0.9
       - type: matches_regex
-        target: '(?i)\bdownload_report\b'
+        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Caller handling:[ \t]*`?download_report`?[ \t]+(?:calls|delegates[ \t]+(?:unchanged[ \t]+)?to|forwards[ \t]+(?:the[ \t]+)?(?:rows|input)[ \t]+(?:unchanged[ \t]+)?to)[ \t]+`?export_report\b`?'
         weight: 0.9
+      - type: matches_regex
+        target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>Blockers|Optional suggestions|Null handling|Caller handling):[^\n]*\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):)'
+        weight: 1.0

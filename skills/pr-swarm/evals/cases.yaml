@@ -149,3 +149,6 @@ cases:
       - type: matches_regex
         target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?#622:[ \t]*merge-ready[ \t]*$'
         weight: 1.0
+      - type: matches_regex
+        target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>#620|#621|#622|Queue actions):[^\n]*\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):)'
+        weight: 1.0
