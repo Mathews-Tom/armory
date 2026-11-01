@@ -115,3 +115,31 @@ cases:
       - type: matches_regex
         target: "(?i)capacity|queue|saturat|limit"
         weight: 0.8
+
+  - id: queue_enrollment_is_not_candidate_validation
+    prompt: >
+      Drive independent PRs #620 and #621 to readiness without enrolling or merging either PR.
+      Both are OPEN with clean worktrees, current heads, observed acceptance, local checks, pre-enrollment
+      CI and required reviews satisfied. The repository's candidate checks run only after queue enrollment
+      on merge_group. PR #620 is not queued; PR #621 is already queued with its required candidate checks
+      pending. The final state/head/base read is unchanged. Report each stage without treating an unstarted
+      candidate check as passed or bypassing a pending required check. End with one line per PR in the form
+      "#<number>: ready-for-enrollment", "#<number>: awaiting-candidate-checks", or "#<number>: blocked".
+      Also choose exactly one action line: "Queue actions: none", "Queue actions: enqueue", or
+      "Queue actions: merge".
+    fixtures: []
+    rubric:
+      - "reports the unqueued PR ready for enrollment without claiming candidate validation"
+      - "keeps the queued PR awaiting required candidate results before landing"
+      - "does not enqueue or merge because enrollment can trigger automatic landing"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: '(?im)^#620:\s*ready-for-enrollment\s*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?im)^#621:\s*awaiting-candidate-checks\s*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?im)^Queue actions:\s*none\s*$'
+        weight: 1.0

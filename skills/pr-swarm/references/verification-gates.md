@@ -9,12 +9,12 @@ These are GitHub API/`gh` CLI behaviors, not agent-specific — they apply regar
 A PR/lane is genuinely done only when **all** of the following hold simultaneously:
 
 1. `state == OPEN`
-2. Current mergeability is confirmed and provider-required review/protection conditions are satisfied; `CLEAN` alone is not proof and a queue-ready PR need not have that display state.
+2. Current mergeability is confirmed and provider-required review/protection conditions applicable at this readiness stage are satisfied; `CLEAN` alone is not proof and a queue-ready PR need not have that display state.
 3. Provider-required, repository-mandated and unclassified applicable checks passed in the required current head/base context. Explicitly classified advisory jobs are reported separately and may be pending or failed; use `ship-workflow`'s sourced policy contract rather than guessing from names or runtime.
 4. Every substantive in-scope finding has a verified fix or authorized disposition, including body-only review findings. Optional feedback has a reasoned disposition without a fix commit; preserve provider-required thread-resolution and reviewer rules.
 5. A final current-state read confirms no new blocking evidence. No fixed quiet window or bot-silence requirement applies.
 6. Worktree clean; local HEAD matches the pushed remote head.
-7. Acceptance was exercised; repository-required local preflight and integration-candidate checks passed. Do not merge an open PR merely to manufacture a "merged tree" check.
+7. Acceptance was exercised and repository-required local preflight passed. An open, unqueued PR can be **ready-for-enrollment** without candidate validation: queue-only checks have not run yet, not passed or been waived. Required `merge_group`/integration-candidate checks must pass on the actual candidate before landing; pending required candidate checks block validation of an already-queued PR. Do not enqueue or merge without separate authority: enrollment can itself trigger automatic landing.
 
 ## React to the first failing check, not the full matrix
 
@@ -88,4 +88,4 @@ After current acceptance, blocking checks and review requirements pass, re-read 
 An agent author and an agent reviewer can keep each other busy indefinitely: a person waves off a nit in seconds, an agent fixes it, which means another commit and another review round. Two rules keep a lane converging:
 
 - **Triage before fixing.** Each finding is Important (fix it), Nit or Pre-existing (reply with a one-line reason and resolve the thread, no commit), or a Repeat of an answered finding (point to the earlier reply and resolve, no commit). Fixes name the bug class and cover every instance in the PR's diff in one push. A resolved thread with a decline reason counts as addressed for condition 4.
-- **Cap rounds at three.** A round is one feedback-answering push plus the re-review it triggers; merge-only and CI-flake pushes don't count. After round 1, re-verify only the files the latest push changed. If new Important findings still arrive after round 3, the lane stops pushing and reports the recurring findings and their bug class; the orchestrator reports that PR unresolved and the user decides whether to rethink the approach or allow another round.
+- **Cap rounds at three.** A round is one feedback-answering push plus the re-review it triggers; merge-only and CI-flake pushes don't count. After round 1, re-verify changed code and affected interactions, including unchanged callers; broaden only when a contract or base change invalidates evidence. If new Important findings still arrive after round 3, the lane stops pushing and reports the recurring findings and their bug class; the orchestrator reports that PR unresolved and the user decides whether to rethink the approach or allow another round.

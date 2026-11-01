@@ -65,6 +65,9 @@ cases:
       M2 adds a provider plugin framework with one provider, and M3 finally wires import/search. Sources require no
       multi-host deployment or second provider. The next release must preserve private document access. M4-M8 have
       only outcomes and dependencies because they are not ready to implement.
+      End with one decision per line: "Distributed platform: build now" or "Distributed platform: defer";
+      "Provider plugins: build now" or "Provider plugins: defer"; and "Private access: preserve now" or
+      "Private access: defer". Explain the selected scope and concrete revisit conditions in the review.
     fixtures: []
     rubric:
       - "challenges infrastructure-first sequencing and recommends the smallest usable import/search slice"
@@ -74,11 +77,17 @@ cases:
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(?i)defer|later|not necessary"
+        target: '(?im)^Distributed platform:\s*defer\s*$'
         weight: 1.0
       - type: matches_regex
-        target: "(?i)import.*search|search.*import"
+        target: '(?i)\bimport\b'
         weight: 0.9
       - type: matches_regex
-        target: "(?i)privat|access|security"
+        target: '(?i)\bsearch\b'
         weight: 0.9
+      - type: matches_regex
+        target: '(?im)^Provider plugins:\s*defer\s*$'
+        weight: 1.0
+      - type: matches_regex
+        target: '(?im)^Private access:\s*preserve now\s*$'
+        weight: 1.0

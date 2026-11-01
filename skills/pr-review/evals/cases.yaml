@@ -90,11 +90,36 @@ cases:
     trigger_expected: false
 
   - id: substantive_review_without_polish_loop
-    prompt: >
-      Re-review a fix to a null check in a report-export PR. The preceding pass already reviewed the remaining code;
-      the public contract and base are unchanged. Required checks and the export smoke pass. The only new bot
-      suggestions are to rename a local variable and add a generic exporter registry for a hypothetical second format.
-      This is the third feedback-answering round. Report merge blockers, not a new implementation.
+    prompt: |
+      Re-review this null-handling fix in a report-export PR. The preceding pass already reviewed the remaining
+      code; the public contract and base are unchanged. Required checks and the export smoke pass. The only new
+      bot suggestions are to rename a local variable and add a generic exporter registry for a hypothetical
+      second format. This is the third feedback-answering round. Report merge blockers, not an implementation.
+
+      Contract: None and an empty list produce ""; non-empty rows are joined with "\n" without alteration.
+      Changed code and its complete affected caller:
+
+      ```diff
+      --- a/reports.py
+      +++ b/reports.py
+      @@ -1,2 +1,4 @@
+       def export_report(rows: list[str] | None) -> str:
+      +    if rows is None:
+      +        return ""
+           return "\n".join(rows)
+      ```
+
+      ```python
+      # downloads.py (unchanged caller)
+      from reports import export_report
+
+      def download_report(rows: list[str] | None) -> str:
+          return export_report(rows)
+      ```
+
+      Explain the changed null handling and affected caller. Conclude with "Blockers: none" or
+      "Blockers: <concrete defect>", and "Optional suggestions: blocking" or
+      "Optional suggestions: non-blocking", one decision per line.
     fixtures: []
     rubric:
       - "reviews changed null handling and affected callers rather than restarting unchanged dimensions"
@@ -104,8 +129,14 @@ cases:
     trigger_expected: true
     assertions:
       - type: matches_regex
-        target: "(?i)non.blocking|optional|nothing to fix|no.*block"
+        target: '(?im)^Blockers:\s*none\s*$'
         weight: 1.0
       - type: matches_regex
-        target: "(?i)changed|affected|null"
+        target: '(?im)^Optional suggestions:\s*non-blocking\s*$'
+        weight: 0.9
+      - type: matches_regex
+        target: '(?i)\bnull\b|\bNone\b'
+        weight: 0.9
+      - type: matches_regex
+        target: '(?i)\bdownload_report\b'
         weight: 0.9

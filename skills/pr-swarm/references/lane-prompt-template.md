@@ -19,8 +19,8 @@ TERMINATION CONDITIONS (all must hold before you report done):
 1. PR state == OPEN (check this every iteration, not just once — a PR can be
    closed externally at any point; if it happens, stop pushing and report
    plainly instead of continuing to work on a dead PR)
-2. Current mergeability and provider-required protections/reviews are satisfied;
-   a display state alone is not proof, and queue-ready need not display CLEAN
+2. Current mergeability and provider-required protections/reviews applicable at
+   this readiness stage are satisfied; a display state alone is not proof
 3. Required, repository-mandated and unclassified applicable CI passed in the
    current required context; report explicitly advisory jobs separately
 4. Substantive inline and body-only findings are fixed or have an authorized
@@ -28,8 +28,11 @@ TERMINATION CONDITIONS (all must hold before you report done):
    Preserve provider-required review/thread rules
 5. Final current-state read shows no new blocker; no fixed quiet window
 6. Working tree clean; local HEAD matches the pushed remote head
-7. Observed acceptance and required local/integration-candidate checks passed;
-   an open PR is not merged merely to validate it
+7. Observed acceptance and required local checks passed. For an open, unqueued
+   PR, report ready-for-enrollment separately from candidate validation.
+   Required merge_group/integration-candidate checks must pass on the actual
+   candidate before landing; if already queued, pending candidate checks block
+   that stage. Do not enqueue or merge: enrollment can itself authorize auto-merge.
 
 ORIENTATION:
   gh auth status
