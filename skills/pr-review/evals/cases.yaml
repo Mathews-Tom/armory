@@ -118,8 +118,8 @@ cases:
       ```
 
       Report null behavior as "Null handling: None returns <result>" on its own line; an explanatory
-      parenthetical after the result is allowed. Describe the caller on a separate line in the form
-      "Caller handling: download_report <delegation to export_report>". Conclude with "Blockers: none"
+      parenthetical after the result is allowed. Report the caller's returned expression on a separate line as
+      "Caller handling: download_report returns export_report(rows)". Conclude with "Blockers: none"
       or "Blockers: <concrete defect>", and "Optional suggestions: blocking" or
       "Optional suggestions: non-blocking", one decision per line.
     fixtures: []
@@ -141,7 +141,7 @@ cases:
           (?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Null handling:[ \t]*`?(?:None|null)`?[ \t]+(?:returns?|produces?|yields?)[ \t]+(?:(?:an?|the)[ \t]+)?(?:empty[ \t]+string|`?(?:""|'')`?)(?:[ \t]+\([^\n]*\))?[.!]?[ \t]*$
         weight: 0.9
       - type: matches_regex
-        target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Caller handling:[ \t]*`?download_report`?[ \t]+(?:calls|delegates[ \t]+(?:unchanged[ \t]+)?to|forwards[ \t]+(?:the[ \t]+)?(?:rows|input)[ \t]+(?:unchanged[ \t]+)?to)[ \t]+`?export_report\b`?'
+        target: '(?m)(?-i:^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?i:Caller handling):[ \t]*`?download_report`?[ \t]+(?i:returns)[ \t]+`?export_report`?[ \t]*\([ \t]*`?rows`?[ \t]*\)`?[.!]?[ \t]*$)'
         weight: 0.9
       - type: matches_regex
         target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>Blockers|Optional suggestions|Null handling|Caller handling):[^\n]*\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):)'

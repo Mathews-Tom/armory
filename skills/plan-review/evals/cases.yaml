@@ -92,5 +92,5 @@ cases:
         target: '(?im)^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?Private access:[ \t]*preserve now[ \t]*$'
         weight: 1.0
       - type: matches_regex
-        target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>Distributed platform|Provider plugins|Private access):[^\n]*\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):)'
+        target: '(?im)\A(?![\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P<field>Distributed platform|Provider plugins|Private access):[ \t]*(?:build now|defer|preserve now)[ \t]*$\n[\s\S]*^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?P=field):[ \t]*(?:build now|defer|preserve now)[ \t]*$)'
         weight: 1.0
