@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
+from scripts import omp_skillsbench
 from scripts.omp_skillsbench import declared_omp_cells, load_omp_run_contract
 from scripts.omp_skillsbench_results import (
     OmpResultError,
@@ -54,6 +56,38 @@ def test_execution_preflight_materializes_three_distinct_conditions() -> None:
     assert len(report.conditions) == 3
     assert len({condition.content_hash for condition in report.conditions}) == 3
     assert all(len(condition.files) == 7 for condition in report.conditions)
+
+
+@pytest.mark.parametrize(
+    "condition", ["current", "reduced-or-rewritten", "strengthened-contract"]
+)
+def test_snapshot_preserves_historical_bundle_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, condition: str
+) -> None:
+    contract = load_omp_run_contract(_CONTRACT_PATH)
+    document = yaml.safe_load(_CONTRACT_PATH.read_text(encoding="utf-8"))
+    historical_root = tmp_path / "historical"
+    for treatment, entry in zip(
+        contract.treatments, document["treatments"], strict=True
+    ):
+        original = historical_root / entry["source"]
+        original.parent.mkdir(parents=True, exist_ok=True)
+        original.write_bytes(treatment.source.read_bytes())
+        entry.pop("snapshot", None)
+    historical_path = tmp_path / "historical.yaml"
+    historical_path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    monkeypatch.setattr(omp_skillsbench, "_REPO_ROOT", historical_root)
+    historical = load_omp_run_contract(historical_path)
+
+    previous = materialize_condition(historical, condition, tmp_path / "previous")
+    current = materialize_condition(contract, condition, tmp_path / "current")
+
+    assert current.content_hash == previous.content_hash
+    assert current.files == previous.files
+    assert "skills/pr-review/SKILL.md" in current.files
+    assert omp_skillsbench.condition_hashes(
+        contract
+    ) == omp_skillsbench.condition_hashes(historical)
 
 
 def test_derives_terminal_receipt_without_model_content(tmp_path: Path) -> None:

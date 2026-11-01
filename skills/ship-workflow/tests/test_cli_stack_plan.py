@@ -14,7 +14,7 @@ import os
 import stat
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
 
@@ -309,6 +309,81 @@ def cli(
     capsys.readouterr()
     code = ship.main()
     return code, json.loads(capsys.readouterr().out)
+
+
+@pytest.mark.parametrize("surface", ["policy", "stack-plan"])
+@pytest.mark.parametrize(
+    "status,conclusion", [("completed", "failure"), ("in_progress", None)]
+)
+def test_cli_accepts_sourced_advisory_ci_without_losing_readiness(
+    stack: Stack,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    surface: str,
+    status: str,
+    conclusion: str | None,
+) -> None:
+    original = stack.forge.observe
+
+    def observe(number: int, *, assurance: str = "routine") -> Observation:
+        current = original(number, assurance=assurance)
+        advisory = replace(
+            current.checks[0],
+            name="metrics",
+            app_id=15368,
+            workflow_id=42,
+            event="pull_request",
+            status=status,
+            conclusion=conclusion,
+        )
+        return replace(current, checks=current.checks + (advisory,))
+
+    monkeypatch.setattr(stack.forge, "observe", observe)
+    decision = dict(DECISION)
+    decision["advisory_checks"] = [
+        {
+            "check": "metrics",
+            "publisher": "github-actions",
+            "app_id": 15368,
+            "workflow_id": 42,
+            "event": "pull_request",
+        }
+    ]
+    if surface == "policy":
+        pr = stack.forge._pull(11)
+        data = {
+            **decision,
+            "schema_version": 1,
+            "head_sha": pr.head_sha,
+            "base_sha": pr.base_sha,
+        }
+        path = write(stack, data, "policy.json")
+        args = ("--pr", "11", "--repo", REPO, "--policy", str(path))
+    else:
+        selected = node(stack, 11, None, "feat/a", "main", True)
+        selected["decision"] = decision
+        path = write(
+            stack,
+            {
+                "schema_version": 1,
+                "repository": REPO,
+                "trunk": "main",
+                "nodes": [selected],
+            },
+        )
+        args = ("--stack-plan", str(path))
+    code, result = cli(
+        stack, monkeypatch, capsys, *args, "--dry-run", "--until", "merged"
+    )
+    assert (code, result["status"]) == (0, "PLANNED"), result
+    if surface == "policy":
+        gate = cast("dict[str, object]", result["gate"])
+    else:
+        land = next(row for row in rows(result, "actions") if row["action"] == "land")
+        gate = cast("dict[str, object]", land["gate"])
+    assert gate["status"] == "READY"
+    details = cast("dict[str, object]", gate["details"])
+    assert cast("Rows", details["advisory_checks"])[0]["conclusion"] == conclusion
 
 
 def rows(result: Result, key: str) -> Rows:

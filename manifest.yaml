@@ -946,10 +946,10 @@ packages:
     difficulty: advanced
     phase: review
   - name: milestone-runner
-    version: 3.0.1
-    description: Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "continue the milestone sequence", "run
-      independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the current design.
-      Not for generating plan files; use plan-prompts. Not for repairing one stack; use stacked-prs.
+    version: 3.1.0
+    description: Use when asked to "run milestones", "execute EXECUTION_PROMPTS.md", "run this /goal", "continue the milestone
+      sequence", "run independent milestones in parallel", "merge the stack", or "reconcile M5" after prior work changes the
+      current design. Not for generating a new plan; use plan-prompts. Not for repairing one stack; use stacked-prs.
     path: skills/milestone-runner
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/milestone-runner/SKILL.md
     complements:
@@ -1060,7 +1060,7 @@ packages:
     difficulty: advanced
     phase: build
   - name: plan-prompts
-    version: 3.0.0
+    version: 3.1.0
     description: Use when asked to "create a development plan", "generate execution prompts", "replan a milestone", "update
       DEVELOPMENT_PLAN.md", "start M5", or "adapt future milestones" after predecessor work changes the current repository
       design. Not for discovering an uncertain destination or unresolved decisions; use decision-map. Not for auditing an
@@ -1085,7 +1085,7 @@ packages:
     difficulty: advanced
     phase: plan
   - name: plan-review
-    version: 1.0.1
+    version: 1.1.0
     description: 'Pre-implementation plan audit stress-testing scope, assumptions, risks, and failure modes before code is
       written. Triggers on: "review this plan", "is this plan solid", "what am I missing", "challenge my assumptions", "stress-test
       this", "/plan-review".'
@@ -1118,7 +1118,7 @@ packages:
     difficulty: advanced
     phase: review
   - name: pr-review
-    version: 1.1.1
+    version: 1.2.0
     description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality
       with severity-ranked findings. Triggers on: "review my PR", "review this code", "check my changes", "audit this PR",
       "code review". NOT for pre-landing gate, use pre-landing-review.'
@@ -1133,7 +1133,7 @@ packages:
     difficulty: intermediate
     phase: review
   - name: pr-swarm
-    version: 1.2.0
+    version: 1.3.0
     description: 'Parallelizes two or more independent "own PR to green" loops for a single repository using isolated git
       worktrees and separate headless Claude Code sessions per PR — resolving merge conflicts, clearing review feedback, and
       watching CI to completion without one PR''s diff or feedback leaking into another''s context. Triggers on: "parallelize
@@ -1323,7 +1323,7 @@ packages:
     - citation-audit
     - literature-review
   - name: ship-workflow
-    version: 2.1.0
+    version: 2.2.0
     description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature
       branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work
       as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the
@@ -1407,7 +1407,7 @@ packages:
     difficulty: intermediate
     phase: build
   - name: stacked-prs
-    version: 0.5.0
+    version: 0.6.0
     description: 'Manages dependent branch stacks and stacked pull requests using safe Git topology rules. Triggers on: "create
       stacked PRs", "publish this stack", "sync my PR stack", "rebase this stack", "merge the stack", "retarget child PRs",
       "split this branch into stacked PRs", "validate this stack", "cleanup stacked branches", or "GitHub native stack". Use

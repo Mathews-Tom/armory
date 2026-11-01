@@ -19,6 +19,7 @@ from urllib.parse import parse_qsl, urlsplit
 import github_ops
 import pytest
 from github_ops import GitHub, Observation, ProviderError
+from lifecycle import Policy, evaluate
 
 REPO = "acme/widget"
 NUMBER = 7
@@ -195,7 +196,12 @@ def run(
 
 
 def review(rid: int, login: str, state: str, commit: str = HEAD) -> dict[str, Any]:
-    return {"id": rid, "state": state, "commit_id": commit, "user": {"login": login}}
+    return {
+        "id": rid,
+        "state": state,
+        "commit_id": commit,
+        "user": {"login": login, "type": "User"},
+    }
 
 
 def merge_commit(parents: list[str] | None = None) -> Reply:
@@ -1004,7 +1010,7 @@ def test_approvals_bind_to_current_head_and_latest_review_per_reviewer() -> None
     ]  # fmt: skip
     perms = {
         f"/repos/{REPO}/collaborators/{n}/permission": permission()
-        for n in ("bob", "erin")
+        for n in ("bob", "dave", "erin")
     }
     obs = observe(
         routes() | {f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged(reviews)} | perms
@@ -1022,7 +1028,7 @@ def test_approval_from_reviewer_without_write_access_does_not_count() -> None:
         f"/repos/{REPO}/collaborators/bob/permission": permission("read"),
     }
     obs = observe(table)
-    assert obs.approvals == 0 and has_issue(obs, "approval-not-counted")
+    assert obs.approvals == 0 and has_issue(obs, "review-not-authoritative")
 
 
 def test_unverifiable_reviewer_permission_never_counts_and_makes_policy_unknown() -> (
@@ -1037,6 +1043,89 @@ def test_unverifiable_reviewer_permission_never_counts_and_makes_policy_unknown(
     obs = observe(table)
     assert obs.approvals == 0 and obs.policy_known is False
     assert has_issue(obs, "reviewer-permission-unverified")
+
+
+@pytest.mark.parametrize("user_type", ["User", "Bot"])
+@pytest.mark.parametrize(
+    "role,blocks",
+    [("read", False), ("triage", False), ("write", True), ("admin", True)],
+)
+def test_change_requests_use_provider_review_authority(
+    user_type: str, role: str, blocks: bool
+) -> None:
+    request = review(1, "reviewer", "CHANGES_REQUESTED")
+    request["user"]["type"] = user_type
+    table = with_ci([run(10, suite=100)], [check_run(1000, "test")]) | {
+        f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged([request]),
+        f"/repos/{REPO}/collaborators/reviewer/permission": permission(role),
+    }
+    current = observe(table)
+    decision = Policy(
+        ("repository review policy",),
+        ("test",),
+        "squash",
+        (),
+        HEAD,
+        BASE,
+        assurance="high",
+    )
+    assert current.policy_known
+    assert current.changes_requested is blocks
+    assert evaluate(current, decision).status == ("BLOCKED" if blocks else "READY")
+    if not blocks:
+        assert has_issue(current, "advisory-review")
+
+
+def test_custom_write_role_keeps_formal_change_request_blocking() -> None:
+    table = with_ci([run(10, suite=100)], [check_run(1000, "test")]) | {
+        f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged(
+            [review(1, "reviewer", "CHANGES_REQUESTED")]
+        ),
+        f"/repos/{REPO}/collaborators/reviewer/permission": Reply(
+            body={"permission": "write", "role_name": "release-reviewer"}
+        ),
+    }
+    current = observe(table)
+    decision = Policy(
+        ("repository review policy",),
+        ("test",),
+        "squash",
+        (),
+        HEAD,
+        BASE,
+        assurance="high",
+    )
+    assert current.policy_known
+    assert current.changes_requested
+    assert evaluate(current, decision).status == "BLOCKED"
+
+
+def test_unreadable_change_request_authority_is_not_advisory() -> None:
+    table = routes() | {
+        f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged(
+            [review(1, "reviewer", "CHANGES_REQUESTED")]
+        ),
+        f"/repos/{REPO}/collaborators/reviewer/permission": Reply(
+            status=403, body={"message": "Forbidden"}
+        ),
+    }
+    current = observe(table)
+    assert not current.policy_known
+    assert evaluate(current, None).status == "BLOCKED"
+
+
+def test_bot_approval_does_not_satisfy_required_human_approval() -> None:
+    approval = review(1, "automation", "APPROVED")
+    approval["user"]["type"] = "Bot"
+    current = observe(
+        routes()
+        | {
+            f"/repos/{REPO}/pulls/{NUMBER}/reviews": paged([approval]),
+            f"/repos/{REPO}/collaborators/automation/permission": permission("admin"),
+        }
+    )
+    assert current.approvals == 0
+    assert has_issue(current, "nonhuman-approval-ignored")
 
 
 def test_unreadable_reviews_are_not_zero_approval_certainty() -> None:

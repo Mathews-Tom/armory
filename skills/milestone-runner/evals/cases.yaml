@@ -4,7 +4,7 @@ cases:
       Run the milestone prompts in .docs/EXECUTION_PROMPTS.md one after another. For each milestone, after the stack reports GO and external gates pass, merge the stack root-to-leaf and clean merged branches before continuing.
     fixtures: []
     rubric:
-      - "restates each milestone's GOAL, NON-GOALS and DONE WHEN from the plan before work"
+      - "carries the project destination/workflow and each milestone's GOAL contribution, NON-GOALS and DONE WHEN from current authority before work"
       - "runs dependent milestones sequentially after a design check"
       - "uses external gates such as PR state, CI, verification commands and review before advancing"
       - "merges root-to-leaf only after gates clear, then cleans verified merged branches"
@@ -49,7 +49,7 @@ cases:
     fixtures: []
     rubric:
       - "delegates landing, retargeting and cleanup to ship-workflow using a stacked-prs stack decision packet; no hand-run merges or branch deletions"
-      - "requires green CI before landing"
+      - "requires provider-required checks, repository mandates and explicit owner gates before landing; reports explicit advisory states truthfully"
       - "removes only branches ship-workflow proved merged"
     trigger_expected: true
     assertions:
@@ -165,6 +165,170 @@ cases:
       - type: contains
         target: "v2.4.0"
         weight: 0.7
+
+  - id: supplied_small_goal_needs_no_plan_cycle
+    prompt: >
+      Run this /goal: add --json to the existing tasks list CLI in one PR. PROJECT: operators inspect tasks using the CLI.
+      GOAL: operators can run tasks list --json and receive a JSON array while normal output remains unchanged.
+      NON-GOALS: other commands or a new formatter framework. DONE WHEN: an empty list returns [] and a populated list
+      parses with the existing task fields. VERIFICATION: existing CLI tests and local preflight plus both observed invocations.
+      There are no DEVELOPMENT_PLAN.md or EXECUTION_PROMPTS.md files.
+    fixtures: []
+    rubric:
+      - "accepts the explicit bounded /goal without stopping for missing files, invoking a plan-generation cycle or writing synthetic planning files"
+      - "performs the design check against the supplied workflow and existing repo, preserving normal output"
+      - "defaults to one cohesive PR, existing local preflight and observed empty/populated JSON behavior"
+      - "retains review, required checks, dirty-workspace safeguards and ship-workflow landing ownership"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(no plan files|without.{0,40}plan|supplied.{0,30}/goal|explicit.{0,30}/goal)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(DESIGN GO|design check)"
+        weight: 0.8
+
+  - id: activate_ready_prompt_preserving_outcome
+    prompt: >
+      Continue the approved rolling-wave plan. M1 is provider-confirmed merged. M2 is the next ready outcome: operators can export
+      the existing report as CSV from the CLI, preserving existing text output and access checks. Its prompt was deliberately
+      deferred. The code moved from report.py to reporting/cli.py and existing test/preflight commands are discoverable.
+      M3 remains a roadmap outcome blocked on an owner delivery-channel decision. No new product decision is needed for M2.
+    fixtures: []
+    rubric:
+      - "materializes M2's actionable prompt in the canonical execution file and routine detail in the first implementation commit rather than requiring a docs-only PR"
+      - "derives binary Done when from approved CSV outcome, preserving text output and access constraints without broadening acceptance"
+      - "uses current repo file/check detail without asking the owner to approve the rename or routine prompt rendering"
+      - "carries project destination and M2 contribution, then performs the design check before code"
+      - "leaves M3 deferred without a synthetic prompt/check requirement and keeps the delivery-channel decision with the owner"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(materializ|render|activat).{0,100}(M2|prompt)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(M3.{0,100}(defer|roadmap)|defer.{0,100}M3)"
+        weight: 0.8
+
+  - id: explicit_advisory_is_not_green_or_required
+    prompt: >
+      Continue M2 to landing. Its local preflight and CSV interaction pass and the PR is reviewed. Current-head unit and security
+      checks required by the provider are green. Repo policy explicitly lists Performance Report as advisory; that job failed.
+      A separate current-head Packaging Check failed but is not classified anywhere. Can M2 merge, and what do you report?
+    fixtures: []
+    rubric:
+      - "reports the Performance Report failure as explicit advisory rather than green or a new blocker"
+      - "fails closed on unclassified Packaging Check and fixes it before landing or advancing dependents"
+      - "preserves provider-required checks and head/base/context freshness under repository and ship-workflow policy"
+      - "does not treat slowness, lack of a required-provider flag or the desire for speed as advisory classification"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(advisory)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(Packaging.{0,100}(block|fail|fix)|unclassified.{0,100}(block|fail.closed))"
+        weight: 0.9
+
+  - id: third_unsuccessful_fix_round_escalates
+    prompt: >
+      M2 has two justified stacked PRs, each already received a primary review and the cumulative integration check passed.
+      Three fix rounds have failed to resolve a permissions defect in PR 2's changed export handler. Unchanged PR 1 still has
+      current passing review/check evidence. The lane proposes another whole-stack review and an automatic fourth fix loop,
+      or merging now to keep velocity. Continue correctly.
+    fixtures: []
+    rubric:
+      - "escalates the concrete permissions defect after the third unsuccessful fix round rather than running an automatic fourth round or merging"
+      - "does not repeat a full primary review of unchanged PR 1 or relabel the cumulative integration check a duplicate full review"
+      - "bounds any targeted re-review to changed code and affected permissions contracts, retaining fresh passing evidence elsewhere"
+      - "blocks M2 and dependents while the correctness/security defect remains"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(escalat|owner.{0,30}decision)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(not merge|no merge|do not merge|block)"
+        weight: 0.9
+
+  - id: stable_unmerged_dependency_needs_authority
+    prompt: >
+      Continue the sequence. M2 consumes M1's stable export interface but M1 is still open. The approved plan explicitly authorizes
+      M2 development against that interface before M1 merges, with normal root-to-leaf landing and checks unchanged.
+      Separately, M4 consumes M3's apparently stable interface; neither the plan nor owner has authorized using M3 before merge.
+      Which work is ready, and what changes invalidate its evidence?
+    fixtures: []
+    rubric:
+      - "confirms the explicit M2 authorization, live interface and revisions before development; preserves dependency landing order and required protections"
+      - "keeps M4 waiting for M3 merge rather than deriving authority from technical stability"
+      - "invalidates affected design/review/check evidence if the authorized unmerged interface or relevant head/base/context changes"
+      - "does not grant either dependency permission to bypass ship-workflow or merge provider gates"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(authoriz|approved plan)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(?i)(M4.{0,100}(wait|merge|not ready)|M3.{0,100}merge)"
+        weight: 0.8
+
+  - id: mainline_failure_requires_containment
+    prompt: >
+      M2 landed through ship-workflow and reported COMPLETE. On the merged base, its promised report export interaction fails.
+      The lane says to mark M2 done and start dependent M3 because pre-merge CI passed, then make the failing runtime check advisory.
+      Continue the milestone sequence safely.
+    fixtures: []
+    rubric:
+      - "does not declare M2 complete or advance dependent M3 despite pre-merge green checks"
+      - "contains the mainline failure by revert or focused repair through normal landing authority and applicable gates"
+      - "does not weaken the runtime acceptance or reclassify the failing check merely to continue"
+      - "reports the observed failure and requires the merged-base interaction to work before dependent progress"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(contain|revert|focused repair)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(ship-workflow|landing authority)"
+        weight: 0.8
+
+  - id: unready_roadmap_is_not_missing_prompt_failure
+    prompt: >
+      Continue the sequence. All active milestones are merged and their runtime outcomes were observed. The only remaining
+      roadmap outcome is scheduled delivery, awaiting the owner's delivery-channel decision, with no execution prompt.
+      Should the missing prompt trigger plan regeneration or invented acceptance?
+    fixtures: []
+    rubric:
+      - "reports completed active work and the remaining roadmap outcome/owner constraint, without claiming the whole destination delivered"
+      - "leaves the future item deferred rather than blocked for missing prompt, design verdict or checks"
+      - "does not generate synthetic files, invent delivery acceptance or ask for approval of nonexistent routine implementation detail"
+      - "stops execution because nothing is actionable and reports the actual owner decision needed"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(defer|not actionable|nothing.{0,20}actionable)"
+        weight: 0.9
+
+  - id: runner_defers_vision_only_architecture
+    prompt: >
+      Run the approved small import milestone. PROJECT: operators import CSV data safely into the existing local store.
+      DONE WHEN: one CSV imports successfully and retrying does not duplicate records. A lane proposes a plugin registry and
+      universal storage adapter because the long-term roadmap includes another importer and database, though neither is approved
+      for current use. It also discovered the current retry path duplicates records. Keep the milestone on its authorized goal.
+    fixtures: []
+    rubric:
+      - "requires the retry correctness fix and working import demonstration as necessary now"
+      - "defers registry/storage abstraction with concrete revisit conditions such as an approved second importer/database"
+      - "preserves ordinary maintainability without authorizing equivalent speculative architecture under a different name"
+      - "carries project destination and current contribution but does not convert the whole roadmap into acceptance"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)(defer|not now)"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)(retry|duplicate)"
+        weight: 0.9
 
   - id: negative_generate_plan_prompts
     prompt: >

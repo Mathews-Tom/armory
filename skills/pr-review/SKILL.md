@@ -2,7 +2,7 @@
 name: pr-review
 description: 'Diff-based PR review across code quality, test coverage, silent failures, type design, and comment quality with severity-ranked findings. Triggers on: "review my PR", "review this code", "check my changes", "audit this PR", "code review". NOT for pre-landing gate, use pre-landing-review.'
 metadata:
-  version: 1.1.1
+  version: 1.2.0
   category: review
   tags: [code-review, pull-request, quality, diff-analysis]
   difficulty: intermediate
@@ -56,17 +56,15 @@ Load only the reference files that apply. Skip dimensions with no matching files
 
 ### Phase 3: Review
 
-For each applicable dimension, analyze the diff using the loaded methodology:
+Review the changed behavior and affected contracts using the applicable methodologies:
 
-1. **Code review** — scan every changed file for guideline violations and bugs.
-   Apply confidence scoring (0-100). Only report issues >= 80.
-2. **Test analysis** — map test coverage to changed code paths. Rate gaps 1-10.
-   Only report gaps >= 5.
-3. **Error handling** — examine every error handler in the diff for silent failures.
-   Classify CRITICAL/HIGH/MEDIUM.
-4. **Type design** — evaluate new or modified types on 4 dimensions (encapsulation,
-   invariant expression, usefulness, enforcement). Rate each 1-10.
-5. **Comment quality** — verify accuracy, assess long-term value, flag comment rot.
+1. **Code review** — report demonstrated bugs and explicit rule violations at confidence >= 80.
+2. **Test analysis** — identify plausible consumer-visible regressions that required behavior does not cover.
+3. **Error handling** — trace failures and their caller-visible consequences.
+4. **Type design** — assess current invariants and actual consumers; speculative extensibility is not a defect.
+5. **Comment quality** — report misleading contracts that affect correct use; ordinary polish is optional.
+
+Read enough surrounding implementation and call sites to prove each scenario. Review changed source rather than generated copies. On fixes, review the changed code and affected interactions; repeat a broader review only when a changed contract or base invalidates the earlier assessment.
 
 ### Phase 4: Aggregate
 
@@ -78,15 +76,15 @@ Merge all findings into a single report, deduplicated and severity-ranked.
 - If code-review and error-handling both flag an empty catch block, merge into one
   finding with the error-handling severity (it's the specialist)
 
-**Severity mapping across dimensions:**
+**Severity is impact, not confidence or a design score.**
 
-| Dimension       | Maps to Critical    | Maps to Important        | Maps to Suggestion    |
-| --------------- | ------------------- | ------------------------ | --------------------- |
-| Code review     | Confidence 90-100   | Confidence 80-89         | —                     |
-| Test analysis   | Rating 9-10         | Rating 7-8               | Rating 5-6            |
-| Error handling  | CRITICAL            | HIGH                     | MEDIUM                |
-| Type design     | Any rating <= 3/10  | Any rating 4-6/10        | Rating 7-8/10         |
-| Comment quality | Factually incorrect | Misleading or incomplete | Restates obvious code |
+| Severity | Evidence and consequence |
+| --- | --- |
+| Critical | Demonstrated severe security, data-loss, availability or equivalent consumer risk; blocks merge. |
+| Important | Concrete regression, broken contract, required behavior gap or evidenced maintainability defect; blocks until resolved or an authorized decision addresses it. |
+| Suggestion | Optional polish or future capability; non-blocking and omitted unless useful or requested. |
+
+Use confidence to filter uncertain claims, not to promote a certain nit into a Critical finding. Respect repository-specific severity labels and provider-required review policy.
 
 ---
 
@@ -107,14 +105,11 @@ Merge all findings into a single report, deduplicated and severity-ranked.
 ## Suggestions (consider)
 - **[dimension]** `file:line` — Description.
 
-## Strengths
-- What's well-done in this changeset.
-
 ## Recommended Action
-1. Fix critical issues
-2. Address important issues
-3. Consider suggestions
-4. Re-run review after fixes
+1. Resolve demonstrated blocking issues, batching fixes by bug class.
+2. Re-review changed code and affected interactions only.
+3. Leave optional suggestions non-blocking; do not expand the PR to obtain reviewer silence.
+4. After three unsuccessful fix/re-review rounds, report the recurring findings for an owner decision. The cap never authorizes merging known defects.
 ```
 
 If no issues are found at any severity level, confirm the code meets standards with
@@ -162,8 +157,7 @@ When a specific aspect is requested, load only that reference file and skip rout
    do not flag arrow functions even if conventional style prefers `function` declarations.
 4. **Deduplication is mandatory.** If two dimensions flag the same issue, merge them.
    Never report the same problem twice.
-5. **Acknowledge strengths.** A review that only lists problems is demoralizing. Note
-   what's done well, even briefly.
+5. **Progress over perfection.** Approve when required behavior and code health meet the repository standard; no finding quota and no mandatory polish. A clean review is a valid result.
 6. **Code-refiner handles simplification.** This skill reviews and reports. It does not
    refactor or simplify — that's the `code-refiner` skill's job. Keep the roles separate.
 
@@ -173,14 +167,14 @@ When a specific aspect is requested, load only that reference file and skip rout
 |---|---|
 | "Tests pass, so the code is fine" | Tests are necessary but insufficient — they miss architecture, security, readability, and maintainability concerns |
 | "It's a small diff, no real review needed" | Small changes cause most production incidents; a 3-line auth bypass is worse than a 300-line refactor |
-| "We'll clean it up later" | Later never comes — the review IS the quality gate before code becomes legacy |
+| "We'll clean it up later" | Fix demonstrated current defects now; defer optional capability and polish without weakening current correctness |
 | "The author is senior, I trust them" | Seniority doesn't prevent mistakes; fresh eyes catch what familiarity blinds |
 | "I already reviewed similar code recently" | Each diff has unique context — assumptions from past reviews cause missed issues |
 | "This is just a refactor, nothing can break" | Refactors change behavior in subtle ways — verify with tests and trace call sites |
 
 ## Red Flags
 
-- Approving without reading every changed file in full (not just diff hunks)
+- Approving without reading the changed behavior and enough surrounding context to verify affected contracts
 - No file:line references in findings — vague feedback is not actionable
 - Skipping a review dimension because "it looks fine"
 - Reporting only style issues while ignoring logic, security, or architecture
@@ -189,9 +183,9 @@ When a specific aspect is requested, load only that reference file and skip rout
 
 ## Verification
 
-- [ ] Every changed file read in full, not just diff hunks
-- [ ] Each review dimension scored: correctness, security, performance, readability, architecture
-- [ ] Every finding includes a file:line reference
-- [ ] At least one actionable finding per 100 lines changed, or explicit "no issues found" with justification
-- [ ] Review summary includes risk level (LOW/MEDIUM/HIGH/CRITICAL) and blocking vs. non-blocking classification
-- [ ] Strengths acknowledged — review is not 100% negative
+- [ ] Changed behavior and affected contracts reviewed with sufficient surrounding context
+- [ ] Applicable dimensions covered; irrelevant dimensions omitted
+- [ ] Every finding includes file:line, concrete scenario, consequence and bug class
+- [ ] Severity reflects impact, not confidence, a score or a target finding count
+- [ ] Blocking and non-blocking feedback distinguished; provider-required reviews preserved
+- [ ] Re-review is scoped to changed code and affected interactions; recurring failures stop after three rounds

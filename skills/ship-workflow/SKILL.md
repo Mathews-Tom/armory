@@ -2,7 +2,7 @@
 name: ship-workflow
 description: 'Resumable shipping lifecycle: reconciles current Git and GitHub facts from any entry (dirty default or feature branch, local commits, published branch, open PR, existing manual or native stack, merged work), commits dirty work as lossless logical commits, publishes or reuses the PR, requires current CI and review evidence, lands it through the supported path and cleans up only proven-stale branches and worktrees. Stops at the requested endpoint and never bumps versions, edits changelogs, tags or publishes. Triggers on: "ship it", "ship this", "open a PR", "push and PR", "land this PR", "merge PR and clean up", "check CI on my PR", "resume the ship run", "/ship-workflow".'
 metadata:
-  version: 2.1.0
+  version: 2.2.0
   category: review
   tags: [shipping, pull-request, ci-cd, merge, cleanup]
   difficulty: intermediate
@@ -56,11 +56,13 @@ For an existing PR with unambiguous provider merge policy:
 uv run --no-project --python 3.12 python "<skill-dir>/scripts/ship.py" --pr 12 --until merged
 ```
 
-Use every applicable current check, including non-required jobs, and the provider's required check publishers, current-head reviews and protections. Pending or failed checks stop landing. Missing/inaccessible evidence is not GREEN. Strict provider-required current-base checks remain authoritative. Repeated display names are normal: workflow, event, publisher, job and current attempt identify the evidence; push results are head-only and do not substitute for PR merge-context results. A newer attempt supersedes older evidence only for the same logical job. Provider-current job IDs define membership: partial reruns can carry distinct same-named jobs from earlier attempts. Do not rename jobs or change workflows to satisfy this controller.
+Provider-required checks/publishers, repository mandates, current-head human approvals and protections remain blocking. Unclassified observed jobs also stay strict: pending or failed evidence stops landing. Only exact, source-backed `advisory_checks` identities in `--policy` or a stack node's decision may report pending/failure without veto; the controller surfaces their state separately. Never infer advisory status from slowness, inherited failure, bot identity or a display-name pattern. Missing/inaccessible required evidence is not GREEN, and advisory declarations never weaken strict current-base gates. Repeated display names are normal: workflow, event, publisher, job and current attempt identify evidence; push results do not substitute for PR merge-context results. Provider-current job IDs preserve distinct carried jobs in partial reruns. Do not rename jobs or change workflows to satisfy this controller.
 
-An explicit `--policy` resolves actual ambiguity: repository merge-method conventions, expected-job inventory, justified skips/head-only checks, documented post-merge commands, protected refs, or a deliberately CI-free repository. Bind it to the current head/base (schema 1) or publication (schema 2), as specified in the lifecycle reference. Empty CI requires a sourced `ci_free` decision; it is never inferred from absent jobs.
+An explicit `--policy` resolves actual ambiguity: repository merge-method conventions, blocking expected-job inventory, exact advisory CI classification, justified skips/head-only checks, documented post-merge commands, protected refs, or a deliberately CI-free repository. Bind it to the current head/base (schema 1) or publication (schema 2), as specified in the lifecycle reference. Empty CI requires a sourced `ci_free` decision; it is never inferred from absent jobs.
 
 Routine assurance does not require checkout-log attestation or immutable action pins. Use `assurance: "high"` in an explicit policy, or a selected stack node's decision, only when requested. That option requires the stronger checkout/commit-parent evidence described in the lifecycle reference. Never silently lower a saved run's assurance; a legacy run or incompatible source update must stop for an explicit migration/policy decision.
+
+Use one primary review per PR. A stack receives one cumulative integration check, not another full review of every slice. After fixes, re-review changed code and affected boundaries; after three unsuccessful fix rounds, escalate the unresolved defects instead of looping or merging them. Provider-required reviews and code-owner protections remain authoritative. Formal changes requested veto only with verified repository review authority; advisory bot comments/reviews do not gain authority from their label. A write-capable bot's formal change request is not automatically advisory, and bot approvals do not satisfy required human approval.
 
 ### 4. Validate local work before push
 
@@ -69,6 +71,8 @@ For dirty work, follow the commit-planning reference: inventory every dispositio
 For publication, give `--title` and `--body-file` together when a PR may be created. Resolve its named base through the plan or a schema 2 binding. Reuse the exact matching PR instead of creating a duplicate. A release-preparation handoff ends at `pr`.
 
 Requested local gates run in isolated clean checkouts before push, with their own deadlines. Use `--gates` for publication and stack replay, and `per_commit: true` in the gate packet when every outgoing/replayed commit must pass. Existing repository hooks still run normally. Do not install or override a pre-push hook, run long validation inside push, or introduce a stop/validate/resume protocol.
+
+Layer checks by risk and purpose: fast changed-scope local checks, stable PR correctness/security gates, integration-candidate checks on the actual combined tree (`merge_group` where configured), mainline acceptance, and expensive scheduled audits. Keep every provider-required and repository-mandated gate. Reuse evidence only when relevant code, dependencies, configuration, toolchain, head/base and execution context match; a required new provider report still runs. Do not rerun unchanged historical slice reviews as a substitute for integration evidence.
 
 The controller freezes and verifies replay proposals before publication. After a definite refusal, unchanged inputs reuse the exact proposed commit objects and renew validation before another guarded push. Callers do not seed `GIT_COMMITTER_DATE`. Unknown outcomes stay pending and reconcile from current facts before any further mutation.
 
@@ -96,6 +100,8 @@ GitHub-native selections use one guarded asynchronous request on the highest sel
 | `BLOCKED` | Report the actual prerequisite, protection or failure; preserve confirmed facts |
 
 Resume only a returned `run_id` using `--resume RUN_ID`; never invent one. Reconcile uncertain pushes, PR creation, retargets, merges and deletions before retrying. A failed post-merge command or required cleanup is merged-but-incomplete, not success. Repair change-owned CI failures within scope; inherited, permission and protection failures remain blockers. Never bypass protection, use an admin merge, weaken checks or solicit reviewer bots.
+
+On a mainline or post-merge failure, contain impact first: use an authorized revert or a focused repair with normal review and gates. Preserve merged-but-incomplete facts and report the recovery owner/action. Never reinterpret a failing gate as advisory, disable a protection or weaken quality to make main green.
 
 Explain waits using `last_gate.reason` or the sanitized `diagnostic` when a transport-level blocker contains only an operation identifier. Name the finite monitoring deadline and any minimum dispatch window. A publication preview with an unresolved named base is a `resolve-base` action with `NEEDS_JUDGMENT` blockers, not an executable push/PR plan.
 

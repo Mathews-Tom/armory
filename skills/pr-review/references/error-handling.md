@@ -1,13 +1,11 @@
 # Error Handling & Silent Failure Analysis
 
-Zero tolerance for silent failures. Every error must be surfaced, logged, and actionable.
+Trace changed failure paths to their caller-visible result. Report concealed failures that violate a contract or prevent required recovery; severity follows the demonstrated impact.
 
 ## Non-Negotiable Rules
 
-1. **Silent failures are unacceptable** — any error without proper logging and user
-   feedback is a critical defect
-2. **Users deserve actionable feedback** — every error message must explain what went
-   wrong and what to do about it
+1. **Failures must remain observable at the appropriate boundary** — propagation to a caller or handling by an outer boundary can be correct; do not require duplicate logging and user messages in every handler.
+2. **Feedback must support the current workflow** — missing actionability is blocking only when it prevents required use, diagnosis or recovery.
 3. **Fallbacks must be explicit and justified** — falling back without user awareness
    hides problems
 4. **Catch blocks must be specific** — broad exception catching hides unrelated errors
@@ -33,7 +31,7 @@ Systematically find:
 
 - Appropriate severity level (error vs warning vs info)
 - Sufficient context (operation, relevant IDs, state)
-- Error tracking IDs for monitoring systems
+- Correlation or tracking IDs when the current operational contract requires them
 - Debuggable 6 months from now by someone without context
 
 **User feedback:**
@@ -65,7 +63,7 @@ Systematically find:
 
 ### 3. Check for Hidden Failure Patterns
 
-Anti-patterns (always flag):
+Investigate these patterns; report a finding only after establishing a concrete failing scenario:
 
 - Empty catch blocks
 - Catch blocks that only log and continue
@@ -78,11 +76,11 @@ Anti-patterns (always flag):
 
 ## Severity Classification
 
-| Severity | Criteria                                                      |
-| -------- | ------------------------------------------------------------- |
-| CRITICAL | Silent failure, broad catch hiding errors, empty catch block  |
-| HIGH     | Poor error message, unjustified fallback, swallowed exception |
-| MEDIUM   | Missing context in logs, could be more specific               |
+| Severity | Criteria |
+| --- | --- |
+| CRITICAL | Concealed failure demonstrably causes severe security, data-loss or availability risk |
+| HIGH | Swallowed or misrouted error breaks required behavior or recovery |
+| MEDIUM | Optional message/log improvement without a demonstrated required-behavior defect; non-blocking |
 
 ## Output Format
 

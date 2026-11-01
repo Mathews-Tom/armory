@@ -58,3 +58,27 @@ cases:
       - "does not activate plan review workflow"
       - "diagram creation is different from plan audit"
     trigger_expected: false
+
+  - id: necessity_now_and_evolvable_architecture
+    prompt: >
+      Review a plan for letting a user import one local document and search it. M1 builds a distributed job platform,
+      M2 adds a provider plugin framework with one provider, and M3 finally wires import/search. Sources require no
+      multi-host deployment or second provider. The next release must preserve private document access. M4-M8 have
+      only outcomes and dependencies because they are not ready to implement.
+    fixtures: []
+    rubric:
+      - "challenges infrastructure-first sequencing and recommends the smallest usable import/search slice"
+      - "defers unused distributed/plugin capability with a concrete revisit condition while preserving private access"
+      - "accepts outcome-level distant milestones rather than demanding premature execution prompts"
+      - "uses the default combined lens without a configuration pause or invented dashboards/10x qualification"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)defer|later|not necessary"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)import.*search|search.*import"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)privat|access|security"
+        weight: 0.9

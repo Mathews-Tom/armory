@@ -88,3 +88,24 @@ cases:
     rubric:
       - "does not activate pr-review workflow (test-harness territory)"
     trigger_expected: false
+
+  - id: substantive_review_without_polish_loop
+    prompt: >
+      Re-review a fix to a null check in a report-export PR. The preceding pass already reviewed the remaining code;
+      the public contract and base are unchanged. Required checks and the export smoke pass. The only new bot
+      suggestions are to rename a local variable and add a generic exporter registry for a hypothetical second format.
+      This is the third feedback-answering round. Report merge blockers, not a new implementation.
+    fixtures: []
+    rubric:
+      - "reviews changed null handling and affected callers rather than restarting unchanged dimensions"
+      - "does not turn optional naming or unused extensibility into blocking findings or commits"
+      - "does not manufacture a finding quota or derive severity from confidence alone"
+      - "if a substantive defect remains, reports the recurring issue for an owner decision rather than starting round four"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)non.blocking|optional|nothing to fix|no.*block"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)changed|affected|null"
+        weight: 0.9

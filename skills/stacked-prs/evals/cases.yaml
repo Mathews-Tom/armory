@@ -549,3 +549,27 @@ cases:
       - "general Git education is not a stacked PR workflow"
       - "does not activate stacked-prs"
     trigger_expected: false
+
+  - id: layered_checks_preserve_integration_context
+    prompt: >
+      Validate an existing two-PR stack. Focused slice checks passed locally, and the repository runs critical
+      integration checks on merge_group before landing and broad regression tests on main. The leaf's parent
+      has just landed, so the leaf's tested base is stale. A coverage dashboard is explicitly advisory in the
+      sourced shipping policy. Do not add more PRs or merge without current required evidence.
+    fixtures: []
+    rubric:
+      - "renews affected leaf evidence against the promoted integration context rather than reusing stale green"
+      - "keeps required per-PR and integration-candidate gates while reporting the advisory dashboard separately"
+      - "does not repeat whole-stack line review or invent additional PRs/full checks on every edit"
+      - "does not promise that a merge queue produces one build or atomically lands the stack"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)base|context|promot"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)advisory"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)integration|merge_group"
+        weight: 0.9

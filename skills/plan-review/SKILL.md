@@ -2,7 +2,7 @@
 name: plan-review
 description: 'Pre-implementation plan audit stress-testing scope, assumptions, risks, and failure modes before code is written. Triggers on: "review this plan", "is this plan solid", "what am I missing", "challenge my assumptions", "stress-test this", "/plan-review".'
 metadata:
-  version: 1.0.1
+  version: 1.1.0
   category: review
   tags: [plan-audit, scope, risk-assessment, assumptions]
   difficulty: intermediate
@@ -22,13 +22,7 @@ severity-tagged review document with a final ship/rethink/reject verdict.
 
 ## Step 0 — Mode Selection
 
-Ask the user a single question via `AskUserQuestion`:
-
-> Which review lens? (1) Product — scope, user impact, business alignment.
-> (2) Engineering — architecture, failure modes, test strategy, performance.
-> (3) Combined (default) — both lenses integrated.
-
-Accept the answer and proceed. Do not ask follow-up configuration questions.
+Use the requested lens: Product, Engineering, or Combined. When none is specified, use Combined without a configuration question. Resolve facts from the plan and repository; ask only for a material decision the evidence cannot settle.
 
 Also assess scope size from the plan:
 
@@ -41,20 +35,11 @@ Also assess scope size from the plan:
 
 ### 1. Plan Comprehension
 
-Read the plan end-to-end. Produce a 2–3 sentence summary confirming
-understanding. Explicitly list:
-
-- **Stated goals** — what the plan claims to achieve.
-- **Non-goals** — what is explicitly out of scope.
-- **Constraints** — budget, timeline, compatibility, team size, or
-  technology constraints mentioned or implied.
-
-If the summary is wrong, the user corrects it here before the rest of the
-review proceeds on a false foundation.
+Read the plan and its authoritative project goal. Summarize the intended user workflow, the next useful outcome, non-goals and constraints in 2–3 sentences. Identify a mismatch between project value and technically coherent milestones before reviewing implementation detail. Do not pause for confirmation unless an unresolved contradiction changes the outcome or safety.
 
 ### 2. Assumption Challenge
 
-Extract every implicit assumption. For each one:
+Extract material assumptions that could change the next outcome or its safety. For each one:
 
 | Assumption | If wrong? | Supporting evidence | What falsifies it? |
 | ---------- | --------- | ------------------- | ------------------ |
@@ -70,7 +55,7 @@ Common assumption categories to probe:
 
 ### 3. Risk & Failure Mapping
 
-For each component or subsystem in the plan, fill a failure mode table:
+For components on the next delivery path, identify demonstrated failure risks:
 
 | Component | Failure Mode | Blast Radius | Recovery Strategy |
 | --------- | ------------ | ------------ | ----------------- |
@@ -86,16 +71,13 @@ propagation where the plan involves three or more interacting components.
 
 For each major component, assess:
 
-- **Error handling strategy** — Are errors classified and routed through a
-  registry, or silently swallowed by catch-all handlers?
+- **Error handling strategy** — Are current failures explicit and recoverable where required? Do not prescribe a registry or retry framework without a consumer.
 - **Data integrity invariants** — What invariants must hold? How are they
   enforced? What happens when they break?
 - **Concurrency and race conditions** — Shared state, lock ordering,
   optimistic vs. pessimistic strategies, idempotency guarantees.
-- **Performance under load** — Expected throughput, latency budget, resource
-  consumption at 10x current scale.
-- **Test strategy adequacy** — Unit, integration, and end-to-end coverage
-  for the component. What is untestable and why?
+- **Performance under load** — Does the design meet evidenced workload and latency constraints? Hypothetical 10x capacity is not a gate without a source requirement.
+- **Test strategy adequacy** — Do focused tests and an observed interaction cover the promised behavior and affected contracts? Separate fast local/PR feedback, integration-candidate checks and broad mainline/release coverage.
 
 This section is language- and framework-agnostic. Reference
 `references/project-detection.md` for framework-aware examples when the
@@ -105,14 +87,11 @@ Skip this section when running product-lens-only mode.
 
 ### 5. Scope & Priority Assessment (Product Lens)
 
-- **Needed vs. nice-to-have** — Which features are load-bearing for the
-  stated goals? Which are speculative?
-- **Deferral candidates** — What can ship in a follow-up without increasing
-  risk?
-- **Over-engineering indicators** — Abstractions, configurability, or
-  extensibility that no current requirement demands.
-- **User-facing impact** — Does the complexity produce proportional user
-  value?
+- **Necessary now vs. eventually useful** — Does each milestone advance the next useful project outcome? For prerequisites and architectural expansion, name the consumer and concrete cost or risk of deferral.
+- **Deferral candidates** — Defer optional capability with a revisit condition. Preserve correctness, security, data integrity and expensive-to-reverse constraints of the current capability.
+- **Changeability vs. speculative extensibility** — Favor clear boundaries and affordable refactoring over unused frameworks, providers or deployment machinery.
+- **Planning horizon** — Detail actionable milestones; keep distant outcomes provisional. Missing distant execution prompts are not defects.
+- **Delivery cost** — Prefer one cohesive PR unless a split improves review or safe integration; examine stack depth and repeated CI/review waits.
 
 Skip this section when running engineering-lens-only mode.
 
@@ -131,16 +110,7 @@ How components connect to each other and to the outside world:
 
 ### 7. What's Missing
 
-Things the plan does not address that it should:
-
-- Monitoring and observability (metrics, logs, alerts, dashboards)
-- Error recovery paths beyond the first retry
-- Edge cases outside the stated happy path
-- Security considerations (authn, authz, input validation, secrets
-  management)
-- Load and scale implications (connection pools, queue depth, storage
-  growth)
-- Operational runbooks for incident response
+Report a missing element only when a source requirement or concrete failing scenario makes it necessary for the current outcome. Consider security, data integrity, recovery, workload and operational needs at that boundary; do not turn this list into mandatory dashboards, runbooks, retries, benchmarks or extra qualification. Put optional improvements under non-blocking follow-ups, or omit them.
 
 ### 8. Execution Assessment
 
@@ -149,10 +119,9 @@ Evaluate the proposed implementation order:
 - **Dependency ordering** — Are prerequisites built before dependents?
 - **Parallel work opportunities** — Which tasks have no mutual dependency
   and can proceed simultaneously?
-- **Risk-first vs. value-first** — Does the plan tackle the highest-risk
-  unknowns early, or defer them?
-- **Prototype candidates** — Which components should be spiked before
-  committing to the full implementation?
+- **Risk-first vs. value-first** — Address an unknown early only when it threatens the next useful outcome or an expensive-to-reverse decision.
+- **Bounded experiments** — Recommend a focused spike only when it can resolve that unknown more cheaply than implementation; state its decision and stop condition.
+- **Integration readiness** — Keep required checks before merge against the actual integration candidate. Local checks and broad post-merge coverage complement rather than replace that safeguard.
 
 ### 9. Verdict
 
@@ -174,25 +143,16 @@ only:
 
 1. **Scope** — What the change does and its boundaries.
 2. **Risks** — Failure modes and blast radius (brief table).
-3. **Missing** — Gaps worth addressing even at this scale.
+3. **Missing** — Only material gaps required by this outcome.
 4. **Verdict** — Ship / Ship with changes / Rethink / Reject.
 
 ## Interaction Protocol
 
-- Use `AskUserQuestion` one issue at a time. Never batch multiple questions
-  into a single prompt.
-- For HIGH-severity findings, surface them immediately and ask whether to
-  continue or pause for discussion before proceeding to the next section.
-- This skill is **read-only**. It does not create, modify, or delete any
-  files.
-- Use ASCII diagrams for data flow and component relationships where they
-  clarify failure propagation or integration topology.
+- Batch related material decisions; finish the reachable review rather than pausing after each finding.
+- Distinguish blocking defects from optional improvements. A plausible long-term benefit alone is not a blocker.
+- This skill is **read-only**. It does not create, modify, or delete files.
+- Use a diagram only when it clarifies a non-obvious dependency or failure.
 
 ## Output Format
 
-Structured review document with:
-
-- Numbered sections matching the sequence above
-- Severity tags on every finding: `[HIGH]`, `[MEDIUM]`, `[LOW]`
-- Summary table of all findings at the end, grouped by severity
-- Final verdict with rationale
+Return only applicable sections, severity-tagged findings with evidence and consequence, and a final verdict with rationale. Separate blocking changes from optional follow-ups. Omit empty sections and do not repeat findings in a second summary table. No finding is a valid result; do not invent work to fill a template.

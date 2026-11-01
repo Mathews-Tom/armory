@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Add sourced, revision-bound `advisory_checks` identities to both policy schemas and manual/native stack decisions. Advisory pending/failure is surfaced without blocking or contaminating strict job freshness; provider-required publishers/checks, repository blocking inventories, unclassified jobs and unreadable required evidence remain fail-closed. Policy fingerprints and frozen graph journals preserve classification through resume.
+- Use verified repository review permissions for formal change-request authority instead of giving every review a veto. Non-authoritative requests remain visible; write-capable human/bot requests remain blocking, unknown permissions fail closed, and bot approvals do not satisfy required human approvals.
+- Document local/PR/integration-candidate/main/scheduled validation layers, context-matched evidence reuse, one primary review plus cumulative stack integration, escalation after three unsuccessful fix rounds, and revert/focused-repair recovery without weakening mainline gates.
 - Routine shipping uses current GitHub checks, required reviews, branch protections and merge policy; checkout-log attestation and immutable action pins are explicit `assurance: "high"` policy instead of default repository prerequisites.
 - Ordinary PRs can use a provider-derived policy when the merge method is unambiguous. Minimal routine packets select a merge method without enumerating CI; explicit inventories, justified skips and deliberately CI-free decisions remain authoritative.
 - Check evidence is qualified by workflow, event, publisher, job and current run/attempt. Provider-current job IDs preserve same-named carried jobs across partial reruns instead of collapsing them by name. Push-only strict repositories use provider-proven inclusion of the current base in the checked head, while observed PR-context checks remain independently authoritative.
@@ -14,6 +17,8 @@
 ### Fixed
 
 - Freeze and reuse exact verified replay commit objects after definite push refusal with unchanged inputs; no caller-seeded committer date or temporary pre-push validation protocol.
+- Require explicit `ci_free` authority when advisory classification leaves no blocking jobs; an advisory-only dashboard cannot stand in for correctness validation.
+- Honor the verified base permission of custom repository roles when determining formal review authority.
 - Renew local gates and the outgoing secret scan after a refused or reconciled not-applied ordinary publication; validation cache hits cannot skip a requested retry check. Push diagnostics describe observed publication failure without misattributing local hooks or transport errors to the remote.
 - Recheck trunk/member inputs after local validation before dispatching a stack push or native request, and validate refreshed native heads rather than old journal members.
 - Invalidate pre-retarget CI by its original workflow trigger, including reruns and automatic base changes; newer runs or attempts with missing job evidence cannot inherit older success.
@@ -23,6 +28,7 @@
 ### Tests
 
 - Cover reviews on later API pages superseding earlier approvals through dismissals, change requests, and stale-head approvals; the regression detects loss of later-page evidence.
+- Add consumer regressions for advisory red/pending readiness, exact workflow/event/publisher/job boundaries, required/advisory conflicts, unreadable evidence, policy schema binding, graph serialization/resume, actual `ship.py --policy`/`--stack-plan` parsing, and authoritative versus advisory formal reviews.
 
 ## 2.0.0
 

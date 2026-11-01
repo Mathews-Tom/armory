@@ -1,6 +1,6 @@
 # Verification Gates
 
-Contents: [Termination conditions](#termination-conditions) · [First-failure reaction](#react-to-the-first-failing-check-not-the-full-matrix) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Quiet window](#quiet-window) · [Review triage and round cap](#review-triage-and-round-cap)
+Contents: [Termination conditions](#termination-conditions) · [First-failure reaction](#react-to-the-first-failing-check-not-the-full-matrix) · [Merge-state staleness](#merge-state-staleness) · [Review-thread pagination](#review-thread-pagination) · [Body-only reviews](#body-only-reviews-the-critical-gap) · [Stale statusCheckRollup entries](#stale-statuscheckrollup-entries) · [The closed-PR trap](#the-closed-pr-trap) · [Final state read](#final-state-read) · [Review triage and round cap](#review-triage-and-round-cap)
 
 These are GitHub API/`gh` CLI behaviors, not agent-specific — they apply regardless of which lane process produced the work.
 
@@ -9,16 +9,16 @@ These are GitHub API/`gh` CLI behaviors, not agent-specific — they apply regar
 A PR/lane is genuinely done only when **all** of the following hold simultaneously:
 
 1. `state == OPEN`
-2. `mergeStateStatus == CLEAN` and `mergeable == MERGEABLE`
-3. Latest CI: every non-skipped check passed, none pending
-4. Unresolved review threads = 0, **and** no unaddressed finding embedded in a body-only review (see below)
-5. No new feedback landed in the last ~10-minute quiet window — a lane stopped by the [round cap](#review-triage-and-round-cap) has not met this condition
-6. Worktree clean; local HEAD matches the pushed remote head
-7. The repo's own test/lint/typecheck gate ran green on the merged tree, not just on the pre-merge branch
+2. Current mergeability is confirmed and provider-required review/protection conditions are satisfied; `CLEAN` alone is not proof and a queue-ready PR need not have that display state.
+3. Provider-required, repository-mandated and unclassified applicable checks passed in the required current head/base context. Explicitly classified advisory jobs are reported separately and may be pending or failed; use `ship-workflow`'s sourced policy contract rather than guessing from names or runtime.
+4. Every substantive in-scope finding has a verified fix or authorized disposition, including body-only review findings. Optional feedback has a reasoned disposition without a fix commit; preserve provider-required thread-resolution and reviewer rules.
+5. A final current-state read confirms no new blocking evidence. No fixed quiet window or bot-silence requirement applies.
+6. Worktree clean; local HEAD matches the pushed remote head.
+7. Acceptance was exercised; repository-required local preflight and integration-candidate checks passed. Do not merge an open PR merely to manufacture a "merged tree" check.
 
 ## React to the first failing check, not the full matrix
 
-`gh pr checks <N>` reports per-job status, not just a run-level aggregate. A run with ten jobs where one has already failed and nine are still queued or in progress is not "still running" from a triage standpoint — the failed job is actionable now. Start fixing it immediately; the still-pending jobs continue in the background and get re-checked on the next poll regardless. Waiting for every job in a run to reach a terminal state before looking at any of them wastes wall-clock time on jobs that were never going to change the fact that one of them already failed.
+`gh pr checks <N>` reports per-job status, not just a run-level aggregate. Start diagnosing an individually failed blocking job immediately while pending jobs continue. Classify review feedback and explicitly advisory failures before acting; they do not automatically justify another fix push. A provider-required check stays blocking regardless of an advisory declaration.
 
 This also means a lane rarely needs to force a fresh CI run at all: pushing the fix for an already-failed job triggers a brand-new run on its own. `gh run rerun` requires repo admin rights a contributor-driven lane typically doesn't have (`Must have admin rights to Repository`) — that's a non-issue here, not a blocker, because the normal fix-and-push cycle never depends on it. Reserve the close/reopen technique (`force-fresh-ci-without-admin-rerun` skill) for the narrow case of re-testing a suspected-flaky failure with no code change to push — not as a routine response to red CI.
 
@@ -71,7 +71,7 @@ Read every `COMMENTED`/`CHANGES_REQUESTED` review's `body` for severity badges, 
 
 ## Stale `statusCheckRollup` entries
 
-The raw `statusCheckRollup` array accumulates every historical check-run row for a PR's head SHA, including ones superseded by a later rerun of the identically-named job. A naive tally of `conclusion` values can show `FAILURE > 0` on a genuinely green, mergeable PR. `mergeStateStatus`/`mergeable` are already the correct aggregate (computed from only the latest run per required check) — trust those over a manual count of the raw array. To confirm one specific job's true state, group entries by `name` and take the one with the latest `completedAt`; `gh pr checks N` (which already dedupes per job) is a fast independent cross-check.
+Historical check-run rows can include superseded attempts. A display name or latest timestamp alone cannot establish which workflow, event, publisher and current attempt a result belongs to. Use `ship-workflow`'s current evidence classification and provider protections; `gh pr checks N` and mergeability are cross-checks, not substitutes for missing evidence. Revalidate affected integration behavior after a head or base change; reuse passing results only when their covered inputs and context are unchanged.
 
 ## The closed-PR trap
 
@@ -79,9 +79,9 @@ The raw `statusCheckRollup` array accumulates every historical check-run row for
 
 A closed PR is not automatically safe to reopen or replace with a fresh PR — some repos gate PR creation behind a contributor-approval mechanism, and reopening/opening fresh re-triggers that gate's evaluation even if the original PR predated the policy. If a PR closes mid-run: stop pushing, read the closing comment, check for a `CONTRIBUTING.md` contributor-gating policy and any existing issue/discussion already addressing it, and report the finding rather than reopening or opening a new PR without explicit instruction.
 
-## Quiet window
+## Final state read
 
-After each push, CI restarts and `mergeStateStatus` typically goes `UNSTABLE` while pending. Wait roughly 10 minutes, re-check every condition. If new feedback landed during the wait, triage it (see below), push the Important fixes, and reset the quiet-window timer — including feedback that lands in the few minutes right after a lane's own final self-check but before the orchestrator's external re-check catches it (a real race, not a bug in either check). One extra quiet window as insurance against reviewer lag before declaring a lane done is worth the wall-clock cost.
+After current acceptance, blocking checks and review requirements pass, re-read PR state, head/base and applicable feedback, then report readiness. If those inputs changed, re-evaluate only affected evidence. Do not add a quiet timer or second insurance wait for an advisory reviewer; unreadable or pending required evidence still blocks. A later substantive finding remains actionable when received, not a reason to hold every completed lane open speculatively.
 
 ## Review triage and round cap
 

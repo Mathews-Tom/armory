@@ -2560,7 +2560,7 @@ class GitHub:
         self, pr: PullRequest, author: str, repo: str, op: str, issues: list[str]
     ) -> tuple[int, bool, bool]:
         repo_path = _repo_path(repo)
-        latest: dict[str, tuple[int, str, str | None, str]] = {}
+        latest: dict[str, tuple[int, str, str | None, str, str | None]] = {}
 
         def read() -> None:
             raw = self._list(f"{repo_path}/pulls/{pr.number}/reviews", f"{op}:reviews")
@@ -2579,6 +2579,7 @@ class GitHub:
                     state,
                     review.opt_text("commit_id"),
                     login,
+                    user.opt_text("type"),
                 )
                 if login.lower() not in latest or latest[login.lower()][0] < entry[0]:
                     latest[login.lower()] = entry
@@ -2588,13 +2589,27 @@ class GitHub:
                 "approvals-unknown: review evidence is unreadable, so approvals are reported as zero"
             )
             return 0, False, False
-        changes_requested = any(
-            state == "CHANGES_REQUESTED" for _, state, _, _ in latest.values()
-        )
+        changes_requested = False
         approvals = 0
         known = True
-        for _, state, commit, login in sorted(latest.values()):
-            if state != "APPROVED":
+        for _, state, commit, login, user_type in sorted(latest.values()):
+            if state not in ("APPROVED", "CHANGES_REQUESTED"):
+                continue
+            if state == "CHANGES_REQUESTED":
+                authoritative = self._can_approve(repo_path, login, op, issues)
+                if authoritative is None:
+                    known = False
+                elif authoritative:
+                    changes_requested = True
+                else:
+                    issues.append(
+                        f"advisory-review: change request by '{_clean(login, 60)}' lacks repository review authority"
+                    )
+                continue
+            if user_type != "User":
+                issues.append(
+                    f"nonhuman-approval-ignored: '{_clean(login, 60)}' cannot satisfy required human approval"
+                )
                 continue
             if commit != pr.head_sha:
                 issues.append(
@@ -2624,15 +2639,19 @@ class GitHub:
                 f"{repo_path}/collaborators/{quote(login, safe='')}/permission",
                 f"{op}:reviewer-permission",
             )
-            role = permission.opt_text("role_name") or permission.text("permission")
-            verdict.append(role in ("admin", "maintain", "write"))
+            role = permission.opt_text("role_name")
+            base_level = permission.text("permission")
+            verdict.append(
+                role in ("admin", "maintain", "write")
+                or base_level in ("admin", "maintain", "write")
+            )
 
         if not self._guard(issues, "reviewer-permission-unverified", read):
             return None
         if not verdict[0]:
             issues.append(
-                f"approval-not-counted: '{_clean(login, 60)}' lacks write access, "
-                "so the approval does not satisfy review policy"
+                f"review-not-authoritative: '{_clean(login, 60)}' lacks write access, "
+                "so the review does not satisfy or veto review policy"
             )
         return verdict[0]
 

@@ -91,3 +91,27 @@ cases:
       - "creating a new PR from an issue is out of scope — pr-swarm only drives already-open PRs"
       - "does not activate pr-swarm"
     trigger_expected: false
+
+  - id: ready_without_advisory_quiet_window
+    prompt: >
+      Drive independent PRs #610 and #611 to readiness. Their required tests, observed acceptance and human reviews
+      pass on the current integration candidates. A sourced shipping policy explicitly classifies the pending
+      coverage dashboard check as advisory; no provider-required check or unresolved required review is exempted.
+      The final PR-state/head/base read is unchanged. Do not merge. Remote runners are saturated by other PRs.
+    fixtures: []
+    rubric:
+      - "reports readiness without a ten-minute quiet window or extra insurance wait for advisory feedback"
+      - "reports advisory pending separately while retaining required checks and reviewer protections"
+      - "bounds new active lanes by remote CI/review capacity instead of launching unlimited work"
+      - "does not merge the PRs to obtain a merged-tree test"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(?i)advisory"
+        weight: 1.0
+      - type: matches_regex
+        target: "(?i)ready|readiness"
+        weight: 0.9
+      - type: matches_regex
+        target: "(?i)capacity|queue|saturat|limit"
+        weight: 0.8
