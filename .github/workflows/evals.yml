@@ -2,132 +2,42 @@ name: Package Evals
 
 on:
   pull_request:
-    paths:
-      - 'skills/**'
-      - 'agents/**'
-      - 'hooks/**'
-      - 'rules/**'
-      - 'commands/**'
-      - 'utilities/**'
-      - 'presets/**'
-      - 'extensions/**'
-      - 'scripts/validate_evals.py'
+  merge_group:
+    types: [checks_requested]
   push:
-    branches:
-      - main
-    paths:
-      - 'skills/**'
-      - 'agents/**'
-      - 'hooks/**'
-      - 'rules/**'
-      - 'commands/**'
-      - 'utilities/**'
-      - 'presets/**'
-      - 'extensions/**'
+    branches: [main]
   schedule:
-    - cron: '0 0 * * 1'  # Weekly Monday — catches model drift
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  schemas:
+    uses: ./.github/workflows/ci-task.yml
+    with:
+      task: schemas
+
+  quality:
+    uses: ./.github/workflows/ci-task.yml
+    with:
+      task: quality
+      base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+
   validate:
     name: Validate eval schema & manifest
+    if: always()
+    needs: [schemas, quality]
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          # PR package selection needs the base branch and merge-base history.
-          fetch-depth: 0
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Validate manifest is up to date
-        run: |
-          python scripts/generate_manifest.py
-          git diff --exit-code manifest.yaml || {
-            echo "ERROR: manifest.yaml is out of sync with package definition files"
-            echo "Run 'python scripts/generate_manifest.py' and commit the result"
-            exit 1
-          }
-
-      - name: Validate eval cases schema
-        run: python scripts/validate_evals.py
-
-      - name: Validate frontmatter
-        run: python scripts/validate_frontmatter.py
-
-      - name: Validate file references
-        run: python scripts/validate_references.py
-
-      - name: Evaluate package quality
-        if: github.event_name == 'pull_request'
-        run: |
-          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md extensions:EXTENSION.md"
-
-          changed_packages=""
-          for mapping in $DEFINITION_MAP; do
-            type_dir="${mapping%%:*}"
-            def_file="${mapping#*:}"
-            matches=$(git diff --diff-filter=ACMR --name-only origin/${{ github.base_ref }}...HEAD -- "${type_dir}/" \
-              | sed -n "s|^${type_dir}/\([^/][^/]*\)/${def_file%.md}\.md$|\1|p" \
-              | sort -u)
-            for pkg in $matches; do
-              changed_packages="${changed_packages} ${type_dir}/${pkg}"
-            done
-          done
-
-          if [ -z "$changed_packages" ]; then
-            echo "No changed packages to evaluate"
-            exit 0
-          fi
-
-          failed=0
-          for pkg_path in $changed_packages; do
-            echo "Evaluating ${pkg_path}..."
-            if ! python scripts/evaluate_package.py --path "${pkg_path}"; then
-              failed=$((failed + 1))
-            fi
-          done
-
-          if [ "$failed" -gt 0 ]; then
-            echo ""
-            echo "FAILED: ${failed} package(s) below quality threshold"
-            exit 1
-          fi
-
-      - name: Check eval coverage for changed packages
-        if: github.event_name == 'pull_request'
-        run: |
-          DEFINITION_MAP="skills:SKILL.md agents:AGENT.md hooks:HOOK.md rules:RULE.md commands:COMMAND.md utilities:UTILITY.md presets:PRESET.md extensions:EXTENSION.md"
-
-          changed_packages=""
-          for mapping in $DEFINITION_MAP; do
-            type_dir="${mapping%%:*}"
-            def_file="${mapping#*:}"
-            matches=$(git diff --diff-filter=ACMR --name-only origin/${{ github.base_ref }}...HEAD -- "${type_dir}/" \
-              | sed -n "s|^${type_dir}/\([^/][^/]*\)/${def_file%.md}\.md$|\1|p" \
-              | sort -u)
-            for pkg in $matches; do
-              changed_packages="${changed_packages} ${type_dir}/${pkg}"
-            done
-          done
-
-          missing=0
-          for pkg_path in $changed_packages; do
-            if [ ! -f "${pkg_path}/evals/cases.yaml" ]; then
-              echo "ERROR: ${pkg_path} definition changed but no evals/cases.yaml found"
-              missing=$((missing + 1))
-            fi
-          done
-
-          if [ "$missing" -gt 0 ]; then
-            echo ""
-            echo "FAILED: ${missing} changed package(s) have no eval cases."
-            exit 1
-          fi
+          persist-credentials: false
+      - name: Required eval readiness
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python scripts/ci.py ready --needs "$CI_NEEDS" --expect schemas quality
