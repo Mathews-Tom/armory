@@ -18,6 +18,8 @@ If some inputs are unavailable, finish reachable analysis and report the coverag
 
 Discover the installed package root containing this reference and `scripts/setup_audit.py`; set `SKILL_ROOT` to that absolute path. Use an available Python 3.12+ interpreter, represented below by `python3.12`. No dependencies are required. Set `PRIVATE_DIR` to an existing canonical absolute directory outside every Git repository, including worktrees, owned by the current user with mode `0700`. Create it privately from the outset using a native tool; do not create public artifacts and tighten permissions afterward.
 
+The helper requires a POSIX host (macOS/Linux) with no-follow file flags and Unix ownership/permissions. It refuses unsupported platforms before reading or creating audit files. On Windows, finish report-only analysis; do not weaken filesystem safeguards or apply edits through another path.
+
 Generated files are create-only with mode `0600`; the review subdirectory must not exist and is created with mode `0700`. Use fresh names for retries. Keep authored findings and browser downloads private too. Never bypass refusals by overwriting artifacts, weakening permissions, or moving outputs into a repository. Reports contain private paths and proposed configuration changes; do not publish them or attach them to PRs.
 
 Use one `--file` per discovered input and select the actual harness:

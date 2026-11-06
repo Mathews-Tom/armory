@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -91,6 +92,35 @@ def select(root: Path, bundle: dict[str, Any], selected: list[str]) -> Path:
             "comments": {},
         },
     )
+
+
+def test_unsupported_platform_refuses_before_file_access(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    target = workspace / "instructions.md"
+    target.write_text("local instructions\n", encoding="utf-8")
+    output = workspace / "snapshot.json"
+    monkeypatch.setattr(AUDIT, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "capture",
+            "--harness",
+            "omp",
+            "--file",
+            str(target),
+            "--out",
+            str(output),
+        ],
+    )
+    assert AUDIT.main() == 2
+    assert "requires a POSIX platform" in capsys.readouterr().err
+    assert target.read_text(encoding="utf-8") == "local instructions\n"
+    assert not output.exists()
 
 
 def test_exact_approval_then_native_edit_and_verified_receipt(workspace: Path) -> None:
@@ -288,7 +318,9 @@ def test_review_excludes_full_replacement_and_displays_final_newline_change(
     change = bundle["findings"][0]["change"]
     assert change["replacement"] == after
     assert "+new rule\n\\ No newline at end of file\n" in change["diff"]
-    assert "UNCHANGED_SECRET" not in (bundle_path.parent / "review.html").read_text()
+    assert "UNCHANGED_SECRET" not in (bundle_path.parent / "review.html").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_output_cannot_overwrite_or_write_inside_repository(workspace: Path) -> None:

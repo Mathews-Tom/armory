@@ -571,6 +571,11 @@ def main() -> int:
     verify_parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
+        require(
+            os.name == "posix",
+            "Audit refused: helper requires a POSIX platform (macOS/Linux); "
+            "use report-only analysis.",
+        )
         if args.command == "capture":
             capture(args.harness, args.file, args.out)
         elif args.command == "review":

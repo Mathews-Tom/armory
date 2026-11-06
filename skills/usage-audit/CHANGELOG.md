@@ -14,3 +14,4 @@
 - An independently authored, original standard-library capture/review/check/verify workflow with private create-only artifacts, source/evidence bindings, offline review, exact proposal selection, and separate chat authorization. This is not a vendored implementation or copied external skill.
 - Native-tool-only application of exact approved replacements to existing files; the helper never writes audited targets. Verification observes selected and unselected targets and reports drift or partial application without rollback.
 - Operator documentation, a synthetic worked example, and behavioral eval cases for coverage gaps, conservative recommendations, review/approval, no-op, failure, and adjacent negative routes.
+- Explicit POSIX host prerequisites and an early unsupported-platform refusal before audit file access; Windows remains report-only.
