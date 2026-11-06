@@ -160,7 +160,7 @@ Use `--live --output /path/to/receipt.json` only when a model request is authori
 | [devils-advocate](skills/devils-advocate/)             | Challenges AI-generated plans, code, designs, and decisions — pre-mortem, inversion, Socratic questioning with steel-manning and clear verdicts     |
 | [dependency-audit](skills/dependency-audit/)           | Dependency risk assessment — license compliance, maintenance health scoring, CVE detection, bloat identification, supply chain analysis             |
 | [qa-systematic](skills/qa-systematic/)                 | Systematic web QA testing with 8-category health scoring, issue taxonomy, and regression tracking — full, quick, and regression modes               |
-| [usage-audit](skills/usage-audit/)                     | Claude Code setup audit for token waste and context bloat across MCP servers, CLAUDE.md, skills, and settings                                      |
+| [usage-audit](skills/usage-audit/)                     | Evidence-backed agent setup and instruction health audit with private offline review, exact-change approval, and drift verification                  |
 | [ux-expert](skills/ux-expert/)                         | UX audit and redesign for B2B SaaS dashboards — 8-dimension analysis, wireframes, component recommendations, severity-ranked findings               |
 
 ### Skills — Visualization & Documents

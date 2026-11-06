@@ -1567,18 +1567,19 @@ packages:
     category: visualization
     difficulty: beginner
   - name: usage-audit
-    version: 1.0.0
-    description: 'Audit a Claude Code setup for token waste and context bloat. Checks MCP servers, CLAUDE.md, skills, and
-      settings against bloat filters. Triggers on: "audit my context", "usage audit", "token audit", "context bloat". NOT
-      for codebase audits.'
+    version: 2.0.0
+    description: Use when auditing AI-agent setup, instruction health, token usage, or context bloat across Claude Code, OMP,
+      Codex, or another harness. Not for skill usage counts alone (skill-inventory), package quality (package-evaluator),
+      MCP conversion (mcp-to-skill), security scans, or code audits.
     path: skills/usage-audit
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/usage-audit/SKILL.md
     tags:
     - context
-    - tokens
+    - usage
+    - setup
+    - instructions
     - audit
-    - claude-code
-    - bloat
+    - cross-harness
     category: review
     difficulty: intermediate
   - name: ux-expert
