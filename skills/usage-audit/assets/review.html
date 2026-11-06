@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; media-src 'none'; worker-src 'none'; manifest-src 'none'">
+  <title>Usage audit · Local review</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f8fc;
+      --white: #ffffff;
+      --ink: #153958;
+      --muted: #526579;
+      --blue: #225da8;
+      --wash: #e8eff8;
+      --rule: #cbd6e2;
+      --red: #92313c;
+      --green: #245f4b;
+      --amber: #795413;
+      font-family: Optima, Candara, "Segoe UI", sans-serif;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); }
+    h1, h2, h3, p, pre, dl { margin: 0; }
+    h1 { max-width: 17ch; font-size: clamp(2.3rem, 5vw, 4.15rem); line-height: 1.08; font-weight: 600; letter-spacing: -.035em; }
+    h2 { font-size: 1.45rem; line-height: 1.25; font-weight: 600; }
+    h3 { font-size: 1.12rem; line-height: 1.4; font-weight: 600; }
+    p { max-width: 74ch; }
+    button, textarea, input { font: inherit; }
+    button, summary, input[type="checkbox"] { cursor: pointer; }
+    button { border: 1px solid var(--blue); border-radius: 5px; background: var(--blue); color: white; padding: .72rem 1.1rem; font-weight: 600; }
+    button:hover { background: var(--ink); }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    :focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
+    a { color: var(--blue); }
+    .skip-link { position: absolute; top: -6rem; left: 1rem; background: white; padding: .6rem 1rem; z-index: 5; }
+    .skip-link:focus { top: 1rem; }
+    .shell { max-width: 1320px; padding: 0 2.8rem; margin: auto; }
+    .masthead { display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding-top: 1.4rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--rule); }
+    .identity { font-weight: 600; font-size: 1.1rem; }
+    .local-note { font-size: .85rem; color: var(--muted); text-align: right; }
+    .intro { padding-top: 3rem; padding-bottom: 2.5rem; display: grid; grid-template-columns: 1.3fr 1fr; gap: 3rem; align-items: end; }
+    .intro-copy { color: var(--muted); }
+    .intro-copy p + p { margin-top: .7rem; }
+    .layout { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); gap: 2.8rem; padding-bottom: 3rem; align-items: start; }
+    .scope { border-top: 5px solid var(--blue); padding-top: 1.1rem; min-width: 0; }
+    .scope h2 { margin-bottom: 1rem; }
+    .scope dt { margin-top: .85rem; color: var(--muted); font-size: .85rem; }
+    .scope dd { margin: .15rem 0 0; overflow-wrap: anywhere; }
+    code, pre, .fingerprint { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .fingerprint { font-size: .72rem; line-height: 1.8; }
+    .scope-note { color: var(--muted); font-size: .85rem; margin: 1.2rem 0; }
+    details { min-width: 0; }
+    summary { padding: .65rem 0; font-weight: 600; }
+    .source-list { list-style: none; margin: 0; padding: 0; }
+    .source-item { padding: .9rem 0; border-top: 1px solid var(--rule); font-size: .85rem; }
+    .source-path { overflow-wrap: anywhere; }
+    .source-meta { margin-top: .3rem; color: var(--muted); }
+    .source-hash { margin-top: .3rem; font-size: .68rem; overflow-wrap: anywhere; }
+    .review { min-width: 0; }
+    .coverage { padding: 1.25rem 1.4rem; background: var(--wash); border-radius: 3px; margin-bottom: 2.4rem; }
+    .coverage > p { margin-top: .5rem; font-size: .9rem; }
+    .coverage-list { list-style: none; margin: .9rem 0 0; padding: 0; }
+    .coverage-item { border-top: 1px solid var(--rule); padding: .75rem 0; }
+    .coverage-title { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+    .coverage-detail { margin-top: .25rem; color: var(--muted); font-size: .88rem; }
+    .coverage-state { flex-shrink: 0; font-size: .8rem; font-weight: 600; }
+    .coverage-state.gap { color: var(--red); }
+    .finding-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+    .finding-heading p { color: var(--muted); font-size: .85rem; }
+    .priority-group + .priority-group { margin-top: 2rem; }
+    .priority-label { padding-bottom: .6rem; border-bottom: 2px solid var(--rule); font-size: 1rem; }
+    .finding { background: var(--white); border-bottom: 1px solid var(--rule); padding: 1.4rem; min-width: 0; }
+    .finding[data-selected="true"] { box-shadow: inset 4px 0 var(--blue); background: #fafdff; }
+    .finding-meta { display: flex; gap: .7rem; flex-wrap: wrap; color: var(--muted); font-size: .8rem; margin-bottom: .65rem; }
+    .finding-id { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+    .finding h3 { overflow-wrap: anywhere; white-space: pre-wrap; }
+    .finding-copy { margin-top: 1rem; }
+    .finding-copy dt { font-size: .85rem; font-weight: 600; }
+    .finding-copy dd { margin: .2rem 0 .85rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 74ch; }
+    .evidence { border-top: 1px solid var(--rule); margin-top: 1rem; }
+    .evidence-list { padding-left: 1.2rem; margin: .4rem 0 1rem; }
+    .evidence-list li + li { margin-top: .8rem; }
+    .evidence-location { font-size: .78rem; overflow-wrap: anywhere; }
+    .evidence-observation { color: var(--muted); font-size: .88rem; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: .2rem; }
+    .patch { border-top: 1px solid var(--rule); }
+    .patch-target { font-size: .85rem; overflow-wrap: anywhere; margin: .35rem 0 .75rem; }
+    .hashes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem .7rem; font-size: .72rem; margin-bottom: .9rem; }
+    .hashes dt { color: var(--muted); }
+    .hashes dd { margin: 0; overflow-wrap: anywhere; }
+    .diff { background: #f3f6fa; border: 1px solid var(--rule); padding: .9rem; font-size: .74rem; line-height: 1.6; overflow-x: auto; tab-size: 4; max-height: 32rem; }
+    .diff-line { display: block; min-height: 1.6em; width: max-content; min-width: 100%; }
+    .diff-add { color: #164f36; background: #e2f0e8; }
+    .diff-remove { color: #7f2330; background: #f8e6e8; }
+    .diff-context { color: var(--muted); }
+    .choice { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+    .choice-label { display: flex; gap: .65rem; align-items: flex-start; font-weight: 600; }
+    .choice-label input { width: 1.15rem; height: 1.15rem; flex-shrink: 0; margin: .2rem 0 0; accent-color: var(--blue); }
+    .choice-help { color: var(--muted); font-size: .8rem; margin: .3rem 0 0 1.8rem; }
+    .report-only { color: var(--muted); font-size: .85rem; margin-top: 1rem; border-top: 1px solid var(--rule); padding-top: .85rem; }
+    .comment-label { display: block; margin-top: 1rem; font-size: .85rem; font-weight: 600; }
+    textarea { display: block; width: 100%; min-height: 4.5rem; resize: vertical; border: 1px solid var(--rule); border-radius: 3px; padding: .65rem; margin-top: .4rem; background: var(--white); color: var(--ink); font-size: .9rem; }
+    .empty { border-top: 2px solid var(--rule); padding: 1.4rem 0; }
+    .empty p { margin-top: .5rem; color: var(--muted); }
+    .selection-bar { background: var(--white); border-top: 2px solid var(--blue); padding: 1rem 0; position: sticky; bottom: 0; z-index: 2; }
+    .selection-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem 2rem; align-items: center; }
+    .selection-count { font-size: 1.15rem; font-weight: 600; }
+    .selection-help { font-size: .8rem; color: var(--muted); max-width: 82ch; margin-top: .15rem; }
+    .download-status { font-size: .85rem; grid-column: 1 / -1; }
+    .download-status:empty { display: none; }
+    .error { border: 2px solid var(--red); padding: 1.2rem; margin-bottom: 2rem; color: var(--red); }
+    [hidden] { display: none !important; }
+    noscript p { margin: 2rem; border: 2px solid var(--red); padding: 1rem; }
+    @media (max-width: 900px) {
+      .shell { padding-left: 1.4rem; padding-right: 1.4rem; }
+      .intro { grid-template-columns: 1fr; gap: 1.2rem; padding-top: 2rem; }
+      .intro-copy { max-width: 65ch; }
+      .layout { grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); gap: 1.4rem; }
+      .finding { padding: 1rem; }
+    }
+    @media (max-width: 650px) {
+      .shell { padding-left: 1rem; padding-right: 1rem; }
+      .masthead { align-items: flex-start; }
+      .local-note { max-width: 17ch; }
+      .intro { padding-bottom: 1.8rem; }
+      .layout { display: block; }
+      .scope { margin-bottom: 2rem; }
+      .scope dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .6rem 1rem; }
+      .scope dt, .scope dd { margin: 0; }
+      .coverage { padding: 1rem; }
+      .finding-heading { display: block; }
+      .finding-heading p { margin-top: .4rem; }
+      .selection-inner { grid-template-columns: 1fr; }
+      .selection-inner button { width: 100%; }
+      .selection-bar { position: static; }
+    }
+    @media print {
+      .selection-bar, .choice, .comment-label, textarea, .skip-link { display: none; }
+      .layout { display: block; }
+      .scope { margin-bottom: 2rem; }
+      body, .finding { background: white; }
+      .diff { max-height: none; white-space: pre-wrap; }
+      .diff-line { width: auto; overflow-wrap: anywhere; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#findings">Skip to findings</a>
+  <header class="masthead shell">
+    <p class="identity">Usage audit / Review</p>
+    <p class="local-note">Private local report<br>No network or file changes</p>
+  </header>
+  <main class="shell">
+    <section class="intro" aria-labelledby="page-title">
+      <h1 id="page-title">Review first.<br>Choose precisely.</h1>
+      <div class="intro-copy">
+        <p>Inspect the evidence and exact proposed edits to your assistant setup. Nothing is selected for you.</p>
+        <p>Saving a selection does not authorize changes. Keep a proposal unchecked to leave that file unchanged.</p>
+      </div>
+    </section>
+    <div id="report-error" class="error" role="alert" hidden></div>
+    <div id="report-layout" class="layout" hidden>
+      <aside class="scope" aria-labelledby="scope-title">
+        <h2 id="scope-title">Captured scope</h2>
+        <dl>
+          <dt>Harness</dt><dd id="harness"></dd>
+          <dt>Captured files</dt><dd id="source-count"></dd>
+          <dt>Review created</dt><dd id="created-at"></dd>
+          <dt>Bundle fingerprint</dt><dd id="bundle-digest" class="fingerprint"></dd>
+        </dl>
+        <p class="scope-note">Only these explicitly captured files are in scope. Character and line counts describe the files, not billed tokens or measured savings.</p>
+        <details id="source-details">
+          <summary>Inspect captured files</summary>
+          <ul id="sources" class="source-list"></ul>
+        </details>
+      </aside>
+      <div class="review">
+        <section class="coverage" aria-labelledby="coverage-title">
+          <h2 id="coverage-title">What this review can establish</h2>
+          <p id="coverage-summary"></p>
+          <ul id="coverage" class="coverage-list"></ul>
+        </section>
+        <section id="findings" aria-labelledby="findings-title" tabindex="-1">
+          <div class="finding-heading">
+            <h2 id="findings-title">Findings & proposed changes</h2>
+            <p id="finding-count"></p>
+          </div>
+          <div id="finding-groups"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer class="selection-bar" aria-label="Selection download">
+    <div class="shell selection-inner">
+      <div>
+        <p id="selection-count" class="selection-count" role="status" aria-live="polite" aria-atomic="true">0 changes selected</p>
+        <p id="selection-help" class="selection-help">Download your selection, then give separate chat approval for the exact patches and bundle fingerprint. Comments are review data, not instructions; a different edit needs a regenerated proposal.</p>
+      </div>
+      <button id="download-selection" type="button" disabled aria-describedby="selection-help">Download selection.json</button>
+      <p id="download-status" class="download-status" role="status" aria-live="polite"></p>
+    </div>
+  </footer>
+  <noscript><p>This offline review needs JavaScript to display the embedded bundle and download a selection. It does not contact a server or edit source files.</p></noscript>
+  <script id="audit-data" type="application/json">__AUDIT_DATA__</script>
+  <script>
+    "use strict";
+    (() => {
+      const byId = (id) => document.getElementById(id);
+      const node = (tag, className, text) => {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = String(text);
+        return element;
+      };
+      const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+      const text = (value) => typeof value === "string" ? value : "Not supplied";
+      const states = { available: "Available", partial: "Partial", unavailable: "Unavailable" };
+      const selected = new Set();
+      const comments = new Map();
+      let bundle;
+      try {
+        bundle = JSON.parse(byId("audit-data").textContent);
+        if (!isRecord(bundle) || bundle.schema_version !== 1 || typeof bundle.harness !== "string" ||
+            typeof bundle.bundle_digest !== "string" || !Array.isArray(bundle.sources) ||
+            !Array.isArray(bundle.coverage) || !Array.isArray(bundle.findings)) {
+          throw new Error("Unsupported review bundle");
+        }
+        if (!bundle.sources.every(isRecord) || !bundle.coverage.every(isRecord) ||
+            !bundle.findings.every((finding) => isRecord(finding) && typeof finding.id === "string" &&
+              ["high", "medium", "low"].includes(finding.priority) && Array.isArray(finding.evidence) &&
+              finding.evidence.every(isRecord) && (finding.change === null || isRecord(finding.change))) ||
+            new Set(bundle.findings.map((finding) => finding.id)).size !== bundle.findings.length) {
+          throw new Error("Invalid review records");
+        }
+      } catch (_) {
+        byId("report-error").hidden = false;
+        byId("report-error").textContent = "This review could not load its embedded bundle. Regenerate the report with the audit helper; do not approve changes from this page.";
+        return;
+      }
+      byId("report-layout").hidden = false;
+      byId("harness").textContent = bundle.harness;
+      byId("source-count").textContent = String(bundle.sources.length);
+      byId("created-at").textContent = text(bundle.created_at);
+      byId("bundle-digest").textContent = bundle.bundle_digest;
+      const sources = new Map(bundle.sources.map((source) => [source.source_id, source]));
+      for (const source of bundle.sources) {
+        const item = node("li", "source-item");
+        item.append(node("p", "source-path", text(source.path)));
+        item.append(node("p", "source-meta", `${text(source.source_id)} · ${source.characters ?? "?"} characters · ${source.lines ?? "?"} lines`));
+        item.append(node("p", "source-meta", `Format: ${text(source.format)}; syntax: ${text(source.syntax)}`));
+        item.append(node("p", "source-hash", `SHA-256: ${text(source.sha256)}`));
+        byId("sources").append(item);
+      }
+      if (bundle.sources.length === 0) {
+        byId("sources").append(node("li", "source-item", "No source files were captured."));
+      }
+      const gaps = bundle.coverage.filter((area) => area.status !== "available");
+      byId("coverage-summary").textContent = bundle.coverage.length === 0
+        ? "No coverage evidence was supplied. Setup health and usage costs are not established by this report."
+        : gaps.length > 0
+          ? `${gaps.length} coverage ${gaps.length === 1 ? "gap needs" : "gaps need"} attention. Missing evidence is not evidence of an unused or safe-to-remove configuration.`
+          : "No gaps were reported in the listed areas. This does not establish coverage beyond the supplied evidence.";
+      for (const area of bundle.coverage) {
+        const item = node("li", "coverage-item");
+        item.dataset.status = typeof area.status === "string" ? area.status : "unavailable";
+        const title = node("div", "coverage-title");
+        title.append(node("strong", "", text(area.area)));
+        const state = Object.hasOwn(states, area.status) ? states[area.status] : "Unavailable";
+        title.append(node("span", area.status === "available" ? "coverage-state" : "coverage-state gap", state));
+        item.append(title, node("p", "coverage-detail", text(area.detail)));
+        byId("coverage").append(item);
+      }
+      const changeCount = bundle.findings.filter((finding) => finding.change !== null).length;
+      byId("finding-count").textContent = `${bundle.findings.length} findings; ${changeCount} proposed ${changeCount === 1 ? "change" : "changes"}`;
+      const updateCount = () => {
+        byId("selection-count").textContent = `${selected.size} ${selected.size === 1 ? "change" : "changes"} selected`;
+        byId("download-status").textContent = "";
+      };
+      const addDescription = (list, label, value) => {
+        list.append(node("dt", "", label), node("dd", "", text(value)));
+      };
+      let findingIndex = 0;
+      for (const priority of ["high", "medium", "low"]) {
+        const findings = bundle.findings.filter((finding) => finding.priority === priority);
+        if (findings.length === 0) continue;
+        const group = node("section", "priority-group");
+        const groupTitle = node("h3", "priority-label", `${priority[0].toUpperCase() + priority.slice(1)} priority (${findings.length})`);
+        groupTitle.id = `priority-${priority}`;
+        group.setAttribute("aria-labelledby", groupTitle.id);
+        group.append(groupTitle);
+        for (const finding of findings) {
+          findingIndex += 1;
+          const prefix = `finding-${findingIndex}`;
+          const article = node("article", "finding");
+          article.dataset.findingId = finding.id;
+          article.dataset.selected = "false";
+          article.setAttribute("aria-labelledby", `${prefix}-title`);
+          const meta = node("div", "finding-meta");
+          meta.append(node("span", "finding-id", finding.id), node("span", "", text(finding.category)),
+            node("span", "", finding.confidence === "observed" ? "Observed evidence" : "Inferred conclusion"));
+          const title = node("h3", "", text(finding.problem));
+          title.id = `${prefix}-title`;
+          const description = node("dl", "finding-copy");
+          addDescription(description, "Why it matters", finding.consequence);
+          addDescription(description, "Recommendation", finding.recommendation);
+          article.append(meta, title, description);
+          const evidence = node("details", "evidence");
+          evidence.append(node("summary", "", `Evidence (${finding.evidence.length})`));
+          const evidenceList = node("ul", "evidence-list");
+          for (const item of finding.evidence) {
+            const source = sources.get(item.source_id);
+            const entry = node("li", "");
+            entry.append(node("p", "evidence-location", `${source ? text(source.path) : "Source not available"} · ${text(item.source_id)} · lines ${item.line_start ?? "?"}–${item.line_end ?? "?"}`));
+            entry.append(node("p", "evidence-observation", text(item.observation)));
+            evidenceList.append(entry);
+          }
+          evidence.append(evidenceList);
+          article.append(evidence);
+          if (finding.change !== null) {
+            const change = finding.change;
+            const patch = node("details", "patch");
+            patch.append(node("summary", "", "Inspect exact proposed diff"));
+            patch.append(node("p", "patch-target", text(change.path)));
+            const hashes = node("dl", "hashes");
+            hashes.append(node("dt", "", "Before SHA-256"), node("dd", "fingerprint", text(change.before_sha256)),
+              node("dt", "", "After SHA-256"), node("dd", "fingerprint", text(change.after_sha256)));
+            patch.append(hashes);
+            const diff = node("pre", "diff");
+            diff.tabIndex = 0;
+            diff.setAttribute("aria-label", `Exact proposed diff for ${finding.id}`);
+            const code = node("code", "");
+            // Retain the original line endings and final newline in the text projection.
+            const lines = text(change.diff).match(/[^\n]*\n|[^\n]+$/g) || [];
+            for (const [index, line] of lines.entries()) {
+              let className = "diff-line";
+              if (index < 2 || line.startsWith("@@")) className += " diff-context";
+              else if (line.startsWith("+")) className += " diff-add";
+              else if (line.startsWith("-")) className += " diff-remove";
+              code.append(node("span", className, line));
+            }
+            diff.append(code);
+            patch.append(diff);
+            article.append(patch);
+            const choice = node("div", "choice");
+            const label = node("label", "choice-label");
+            const checkbox = node("input", "change-checkbox");
+            checkbox.type = "checkbox";
+            checkbox.id = `${prefix}-select`;
+            checkbox.checked = false;
+            checkbox.dataset.findingId = finding.id;
+            checkbox.setAttribute("aria-describedby", `${prefix}-choice-help`);
+            label.htmlFor = checkbox.id;
+            label.append(checkbox, node("span", "", "Include this exact change in my selection"));
+            const help = node("p", "choice-help", "Unchecked: keep unchanged. Selection is not authorization to apply.");
+            help.id = `${prefix}-choice-help`;
+            checkbox.addEventListener("change", () => {
+              if (checkbox.checked) selected.add(finding.id);
+              else selected.delete(finding.id);
+              article.dataset.selected = String(checkbox.checked);
+              updateCount();
+            });
+            choice.append(label, help);
+            article.append(choice);
+          } else {
+            article.append(node("p", "report-only", "Report only. No file change is proposed or selectable."));
+          }
+          const commentLabel = node("label", "comment-label", "Review comment (optional)");
+          const comment = node("textarea", "finding-comment");
+          comment.id = `${prefix}-comment`;
+          comment.dataset.findingId = finding.id;
+          comment.rows = 2;
+          comment.spellcheck = false;
+          comment.setAttribute("aria-describedby", "selection-help");
+          commentLabel.htmlFor = comment.id;
+          comment.addEventListener("input", () => {
+            if (comment.value.length > 0) comments.set(finding.id, comment.value);
+            else comments.delete(finding.id);
+            byId("download-status").textContent = "";
+          });
+          article.append(commentLabel, comment);
+          group.append(article);
+        }
+        byId("finding-groups").append(group);
+      }
+      if (bundle.findings.length === 0) {
+        const empty = node("div", "empty");
+        empty.id = "empty-findings";
+        empty.append(node("h3", "", "No findings in this bundle"),
+          node("p", "", "No edits are proposed. Check the captured scope and coverage above; an empty report does not prove the entire setup is healthy or efficient. You can download a zero-change selection."));
+        byId("finding-groups").append(empty);
+      }
+      const download = byId("download-selection");
+      download.disabled = false;
+      download.addEventListener("click", () => {
+        const selection = {
+          schema_version: 1,
+          bundle_digest: bundle.bundle_digest,
+          selected: bundle.findings.filter((finding) => selected.has(finding.id)).map((finding) => finding.id),
+          comments: Object.fromEntries(comments)
+        };
+        const blob = new Blob([JSON.stringify(selection, null, 2) + "\n"], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = node("a", "");
+        link.href = url;
+        link.download = "selection.json";
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+        byId("download-status").textContent = selected.size === 0
+          ? "Download requested: zero changes selected. This is a no-op, not permission to modify files."
+          : "Download requested. No source files were changed. Separate chat approval of these exact changes is still required.";
+      });
+    })();
+  </script>
+</body>
+</html>
