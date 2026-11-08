@@ -2,7 +2,7 @@
 
 Source: [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), maintained by WikiProject AI Cleanup (CC BY-SA 4.0). Last synced: revision of 2026-09-11. All examples below are original to this repository.
 
-29 patterns in five classes, ordered by strength. Class A patterns justify an edit on a single sighting. Patterns marked **weak alone** are habits careful writers also have — act on them only when several tells share the same passage. Cross-reference patterns by **name**; numbers are for compact reporting and may change between versions.
+31 patterns in five classes, ordered by strength. Class A patterns justify an edit on a single sighting. Patterns marked **weak alone** are habits careful writers also have — act on them only when several tells share the same passage. Cross-reference patterns by **name**; numbers are for compact reporting and may change between versions.
 
 Why these patterns exist: a language model writes whatever is most likely to come next, so by default it makes the choice that fits the widest range of readers and subjects. A person chooses for one reader and one subject. Word habits churn with every model release; the structural habits persist. That is why structure leads this list and vocabulary sits in the middle.
 
@@ -42,7 +42,7 @@ After:
 
 **Watch for:** "the real question is", "at its core", "what really matters", "the heart of the matter", "X is the language/currency/architecture of Y", "X becomes a trap", "X isn't a tool, it's a mindset".
 
-**Problem:** An ordinary point is dressed as a hidden truth or aphorism, and the dressing adds no detail. Replace the saying with the specific claim it gestures at.
+**Problem:** An ordinary point is dressed as a hidden truth or aphorism, and the dressing adds no detail. Replace the saying with the specific claim it gestures at. If no specific claim sits underneath, as with most closing kickers, delete the line: a fresher metaphor is still a saying.
 
 Before:
 > At its core, observability is the language of trust between a team and its systems.
@@ -52,9 +52,9 @@ After:
 
 ### Pattern 4: Staged Run-Up
 
-**Watch for:** "Let's dive in", "let's explore", "here's what you need to know", "without further ado", "Here's the thing:", "Honestly?", "Let's be honest", standalone "Look," before a routine claim.
+**Watch for:** "Let's dive in", "let's explore", "here's what you need to know", "without further ado", "Here's the thing:", "Honestly?", "Let's be honest", standalone "Look," before a routine claim; insider setups that cast the writer as the one who knows: "What nobody tells you is", "What most people get wrong", "The part everyone misses", "This is the step most teams skip".
 
-**Problem:** The writer announces the point or stages a moment of candor instead of making the point. Delete the run-up and state the point. "Honestly" inside a casual sentence is ordinary; the tell is the standalone opener.
+**Problem:** The writer announces the point or stages a moment of candor instead of making the point. Delete the run-up and state the point. An insider setup also flatters the writer at the reader's expense; the claim has to stand without it. "Honestly" inside a casual sentence is ordinary; the tell is the standalone opener.
 
 Before:
 > Here's the thing: connection pooling matters more than most teams realize. Let's break down why.
@@ -74,13 +74,37 @@ Before:
 After:
 > The worker retries only failed rows, so successful rows are never double-processed.
 
+### Pattern 6: Staged Reveal
+
+**Watch for:** a short noun phrase, a colon, then the punchline ("The best part: it runs offline.", "The catch: it only runs on Linux.", "The verdict: ship it."); a one-word question the text answers in the next breath ("The fix? A config flag.", "Why does this matter? Because..."); set-pieces such as "Picture this:", "Plot twist:", and the "What if I told you..." opener.
+
+**Problem:** The sentence withholds its own subject to stage a reveal, so an ordinary fact arrives with a drumroll. Write the plain sentence with its subject and verb. Colons that introduce a list, a label, a definition, or a quotation are not this pattern, and neither is a question the text leaves for the reader or an FAQ heading.
+
+Before:
+> The catch: the importer only reads UTF-8. The fix? A transcoding step before the parser.
+
+After:
+> The importer only reads UTF-8, so a transcoding step runs before the parser.
+
+### Pattern 7: Reader Steering
+
+**Watch for:** asides that grade the text instead of adding to it: "This is worth pausing on", "The important bit is", "Notice what happened here", "It's subtle, but", "As you can see" with nothing to see, and "In other words" before a restatement of a sentence that was already clear.
+
+**Problem:** An aside that grades the text does the reader's judging for them and gives them nothing to judge. Cut it. If the sentence it propped up cannot stand alone, strengthen that sentence with a detail the text already has; never write new support.
+
+Before:
+> The parser now rejects duplicate keys. This is worth pausing on, because silent overwrites were how the config drift started.
+
+After:
+> The parser now rejects duplicate keys; silent overwrites were how the config drift started.
+
 ---
 
 ## Class B — Inflation and Borrowed Authority
 
 The fact underneath is usually sound. Keep the fact, cut the dressing. Act on one sighting.
 
-### Pattern 6: Significance and Legacy Inflation
+### Pattern 8: Significance and Legacy Inflation
 
 **Watch for:** "stands as a testament", "marks a pivotal moment", "plays a key/vital/crucial role", "underscores the importance", "reflects a broader trend", "setting the stage for", "evolving landscape", "indelible mark", "deeply rooted", "represents a shift".
 
@@ -92,7 +116,7 @@ Before:
 After:
 > The 2019 rewrite split the monolith's billing and auth modules into separate services.
 
-### Pattern 7: Promotional Language
+### Pattern 9: Promotional Language
 
 **Watch for:** "boasts", "vibrant", "rich" (figurative), "nestled", "breathtaking", "stunning", "renowned", "groundbreaking" (figurative), "must-visit", "state-of-the-art", "seamless", "cutting-edge", "world-class", sales-brochure ranges like "whether you're a beginner or a seasoned expert".
 
@@ -104,7 +128,7 @@ Before:
 After:
 > The library exposes four functions and needs no configuration for the default case.
 
-### Pattern 8: Superficial -ing Analyses
+### Pattern 10: Superficial -ing Analyses
 
 **Watch for:** trailing participle phrases: "..., highlighting...", "..., underscoring...", "..., reflecting...", "..., showcasing...", "..., ensuring...", "..., fostering...", "..., contributing to...".
 
@@ -116,7 +140,7 @@ Before:
 After:
 > The team adopted trunk-based development. Merge conflicts dropped by half in the first quarter.
 
-### Pattern 9: Notability and Borrowed Authority
+### Pattern 11: Notability and Borrowed Authority
 
 **Watch for:** "cited in NYT, BBC, and Forbes", "written by a leading expert", "recognized globally", "an active social media presence", lists of outlets or awards without any specific claim.
 
@@ -128,7 +152,7 @@ Before:
 After:
 > In a 2025 Wired interview she argued that consensus protocols are over-deployed for workloads that tolerate stale reads.
 
-### Pattern 10: Vague Attributions
+### Pattern 12: Vague Attributions
 
 **Watch for:** "Experts believe", "Industry reports suggest", "Observers have noted", "Some critics argue", "Studies have shown" with no study named.
 
@@ -140,7 +164,7 @@ Before:
 After:
 > Google's 2016 paper on its monorepo reports simplified dependency management across 25,000 engineers; it does not measure productivity directly.
 
-### Pattern 11: Vague Connection or Association
+### Pattern 13: Vague Connection or Association
 
 **Watch for:** "associated with", "in association with", "connected to", "in connection with", "linked to", "tied to".
 
@@ -152,11 +176,11 @@ Before:
 After:
 > He was the tech lead for the payments platform from 2021 to 2023.
 
-### Pattern 12: Formulaic Challenges and Upbeat Conclusions
+### Pattern 14: Formulaic Challenges and Upbeat Conclusions
 
-**Watch for:** "Despite these challenges... continues to thrive", stock "Challenges and Future Outlook" sections, "The future looks bright", "exciting times ahead", "a step in the right direction", any final paragraph that only cheers.
+**Watch for:** "Despite these challenges... continues to thrive", stock "Challenges and Future Outlook" sections, "The future looks bright", "exciting times ahead", "a step in the right direction", any final paragraph that only cheers; recap endings that open with "In conclusion", "Overall", or "Ultimately" and restate the body.
 
-**Problem:** Problems are raised and dismissed in one rhetorical move, or the piece ends on generic optimism instead of information. State the problems plainly. End on the last concrete fact; if the source states real plans, use those.
+**Problem:** Problems are raised and dismissed in one rhetorical move, or the piece ends on generic optimism or a summary of what the reader just read instead of information. State the problems plainly. End on the last concrete fact; if the source states real plans, use those. Delete a recap rather than rewording it.
 
 Before:
 > Despite scaling challenges, the platform continues to thrive. The future looks bright as the team pushes toward excellence.
@@ -170,7 +194,7 @@ After:
 
 Vocabulary and grammar tells. The word list churns with each model generation — treat it as the weakest signal class and re-sync from the source periodically.
 
-### Pattern 13: AI-Frequency Vocabulary
+### Pattern 15: AI-Frequency Vocabulary
 
 **Overused words:** additionally, align with, bolstered, crucial, deep dive, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract), leverage (verb), meticulous(ly), pivotal, robust (figurative), showcase, tapestry (abstract), testament, underscore (verb), valuable, vibrant.
 
@@ -182,7 +206,7 @@ Before:
 After:
 > The two caching layers can serve stale data unless invalidation is coordinated between them.
 
-### Pattern 14: Copula Avoidance
+### Pattern 16: Copula Avoidance
 
 **Watch for:** "serves as", "stands as", "functions as", "acts as", "represents", "boasts", "features", "offers" — where "is", "are", or "has" would do.
 
@@ -194,7 +218,7 @@ Before:
 After:
 > The gateway is the single entry point and has built-in rate limiting.
 
-### Pattern 15: Filler Phrases
+### Pattern 17: Filler Phrases
 
 Common substitutions:
 
@@ -209,7 +233,7 @@ Common substitutions:
 - "in terms of" → delete or restructure
 - "plays a role in" → name the action
 
-### Pattern 16: Excessive Hedging
+### Pattern 18: Excessive Hedging
 
 **Watch for:** stacked qualifiers — "could potentially possibly", "might arguably", "it may perhaps be the case that". **Weak alone.**
 
@@ -221,7 +245,7 @@ Before:
 After:
 > The index should speed up lookups by customer ID; range scans are unaffected.
 
-### Pattern 17: Rule of Three
+### Pattern 19: Rule of Three
 
 **Watch for:** triads everywhere — "fast, reliable, and scalable"; three parallel examples; three short facts and a lesson. **Weak alone** — writers use deliberate triads for rhythm.
 
@@ -233,7 +257,7 @@ Before:
 After:
 > The new pipeline runs in 4 minutes instead of 11, and its failures now surface in one log stream.
 
-### Pattern 18: Repeated Sentence Openings
+### Pattern 20: Repeated Sentence Openings
 
 **Watch for:** several consecutive sentences opening with the same subject or word. **Weak alone** — writers repeat openings deliberately for rhythm ("She came. She saw. She conquered.").
 
@@ -245,7 +269,7 @@ Before:
 After:
 > The service reads the queue, batches the events, and writes them to the warehouse.
 
-### Pattern 19: Passive Voice and Missing Subjects
+### Pattern 21: Passive Voice and Missing Subjects
 
 **Watch for:** "No configuration needed.", "Results are preserved automatically.", "Mistakes were made." **Weak alone** — passive is standard in some registers (methods sections, incident reports).
 
@@ -263,7 +287,7 @@ After:
 
 Individually weak; strong in clusters. A document showing three of these at once is likely generated.
 
-### Pattern 20: Em Dash Overuse
+### Pattern 22: Em Dash Overuse
 
 **Watch for:** dashes as the universal connector — multiple per paragraph, spaced hyphens (` -- `) used as dashes. **Weak alone** — many strong writers use dashes deliberately.
 
@@ -275,7 +299,7 @@ Before:
 After:
 > The deploy failed because the config was stale. The rollback failed too; nobody had tested it.
 
-### Pattern 21: Boldface and Inline-Header Lists
+### Pattern 23: Boldface and Inline-Header Lists
 
 **Watch for:** bold as decoration ("**OKRs**, **KPIs**"); bullet lists where every item is a **Bold Label:** followed by a sentence; the label restated in the sentence ("**Performance:** Performance improved").
 
@@ -288,7 +312,7 @@ Before:
 After:
 > This release cuts cold-start time to 300ms and adds encryption at rest.
 
-### Pattern 22: Decorative Headings
+### Pattern 24: Decorative Headings
 
 **Watch for:** Title Case In Every Heading, emoji or arrows decorating headings and bullets ("🚀 Launch Phase:", "→ Key Insight:"), headings that only contain other headings.
 
@@ -300,7 +324,7 @@ Before:
 After:
 > ## Roadmap
 
-### Pattern 23: Curly Quotation Marks
+### Pattern 25: Curly Quotation Marks
 
 **Watch for:** curly quotes (“...”) and curly apostrophes (’) in plain-text or code-adjacent contexts, or mixed curly and straight in the same document. **Weak alone** — word processors and typographic pipelines insert them; published prose legitimately uses them; some models never emit them.
 
@@ -312,7 +336,7 @@ After:
 
 Text that was written for the chat session or an earlier draft, not for the reader. Act on one sighting.
 
-### Pattern 24: Chatbot Wrappers and Sycophancy
+### Pattern 26: Chatbot Wrappers and Sycophancy
 
 **Watch for:** "Great question!", "Certainly!", "I'd be happy to help", "Welcome to this guide", "I hope this helps!", "Feel free to reach out", "Let me know if you'd like...".
 
@@ -324,7 +348,7 @@ Before:
 After:
 > The client retries failed requests three times with exponential backoff starting at 200ms.
 
-### Pattern 25: Knowledge-Cutoff Disclaimers and Unsupported Guesses
+### Pattern 27: Knowledge-Cutoff Disclaimers and Unsupported Guesses
 
 **Watch for:** "While details are limited in available sources, it appears...", "As of my last update...", "it is likely that...", "presumably" bridging a gap in sources.
 
@@ -336,7 +360,7 @@ Before:
 After:
 > The changelog for v4.0 lists the migration but gives no detail on scope.
 
-### Pattern 26: Heading Echoed in the First Sentence
+### Pattern 28: Heading Echoed in the First Sentence
 
 **Watch for:** a section whose first sentence restates its heading ("## Performance" followed by "Performance is a critical aspect of the system.").
 
@@ -350,7 +374,7 @@ After:
 > ## Error handling
 > All handlers return typed errors; the middleware maps them to HTTP status codes.
 
-### Pattern 27: Writing About the Previous Version
+### Pattern 29: Writing About the Previous Version
 
 **Watch for:** prose describing the edit instead of the subject: "This function was added to replace...", "This section has been updated to...", "The revised approach now...", "(previously X)" clutter.
 
@@ -362,7 +386,7 @@ Before:
 After:
 > This module validates request payloads before they reach the controller.
 
-### Pattern 28: Re-Explaining Shared Context
+### Pattern 30: Re-Explaining Shared Context
 
 **Watch for:** a reply that opens by restating the question or the situation both parties already know; a review response that re-derives the whole diagnosis before answering; background paragraphs addressed to someone who wrote the background.
 
@@ -374,7 +398,7 @@ Before:
 After:
 > Fixed — added a guard clause above line 42. Empty payloads now return 400.
 
-### Pattern 29: Mechanical Chat Residue
+### Pattern 31: Mechanical Chat Residue
 
 **Watch for:** citation artifacts leaked from chat interfaces — `:contentReference[oaicite:0]{index=0}`, `turn0search0`, `[cite: 3]`, `[span_1](start_span)`; tracking parameters like `utm_source=chatgpt.com` in URLs; placeholder text ("[Insert name here]", "TODO: add example" in shipped prose); Markdown headings that skip levels; Markdown syntax in venues that don't render it.
 
@@ -384,7 +408,7 @@ After:
 
 ## False-Positive Guards
 
-Do not flag these — the source lists them as ineffective or misleading indicators:
+Do not flag these. All but the last come from the source's list of ineffective or misleading indicators:
 
 - **Perfect grammar.** Many people write cleanly.
 - **Formal, academic, or "fancy" prose.** Only the specific words in the vocabulary list are elevated in model output; formality itself is not a tell.
@@ -394,6 +418,7 @@ Do not flag these — the source lists them as ineffective or misleading indicat
 - **A single dash, triad, hedge, or curly quote.** Weak-alone patterns need company.
 - **Deliberate repetition and rhetorical fragments in an author's own voice sample.** The sample wins.
 - **Unsourced content.** Predates LLMs as a phenomenon; modern chatbots often do include citations.
+- **Hedges and edge that belong to the writer.** A writer's own doubt markers ("I think", "maybe"), swearing, blunt asides, and confessions are part of how they sound. Remove one only when a named pattern covers it, such as stacked qualifiers or a standalone run-up opener.
 
 One further guard: absence of every pattern above does not prove a human wrote the text, and their presence does not prove a machine did. These patterns justify editing prose on its own merits — they are not an authorship test.
 

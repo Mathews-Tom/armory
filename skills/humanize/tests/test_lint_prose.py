@@ -334,6 +334,36 @@ def test_candidates_are_flagged_only_in_prose(
     assert report["notice"]
 
 
+def test_staged_reveals_and_insider_setups_are_flagged_but_plain_colons_are_not(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    text = (
+        "The best part: it runs offline.\n\n"
+        "The importer only reads UTF-8. The fix? A transcoding step.\n\n"
+        "  - The catch: it only runs on Linux.\n\n"
+        "What nobody tells you is that the cache is cold on deploy.\n\n"
+        "This is the step most teams skip.\n\n"
+        "The config has three parts: input, transform, and output.\n\n"
+        "Install the package: run the command below.\n\n"
+        "The team found the fix: a timeout bump. The parser has one problem: BOMs.\n\n"
+        "We spent a week arguing about\nthe answer: either way the tests pass.\n\n"
+        "The Problem: Slow Builds\n===\n\n"
+        "Let me think about it. Plot twist: it was DNS.\n\n"
+        "> The best part: it learns.\n\n"
+        "`The result? Faster.`\n"
+    )
+    report = scan(capsys, write(tmp_path, text))
+    found = [(f["rule"], f["line"], f["evidence"]) for f in report["findings"]]
+    assert found == [
+        ("HUM012", 1, "The best part:"),
+        ("HUM012", 3, "The fix?"),
+        ("HUM012", 5, "The catch:"),
+        ("HUM006", 7, "What nobody tells you"),
+        ("HUM006", 9, "the step most teams skip"),
+        ("HUM012", 23, "Plot twist:"),
+    ]
+
+
 def test_unreadable_input_is_reported_not_scanned(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

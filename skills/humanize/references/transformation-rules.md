@@ -77,6 +77,16 @@ Replace templates with the specific thing they gesture at:
 
 Rewriting is not deleting. Cutting a tell must not cut the claim under it — an inflated sentence usually contains one real fact wearing a costume. Strip the costume, keep the fact. When a whole sentence contains no fact (a pure closer, a send-off paragraph, a phantom objection), deletion is correct; when in doubt, keep the claim in plainer words.
 
+## Portable Sentences
+
+A sentence that fails the portability test (it would stay just as true after swapping in a different product, team, or place) and shows a named pattern has no fact of its own to keep. In order of preference:
+
+- Swap in a detail the text already holds, such as a number, a name, a cause, or a result, moving that detail up when it does the sentence's job better.
+- Delete it when the neighboring sentences already carry the point.
+- Ask the user for the missing detail when the paragraph needs one and the text has none.
+
+Specificity comes from the source or the user. A plausible number, customer, or result written to make the sentence concrete is an invented claim.
+
 ## Replies and Follow-Ups
 
 For text that answers something (review responses, comment replies, follow-up emails), structure matters more than sentence-level style (see the re-explaining-shared-context pattern):

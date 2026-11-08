@@ -1,5 +1,13 @@
 # Changelog — Humanize
 
+## 2.2.0
+
+- Keep the writer's voice without a sample: Phase 1 records the draft's voice traits and the sentences that already read as human, Phase 2 makes the smallest edit that removes each finding and restructures only for structural findings, Phase 3 adds a voice check, and Phase 4 rewrites a sentence or paragraph only when a fix reads as a patch.
+- Add the portability test to Phase 1 (a generic sentence counts only when it also shows a named pattern) and a Portable Sentences rewrite strategy that replaces, deletes, or asks, never manufactures specifics.
+- Pattern reference (31 patterns): add Staged Reveal (colon reveals, self-answered questions) and Reader Steering (asides that tell the reader how to weigh the text) to Class A; extend Staged Run-Up with insider setups, Deep-Sounding Sayings with deleting kickers that have no claim underneath, and Formulaic Challenges and Upbeat Conclusions with recap endings; add a guard for the writer's own hedges and edge.
+- Scanner: add `HUM012` (staged reveal) and insider-setup cues to `HUM006`.
+- Detection reports gain a Fix column.
+
 ## 2.1.0
 
 - Add `scripts/lint_prose.py`: a deterministic prose scanner with stable rule IDs (`HUM001`-`HUM011`), exact offsets, line/column and evidence, `--lines` changed-line focus with paragraph context, an explicit `fix` command that deletes only selected chat artifacts into a new file, and `patterns` to print selected sections of the pattern reference instead of loading it whole.

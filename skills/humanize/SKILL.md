@@ -2,7 +2,7 @@
 name: humanize
 description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts, using a deterministic scan and preservation check. Triggers on: "humanize text", "make this sound human", "remove AI patterns", "rewrite to sound natural", "make this less AI", "de-slop this", "not sound like ChatGPT", "human pass", "strip chat artifacts".'
 metadata:
-  version: 2.1.0
+  version: 2.2.0
   category: review
   tags: [writing, natural-language, rewriting, editing]
   difficulty: intermediate
@@ -56,9 +56,10 @@ Four phases. Do not skip phases (mechanical cleanup has its own path in the mode
 
 1. Run `scan`. When the user names changed lines or supplies a diff, pass `--lines` and treat only those paragraphs as in scope.
 2. Load guidance through `patterns`, not the whole reference: `--class A,B,E --guards` for the judgment read, `--class C,D` once the scan or the read shows habits there, `--rules` for the IDs that fired. Open `references/detection-patterns.md` only for a whole-catalog audit.
-3. Read the in-scope text once. Mark every pattern found, strongest class first (A: Staging, B: Inflation, C: Language habits, D: Formatting, E: Leftovers). Confirm or dismiss each `candidate` by the guards. Look at paragraph shape as well as sentences — a contrast split across two sentences, three parallel examples, or the same closer after every section is the same tell at larger scale.
+3. Read the in-scope text once. Mark every pattern found, strongest class first (A: Staging, B: Inflation, C: Language habits, D: Formatting, E: Leftovers). Confirm or dismiss each `candidate` by the guards. Look at paragraph shape as well as sentences — a contrast split across two sentences, three parallel examples, or the same closer after every section is the same tell at larger scale. Apply the **portability test** to sentences that feel generic: if a sentence would stay just as true after swapping in a different product, team, or place, it says nothing about this one. A portable sentence is a finding only when it also shows a named pattern (usually a saying, an inflation, reader steering, or a recap ending); otherwise leave it.
+4. When the mode continues to Phase 2, write down the voice traits to keep (see Voice matching) and mark the sentences that already read as a person writing for this reader. Marked sentences keep their wording through every later phase.
 
-Done when every finding is confirmed, dismissed with a named guard, or queued for mechanical fix, and every in-scope paragraph was read.
+Done when every finding is confirmed, dismissed with a named guard, or queued for mechanical fix, and every in-scope paragraph was read; when Phase 2 follows, also when the voice traits are written down.
 
 Apply the strength rules from the pattern reference:
 
@@ -78,7 +79,7 @@ Apply the strength rules from the pattern reference:
 
 ### Phase 2: Draft the rewrite
 
-Rewrite only paragraphs that carry confirmed findings; leave every other paragraph and every protected region verbatim. Within a flagged paragraph, do not treat the original structure as fixed. Keep every supported claim. You may shorten dull parts, merge or split sentences, and reorder — but keep the information. Load only the matching domain section of `references/style-guide.md`, the matching examples file, and the `references/transformation-rules.md` sections the findings call for.
+Rewrite only paragraphs that carry confirmed findings; leave every other paragraph and every protected region verbatim. Within a flagged paragraph, make the smallest edit that removes each finding and keep the writer's strong sentences, word choices, and progression. Restructure the paragraph only when the finding is structural (a triad, a closer, a list that should be prose, a reveal staged across two sentences) or when sentence-level fixes leave it awkward; then you may shorten, merge, split, or reorder the unmarked sentences around the marked ones, but keep every supported claim. Load only the matching domain section of `references/style-guide.md`, the matching examples file, and the `references/transformation-rules.md` sections the findings call for.
 
 Hard rule: **never invent**. Do not add a fact, name, number, date, quote, or citation unless it comes from the source text or the user. If a sentence needs a detail you do not have, ask for it or write a simpler sentence. An opinion or reaction is allowed where the voice calls for one; a factual claim is not. Fiction is exempt — invented detail is the task there.
 
@@ -89,18 +90,19 @@ Put the draft in a file and run `check_preservation.py SOURCE DRAFT`, adding `--
 - **Semantic check.** Every factual claim, data point, argument, and technical term in the original must survive, unless a pattern explicitly calls for cutting it (e.g. an invented significance claim). A lost claim is an error. An added claim is an error. The checker cannot see this.
 - **Residue check.** Search for the five tells that most often survive a rewrite: a negative parallelism, a one-line closer, a dash, a triad, a bold label.
 - **Shape check.** Structural edits (triad removal, list-to-prose, closer cuts) drop facts most often — re-verify numbers, rankings, and claims that things happened together.
+- **Voice check.** Compare the draft with the voice traits from Phase 1. Their hedges, humor, and edge survive; the marked sentences are unchanged; and how much of the text changed matches how many findings there were. Restore any clean sentence that was rewritten only for consistency.
 
-Done when the checker exits 0 (or each remaining failure is an edit the user asked for, with `--allow` where it applies) and the three reads found nothing.
+Done when the checker exits 0 (or each remaining failure is an edit the user asked for, with `--allow` where it applies) and the four reads found nothing.
 
 ### Phase 4: Finalize
 
-State each point naturally instead of patching flagged phrases one at a time. If a sentence stays awkward, rewrite the paragraph around its main point, then rerun the checker. Vary sentence length — real writing alternates short and long, but as a product of choosing for one reader, not as a formula. Write the file only after the checker passes. Output per the format below.
+Read each edited sentence in place. If a fix reads as a patch, rewrite that sentence around its point; if the paragraph still reads awkwardly, rewrite its unmarked sentences, then rerun the checker and the voice check. In paragraphs you rewrote, vary sentence length — real writing alternates short and long, but as a product of choosing for one reader, not as a formula. Write the file only after the checker passes. Output per the format below.
 
 ## Voice matching
 
 If the user supplies a writing sample, read it first and match its sentence length, word choice, punctuation, openings, and transitions. **The sample overrides the pattern reference**, including the dash rule: if the sample uses em dashes, keep them at roughly the sample's rate; same for deliberate triads or repeated openings.
 
-Without a sample, take the voice from the kind of text. Personal writing (blogs, essays, opinions) keeps the writer's opinions, uncertainty, humor, and asides. Reference, technical, legal, and factual text stays neutral and plain. Removing tells is half the job — the result must still sound like a person, not sanitized output.
+Without a sample, the draft is the sample. Before editing, note how the writer sounds: word choice, sentence rhythm, how blunt or funny they are, where they admit doubt, where they wander, and how finished the prose is. Keep all of it. An edited rough draft should read as the same writer with the tells removed, not as a draft whose every paragraph got the same polish. The kind of text sets the register. Personal writing (blogs, essays, opinions) keeps the writer's opinions, uncertainty, humor, and asides. Reference, technical, legal, and factual text stays neutral and plain. Removing tells is half the job — the result must still sound like a person, not sanitized output.
 
 ## Scope Modes
 
@@ -142,12 +144,12 @@ For short texts (under 100 words), skip the changes summary unless the user requ
 
 ### Findings
 
-| Location | Pattern | Severity | Evidence |
-|----------|---------|----------|----------|
-| Para 1 | AI-frequency vocabulary | HIGH | "delve", "intricate", "pivotal" in one sentence |
-| Para 2 | Copula avoidance | MEDIUM | "serves as" instead of "is" |
-| Para 3 | Negative parallelism | HIGH | "It's not just X — it's Y" |
-| ... | ... | ... | ... |
+| Location | Pattern | Severity | Evidence | Fix |
+|----------|---------|----------|----------|-----|
+| Para 1 | AI-frequency vocabulary | HIGH | "delve", "intricate", "pivotal" in one sentence | Use the plain words |
+| Para 2 | Copula avoidance | MEDIUM | "serves as" instead of "is" | Use "is" |
+| Para 3 | Negative parallelism | HIGH | "It's not just X — it's Y" | State Y directly |
+| ... | ... | ... | ... | ... |
 
 ### Summary
 [1-2 sentences: overall assessment and highest-priority patterns to fix first]
@@ -161,7 +163,7 @@ Reference patterns by name in findings; numbers are version-dependent.
 | ------------------------------------ | ---------------------------------------------------- | ------------------------------------ |
 | `scripts/lint_prose.py` | Scan, mechanical `fix`, rule list, and `patterns` selection from the pattern reference | Phase 1; mechanical cleanup |
 | `scripts/check_preservation.py` | Protected-structure and literal comparison of source and draft | Phase 3 |
-| `references/detection-patterns.md`   | 29 AI-writing patterns in 5 strength classes, false-positive guards | Through `patterns` selections; read whole only for a whole-catalog audit |
+| `references/detection-patterns.md`   | 31 AI-writing patterns in 5 strength classes, false-positive guards | Through `patterns` selections; read whole only for a whole-catalog audit |
 | `references/historical-patterns.md`  | Retired patterns — recognize, but never flag as primary evidence | When a retired pattern seems present |
 | `references/style-guide.md`          | Domain-specific voice profiles and calibration rules | Phase 2: only the matching domain section |
 | `references/transformation-rules.md` | Structural rewrite strategies | Phase 2: sections the findings call for |
