@@ -152,6 +152,14 @@ RULES: Final[dict[str, Rule]] = {
             "Knowledge-Cutoff Disclaimers and Unsupported Guesses",
             "Model self-reference or knowledge-limit disclaimer.",
         ),
+        Rule(
+            "HUM012",
+            "staged-reveal",
+            "candidate",
+            False,
+            "Staged Reveal",
+            "Withholds the subject behind a colon or a self-answered question to stage a reveal.",
+        ),
     )
 }
 
@@ -230,6 +238,14 @@ _CANDIDATES: Final[dict[str, tuple[re.Pattern[str], ...]]] = {
             r"\bhere(?:'s| is) (?:a|an) (?:quick |brief |comprehensive |detailed |complete )?"
             r"(?:overview|breakdown|summary|rundown)\b",
             r"\bhere(?:'s| is) the (?:thing|kicker|catch|truth)\s*[:.]",
+            (
+                r"\bwhat (?:nobody|no one|most people|few people|everyone) (?:tells you|will tell you|"
+                r"won't tell you|doesn't tell you|gets wrong|get wrong|misses|miss|overlooks|forgets)\b"
+            ),
+            (
+                r"\bthe (?:part|thing|step|bit) (?:that )?(?:everyone|nobody|no one|most people|most teams|"
+                r"most engineers) (?:miss(?:es)?|skips?|gets? wrong|overlooks?|forgets?|ignores?)\b"
+            ),
         )
     ),
     "HUM007": tuple(
@@ -260,6 +276,36 @@ _DRAMATIC: Final = re.compile(
     ),
     re.IGNORECASE,
 )
+# HUM012 cues; each must start a sentence (checked per paragraph by _scan_reveals).
+_REVEAL_FILLER_STOP: Final = "the|a|an|this|that|its|our|their|his|her|my|your|one|every|each|another|some|no|all"
+_REVEALS: Final = tuple(
+    re.compile(_apos(p), re.IGNORECASE)
+    for p in (
+        # "The <0-3 words> part/catch/result...: " reveal; the window excludes
+        # determiners so "The parser has one problem:" (a full clause) is skipped.
+        (
+            r"\b(?:and |but )?(?:the|my|our) "
+            rf"(?:(?!(?:{_REVEAL_FILLER_STOP}) )(?:[\w-]|')+ ){{0,3}}?"
+            r"(?:part|thing|catch|twist|kicker|trick|secret|result|upshot|payoff|takeaway|"
+            r"lesson|difference|answer|fix|reason|bottom line|detail|truth|problem|verdict)"
+            r"(?: (?:that|which) [^:.!?\n]{1,40})?:(?=[ \t]+\S)"
+        ),
+        # One-word question answered in the next breath.
+        (
+            r"\b(?:the )?(?:result|answer|catch|fix|reason|problem|outcome|verdict|twist|"
+            r"difference|secret|takeaway|kicker|upshot)\?(?=[ \t]+\S)"
+        ),
+        (
+            r"\bwhy (?:does|did|is|would|should) (?:this|that|it) (?:matter|work|happen|help)\?[ \t]+"
+            r"(?:because|simple|it's|it is)\b"
+        ),
+        r"\bwhat if i told you\b",
+        r"\b(?:picture this|plot twist):",
+    )
+)
+_LIST_MARKER: Final = re.compile(r"[ \t]*(?:[-*+]|\d+[.)])[ \t]+")
+_BLANK: Final = re.compile(r"[ \t]*")
+_SETEXT_UNDERLINE: Final = re.compile(r"\n[ \t]*(?:=+|-+)[ \t]*\r?$")
 _HEADING_EMOJI: Final = re.compile(
     r"^( {0,3}#{1,6}[ \t]+(?:[*_]{1,2})?)((?:[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2190-\u21FF]\ufe0f?[ \t]*)+)"
 )
@@ -495,6 +541,43 @@ def _scan_wrappers(doc: Document, masked: str) -> list[Finding]:
     return found
 
 
+def _starts_sentence(local: str, pos: int) -> bool:
+    """True when ``pos`` in paragraph text ``local`` is where a sentence begins.
+
+    Looks only at the current line prefix and the characters just before ``pos``,
+    so the cost does not grow with the paragraph length.
+    """
+    line_start = local.rfind("\n", 0, pos) + 1
+    if _LIST_MARKER.fullmatch(local, line_start, pos):
+        return True
+    if line_start == 0 and _BLANK.fullmatch(local, 0, pos):
+        return True
+    end = pos
+    while end > 0 and local[end - 1].isspace():
+        end -= 1
+    if end == pos:
+        return False
+    while end > 0 and local[end - 1] in "\"'\u2019)]":
+        end -= 1
+    return end > 0 and local[end - 1] in ".!?"
+
+
+def _scan_reveals(doc: Document, masked: str) -> list[Finding]:
+    found: list[Finding] = []
+    for paragraph in doc.paragraphs:
+        local = masked[paragraph.start : paragraph.end]
+        if paragraph.heading_level or _SETEXT_UNDERLINE.search(local):
+            continue
+        for pattern in _REVEALS:
+            for match in pattern.finditer(local):
+                if _starts_sentence(local, match.start()):
+                    start = paragraph.start + match.start()
+                    found.append(
+                        _make("HUM012", doc, start, paragraph.start + match.end())
+                    )
+    return _drop_overlaps(found)
+
+
 def _scan_dramatic(doc: Document, masked: str) -> list[Finding]:
     found: list[Finding] = []
     for index, paragraph in enumerate(doc.paragraphs):
@@ -516,6 +599,8 @@ def scan(doc: Document, enabled: set[str] | None = None) -> list[Finding]:
         found += _scan_wrappers(doc, masked)
     if "HUM008" in active:
         found += _scan_dramatic(doc, masked)
+    if "HUM012" in active:
+        found += _scan_reveals(doc, masked)
     for rule_id in ("HUM006", "HUM007", "HUM011"):
         if rule_id in active:
             found += _regex_findings(rule_id, doc, masked)

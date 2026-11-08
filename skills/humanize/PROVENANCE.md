@@ -10,6 +10,8 @@
 
 [blader/humanizer](https://github.com/blader/humanizer) v3.1.0, commit `225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8`, was inspected during design. It is a prose guidance package with its own validator, not a linter for user text, so it supplied no implementation, and nothing from it is vendored here.
 
+[petergyang/no-ai-slop](https://github.com/petergyang/no-ai-slop) (MIT), commit `000650b156983f5159695b441477f4e63b25dc85`, was inspected for 2.2.0. Its editing principles informed the voice-preservation workflow, the portability test, the Staged Reveal and Reader Steering patterns, and the extensions to Staged Run-Up, Deep-Sounding Sayings, and Formulaic Challenges and Upbeat Conclusions; none of these come from the Wikipedia source. Some quoted tell phrases in the Watch-for lists also appear among its examples, because they are common idioms ("What if I told you", "Plot twist:", "What nobody tells you", "What most people get wrong", "The part everyone misses", "As you can see", "In other words", "In conclusion"). Explanations, before/after examples, scanner cues and workflow wording are original to this repository; nothing from it is vendored here.
+
 ## Limits
 
 Scanner findings are review candidates. They are not evidence of AI authorship and do not measure detector scores.

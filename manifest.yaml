@@ -633,7 +633,7 @@ packages:
     - launch-video
     - watch
   - name: humanize
-    version: 2.1.0
+    version: 2.2.0
     description: 'Detects and removes AI-generated writing patterns while preserving meaning and facts, using a deterministic
       scan and preservation check. Triggers on: "humanize text", "make this sound human", "remove AI patterns", "rewrite to
       sound natural", "make this less AI", "de-slop this", "not sound like ChatGPT", "human pass", "strip chat artifacts".'
