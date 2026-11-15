@@ -1639,10 +1639,10 @@ packages:
     category: visualization
     difficulty: intermediate
   - name: web-fetch
-    version: 1.1.1
-    description: 'Web content fetching via curl and WebFetch when a specific URL is provided. Covers HTTP GET/POST, JSON APIs,
-      HTML, auth, cookies. Triggers on: "fetch this URL", "download HTML", "call this API", "curl this endpoint". NOT for
-      search, use tavily.'
+    version: 1.2.0
+    description: 'Fetch specific URLs with curl/WebFetch, plus Reddit posts and comment/reply threads with a deterministic
+      browser helper. Triggers on: "fetch this URL", "download HTML", "call this API", "curl this endpoint", "fetch this Reddit
+      post", "read the entire Reddit thread". NOT for open-ended search (use tavily) or general browser automation.'
     path: skills/web-fetch
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/web-fetch/SKILL.md
     tags:
@@ -1650,6 +1650,7 @@ packages:
     - curl
     - api
     - web-content
+    - reddit
     category: content
     difficulty: beginner
     complements:
