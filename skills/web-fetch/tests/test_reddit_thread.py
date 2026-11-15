@@ -327,3 +327,24 @@ def test_continuation_gate_is_blocked_not_a_retryable_partial_capture() -> None:
     thread.finish()
     assert thread.status == "blocked"
     assert thread.comments["t1_parent1"]["body_text"] == "A comment"
+
+
+@pytest.mark.parametrize("missing_body", [None, ""])
+@pytest.mark.parametrize("captured_expanded", [False, True])
+def test_sparse_continuation_preserves_captured_post_body(
+    missing_body: str | None, captured_expanded: bool
+) -> None:
+    thread = reader.Thread("t3_abc123", 10)
+    root = snapshot([], count=0, expanded=captured_expanded)
+    root["post"]["body_text"] = "Full original post"
+    root["post"]["links"] = ["https://example.com/source"]
+    thread.merge(root)
+    continuation = snapshot([], count=0, source=CONTINUATION)
+    continuation["post"].update(body_text=missing_body, links=[], body_expanded=True)
+    thread.merge(continuation)
+    thread.finish()
+    document = thread.document()
+    assert document["post"]["body_text"] == "Full original post"
+    assert document["post"]["links"] == ["https://example.com/source"]
+    assert document["post"]["body_expanded"] is captured_expanded
+    assert "> Full original post" in reader.markdown(document)

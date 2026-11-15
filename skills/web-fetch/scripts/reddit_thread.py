@@ -144,10 +144,9 @@ class Thread:
             raise CollectionError(
                 "Unsupported or unrendered Reddit page; no post extracted"
             )
-        if (
-            self.post is None
-            or incoming.get("body_expanded")
-            or not self.post.get("body_expanded")
+        if self.post is None or (
+            (incoming.get("body_text") or not self.post.get("body_text"))
+            and (incoming.get("body_expanded") or not self.post.get("body_expanded"))
         ):
             self.post = dict(incoming)
         comments = snapshot.get("comments")
