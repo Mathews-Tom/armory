@@ -144,11 +144,19 @@ class Thread:
             raise CollectionError(
                 "Unsupported or unrendered Reddit page; no post extracted"
             )
-        if self.post is None or (
-            (incoming.get("body_text") or not self.post.get("body_text"))
-            and (incoming.get("body_expanded") or not self.post.get("body_expanded"))
-        ):
+        if self.post is None:
             self.post = dict(incoming)
+        else:
+            replace_body = bool(incoming.get("body_text")) and (
+                not self.post.get("body_text")
+                or incoming.get("body_expanded")
+                or not self.post.get("body_expanded")
+            )
+            for key, value in incoming.items():
+                if key in ("body_text", "links", "body_expanded") and not replace_body:
+                    continue
+                if value is not None:
+                    self.post[key] = value
         comments = snapshot.get("comments")
         if not isinstance(comments, list):
             raise CollectionError("Browser returned invalid comments")

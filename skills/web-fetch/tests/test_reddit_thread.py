@@ -335,11 +335,13 @@ def test_sparse_continuation_preserves_captured_post_body(
     missing_body: str | None, captured_expanded: bool
 ) -> None:
     thread = reader.Thread("t3_abc123", 10)
-    root = snapshot([], count=0, expanded=captured_expanded)
+    root = snapshot(
+        [comment("t1_parent1", "t3_abc123")], count=1, expanded=captured_expanded
+    )
     root["post"]["body_text"] = "Full original post"
     root["post"]["links"] = ["https://example.com/source"]
     thread.merge(root)
-    continuation = snapshot([], count=0, source=CONTINUATION)
+    continuation = snapshot([], count=5, source=CONTINUATION)
     continuation["post"].update(body_text=missing_body, links=[], body_expanded=True)
     thread.merge(continuation)
     thread.finish()
@@ -348,3 +350,44 @@ def test_sparse_continuation_preserves_captured_post_body(
     assert document["post"]["links"] == ["https://example.com/source"]
     assert document["post"]["body_expanded"] is captured_expanded
     assert "> Full original post" in reader.markdown(document)
+    assert document["post"]["reported_comment_count"] == 5
+    assert document["status"] == "partial"
+    assert "Reported comment count exceeds captured comments" in document["issues"]
+
+
+@pytest.mark.parametrize("missing_body", [None, ""])
+def test_newly_available_body_replaces_empty_expanded_snapshot(
+    missing_body: str | None,
+) -> None:
+    thread = reader.Thread("t3_abc123", 10)
+    root = snapshot([], count=0)
+    root["post"]["body_text"] = missing_body
+    thread.merge(root)
+    revealed = snapshot([], count=0, expanded=False)
+    revealed["post"]["body_text"] = "Recovered preview"
+    revealed["post"]["links"] = ["https://example.com/recovered"]
+    thread.merge(revealed)
+    thread.finish()
+    document = thread.document()
+    assert document["post"]["body_text"] == "Recovered preview"
+    assert document["post"]["links"] == ["https://example.com/recovered"]
+    assert document["post"]["body_expanded"] is False
+    assert document["status"] == "partial"
+    assert "Post body still has a Read more control" in document["issues"]
+    assert "> Recovered preview" in reader.markdown(document)
+
+
+def test_unavailable_count_does_not_erase_an_observed_discrepancy() -> None:
+    thread = reader.Thread("t3_abc123", 10)
+    thread.merge(snapshot([comment("t1_parent1", "t3_abc123")], count=5))
+    continuation = snapshot([], source=CONTINUATION)
+    continuation["post"].update(
+        body_text="Newly expanded post", reported_comment_count=None
+    )
+    thread.merge(continuation)
+    thread.finish()
+    document = thread.document()
+    assert document["post"]["body_text"] == "Newly expanded post"
+    assert document["post"]["reported_comment_count"] == 5
+    assert document["status"] == "partial"
+    assert "Reported comment count exceeds captured comments" in document["issues"]
