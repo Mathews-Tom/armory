@@ -16,6 +16,55 @@
   }
   const unavailable = !gateReason && /page not found|content is no longer available/i.test(sample);
   const blocked = Boolean(gateReason);
+  const trimmed = pageText.trim();
+  const looksJson = (document.contentType || '').includes('json') ||
+    trimmed.startsWith('[') || trimmed.startsWith('{');
+  if (mode === 'json_ready') {
+    return Boolean(document.readyState === 'complete' && (looksJson || blocked || unavailable || trimmed.length > 0));
+  }
+  if (mode === 'json') {
+    if (looksJson) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return { source_url: location.href, blocked: false, gate_reason: null,
+            unavailable: false, page_title: document.title || null, error: null, payload: parsed };
+        }
+        if (parsed && typeof parsed === 'object') {
+          const code = Number(parsed.error);
+          const msg = String(parsed.message || parsed.reason || '');
+          const reasonField = String(parsed.reason || '').toLowerCase();
+          if (code === 404 || /not found/i.test(msg)) {
+            return { source_url: location.href, blocked: false, gate_reason: 'not_found',
+              unavailable: true, page_title: document.title || null,
+              error: (msg || 'Not Found').slice(0, 240), payload: null };
+          }
+          if (code === 401 || /unauthorized/i.test(msg)) {
+            return { source_url: location.href, blocked: true, gate_reason: 'login_required',
+              unavailable: false, page_title: document.title || null,
+              error: (msg || 'Unauthorized').slice(0, 240), payload: null };
+          }
+          if (code === 429 || /too many requests/i.test(msg)) {
+            return { source_url: location.href, blocked: true, gate_reason: 'rate_limit',
+              unavailable: false, page_title: document.title || null,
+              error: (msg || 'Too Many Requests').slice(0, 240), payload: null };
+          }
+          if (code === 403 || /forbidden/i.test(msg)) {
+            const reason = /private|banned|quarantined/.test(reasonField)
+              ? 'private_or_banned' : 'network_security';
+            return { source_url: location.href, blocked: true, gate_reason: reason,
+              unavailable: false, page_title: document.title || null,
+              error: (msg || 'Forbidden').slice(0, 240), payload: null };
+          }
+        }
+      } catch {}
+    }
+    const snippet = (pageText || document.title || 'Reddit JSON not returned')
+      .trim().replace(/\s+/g, ' ').slice(0, 240);
+    return { source_url: location.href, blocked,
+      gate_reason: gateReason || (unavailable ? 'not_found' : null),
+      unavailable, page_title: document.title || null, error: snippet, payload: null };
+  }
   if (mode === 'ready') return Boolean(post || blocked || unavailable);
   if (!post) {
     const snippet = (pageText || document.title || 'Reddit post not rendered')

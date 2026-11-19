@@ -1,5 +1,11 @@
 # Changelog — Web Fetch
 
+## 1.4.0
+
+- Make `browser-json` the default capture backend in `reddit_thread.py` (`--backend browser-json`, with `--backend dom` retained as fallback): navigates directly to Reddit's `.json` thread listing in the authorized browser session without SPA DOM rendering or scrolling, preserves `[deleted]`/`[removed]` parent markers so child replies stay linked, and follows same-post `more` continuations.
+- Add single-tab multi-URL batch capture (`reddit_thread.py URL1 URL2 ... --output DIR`) that reuses one tab across all posts, writes per-post subdirectories plus `batch.json`, and fails fast automatically on environment-level Reddit blocks.
+- Document an isolated persistent `--profile` session as the primary setup so tabs stay out of the user's daily Chrome window.
+
 ## 1.3.0
 
 - Classify Reddit access/verification gates (`network_security`, `human_verification`, `rate_limit`, `login_required`, `private_or_banned`) separately from unavailable/not-found posts (`not_found`), preserving `block_reason`, `visited_pages`, and a safely quoted `gate_detail` excerpt in `thread.json` and `thread.md`.

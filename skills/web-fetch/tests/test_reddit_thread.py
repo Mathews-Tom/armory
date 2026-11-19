@@ -64,6 +64,9 @@ def snapshot(
         "https://old.reddit.com/r/test/comments/abc123/title/reply/",
         "https://redd.it/abc123",
         "https://www.reddit.com:443/comments/ABC123/",
+        "https://www.reddit.com/comments/abc123.json?limit=500",
+        "https://www.reddit.com/r/test/comments/abc123/title.json",
+        "https://www.reddit.com/comments/abc123/_/reply1.json",
     ],
 )
 def test_reddit_permalink_identity(url: str) -> None:
@@ -83,6 +86,8 @@ def test_reddit_permalink_identity(url: str) -> None:
         "https://reddit.com/r/test/s/sharetoken",
         "file:///comments/abc123/",
         "https://reddit.com\\@evil.example/comments/abc123/",
+        "https://www.reddit.com/comments/abc123.evil",
+        "https://www.reddit.com/comments/abc123.json/extra",
     ],
 )
 def test_rejects_non_post_and_unsafe_destinations(url: str) -> None:
@@ -476,6 +481,222 @@ def test_resolve_session_precedence_and_validation(
         reader.resolve_session("   ")
 
 
+def _reddit_listing(
+    post_short: str = "abc123",
+    *,
+    num_comments: int = 1,
+    comments: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": "Listing",
+            "data": {
+                "children": [
+                    {
+                        "kind": "t3",
+                        "data": {
+                            "id": post_short,
+                            "name": f"t3_{post_short}",
+                            "title": f"Post {post_short}",
+                            "author": "op",
+                            "subreddit_name_prefixed": "r/test",
+                            "created_utc": 1700000000,
+                            "score": 42,
+                            "selftext": "Check https://example.com/post.",
+                            "url": f"https://www.reddit.com/r/test/comments/{post_short}/",
+                            "num_comments": num_comments,
+                        },
+                    }
+                ]
+            },
+        },
+        {
+            "kind": "Listing",
+            "data": {
+                "children": comments
+                if comments is not None
+                else [
+                    {
+                        "kind": "t1",
+                        "data": {
+                            "id": "parent1",
+                            "name": "t1_parent1",
+                            "parent_id": f"t3_{post_short}",
+                            "link_id": f"t3_{post_short}",
+                            "author": "alice",
+                            "body": "Top comment",
+                            "score": 5,
+                            "created_utc": 1700000100,
+                            "replies": "",
+                        },
+                    }
+                ]
+            },
+        },
+    ]
+
+
+def test_parse_json_listing_preserves_deleted_parent_and_more_stubs() -> None:
+    payload = _reddit_listing(
+        num_comments=3,
+        comments=[
+            {
+                "kind": "t1",
+                "data": {
+                    "id": "del1",
+                    "name": "t1_del1",
+                    "parent_id": "t3_abc123",
+                    "link_id": "t3_abc123",
+                    "author": "[deleted]",
+                    "body": "[deleted]",
+                    "score": 0,
+                    "created_utc": 1700000100,
+                    "replies": {
+                        "kind": "Listing",
+                        "data": {
+                            "children": [
+                                {
+                                    "kind": "t1",
+                                    "data": {
+                                        "id": "child1",
+                                        "name": "t1_child1",
+                                        "parent_id": "t1_del1",
+                                        "link_id": "t3_abc123",
+                                        "author": "bob",
+                                        "body": "See https://example.com/reply!",
+                                        "score": 3,
+                                        "created_utc": 1700000200,
+                                        "replies": {
+                                            "kind": "Listing",
+                                            "data": {
+                                                "children": [
+                                                    {
+                                                        "kind": "more",
+                                                        "data": {
+                                                            "parent_id": "t1_child1",
+                                                            "children": [],
+                                                        },
+                                                    }
+                                                ]
+                                            },
+                                        },
+                                    },
+                                }
+                            ]
+                        },
+                    },
+                },
+            },
+            {
+                "kind": "more",
+                "data": {"parent_id": "t3_abc123", "children": ["extra1"]},
+            },
+        ],
+    )
+    snap = reader.parse_json_listing(
+        "t3_abc123", payload, "https://www.reddit.com/comments/abc123.json"
+    )
+    assert snap["post"]["body_expanded"] is True
+    assert snap["post"]["links"] == ["https://example.com/post"]
+    assert [c["id"] for c in snap["comments"]] == ["t1_del1", "t1_child1"]
+    assert snap["comments"][0]["body_text"] == "[deleted]"
+    assert snap["comments"][1]["parent_id"] == "t1_del1"
+    assert snap["comments"][1]["links"] == ["https://example.com/reply"]
+    hrefs = [a["href"] for a in snap["actions"]]
+    assert any("/_/child1.json" in h for h in hrefs)
+    assert any("/_/extra1.json" in h for h in hrefs)
+
+
+def test_collect_json_expands_more_stubs_and_skips_already_captured() -> None:
+    root_payload = _reddit_listing(
+        num_comments=3,
+        comments=[
+            {
+                "kind": "t1",
+                "data": {
+                    "id": "c1",
+                    "name": "t1_c1",
+                    "parent_id": "t3_abc123",
+                    "author": "a",
+                    "body": "First",
+                    "score": 1,
+                    "created_utc": 1700000100,
+                    "replies": "",
+                },
+            },
+            {
+                "kind": "more",
+                "data": {"parent_id": "t3_abc123", "children": ["c2", "c3"]},
+            },
+        ],
+    )
+    c2_payload = _reddit_listing(
+        num_comments=3,
+        comments=[
+            {
+                "kind": "t1",
+                "data": {
+                    "id": "c2",
+                    "name": "t1_c2",
+                    "parent_id": "t3_abc123",
+                    "author": "b",
+                    "body": "Second",
+                    "score": 1,
+                    "created_utc": 1700000200,
+                    "replies": {
+                        "kind": "Listing",
+                        "data": {
+                            "children": [
+                                {
+                                    "kind": "t1",
+                                    "data": {
+                                        "id": "c3",
+                                        "name": "t1_c3",
+                                        "parent_id": "t1_c2",
+                                        "author": "c",
+                                        "body": "Third already included",
+                                        "score": 1,
+                                        "created_utc": 1700000300,
+                                        "replies": "",
+                                    },
+                                }
+                            ]
+                        },
+                    },
+                },
+            }
+        ],
+    )
+    opened: list[str] = []
+
+    def call(*args: str, **_kwargs: Any) -> dict[str, Any]:
+        if args and args[0] == "open":
+            opened.append(args[1])
+        return {}
+
+    def json_snap(_identity: str) -> dict[str, Any]:
+        current = opened[-1]
+        payload = c2_payload if "/_/c2.json" in current else root_payload
+        return {
+            "source_url": current,
+            "blocked": False,
+            "unavailable": False,
+            "payload": payload,
+        }
+
+    browser = SimpleNamespace(
+        call=call, wait_for_json=lambda *_: None, json_snapshot=json_snap
+    )
+    thread = reader.Thread("t3_abc123", 10, backend="browser-json")
+    reader.collect_json(browser, thread, 10)
+    thread.finish()
+    assert thread.status == "browser_exhausted"
+    assert set(thread.comments) == {"t1_c1", "t1_c2", "t1_c3"}
+    # c3 was returned inside c2's subtree, so /_/c3.json was skipped!
+    assert len(opened) == 2
+    assert thread.actions == 1
+
+
 def test_main_env_session_closes_only_created_tab(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -492,15 +713,16 @@ def test_main_env_session_closes_only_created_tab(
                 return {"targetId": "tab-42"}
             return {}
 
-        def wait_for_post(self, _identity: str) -> None:
+        def wait_for_json(self, _identity: str) -> None:
             return None
 
-        def snapshot(
-            self, _identity: str, action: dict[str, Any] | None = None
-        ) -> dict[str, Any]:
-            if action:
-                return {"acted": True}
-            return snapshot([comment("t1_parent1", "t3_abc123")], count=1)
+        def json_snapshot(self, _identity: str) -> dict[str, Any]:
+            return {
+                "source_url": "https://www.reddit.com/comments/abc123.json",
+                "blocked": False,
+                "unavailable": False,
+                "payload": _reddit_listing("abc123", num_comments=1),
+            }
 
     output = tmp_path / "env-capture"
     monkeypatch.setenv("REDDIT_BROWSER_SESSION", "reddit-capture")
@@ -514,8 +736,10 @@ def test_main_env_session_closes_only_created_tab(
     document = json.loads((output / "thread.json").read_text(encoding="utf-8"))
     assert document["status"] == "browser_exhausted"
     assert document["session_mode"] == "env"
+    assert document["backend"] == "browser-json"
     summary = json.loads(capsys.readouterr().out)
     assert summary["status"] == "browser_exhausted"
+    assert summary["backend"] == "browser-json"
     assert "block_reason" not in summary
 
 
@@ -542,17 +766,16 @@ def test_main_ephemeral_block_reports_reason_and_conditional_hint(
                 return {"targetId": "tab-99"}
             return {}
 
-        def wait_for_post(self, _identity: str) -> None:
+        def wait_for_json(self, _identity: str) -> None:
             return None
 
-        def snapshot(
-            self, _identity: str, _action: dict[str, Any] | None = None
-        ) -> dict[str, Any]:
+        def json_snapshot(self, _identity: str) -> dict[str, Any]:
             return {
-                "source_url": "https://www.reddit.com/comments/abc123/",
+                "source_url": "https://www.reddit.com/comments/abc123.json",
                 "blocked": True,
                 "gate_reason": gate_reason,
                 "error": "Gate message",
+                "payload": None,
             }
 
     output = tmp_path / f"blocked-{gate_reason}"
@@ -573,3 +796,128 @@ def test_main_ephemeral_block_reports_reason_and_conditional_hint(
     summary = json.loads(capsys.readouterr().out)
     assert summary["status"] == "blocked"
     assert summary["block_reason"] == gate_reason
+
+
+def test_main_batch_reuses_single_tab_and_continues_after_not_found(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    class BatchBrowser:
+        def __init__(self, _session: str, deadline: float) -> None:
+            self.deadline = deadline
+            self.current_url = ""
+
+        def call(self, *args: str, **_kwargs: Any) -> dict[str, Any]:
+            calls.append(args)
+            if args[:2] == ("tab", "new"):
+                return {"targetId": "tab-batch"}
+            if args and args[0] == "open":
+                self.current_url = args[1]
+            return {}
+
+        def wait_for_json(self, _identity: str) -> None:
+            return None
+
+        def json_snapshot(self, identity: str) -> dict[str, Any]:
+            if identity == "t3_miss2":
+                return {
+                    "source_url": self.current_url,
+                    "blocked": False,
+                    "unavailable": True,
+                    "gate_reason": "not_found",
+                    "error": "Not Found",
+                    "payload": None,
+                }
+            return {
+                "source_url": self.current_url,
+                "blocked": False,
+                "unavailable": False,
+                "payload": _reddit_listing(identity[3:], num_comments=1),
+            }
+
+    output = tmp_path / "batch-ok"
+    monkeypatch.setenv("REDDIT_BROWSER_SESSION", "reddit-capture")
+    monkeypatch.setattr(reader, "Browser", BatchBrowser)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reddit_thread.py",
+            "https://www.reddit.com/comments/post1/",
+            "https://www.reddit.com/comments/miss2/",
+            "https://www.reddit.com/comments/post3/",
+            "--output",
+            str(output),
+        ],
+    )
+    assert reader.main() == 2
+    assert calls.count(("tab", "new", "about:blank")) == 1
+    assert calls.count(("tab", "close", "tab-batch")) == 1
+    assert (output / "post1" / "thread.json").exists()
+    assert (output / "miss2" / "thread.json").exists()
+    assert (output / "post3" / "thread.json").exists()
+    batch = json.loads((output / "batch.json").read_text(encoding="utf-8"))
+    assert batch["stopped_early"] is False
+    assert batch["skipped"] == []
+    assert [r["status"] for r in batch["results"]] == [
+        "browser_exhausted",
+        "error",
+        "browser_exhausted",
+    ]
+    out_summary = json.loads(capsys.readouterr().out)
+    assert len(out_summary["results"]) == 3
+
+
+def test_main_batch_fails_fast_on_environment_block(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    opened: list[str] = []
+
+    class BlockedBatchBrowser:
+        def __init__(self, _session: str, deadline: float) -> None:
+            self.deadline = deadline
+
+        def call(self, *args: str, **_kwargs: Any) -> dict[str, Any]:
+            if args[:2] == ("tab", "new"):
+                return {"targetId": "tab-ff"}
+            if args and args[0] == "open":
+                opened.append(args[1])
+            return {}
+
+        def wait_for_json(self, _identity: str) -> None:
+            return None
+
+        def json_snapshot(self, _identity: str) -> dict[str, Any]:
+            return {
+                "source_url": opened[-1],
+                "blocked": True,
+                "gate_reason": "network_security",
+                "error": "Blocked by network security",
+                "payload": None,
+            }
+
+    output = tmp_path / "batch-ff"
+    monkeypatch.delenv("REDDIT_BROWSER_SESSION", raising=False)
+    monkeypatch.setattr(reader, "Browser", BlockedBatchBrowser)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reddit_thread.py",
+            "https://www.reddit.com/comments/post1/",
+            "https://www.reddit.com/comments/post2/",
+            "https://www.reddit.com/comments/post3/",
+            "--output",
+            str(output),
+        ],
+    )
+    assert reader.main() == 2
+    assert len(opened) == 1
+    batch = json.loads((output / "batch.json").read_text(encoding="utf-8"))
+    assert batch["stopped_early"] is True
+    assert batch["skipped"] == ["t3_post2", "t3_post3"]
+    assert batch["results"][0]["block_reason"] == "network_security"
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["stopped_early"] is True
+    assert summary["skipped"] == ["t3_post2", "t3_post3"]
