@@ -32,10 +32,11 @@ Use this branch for a Reddit post, its comments, nested replies, or an entire th
 **Choose the browser session upfront:** Reddit frequently serves network-security or verification gates to fresh, unauthenticated headless Chrome sessions. Before the first capture, check whether `REDDIT_BROWSER_SESSION` is set or the user has named a dedicated `agent-browser` session. If neither is configured, warn the user that standalone headless Chrome is commonly blocked by Reddit and ask upfront whether to configure a dedicated user-authorized session (`--session` or `REDDIT_BROWSER_SESSION`, see [references/reddit.md](references/reddit.md)) or attempt standalone headless Chrome. Never switch profiles, proxies, or engines after hitting a block.
 
 ```bash
-# Preferred: dedicated user-authorized agent-browser session (or export REDDIT_BROWSER_SESSION)
+# Preferred: dedicated user-authorized agent-browser session
+# (omit --session when REDDIT_BROWSER_SESSION is already exported)
 python3 "$SKILL_ROOT/scripts/reddit_thread.py" \
   "https://www.reddit.com/r/AI_Agents/comments/1xwxphk/my_agents_output_tests_stayed_green_while_it/" \
-  --session "$REDDIT_BROWSER_SESSION" \
+  --session "reddit-capture" \
   --output "/tmp/reddit-thread-$(date +%s)-$$"
 
 # Standalone ephemeral headless browser (only when the user chooses to try it upfront)

@@ -20,7 +20,8 @@ Reddit frequently serves network-security or human-verification gates to fresh, 
 export REDDIT_BROWSER_SESSION="reddit-capture"
 
 # Option A: attach to a running Chrome with remote debugging enabled
-# (e.g. chrome://inspect/#remote-debugging, or Chrome started with --remote-debugging-port=9222)
+# (enable chrome://inspect/#remote-debugging, or launch Chrome with
+# --remote-debugging-port=9222 and a dedicated --user-data-dir=/tmp/chrome-reddit-debug)
 agent-browser --session "$REDDIT_BROWSER_SESSION" --auto-connect --pin-tab tab new about:blank
 # Or target an explicit local CDP port/URL:
 agent-browser --session "$REDDIT_BROWSER_SESSION" --cdp 9222 --pin-tab tab new about:blank
@@ -29,11 +30,10 @@ agent-browser --session "$REDDIT_BROWSER_SESSION" --cdp 9222 --pin-tab tab new a
 agent-browser --session "$REDDIT_BROWSER_SESSION" --headed open about:blank
 ```
 
-Then run the helper (it automatically picks up `REDDIT_BROWSER_SESSION`, or pass `--session` explicitly):
+Then run the helper (with `REDDIT_BROWSER_SESSION` exported, `--session` can be omitted; or pass `--session "reddit-capture"` explicitly):
 
 ```bash
 python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$REDDIT_POST_URL" \
-  --session "$REDDIT_BROWSER_SESSION" \
   --output "/tmp/reddit-thread-$(date +%s)-$$"
 ```
 
