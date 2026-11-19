@@ -92,8 +92,15 @@ def _extract_links(text: str | None) -> list[str]:
     if not text:
         return []
     found: list[str] = []
-    for match in re.finditer(r"https?://[^\s<>\"'\)\]]+", text):
-        url = match.group(0).rstrip(".,;:!?")
+    for match in re.finditer(r"https?://[^\s<>\"'\]]+", text):
+        url = match.group(0)
+        while url:
+            trimmed = url.rstrip(".,;:!?")
+            if trimmed.endswith(")") and trimmed.count(")") > trimmed.count("("):
+                trimmed = trimmed[:-1]
+            if trimmed == url:
+                break
+            url = trimmed
         if url and url not in found:
             found.append(url)
     return found

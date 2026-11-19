@@ -46,7 +46,7 @@ python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$URL_1" "$URL_2" "$URL_3" \
   --output "/tmp/reddit-batch-$(date +%s)-$$"
 ```
 
-Never discover or extract a user's browser tokens, cookies, or profile files. In a borrowed session (`--session` or `REDDIT_BROWSER_SESSION`), the helper creates one fresh tab for its own work (reused across all URLs in that invocation) and closes only that tab by target ID; it never closes the borrowed browser, and when the session is pinned with `--pin-tab` (or isolated via `--profile`), pre-existing user tabs are never navigated. The caller owns the setup tab and session lifecycle (`agent-browser --session "$REDDIT_BROWSER_SESSION" close` when done).
+Never discover or extract a user's browser tokens, cookies, or profile files. In a borrowed session (`--session` or `REDDIT_BROWSER_SESSION`), the helper creates one fresh tab for its own work (reused across all URLs in that invocation) and closes only that tab by target ID; it never closes the borrowed browser, and when the session is pinned with `--pin-tab` (or isolated via `--profile`), pre-existing user tabs are never navigated. Do not run concurrent `reddit_thread.py` invocations against the same session—serialize calls or pass multiple URLs in one batch invocation instead, because session pinning does not isolate concurrent commands sharing one session. The caller owns the setup tab and session lifecycle (`agent-browser --session "$REDDIT_BROWSER_SESSION" close` when done).
 
 **Standalone headless default:** If neither `--session` nor `REDDIT_BROWSER_SESSION` is set, the helper starts a uniquely named ephemeral headless session, creates a tab, and closes that owned browser afterward:
 
@@ -60,7 +60,7 @@ Permalinks on `reddit.com`, `www`, `old`, `new`, `np`, and `m` subdomains, plus 
 
 ## Outputs and completeness
 
-For a single URL, `thread.json` is the machine-readable source and `thread.md` is a readable view. For multiple URLs in one invocation, each post is written to `<output>/<post_id>/thread.json` and `thread.md`, alongside `<output>/batch.json`. New output directories are private (`0700`), with files `0600`. Read JSON through `jq` when selecting metadata; do not paste entire threads into context unless needed.
+For a single post, `thread.json` is the machine-readable source and `thread.md` is a readable view at the output root. Batch output (`<output>/<post_id>/thread.json` and `thread.md`, alongside `<output>/batch.json`) is produced only when multiple **distinct** post IDs are supplied; duplicate URLs resolving to the same post are deduplicated and use single-post mode at the output root without `batch.json`. New output directories are private (`0700`), with files `0600`. Read JSON through `jq` when selecting metadata; do not paste entire threads into context unless needed.
 
 JSON contains `backend` (`browser-json` or `dom`), the post's title, author, text, links, timestamp and displayed score/count, and one flat comment record per stable Reddit fullname. Each comment carries `parent_id`, text, author, timestamp, score, permalink, and links; parent IDs preserve nested replies without duplicating their bodies into ancestors, and deleted/removed parent markers (`[deleted]`, `[removed]`) are preserved so child replies stay linked. The Markdown view traverses that hierarchy and labels unresolved records separately. Media and external linked articles are not downloaded or transcribed; absent/deleted/removed bodies are not reconstructed.
 

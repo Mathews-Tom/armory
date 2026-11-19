@@ -921,3 +921,82 @@ def test_main_batch_fails_fast_on_environment_block(
     summary = json.loads(capsys.readouterr().out)
     assert summary["stopped_early"] is True
     assert summary["skipped"] == ["t3_post2", "t3_post3"]
+
+
+def test_extract_links_preserves_balanced_parentheses_in_post_and_comments() -> None:
+    wiki = "https://en.wikipedia.org/wiki/Function_(mathematics)"
+    nested = "https://example.com/a_(b_(c))"
+    payload = _reddit_listing(
+        num_comments=1,
+        comments=[
+            {
+                "kind": "t1",
+                "data": {
+                    "id": "c1",
+                    "name": "t1_c1",
+                    "parent_id": "t3_abc123",
+                    "link_id": "t3_abc123",
+                    "author": "alice",
+                    "body": (
+                        f"Markdown [Function]({wiki}), prose ({wiki}.), "
+                        f"and [nested]({nested})!"
+                    ),
+                    "score": 1,
+                    "created_utc": 1700000100,
+                    "replies": "",
+                },
+            }
+        ],
+    )
+    payload[0]["data"]["children"][0]["data"]["selftext"] = (
+        f"Bare {wiki} and markdown [docs]({wiki})."
+    )
+    snap = reader.parse_json_listing(
+        "t3_abc123", payload, "https://www.reddit.com/comments/abc123.json"
+    )
+    assert snap["post"]["links"] == [wiki]
+    assert snap["comments"][0]["links"] == [wiki, nested]
+
+
+def test_duplicate_urls_for_same_post_use_single_mode_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class SingleBrowser:
+        def __init__(self, _session: str, deadline: float) -> None:
+            self.deadline = deadline
+
+        def call(self, *args: str, **_kwargs: Any) -> dict[str, Any]:
+            if args[:2] == ("tab", "new"):
+                return {"targetId": "tab-dup"}
+            return {}
+
+        def wait_for_json(self, _identity: str) -> None:
+            return None
+
+        def json_snapshot(self, _identity: str) -> dict[str, Any]:
+            return {
+                "source_url": "https://www.reddit.com/comments/abc123.json",
+                "blocked": False,
+                "unavailable": False,
+                "payload": _reddit_listing("abc123", num_comments=1),
+            }
+
+    output = tmp_path / "dup-single"
+    monkeypatch.setenv("REDDIT_BROWSER_SESSION", "reddit-capture")
+    monkeypatch.setattr(reader, "Browser", SingleBrowser)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reddit_thread.py",
+            "https://www.reddit.com/r/test/comments/abc123/title/",
+            "https://redd.it/abc123",
+            "--output",
+            str(output),
+        ],
+    )
+    assert reader.main() == 0
+    assert (output / "thread.json").exists()
+    assert not (output / "batch.json").exists()
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["status"] == "browser_exhausted"
