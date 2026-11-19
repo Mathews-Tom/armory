@@ -2,13 +2,27 @@
 (({ postId, action = null, mode = 'snapshot' }) => {
   const post = document.querySelector(`shreddit-post[id="${postId}"]`);
   const pageText = document.body?.innerText || '';
-  const gate = /blocked by network security|prove your humanity|whoa there, pardner|verify you are human|too many requests|private community|community is private|community has been banned|page not found|content is no longer available/i;
-  const blocked = gate.test(`${document.title}\n${pageText}`) ||
-    /^\/(?:login|account\/login)\/?$/i.test(location.pathname);
-  if (mode === 'ready') return Boolean(post || blocked);
+  const sample = `${document.title}\n${pageText}`;
+  const gateChecks = [
+    ['network_security', /blocked by network security/i],
+    ['human_verification', /prove your humanity|verify you are human/i],
+    ['rate_limit', /whoa there, pardner|too many requests/i],
+    ['private_or_banned', /private community|community is private|community has been banned/i],
+  ];
+  let gateReason = /^\/(?:login|account\/login)\/?$/i.test(location.pathname) ? 'login_required' : null;
+  if (!gateReason) {
+    const matched = gateChecks.find(([, pattern]) => pattern.test(sample));
+    if (matched) gateReason = matched[0];
+  }
+  const unavailable = !gateReason && /page not found|content is no longer available/i.test(sample);
+  const blocked = Boolean(gateReason);
+  if (mode === 'ready') return Boolean(post || blocked || unavailable);
   if (!post) {
+    const snippet = (pageText || document.title || 'Reddit post not rendered')
+      .trim().replace(/\s+/g, ' ').slice(0, 240);
     return { source_url: location.href, post: null, comments: [], actions: [],
-      blocked, error: pageText.slice(0, 400) || document.title || 'Reddit post not rendered' };
+      blocked, gate_reason: gateReason || (unavailable ? 'not_found' : null),
+      unavailable, page_title: document.title || null, error: snippet };
   }
   const roots = [document];
   for (let i = 0; i < roots.length; i++) {
@@ -93,7 +107,7 @@
         permalink: `https://www.reddit.com/comments/${postId.slice(3)}/comment/${id?.slice(3)}/` };
     });
   const count = post.getAttribute('comment-count');
-  return { source_url: location.href, blocked: false, error: null,
+  return { source_url: location.href, blocked: false, gate_reason: null, unavailable: false, error: null,
     post: { id: postId, title: post.getAttribute('post-title'),
       author: post.getAttribute('author'), subreddit: post.getAttribute('subreddit-prefixed-name'),
       created_at: post.getAttribute('created-timestamp'), score: post.getAttribute('score'),

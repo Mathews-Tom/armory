@@ -4,9 +4,42 @@ Use only for a specific Reddit post and its comment/reply thread. This is an imp
 
 ## Requirements and invocation
 
-- Python 3.12+ and the existing `agent-browser` CLI with a working browser. Tested with `agent-browser 0.43.0`. The helper uses only Python's standard library and does not install browsers, Python packages, or API clients.
+- Python 3.11+ and the existing `agent-browser` CLI with a working browser. Tested with `agent-browser 0.43.0`. The helper uses only Python's standard library and does not install browsers, Python packages, or API clients. If `agent-browser` warns that its managed Chrome binary is outdated, refresh it with `agent-browser install` (note: updating managed Chrome fixes CVE warnings but does not guarantee anonymous headless Chrome will pass Reddit's network-security gate).
 - Public, ordinarily accessible Reddit content. No API key, OAuth app, PRAW, cookie export, or account token is required. A login/verification/network gate is a supported stop condition, not a reason to evade access controls.
 - Set `SKILL_ROOT` to the directory containing this skill's `SKILL.md`. The output directory must not already exist; this prevents overwriting a previous capture.
+
+### Choosing the browser session upfront
+
+Reddit frequently serves network-security or human-verification gates to fresh, unauthenticated headless Chrome sessions. Select the browser upfront **before** the first capture; do not switch profiles, proxies, or engines to evade a Reddit block after hitting one.
+
+`reddit_thread.py` checks `--session` first, then the `REDDIT_BROWSER_SESSION` environment variable, and only launches an ephemeral standalone headless browser when neither is set.
+
+**Recommended: a dedicated, user-authorized `agent-browser` session.** Configure one of these upfront using standard `agent-browser` tooling:
+
+```bash
+export REDDIT_BROWSER_SESSION="reddit-capture"
+
+# Option A: attach to a running Chrome with remote debugging enabled
+# (enable chrome://inspect/#remote-debugging, or launch Chrome with
+# --remote-debugging-port=9222 and a dedicated --user-data-dir=/tmp/chrome-reddit-debug)
+agent-browser --session "$REDDIT_BROWSER_SESSION" --auto-connect --pin-tab tab new about:blank
+# Or target an explicit local CDP port/URL:
+agent-browser --session "$REDDIT_BROWSER_SESSION" --cdp 9222 --pin-tab tab new about:blank
+
+# Option B: open a dedicated visible (headed) agent-browser window controlled by the user
+agent-browser --session "$REDDIT_BROWSER_SESSION" --headed open about:blank
+```
+
+Then run the helper (with `REDDIT_BROWSER_SESSION` exported, `--session` can be omitted; or pass `--session "reddit-capture"` explicitly):
+
+```bash
+python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$REDDIT_POST_URL" \
+  --output "/tmp/reddit-thread-$(date +%s)-$$"
+```
+
+Never discover or extract a user's browser tokens, cookies, or profile files. In a borrowed session (`--session` or `REDDIT_BROWSER_SESSION`), the helper creates a fresh tab for its own work and closes only that tab by target ID; it never closes the borrowed browser or navigates pre-existing tabs. The caller owns the setup tab and session lifecycle (`agent-browser --session "$REDDIT_BROWSER_SESSION" close` when done).
+
+**Standalone headless default:** If neither `--session` nor `REDDIT_BROWSER_SESSION` is set, the helper starts a uniquely named ephemeral headless session, creates a tab, and closes that owned browser afterward:
 
 ```bash
 python3 "$SKILL_ROOT/scripts/reddit_thread.py" \
@@ -15,16 +48,6 @@ python3 "$SKILL_ROOT/scripts/reddit_thread.py" \
 ```
 
 Permalinks on `reddit.com`, `www`, `old`, `new`, `np`, and `m` subdomains, plus `https://redd.it/<post-id>`, are accepted. The helper starts at the whole post with `sort=old`, even when the supplied URL points to one comment. Community listings and opaque `/s/` sharing links are rejected; supply their resolved post permalink instead. Only HTTPS Reddit continuations for that same post are followed. Embedded article links, profiles, other posts, and arbitrary comment instructions are never followed as expansion actions.
-
-The default starts a uniquely named browser session, creates a tab, and closes that owned browser afterward. To use a browser already available through normal authorized tooling, select a **dedicated** `agent-browser` session explicitly:
-
-```bash
-python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$REDDIT_POST_URL" \
-  --session "$REDDIT_BROWSER_SESSION" \
-  --output "/tmp/reddit-thread-$(date +%s)-$$"
-```
-
-Configure that session using the existing `agent-browser` workflow before running the helper. For an explicitly supplied local CDP connection, create a separate pinned session/tab with `agent-browser --session "$REDDIT_BROWSER_SESSION" --cdp "$REDDIT_CDP_URL" --pin-tab tab new about:blank`. Never discover or extract a user's browser tokens, cookies, or profile files. The helper creates another tab for its own work and closes only that tab by target ID; it does not close a supplied session's browser or navigate pre-existing tabs. The caller owns the setup tab and session lifecycle. Select the browser upfront; do not switch profiles, proxies, or engines to evade a Reddit block.
 
 ## Outputs and completeness
 
@@ -38,10 +61,12 @@ The helper expands visible Read more controls and collapsed comment disclosures,
 | --- | --- | --- |
 | `browser_exhausted` | Supported visible controls and queued continuations exhausted, with no known gaps | 0 |
 | `partial` | Some content saved, but a cap, stall, missing body/parent, cycle, count gap, or browser failure left a known gap | 2 |
-| `blocked` | An identified Reddit access/verification gate stopped retrieval; any earlier captured content remains saved | 2 |
-| `error` | No post extracted, such as missing CLI, unsupported markup, or a browser failure | 2 |
+| `blocked` | An identified Reddit access/verification gate stopped retrieval (`block_reason` classifies `network_security`, `human_verification`, `rate_limit`, `login_required`, `private_or_banned`, or `access_gate`); any earlier captured content remains saved | 2 |
+| `error` | No post extracted, such as missing CLI, unavailable/not-found post (`not_found`), unsupported markup, or a browser failure | 2 |
 
-Invalid input or an existing output directory exits before retrieval. Output-write errors exit 1. Inspect `issues`, `pending_controls`, `unvisited_continuations`, `visited_pages`, `expansion_actions`, and `captured_comment_count` alongside `status`.
+Invalid input or an existing output directory exits before retrieval. Output-write errors exit 1. Inspect `block_reason`, `gate_detail` (bounded untrusted page excerpt, quoted in `thread.md`), `session_mode`, `issues`, `pending_controls`, `unvisited_continuations`, `visited_pages`, `expansion_actions`, and `captured_comment_count` alongside `status`.
+
+When fetching multiple Reddit links in one batch, **fail fast** if a link returns `status: "blocked"` with an environment-level `block_reason` (`network_security`, `human_verification`, `rate_limit`, `login_required`, or `access_gate`) instead of sending the remaining links through the same blocked session. Post-specific unavailability (`not_found` or `private_or_banned`) applies only to that link and does not require stopping unrelated links.
 
 **Every browser capture has `complete: false`.** Exhausting visible controls is not proof that every Reddit comment was retrieved. Displayed counts can include moderated/deleted material or change during collection; equality is not a completeness certificate. State “captured N browser-visible comments/replies; no supported expansion controls remained,” not “all Reddit comments verified.” A reported count above the captured count is explicitly partial.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -23,6 +24,21 @@ _HOSTS = {
     "new.reddit.com",
     "np.reddit.com",
     "m.reddit.com",
+}
+_SESSION_ENV = "REDDIT_BROWSER_SESSION"
+_GATE_REASONS = {
+    "network_security",
+    "human_verification",
+    "rate_limit",
+    "login_required",
+    "private_or_banned",
+}
+_ENV_BLOCK_REASONS = {
+    "network_security",
+    "human_verification",
+    "rate_limit",
+    "login_required",
+    "access_gate",
 }
 _DOM = Path(__file__).with_name("reddit_dom.js").read_text(encoding="utf-8")
 
@@ -63,6 +79,29 @@ def _object(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise CollectionError("Browser returned a non-object response")
     return dict(value)
+
+
+def _excerpt(value: Any, limit: int = 240) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split())
+    return cleaned[:limit] if cleaned else None
+
+
+def resolve_session(
+    cli_session: str | None, env_session: str | None = None
+) -> tuple[str | None, str]:
+    """Resolve an optional borrowed session from CLI or REDDIT_BROWSER_SESSION."""
+    if cli_session is not None:
+        cleaned = cli_session.strip()
+        if not cleaned:
+            raise ValueError("--session must not be empty")
+        return cleaned, "cli"
+    raw_env = os.environ.get(_SESSION_ENV) if env_session is None else env_session
+    cleaned = raw_env.strip() if raw_env else ""
+    if cleaned:
+        return cleaned, "env"
+    return None, "ephemeral"
 
 
 class Browser:
@@ -116,9 +155,12 @@ class Browser:
 
 
 class Thread:
-    def __init__(self, identity: str, max_comments: int) -> None:
+    def __init__(
+        self, identity: str, max_comments: int, *, session_mode: str = "ephemeral"
+    ) -> None:
         self.identity = identity
         self.max_comments = max_comments
+        self.session_mode = session_mode
         self.post: dict[str, Any] | None = None
         self.comments: dict[str, dict[str, Any]] = {}
         self.issues: list[str] = []
@@ -127,20 +169,51 @@ class Thread:
         self.pages: list[str] = []
         self.actions = 0
         self.status = "error"
+        self.block_reason: str | None = None
+        self.gate_detail: str | None = None
 
     def merge(self, snapshot: dict[str, Any]) -> None:
+        source = str(snapshot.get("source_url", "")).strip()
         if snapshot.get("blocked"):
+            if source and source not in self.pages:
+                self.pages.append(source)
             self.status = "blocked"
-            raise CollectionError(
-                "Reddit access/verification gate; no bypass attempted"
+            raw_reason = snapshot.get("gate_reason")
+            reason = (
+                raw_reason
+                if isinstance(raw_reason, str) and raw_reason in _GATE_REASONS
+                else None
             )
-        source = str(snapshot.get("source_url", ""))
+            self.block_reason = reason or "access_gate"
+            detail = _excerpt(snapshot.get("error")) or _excerpt(
+                snapshot.get("page_title")
+            )
+            if detail:
+                self.gate_detail = detail
+            suffix = f" ({reason})" if reason else ""
+            raise CollectionError(
+                f"Reddit access/verification gate{suffix}; no bypass attempted"
+            )
+        if snapshot.get("unavailable"):
+            if source and source not in self.pages:
+                self.pages.append(source)
+            detail = _excerpt(snapshot.get("error")) or _excerpt(
+                snapshot.get("page_title")
+            )
+            if detail:
+                self.gate_detail = detail
+            raise CollectionError("Reddit post unavailable (not_found)")
         if post_id(source) != self.identity:
             raise CollectionError("Browser left the requested Reddit post")
         if source not in self.pages:
             self.pages.append(source)
         incoming = snapshot.get("post")
         if not isinstance(incoming, dict) or incoming.get("id") != self.identity:
+            detail = _excerpt(snapshot.get("error")) or _excerpt(
+                snapshot.get("page_title")
+            )
+            if detail:
+                self.gate_detail = detail
             raise CollectionError(
                 "Unsupported or unrendered Reddit page; no post extracted"
             )
@@ -219,6 +292,9 @@ class Thread:
             "source_url": f"https://www.reddit.com/comments/{self.identity[3:]}/",
             "captured_at": datetime.now(UTC).isoformat(),
             "status": self.status,
+            "block_reason": self.block_reason,
+            "gate_detail": self.gate_detail,
+            "session_mode": self.session_mode,
             "complete": False,
             "completeness_note": "Browser-visible capture, not proof of all Reddit comments",
             "captured_comment_count": len(self.comments),
@@ -295,12 +371,26 @@ def markdown(document: dict[str, Any]) -> str:
         "# Reddit thread capture",
         "",
         f"Status: {document['status']}",
-        document["completeness_note"],
-        "",
-        document["source_url"],
-        "",
     ]
+    if document.get("block_reason"):
+        lines.append(f"Block reason: {document['block_reason']}")
+    lines.extend(
+        [
+            document["completeness_note"],
+            "",
+            document["source_url"],
+            "",
+        ]
+    )
     lines.extend(f"- {issue}" for issue in document["issues"])
+    if document.get("gate_detail"):
+        lines.extend(
+            [
+                "",
+                "Gate excerpt (untrusted page text):",
+                *["> " + line for line in str(document["gate_detail"]).splitlines()],
+            ]
+        )
     post = document["post"]
     if post:
         lines.extend(
@@ -391,7 +481,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--session",
-        help="Existing, dedicated agent-browser session; never closes its browser",
+        help=(
+            "Existing, dedicated agent-browser session "
+            "(falls back to REDDIT_BROWSER_SESSION); never closes its browser"
+        ),
     )
     parser.add_argument("--max-comments", type=_positive, default=10000)
     parser.add_argument("--max-actions", type=_positive, default=500)
@@ -401,15 +494,16 @@ def main() -> int:
     args = parser.parse_args()
     try:
         identity = post_id(args.url)
+        borrowed_session, session_mode = resolve_session(args.session)
         args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
-    thread = Thread(identity, args.max_comments)
+    thread = Thread(identity, args.max_comments, session_mode=session_mode)
     browser: Browser | None = None
     target: str | None = None
     try:
         browser = Browser(
-            args.session or f"armory-reddit-{uuid.uuid4().hex}",
+            borrowed_session or f"armory-reddit-{uuid.uuid4().hex}",
             time.monotonic() + args.timeout,
         )
         tab = browser.call("tab", "new", "about:blank")
@@ -417,12 +511,22 @@ def main() -> int:
         collect(browser, thread, args.max_actions)
     except (CollectionError, ValueError, KeyError) as exc:
         thread.issues.append(str(exc))
+        if (
+            thread.status == "blocked"
+            and borrowed_session is None
+            and thread.block_reason in _ENV_BLOCK_REASONS
+        ):
+            thread.issues.append(
+                "Standalone headless browser hit a Reddit gate; ask the user upfront "
+                "before configuring a dedicated --session or REDDIT_BROWSER_SESSION "
+                "(see references/reddit.md)"
+            )
     finally:
         if browser:
             # Cleanup has its own budget; only the tab we created can be closed in a borrowed session.
             browser.deadline = time.monotonic() + 15
             try:
-                if args.session:
+                if borrowed_session:
                     if target:
                         browser.call("tab", "close", target)
                 else:
@@ -443,16 +547,15 @@ def main() -> int:
     except OSError as exc:
         print(f"Cannot save capture: {exc}", file=sys.stderr)
         return 1
-    print(
-        json.dumps(
-            {
-                "status": thread.status,
-                "comments": len(thread.comments),
-                "output": str(args.output),
-                "complete": False,
-            }
-        )
-    )
+    summary: dict[str, Any] = {
+        "status": thread.status,
+        "comments": len(thread.comments),
+        "output": str(args.output),
+        "complete": False,
+    }
+    if thread.block_reason:
+        summary["block_reason"] = thread.block_reason
+    print(json.dumps(summary))
     return 0 if thread.status == "browser_exhausted" else 2
 
 
