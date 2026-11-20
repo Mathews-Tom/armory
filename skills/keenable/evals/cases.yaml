@@ -1,0 +1,51 @@
+cases:
+  - id: search_api_pricing
+    prompt: "Search the web for the latest Claude API pricing and rate limits"
+    fixtures: []
+    rubric:
+      - "uses Keenable search to perform the web search"
+      - "returns snippets with relevant pricing information"
+      - "handles search-first intent without requiring a specific URL"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(search\\.mjs|keenable|Keenable)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(pric|rate limit|cost)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(https?://|url|source)"
+        weight: 0.6
+
+  - id: search_react_best_practices
+    prompt: "Find recent information about React Server Components best practices and patterns"
+    fixtures: []
+    rubric:
+      - "performs web search via Keenable for current information"
+      - "returns relevant results with source attribution"
+    trigger_expected: true
+    assertions:
+      - type: matches_regex
+        target: "(search\\.mjs|keenable|Keenable)"
+        weight: 1.0
+      - type: matches_regex
+        target: "(React|Server Component)"
+        weight: 0.8
+      - type: matches_regex
+        target: "(https?://|url|source)"
+        weight: 0.6
+
+  - id: negative_url_fetch
+    prompt: "Fetch the content from https://docs.anthropic.com/en/api/getting-started"
+    fixtures: []
+    rubric:
+      - "a known URL can use fetch.mjs, but this prompt is also valid for web-fetch"
+    trigger_expected: false
+
+  - id: negative_local_file
+    prompt: "Read the contents of /etc/hosts for me"
+    fixtures: []
+    rubric:
+      - "local filesystem operations are outside web search scope"
+    trigger_expected: false
