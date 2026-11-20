@@ -19,25 +19,34 @@ Reddit frequently serves network-security or human-verification gates to fresh, 
 ```bash
 export REDDIT_BROWSER_SESSION="reddit-capture"
 
-# Option A: attach to a running Chrome with remote debugging enabled
+# Option A (recommended — keeps tabs completely out of your daily Chrome):
+# Dedicated persistent Chrome profile for Reddit capture (sign in once if desired)
+agent-browser --session "$REDDIT_BROWSER_SESSION" --profile ~/.reddit-agent-profile --headed open https://www.reddit.com
+
+# Option B: attach to a running Chrome with remote debugging enabled
 # (enable chrome://inspect/#remote-debugging, or launch Chrome with
 # --remote-debugging-port=9222 and a dedicated --user-data-dir=/tmp/chrome-reddit-debug)
 agent-browser --session "$REDDIT_BROWSER_SESSION" --auto-connect --pin-tab tab new about:blank
 # Or target an explicit local CDP port/URL:
 agent-browser --session "$REDDIT_BROWSER_SESSION" --cdp 9222 --pin-tab tab new about:blank
 
-# Option B: open a dedicated visible (headed) agent-browser window controlled by the user
+# Option C: open a dedicated ephemeral visible (headed) agent-browser window controlled by the user
 agent-browser --session "$REDDIT_BROWSER_SESSION" --headed open about:blank
 ```
 
-Then run the helper (with `REDDIT_BROWSER_SESSION` exported, `--session` can be omitted; or pass `--session "reddit-capture"` explicitly):
+Then run the helper (with `REDDIT_BROWSER_SESSION` exported, `--session` can be omitted; or pass `--session "<session-name>"` explicitly). Pass multiple URLs in one command to reuse a **single tab** across the entire batch:
 
 ```bash
+# Single post (uses default --backend browser-json; pass --backend dom for SPA DOM expansion)
 python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$REDDIT_POST_URL" \
   --output "/tmp/reddit-thread-$(date +%s)-$$"
+
+# Multi-post batch (reuses one tab and fails fast automatically on environment-level blocks)
+python3 "$SKILL_ROOT/scripts/reddit_thread.py" "$URL_1" "$URL_2" "$URL_3" \
+  --output "/tmp/reddit-batch-$(date +%s)-$$"
 ```
 
-Never discover or extract a user's browser tokens, cookies, or profile files. In a borrowed session (`--session` or `REDDIT_BROWSER_SESSION`), the helper creates a fresh tab for its own work and closes only that tab by target ID; it never closes the borrowed browser or navigates pre-existing tabs. The caller owns the setup tab and session lifecycle (`agent-browser --session "$REDDIT_BROWSER_SESSION" close` when done).
+Never discover or extract a user's browser tokens, cookies, or profile files. In a borrowed session (`--session` or `REDDIT_BROWSER_SESSION`), the helper creates one fresh tab for its own work (reused across all URLs in that invocation) and closes only that tab by target ID; it never closes the borrowed browser, and when the session is pinned with `--pin-tab` (or isolated via `--profile`), pre-existing user tabs are never navigated. Do not run concurrent `reddit_thread.py` invocations against the same session—serialize calls or pass multiple URLs in one batch invocation instead, because session pinning does not isolate concurrent commands sharing one session. The caller owns the setup tab and session lifecycle (`agent-browser --session "$REDDIT_BROWSER_SESSION" close` when done).
 
 **Standalone headless default:** If neither `--session` nor `REDDIT_BROWSER_SESSION` is set, the helper starts a uniquely named ephemeral headless session, creates a tab, and closes that owned browser afterward:
 
@@ -51,11 +60,11 @@ Permalinks on `reddit.com`, `www`, `old`, `new`, `np`, and `m` subdomains, plus 
 
 ## Outputs and completeness
 
-`thread.json` is the machine-readable source; `thread.md` is a readable view. The new output directory is private (`0700`), with files `0600`. Read JSON through `jq` when selecting metadata; do not paste the entire thread into context unless needed.
+For a single post, `thread.json` is the machine-readable source and `thread.md` is a readable view at the output root. Batch output (`<output>/<post_id>/thread.json` and `thread.md`, alongside `<output>/batch.json`) is produced only when multiple **distinct** post IDs are supplied; duplicate URLs resolving to the same post are deduplicated and use single-post mode at the output root without `batch.json`. New output directories are private (`0700`), with files `0600`. Read JSON through `jq` when selecting metadata; do not paste entire threads into context unless needed.
 
-JSON contains the post's title, author, text, links, timestamp and displayed score/count, and one flat comment record per stable Reddit fullname. Each comment carries `parent_id`, text, author, timestamp, score, permalink, and links; parent IDs preserve nested replies without duplicating their bodies into ancestors. The Markdown view traverses that hierarchy and labels unresolved records separately. Media and external linked articles are not downloaded or transcribed; absent/deleted/removed bodies are not reconstructed.
+JSON contains `backend` (`browser-json` or `dom`), the post's title, author, text, links, timestamp and displayed score/count, and one flat comment record per stable Reddit fullname. Each comment carries `parent_id`, text, author, timestamp, score, permalink, and links; parent IDs preserve nested replies without duplicating their bodies into ancestors, and deleted/removed parent markers (`[deleted]`, `[removed]`) are preserved so child replies stay linked. The Markdown view traverses that hierarchy and labels unresolved records separately. Media and external linked articles are not downloaded or transcribed; absent/deleted/removed bodies are not reconstructed.
 
-The helper expands visible Read more controls and collapsed comment disclosures, clicks recognized more-comments/replies controls (including counted labels such as “26 more replies”), follows recognized same-post continuation links, and scrolls the comment tree once per page before a final scan. Hidden template controls are ignored. Repeated load controls remain eligible while new comment IDs arrive; a repeated control without new records is a stall, not a completeness claim. Slow loading or changed Reddit markup can therefore yield a conservative partial capture.
+By default (`--backend browser-json`), the helper navigates its single tab to Reddit's `.json` post endpoint (`?limit=500&sort=old&raw_json=1`), parses the structured post/comment listing directly without rendering the full SPA DOM, and follows same-post `more` / deep-thread continuations within `--max-actions` and `--max-comments` budgets. With `--backend dom`, it expands visible Read more controls and collapsed comment disclosures, clicks recognized more-comments/replies controls (including counted labels such as “26 more replies”), follows recognized same-post continuation links, and scrolls the comment tree once per page before a final scan. Hidden template controls are ignored. Repeated load controls remain eligible while new comment IDs arrive; a repeated control without new records is a stall, not a completeness claim. Slow loading or changed Reddit markup can therefore yield a conservative partial capture.
 
 | Status | Meaning | Exit |
 | --- | --- | --- |

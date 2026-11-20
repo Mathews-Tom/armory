@@ -62,7 +62,7 @@ def post_id(url: str) -> str:
         match = re.fullmatch(r"/([a-z0-9]+)/?", parsed.path, re.IGNORECASE)
     elif parsed.hostname in _HOSTS:
         match = re.match(
-            r"^/(?:r/[A-Za-z0-9_]+/)?comments/([a-z0-9]+)(?:/|$)",
+            r"^/(?:r/[A-Za-z0-9_]+/)?comments/([a-z0-9]+)(?:/|\.json$|$)",
             parsed.path,
             re.IGNORECASE,
         )
@@ -86,6 +86,181 @@ def _excerpt(value: Any, limit: int = 240) -> str | None:
         return None
     cleaned = " ".join(value.split())
     return cleaned[:limit] if cleaned else None
+
+
+def _extract_links(text: str | None) -> list[str]:
+    if not text:
+        return []
+    found: list[str] = []
+    for match in re.finditer(r"https?://[^\s<>\"'\]]+", text):
+        url = match.group(0)
+        while url:
+            trimmed = url.rstrip(".,;:!?")
+            if trimmed.endswith(")") and trimmed.count(")") > trimmed.count("("):
+                trimmed = trimmed[:-1]
+            if trimmed == url:
+                break
+            url = trimmed
+        if url and url not in found:
+            found.append(url)
+    return found
+
+
+def _iso_utc(value: Any) -> str | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return datetime.fromtimestamp(float(value), UTC).isoformat()
+    return None
+
+
+def parse_json_listing(identity: str, payload: Any, source_url: str) -> dict[str, Any]:
+    """Convert a Reddit post/comment Listing JSON array into a Thread.merge snapshot."""
+    if not isinstance(payload, list) or len(payload) < 2:
+        raise CollectionError(
+            "Unsupported or unrendered Reddit JSON; expected [post, comments] listing"
+        )
+    post_listing = _object(payload[0])
+    post_children = _object(post_listing.get("data")).get("children")
+    if not isinstance(post_children, list) or not post_children:
+        raise CollectionError("Reddit JSON listing contains no post record")
+    post_node = _object(post_children[0])
+    post_data = _object(post_node.get("data"))
+    raw_post_id = post_data.get("name")
+    if not isinstance(raw_post_id, str) and isinstance(post_data.get("id"), str):
+        raw_post_id = f"t3_{post_data['id'].lower()}"
+    if not isinstance(raw_post_id, str) or raw_post_id.lower() != identity:
+        raise CollectionError("Reddit JSON post ID does not match requested post")
+    raw_body = post_data.get("selftext")
+    body_text = raw_body.strip() if isinstance(raw_body, str) else ""
+    num_comments = post_data.get("num_comments")
+    reported_count = (
+        num_comments
+        if isinstance(num_comments, int) and not isinstance(num_comments, bool)
+        else None
+    )
+    score = post_data.get("score")
+    post = {
+        "id": identity,
+        "title": post_data.get("title"),
+        "author": post_data.get("author"),
+        "subreddit": post_data.get("subreddit_name_prefixed"),
+        "created_at": _iso_utc(post_data.get("created_utc")),
+        "score": str(score) if score is not None else None,
+        "body_text": body_text or None,
+        "links": _extract_links(body_text or None),
+        "content_url": post_data.get("url"),
+        "body_expanded": True,
+        "reported_comment_count": reported_count,
+    }
+    comment_listing = _object(payload[1])
+    root_children = _object(comment_listing.get("data")).get("children")
+    if not isinstance(root_children, list):
+        raise CollectionError("Reddit JSON listing contains invalid comments")
+    comments: list[dict[str, Any]] = []
+    actions: list[dict[str, Any]] = []
+    seen_action_keys: set[str] = set()
+    post_short = identity[3:]
+    stack: list[Any] = list(reversed(root_children))
+    while stack:
+        item = stack.pop()
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("kind")
+        data = item.get("data")
+        if not isinstance(data, dict):
+            continue
+        if kind == "t1":
+            raw_cid = data.get("name")
+            if not isinstance(raw_cid, str) and isinstance(data.get("id"), str):
+                raw_cid = f"t1_{data['id']}"
+            if not isinstance(raw_cid, str):
+                raise CollectionError("Reddit comment is missing its stable fullname")
+            cid = raw_cid.lower()
+            if not re.fullmatch(r"t1_[a-z0-9]+", cid):
+                raise CollectionError("Reddit comment is missing its stable fullname")
+            link_id = data.get("link_id")
+            if isinstance(link_id, str) and link_id.lower() != identity:
+                continue
+            raw_parent = data.get("parent_id")
+            parent_id = raw_parent.lower() if isinstance(raw_parent, str) else None
+            c_body = data.get("body")
+            c_text = c_body.strip() if isinstance(c_body, str) else ""
+            c_score = data.get("score")
+            comments.append(
+                {
+                    "id": cid,
+                    "parent_id": parent_id,
+                    "author": data.get("author"),
+                    "created_at": _iso_utc(data.get("created_utc")),
+                    "score": str(c_score) if c_score is not None else None,
+                    "body_text": c_text or None,
+                    "links": _extract_links(c_text or None),
+                    "permalink": (
+                        f"https://www.reddit.com/comments/{post_short}"
+                        f"/comment/{cid[3:]}/"
+                    ),
+                }
+            )
+            replies = data.get("replies")
+            if isinstance(replies, dict):
+                reply_data = replies.get("data")
+                if isinstance(reply_data, dict):
+                    reply_children = reply_data.get("children")
+                    if isinstance(reply_children, list):
+                        stack.extend(reversed(reply_children))
+        elif kind == "more":
+            more_children = data.get("children")
+            if isinstance(more_children, list) and more_children:
+                for child_id in more_children:
+                    if not isinstance(child_id, str):
+                        continue
+                    short = child_id.lower()
+                    if not re.fullmatch(r"[a-z0-9]+", short):
+                        continue
+                    key = f"more:{short}"
+                    if key in seen_action_keys:
+                        continue
+                    seen_action_keys.add(key)
+                    actions.append(
+                        {
+                            "kind": "navigate",
+                            "key": key,
+                            "comment_id": f"t1_{short}",
+                            "href": (
+                                f"https://www.reddit.com/comments/{post_short}"
+                                f"/_/{short}.json?limit=500&sort=old&raw_json=1"
+                            ),
+                        }
+                    )
+            else:
+                raw_parent = data.get("parent_id")
+                if isinstance(raw_parent, str) and re.fullmatch(
+                    r"t1_[a-z0-9]+", raw_parent, re.IGNORECASE
+                ):
+                    parent_short = raw_parent[3:].lower()
+                    key = f"continue:{parent_short}"
+                    if key not in seen_action_keys:
+                        seen_action_keys.add(key)
+                        actions.append(
+                            {
+                                "kind": "navigate",
+                                "key": key,
+                                "href": (
+                                    f"https://www.reddit.com/comments/{post_short}"
+                                    f"/_/{parent_short}.json"
+                                    "?limit=500&sort=old&raw_json=1"
+                                ),
+                            }
+                        )
+    return {
+        "source_url": source_url,
+        "blocked": False,
+        "gate_reason": None,
+        "unavailable": False,
+        "error": None,
+        "post": post,
+        "comments": comments,
+        "actions": actions,
+    }
 
 
 def resolve_session(
@@ -153,14 +328,30 @@ class Browser:
         payload = json.dumps({"postId": identity, "mode": "ready"})
         self.call("wait", "--fn", f"({_DOM})({payload})")
 
+    def wait_for_json(self, identity: str) -> None:
+        payload = json.dumps({"postId": identity, "mode": "json_ready"})
+        self.call("wait", "--fn", f"({_DOM})({payload})")
+
+    def json_snapshot(self, identity: str) -> dict[str, Any]:
+        payload = json.dumps({"postId": identity, "mode": "json"})
+        return _object(
+            self.call("eval", "--stdin", script=f"({_DOM})({payload})").get("result")
+        )
+
 
 class Thread:
     def __init__(
-        self, identity: str, max_comments: int, *, session_mode: str = "ephemeral"
+        self,
+        identity: str,
+        max_comments: int,
+        *,
+        session_mode: str = "ephemeral",
+        backend: str = "dom",
     ) -> None:
         self.identity = identity
         self.max_comments = max_comments
         self.session_mode = session_mode
+        self.backend = backend
         self.post: dict[str, Any] | None = None
         self.comments: dict[str, dict[str, Any]] = {}
         self.issues: list[str] = []
@@ -288,6 +479,7 @@ class Thread:
         return {
             "schema_version": 1,
             "source": "reddit_browser",
+            "backend": self.backend,
             "post_id": self.identity,
             "source_url": f"https://www.reddit.com/comments/{self.identity[3:]}/",
             "captured_at": datetime.now(UTC).isoformat(),
@@ -306,6 +498,62 @@ class Thread:
             "unvisited_continuations": self.continuations,
             "expansion_actions": self.actions,
         }
+
+
+def collect_json(browser: Browser, thread: Thread, max_actions: int) -> None:
+    root = (
+        f"https://www.reddit.com/comments/{thread.identity[3:]}.json"
+        "?limit=500&sort=old&raw_json=1"
+    )
+    queue: list[tuple[str, str | None]] = []
+    visited = {root}
+    current = root
+    while True:
+        browser.call("open", current)
+        browser.wait_for_json(thread.identity)
+        raw = browser.json_snapshot(thread.identity)
+        if raw.get("blocked") or raw.get("unavailable"):
+            thread.merge(raw)
+        payload = raw.get("payload")
+        if payload is None:
+            detail = _excerpt(raw.get("error")) or _excerpt(raw.get("page_title"))
+            if detail:
+                thread.gate_detail = detail
+            raise CollectionError(
+                "Unsupported or unrendered Reddit JSON; no post extracted"
+            )
+        source_url = str(raw.get("source_url") or current)
+        snapshot = parse_json_listing(thread.identity, payload, source_url)
+        thread.merge(snapshot)
+        if thread.issues:
+            return
+        for action in thread.pending:
+            if action.get("kind") != "navigate":
+                continue
+            href = str(action.get("href", ""))
+            if post_id(href) != thread.identity:
+                raise CollectionError("Continuation leaves the requested post")
+            target_comment = action.get("comment_id")
+            if isinstance(target_comment, str) and target_comment in thread.comments:
+                continue
+            if href not in visited and all(existing != href for existing, _ in queue):
+                queue.append(
+                    (href, target_comment if isinstance(target_comment, str) else None)
+                )
+        while queue and queue[0][1] is not None and queue[0][1] in thread.comments:
+            queue.pop(0)
+        thread.continuations = [href for href, _ in queue]
+        if not queue:
+            thread.pending = []
+            return
+        if thread.actions >= max_actions:
+            thread.issues.append("Expansion action budget reached")
+            thread.pending = [{"kind": "navigate", "href": queue[0][0]}]
+            return
+        thread.actions += 1
+        current, _ = queue.pop(0)
+        visited.add(current)
+        thread.continuations = [href for href, _ in queue]
 
 
 def collect(browser: Browser, thread: Thread, max_actions: int) -> None:
@@ -473,42 +721,33 @@ def _positive(value: str) -> int:
     return number
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("url")
-    parser.add_argument(
-        "--output", required=True, type=Path, help="New private output directory"
-    )
-    parser.add_argument(
-        "--session",
-        help=(
-            "Existing, dedicated agent-browser session "
-            "(falls back to REDDIT_BROWSER_SESSION); never closes its browser"
-        ),
-    )
-    parser.add_argument("--max-comments", type=_positive, default=10000)
-    parser.add_argument("--max-actions", type=_positive, default=500)
-    parser.add_argument(
-        "--timeout", type=_positive, default=300, help="Collection budget in seconds"
-    )
-    args = parser.parse_args()
+def _write_thread_files(output_dir: Path, document: dict[str, Any]) -> None:
+    for name, content in (
+        ("thread.json", json.dumps(document, ensure_ascii=False, indent=2) + "\n"),
+        ("thread.md", markdown(document)),
+    ):
+        path = output_dir / name
+        with path.open("x", encoding="utf-8") as stream:
+            path.chmod(0o600)
+            stream.write(content)
+
+
+def _run_one(
+    browser: Browser,
+    identity: str,
+    *,
+    max_comments: int,
+    max_actions: int,
+    session_mode: str,
+    borrowed_session: str | None,
+    backend: str,
+) -> Thread:
+    thread = Thread(identity, max_comments, session_mode=session_mode, backend=backend)
     try:
-        identity = post_id(args.url)
-        borrowed_session, session_mode = resolve_session(args.session)
-        args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
-    except (ValueError, OSError) as exc:
-        parser.error(str(exc))
-    thread = Thread(identity, args.max_comments, session_mode=session_mode)
-    browser: Browser | None = None
-    target: str | None = None
-    try:
-        browser = Browser(
-            borrowed_session or f"armory-reddit-{uuid.uuid4().hex}",
-            time.monotonic() + args.timeout,
-        )
-        tab = browser.call("tab", "new", "about:blank")
-        target = str(tab["targetId"])
-        collect(browser, thread, args.max_actions)
+        if backend == "browser-json":
+            collect_json(browser, thread, max_actions)
+        else:
+            collect(browser, thread, max_actions)
     except (CollectionError, ValueError, KeyError) as exc:
         thread.issues.append(str(exc))
         if (
@@ -521,6 +760,94 @@ def main() -> int:
                 "before configuring a dedicated --session or REDDIT_BROWSER_SESSION "
                 "(see references/reddit.md)"
             )
+    return thread
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("urls", nargs="+", help="One or more Reddit post permalinks")
+    parser.add_argument(
+        "--output", required=True, type=Path, help="New private output directory"
+    )
+    parser.add_argument(
+        "--session",
+        help=(
+            "Existing, dedicated agent-browser session "
+            "(falls back to REDDIT_BROWSER_SESSION); never closes its browser"
+        ),
+    )
+    parser.add_argument(
+        "--backend",
+        choices=("browser-json", "dom"),
+        default="browser-json",
+        help="Capture backend: browser-json (default) or dom",
+    )
+    parser.add_argument("--max-comments", type=_positive, default=10000)
+    parser.add_argument("--max-actions", type=_positive, default=500)
+    parser.add_argument(
+        "--timeout", type=_positive, default=300, help="Collection budget in seconds"
+    )
+    args = parser.parse_args()
+    try:
+        identities: list[str] = []
+        for raw_url in args.urls:
+            identity = post_id(raw_url)
+            if identity not in identities:
+                identities.append(identity)
+        borrowed_session, session_mode = resolve_session(args.session)
+        args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+
+    single_mode = len(identities) == 1
+    browser: Browser | None = None
+    target: str | None = None
+    threads: list[Thread] = []
+    skipped: list[str] = []
+    cleanup_error: str | None = None
+    stopped_early = False
+    try:
+        browser = Browser(
+            borrowed_session or f"armory-reddit-{uuid.uuid4().hex}",
+            time.monotonic() + args.timeout,
+        )
+        tab = browser.call("tab", "new", "about:blank")
+        target = str(tab["targetId"])
+        for index, identity in enumerate(identities):
+            thread = _run_one(
+                browser,
+                identity,
+                max_comments=args.max_comments,
+                max_actions=args.max_actions,
+                session_mode=session_mode,
+                borrowed_session=borrowed_session,
+                backend=args.backend,
+            )
+            threads.append(thread)
+            if (
+                not single_mode
+                and thread.status == "blocked"
+                and thread.block_reason in _ENV_BLOCK_REASONS
+                and index + 1 < len(identities)
+            ):
+                stopped_early = True
+                skipped.extend(identities[index + 1 :])
+                break
+    except (CollectionError, ValueError, KeyError) as exc:
+        if not threads:
+            failed = Thread(
+                identities[0],
+                args.max_comments,
+                session_mode=session_mode,
+                backend=args.backend,
+            )
+            failed.issues.append(str(exc))
+            threads.append(failed)
+            if len(identities) > 1:
+                stopped_early = True
+                skipped.extend(identities[1:])
+        else:
+            threads[-1].issues.append(str(exc))
     finally:
         if browser:
             # Cleanup has its own budget; only the tab we created can be closed in a borrowed session.
@@ -532,31 +859,84 @@ def main() -> int:
                 else:
                     browser.call("close")
             except CollectionError as exc:
-                thread.issues.append(f"Browser cleanup failed: {exc}")
-    thread.finish()
-    document = thread.document()
+                cleanup_error = f"Browser cleanup failed: {exc}"
+
+    if cleanup_error and threads:
+        threads[-1].issues.append(cleanup_error)
+
+    if single_mode:
+        thread = threads[0]
+        thread.finish()
+        document = thread.document()
+        try:
+            _write_thread_files(args.output, document)
+        except OSError as exc:
+            print(f"Cannot save capture: {exc}", file=sys.stderr)
+            return 1
+        summary: dict[str, Any] = {
+            "status": thread.status,
+            "comments": len(thread.comments),
+            "output": str(args.output),
+            "backend": args.backend,
+            "complete": False,
+        }
+        if thread.block_reason:
+            summary["block_reason"] = thread.block_reason
+        print(json.dumps(summary))
+        return 0 if thread.status == "browser_exhausted" else 2
+
+    batch_results: list[dict[str, Any]] = []
     try:
-        for name, content in (
-            ("thread.json", json.dumps(document, ensure_ascii=False, indent=2) + "\n"),
-            ("thread.md", markdown(document)),
-        ):
-            path = args.output / name
-            with path.open("x", encoding="utf-8") as stream:
-                path.chmod(0o600)
-                stream.write(content)
+        for thread in threads:
+            thread.finish()
+            document = thread.document()
+            subdir = args.output / thread.identity[3:]
+            subdir.mkdir(mode=0o700, exist_ok=False)
+            _write_thread_files(subdir, document)
+            entry: dict[str, Any] = {
+                "post_id": thread.identity,
+                "status": thread.status,
+                "comments": len(thread.comments),
+                "output": str(subdir),
+                "complete": False,
+            }
+            if thread.block_reason:
+                entry["block_reason"] = thread.block_reason
+            batch_results.append(entry)
+        batch_doc = {
+            "schema_version": 1,
+            "source": "reddit_browser",
+            "backend": args.backend,
+            "session_mode": session_mode,
+            "complete": False,
+            "stopped_early": stopped_early,
+            "results": batch_results,
+            "skipped": skipped,
+        }
+        batch_path = args.output / "batch.json"
+        with batch_path.open("x", encoding="utf-8") as stream:
+            batch_path.chmod(0o600)
+            stream.write(json.dumps(batch_doc, ensure_ascii=False, indent=2) + "\n")
     except OSError as exc:
         print(f"Cannot save capture: {exc}", file=sys.stderr)
         return 1
-    summary: dict[str, Any] = {
-        "status": thread.status,
-        "comments": len(thread.comments),
-        "output": str(args.output),
-        "complete": False,
-    }
-    if thread.block_reason:
-        summary["block_reason"] = thread.block_reason
-    print(json.dumps(summary))
-    return 0 if thread.status == "browser_exhausted" else 2
+
+    print(
+        json.dumps(
+            {
+                "output": str(args.output),
+                "backend": args.backend,
+                "stopped_early": stopped_early,
+                "results": batch_results,
+                "skipped": skipped,
+                "complete": False,
+            }
+        )
+    )
+    all_exhausted = not skipped and all(
+        entry["status"] == "browser_exhausted" for entry in batch_results
+    )
+    return 0 if all_exhausted else 2
 
 
 if __name__ == "__main__":
