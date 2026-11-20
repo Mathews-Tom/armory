@@ -1,0 +1,19 @@
+cases:
+  - id: unresolved_destination
+    prompt: "Map the decisions we must settle before implementation planning starts."
+    expected: skills/decision-map
+    non_winners:
+      - skills/plan-prompts
+      - skills/task-decomposer
+  - id: approved_design_to_milestones
+    prompt: "Create a development plan and execution prompts from signed-off design documents."
+    expected: skills/plan-prompts
+    non_winners:
+      - skills/decision-map
+      - skills/task-decomposer
+  - id: known_feature_to_work_items
+    prompt: "Decompose this feature into dependency-mapped work items, edge cases, and a test matrix."
+    expected: skills/task-decomposer
+    non_winners:
+      - skills/decision-map
+      - skills/plan-prompts
