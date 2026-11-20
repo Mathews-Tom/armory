@@ -65,7 +65,7 @@ console.log("## Sources\n");
 for (const r of results) {
   const title = String(r?.title ?? "").trim();
   const pageUrl = String(r?.url ?? "").trim();
-  const content = String(r?.description ?? r?.snippet ?? "").trim();
+  const content = String(r?.snippet ?? "").trim() || String(r?.description ?? "").trim();
   if (!title || !pageUrl) continue;
   console.log(`- **${title}**`);
   console.log(`  ${pageUrl}`);
