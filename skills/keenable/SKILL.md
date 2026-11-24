@@ -53,7 +53,12 @@ Both scripts exist at `scripts/`. No key is required. `KEENABLE_API_KEY` is opti
 node {baseDir}/scripts/search.mjs "query"
 node {baseDir}/scripts/search.mjs "query" -n 10
 node {baseDir}/scripts/search.mjs "query" --days 7
+node {baseDir}/scripts/search.mjs "query" --keyless
 ```
+
+When the user explicitly asks for a keyless search (or a search without an API
+key), pass `--keyless`. It always uses the public endpoint and does not send
+`KEENABLE_API_KEY`, even if one is set. Without the flag, a configured key is used.
 
 ### Search Options
 
@@ -61,6 +66,7 @@ node {baseDir}/scripts/search.mjs "query" --days 7
 | ------------ | ------- | -------------------------------------------------------- |
 | `-n <count>` | 5       | Number of results to return (max: 50).                   |
 | `--days <n>` | —       | Limit results to pages published in the last n days.     |
+| `--keyless`  | off     | Use the public endpoint and ignore `KEENABLE_API_KEY`.   |
 
 ## Fetch Content from URL
 

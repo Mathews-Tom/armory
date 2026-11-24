@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 function usage() {
-  console.error(`Usage: search.mjs "query" [-n 5] [--days 7]`);
+  console.error(`Usage: search.mjs "query" [-n 5] [--days 7] [--keyless]`);
   process.exit(2);
 }
 
@@ -20,6 +20,7 @@ if (args.length === 0 || args[0] === "-h" || args[0] === "--help") usage();
 const query = args[0];
 let n = 5;
 let days = null;
+let keyless = false;
 
 for (let i = 1; i < args.length; i++) {
   const a = args[i];
@@ -33,11 +34,16 @@ for (let i = 1; i < args.length; i++) {
     i++;
     continue;
   }
+  if (a === "--keyless") {
+    keyless = true;
+    continue;
+  }
   console.error(`Unknown arg: ${a}`);
   usage();
 }
 
-const apiKey = (process.env.KEENABLE_API_KEY ?? "").trim();
+// --keyless always uses the public endpoint and never sends KEENABLE_API_KEY.
+const apiKey = keyless ? "" : (process.env.KEENABLE_API_KEY ?? "").trim();
 const url = apiKey
   ? "https://api.keenable.ai/v1/search"
   : "https://api.keenable.ai/v1/search/public";

@@ -23,21 +23,30 @@ if (args.length !== 1) {
 const pageUrl = args[0];
 
 const apiKey = (process.env.KEENABLE_API_KEY ?? "").trim();
-const endpoint = new URL(
-  apiKey ? "https://api.keenable.ai/v1/fetch" : "https://api.keenable.ai/v1/fetch/public",
-);
-endpoint.searchParams.set("url", pageUrl);
+const endpoint = apiKey
+  ? "https://api.keenable.ai/v1/fetch"
+  : "https://api.keenable.ai/v1/fetch/public";
 
-const headers = { Accept: "application/json", "X-Keenable-Title": "armory" };
+const headers = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+  "X-Keenable-Title": "armory",
+};
 if (apiKey) headers["X-API-Key"] = apiKey;
 
-const resp = await fetch(endpoint, { method: "GET", headers });
+// POST is the current fetch API; GET /v1/fetch is deprecated (sunset 2027-03-01).
+const resp = await fetch(endpoint, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({ urls: [pageUrl] }),
+});
 if (!resp.ok) {
   const text = await resp.text().catch(() => "");
   throw new Error(`Keenable Fetch failed (${resp.status}): ${text}`);
 }
 
-const data = await resp.json();
+const payload = await resp.json();
+const data = Array.isArray(payload?.results) ? payload.results[0] ?? {} : {};
 const content = String(data?.content ?? "").trim();
 console.log(`# ${data?.title || pageUrl}\n`);
 console.log(`Source: ${data?.url || pageUrl}\n`);

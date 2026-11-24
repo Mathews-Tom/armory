@@ -6,6 +6,7 @@ cases:
       - "uses Keenable search for keyless web search"
       - "returns snippets with relevant pricing information"
       - "does not require TAVILY_API_KEY or other vendor keys"
+      - "passes --keyless so the public endpoint is used even if KEENABLE_API_KEY is set"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -24,6 +25,7 @@ cases:
     rubric:
       - "performs keyless web search via Keenable"
       - "returns relevant results with source attribution"
+      - "passes --keyless so the public endpoint is used even if KEENABLE_API_KEY is set"
     trigger_expected: true
     assertions:
       - type: matches_regex
