@@ -1,11 +1,11 @@
 cases:
-  - id: search_api_pricing
-    prompt: "Search the web for the latest Claude API pricing and rate limits"
+  - id: keyless_search_api_pricing
+    prompt: "Search without an API key for the latest Claude API pricing and rate limits"
     fixtures: []
     rubric:
-      - "uses Keenable search to perform the web search"
+      - "uses Keenable search for keyless web search"
       - "returns snippets with relevant pricing information"
-      - "handles search-first intent without requiring a specific URL"
+      - "does not require TAVILY_API_KEY or other vendor keys"
     trigger_expected: true
     assertions:
       - type: matches_regex
@@ -18,11 +18,11 @@ cases:
         target: "(https?://|url|source)"
         weight: 0.6
 
-  - id: search_react_best_practices
-    prompt: "Find recent information about React Server Components best practices and patterns"
+  - id: keyless_search_react
+    prompt: "Run a keyless web search for React Server Components best practices and patterns"
     fixtures: []
     rubric:
-      - "performs web search via Keenable for current information"
+      - "performs keyless web search via Keenable"
       - "returns relevant results with source attribution"
     trigger_expected: true
     assertions:
@@ -36,11 +36,18 @@ cases:
         target: "(https?://|url|source)"
         weight: 0.6
 
+  - id: negative_generic_web_search
+    prompt: "Search the web for the latest Claude API pricing and rate limits"
+    fixtures: []
+    rubric:
+      - "generic search the web belongs to tavily, not keyless Keenable routing"
+    trigger_expected: false
+
   - id: negative_url_fetch
     prompt: "Fetch the content from https://docs.anthropic.com/en/api/getting-started"
     fixtures: []
     rubric:
-      - "a known URL can use fetch.mjs, but this prompt is also valid for web-fetch"
+      - "direct URL fetching is web-fetch territory when Keenable is not already active"
     trigger_expected: false
 
   - id: negative_local_file

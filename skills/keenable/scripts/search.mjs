@@ -5,6 +5,15 @@ function usage() {
   process.exit(2);
 }
 
+function positiveInt(flag, value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    console.error(`${flag} requires a positive integer, got: ${value ?? "(missing)"}`);
+    usage();
+  }
+  return parsed;
+}
+
 const args = process.argv.slice(2);
 if (args.length === 0 || args[0] === "-h" || args[0] === "--help") usage();
 
@@ -15,12 +24,12 @@ let days = null;
 for (let i = 1; i < args.length; i++) {
   const a = args[i];
   if (a === "-n") {
-    n = Number.parseInt(args[i + 1] ?? "5", 10);
+    n = positiveInt("-n", args[i + 1]);
     i++;
     continue;
   }
   if (a === "--days") {
-    days = Number.parseInt(args[i + 1] ?? "7", 10);
+    days = positiveInt("--days", args[i + 1]);
     i++;
     continue;
   }
@@ -43,7 +52,7 @@ const body = {
   query,
   max_results: Math.max(1, Math.min(n, 50)),
 };
-if (days && Number.isFinite(days) && days > 0) {
+if (days) {
   body.published_after = `${Math.trunc(days)}d`;
 }
 

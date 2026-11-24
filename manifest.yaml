@@ -695,9 +695,9 @@ packages:
     difficulty: intermediate
   - name: keenable
     version: 1.0.0
-    description: 'Keyless web search and page fetch via Keenable when no vendor key is required. Returns title, URL and snippet
-      for current information. Triggers on: "search the web", "look up online", "find recent information", "web search", "fetch
-      this page". NOT a replacement for the Tavily skill; use that when a Tavily key is already configured.'
+    description: 'Keyless web search and page fetch via Keenable when no vendor API key is available. Returns title, URL and
+      snippet for current information. Triggers on: "search without an API key", "keyless web search", "keenable". NOT for
+      generic "search the web" (use tavily when TAVILY_API_KEY is set); NOT for known local or private URLs (use web-fetch).'
     path: skills/keenable
     source: https://github.com/Mathews-Tom/armory/blob/main/skills/keenable/SKILL.md
     tags:

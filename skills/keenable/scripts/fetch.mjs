@@ -8,18 +8,25 @@ function usage() {
 const args = process.argv.slice(2);
 if (args.length === 0 || args[0] === "-h" || args[0] === "--help") usage();
 
-const pageUrl = args.find((a) => !a.startsWith("-"));
-if (!pageUrl) {
-  console.error("No URL provided");
+for (const a of args) {
+  if (a.startsWith("-")) {
+    console.error(`Unknown arg: ${a}`);
+    usage();
+  }
+}
+
+if (args.length !== 1) {
+  console.error("Expected exactly one URL");
   usage();
 }
+
+const pageUrl = args[0];
 
 const apiKey = (process.env.KEENABLE_API_KEY ?? "").trim();
 const endpoint = new URL(
   apiKey ? "https://api.keenable.ai/v1/fetch" : "https://api.keenable.ai/v1/fetch/public",
 );
 endpoint.searchParams.set("url", pageUrl);
-endpoint.searchParams.set("keenable_title", "armory");
 
 const headers = { Accept: "application/json", "X-Keenable-Title": "armory" };
 if (apiKey) headers["X-API-Key"] = apiKey;

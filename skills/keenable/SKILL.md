@@ -1,6 +1,6 @@
 ---
 name: keenable
-description: 'Keyless web search and page fetch via Keenable when no vendor key is required. Returns title, URL and snippet for current information. Triggers on: "search the web", "look up online", "find recent information", "web search", "fetch this page". NOT a replacement for the Tavily skill; use that when a Tavily key is already configured.'
+description: 'Keyless web search and page fetch via Keenable when no vendor API key is available. Returns title, URL and snippet for current information. Triggers on: "search without an API key", "keyless web search", "keenable". NOT for generic "search the web" (use tavily when TAVILY_API_KEY is set); NOT for known local or private URLs (use web-fetch).'
 metadata:
   version: 1.0.0
   category: research
@@ -15,14 +15,30 @@ the public endpoints; set `KEENABLE_API_KEY` for higher limits.
 
 This is an opt-in skill. It does not replace Tavily or `web-fetch`.
 
+## Package boundary
+
+| Neighbour   | Keenable handles                                      | Neighbour handles                                      |
+| ----------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| `tavily`    | Keyless or Keenable-keyed search when no Tavily key   | Generic web search when `TAVILY_API_KEY` is configured |
+| `web-fetch` | Page text via Keenable after this skill is already active | Direct fetch of a known URL, localhost, intranet, signed URLs |
+
+Keenable's description triggers only on explicit no-key or Keenable-named intent so it does not compete with `tavily` for the same phrases.
+
 ## When to Use Keenable vs Other Tools
 
-| Situation                           | Tool            | Reason                                              |
-| ----------------------------------- | --------------- | --------------------------------------------------- |
-| Need current information, no API key | `search.mjs`   | Public search endpoint, no vendor signup            |
-| Have a specific URL, need page text | `fetch.mjs`     | Public fetch returns clean markdown                 |
-| Already using Tavily with a key     | `tavily` skill  | Keep using Tavily when that key is already set      |
-| Need a static resource already known | direct fetch   | Skip a search if no live lookup is needed           |
+| Situation                                    | Tool            | Reason                                              |
+| -------------------------------------------- | --------------- | --------------------------------------------------- |
+| Web search without any vendor API key        | `search.mjs`    | Public search endpoint, no Tavily or other signup   |
+| User asks for Keenable or keyless web search | `search.mjs`    | Matches this skill's invocation contract            |
+| Have a URL, skill already active             | `fetch.mjs`     | Public fetch returns clean markdown via Keenable    |
+| `TAVILY_API_KEY` already set                 | `tavily` skill  | Tavily owns generic web-search routing              |
+| Known URL, local or private host             | `web-fetch`     | Fetches without sending the URL to Keenable         |
+
+## Data handling
+
+- Search queries and URLs passed to `fetch.mjs` are sent to Keenable (`api.keenable.ai`); Keenable's servers retrieve page content.
+- Do not pass intranet, `localhost`, or signed or credential-bearing URLs to `fetch.mjs`; use `web-fetch` for those.
+- Both scripts send `X-Keenable-Title: armory` to identify the caller.
 
 ## Scripts
 
@@ -52,7 +68,9 @@ node {baseDir}/scripts/search.mjs "query" --days 7
 node {baseDir}/scripts/fetch.mjs "https://example.com/article"
 ```
 
-Use when you already have a URL and need the page content as markdown.
+Use when this skill is already active, you have a public URL, and need the page
+content as markdown. Do not use for triggers; direct URL requests route to
+`web-fetch` instead.
 
 ## Output Format
 
