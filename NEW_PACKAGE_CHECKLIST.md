@@ -77,6 +77,7 @@ Native extensions follow every phase plus the extension-specific items in Phase 
 Run checks only within the assignment's authority. Record actual commands, outcomes and unresolved prerequisites; never mark an unrun item complete.
 
 - [ ] **Regenerate manifest**: `uv run python scripts/generate_manifest.py`.
+- [ ] **Classify the package for SkillsBench**: add an `excluded:` entry (`package_type`, `name`, `rationale`) to `evals/skillsbench/package_strata.yaml` within its package-type group, then run `uv run python scripts/validate_skillsbench.py`. Every discovered package must be classified exactly once; the frozen `included:` sample keeps one package per historical type and does not change for new packages. A missing entry fails the SkillsBench and run-preflight suites in the Tests workflow.
 - [ ] **Sync registered shared templates**, if used: `uv run python scripts/sync_templates.py`.
 - [ ] **Validate frontmatter**: `uv run python scripts/validate_frontmatter.py`. This covers policies not all enforced by the static evaluator, including description limits and required version/type details.
 - [ ] **Validate local references**: `uv run python scripts/validate_references.py`.
