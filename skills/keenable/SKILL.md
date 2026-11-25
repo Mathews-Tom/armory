@@ -90,7 +90,7 @@ page title, source URL, and markdown body.
 | `401 Unauthorized`       | Invalid API key               | Check `KEENABLE_API_KEY`; keyless calls should not send a key              |
 | `429 Too Many Requests`  | Rate limit hit                | Wait and retry; public limits are documented at https://docs.keenable.ai/rate-limits |
 | Empty sources list       | No matches found              | Broaden or rephrase the query                                              |
-| Fetch returns no content | Page could not be extracted   | Try a different URL                                                        |
+| Fetch error on stderr (non-zero exit) | Page fetch failed (`results[0].error`, or empty `results`) | Read the `code` and `message` on stderr; fix the URL or try again          |
 
 ## Limitations
 

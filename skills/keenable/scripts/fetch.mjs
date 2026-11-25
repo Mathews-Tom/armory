@@ -46,7 +46,20 @@ if (!resp.ok) {
 }
 
 const payload = await resp.json();
-const data = Array.isArray(payload?.results) ? payload.results[0] ?? {} : {};
+const results = Array.isArray(payload?.results) ? payload.results : [];
+if (results.length === 0) {
+  console.error("Keenable Fetch returned no results");
+  process.exit(1);
+}
+
+const data = results[0] ?? {};
+if (data?.error) {
+  const code = String(data.error.code ?? "fetch_failed");
+  const message = String(data.error.message ?? "Page could not be fetched");
+  console.error(`${code}: ${message}`);
+  process.exit(1);
+}
+
 const content = String(data?.content ?? "").trim();
 console.log(`# ${data?.title || pageUrl}\n`);
 console.log(`Source: ${data?.url || pageUrl}\n`);

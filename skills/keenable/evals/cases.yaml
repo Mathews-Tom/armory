@@ -13,6 +13,9 @@ cases:
         target: "(search\\.mjs|keenable|Keenable)"
         weight: 1.0
       - type: matches_regex
+        target: "--keyless"
+        weight: 0.9
+      - type: matches_regex
         target: "(pric|rate limit|cost)"
         weight: 0.8
       - type: matches_regex
@@ -31,6 +34,9 @@ cases:
       - type: matches_regex
         target: "(search\\.mjs|keenable|Keenable)"
         weight: 1.0
+      - type: matches_regex
+        target: "--keyless"
+        weight: 0.9
       - type: matches_regex
         target: "(React|Server Component)"
         weight: 0.8
