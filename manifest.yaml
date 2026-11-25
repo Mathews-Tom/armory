@@ -693,6 +693,20 @@ packages:
     - recipient
     category: business
     difficulty: intermediate
+  - name: keenable
+    version: 1.0.0
+    description: 'Keyless web search and page fetch via Keenable when no vendor API key is available. Returns title, URL and
+      snippet for current information. Triggers on: "search without an API key", "keyless web search", "keenable". NOT for
+      generic "search the web" (use tavily when TAVILY_API_KEY is set); NOT for known local or private URLs (use web-fetch).'
+    path: skills/keenable
+    source: https://github.com/Mathews-Tom/armory/blob/main/skills/keenable/SKILL.md
+    tags:
+    - web-search
+    - research
+    - real-time
+    - keyless
+    category: research
+    difficulty: beginner
   - name: kg-builder
     version: 1.0.0
     description: Designs and builds knowledge graphs from documents — ontology modeling with domain/range constraints, entity/relation/event
